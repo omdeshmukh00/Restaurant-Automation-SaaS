@@ -222,6 +222,13 @@ export class OrdersController {
       const { estimatedPreparationTime } = req.body;
       const order = await OrdersService.acceptOrder(restaurantId, id, estimatedPreparationTime, req.user?.id);
 
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.KITCHEN_ORDER_ACCEPTED,
+        metadata: { estimatedPreparationTime },
+      });
+
       ok(res, { order });
     } catch (error) {
       next(error);
@@ -236,6 +243,11 @@ export class OrdersController {
       const { id } = req.params;
       const order = await OrdersService.startCooking(restaurantId, id, req.user?.id);
 
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.KITCHEN_ORDER_STARTED,
+      });
 
       ok(res, { order });
     } catch (error) {
@@ -251,6 +263,11 @@ export class OrdersController {
       const { id } = req.params;
       const order = await OrdersService.markReady(restaurantId, id, req.user?.id);
 
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.KITCHEN_ORDER_READY,
+      });
 
       ok(res, { order });
     } catch (error) {
@@ -267,7 +284,12 @@ export class OrdersController {
       const { delayMinutes } = req.body;
       const order = await OrdersService.delayOrder(restaurantId, id, delayMinutes, req.user?.id);
 
-      
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.KITCHEN_ORDER_DELAYED,
+        metadata: { delayMinutes },
+      });
 
       ok(res, { order });
     } catch (error) {
@@ -283,6 +305,13 @@ export class OrdersController {
       const { id } = req.params;
       const { reason } = req.body;
       const order = await OrdersService.rejectOrder(restaurantId, id, reason, req.user?.id);
+
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.KITCHEN_ORDER_REJECTED,
+        metadata: { reason },
+      });
 
       ok(res, { order });
     } catch (error) {

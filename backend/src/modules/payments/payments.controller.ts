@@ -5,6 +5,8 @@ import { ok } from '../../utils/responses';
 import { PaymentMethod } from '../billing/billing.schema';
 import { PaymentsService } from './payments.service';
 import type { ListPaymentsQuery } from './payments.schema';
+import { logAudit, logAuditRaw } from '../auditLogs/auditLogs.helper';
+import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 
 function requireTableSession(req: Request) {
   if (!req.tableSession) {
@@ -30,6 +32,19 @@ export async function createCustomerPaymentController(req: Request, res: Respons
     const data = await PaymentsService.createCustomerPayment(session.restaurantId, session._id, method);
 
     ok(res, data, 201);
+    void logAuditRaw({
+      actorId:      session._id.toString(),
+      actorRole:    'CUSTOMER',
+      restaurantId: session.restaurantId.toString(),
+      entityType:   AuditEntity.PAYMENT,
+      entityId: String((data.payment as any)?._id ?? data.billId),
+      action:       AuditAction.PAYMENT_CREATED,
+      metadata: {
+        method,
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   } catch (error) {
     next(error);
   }
@@ -60,6 +75,19 @@ export async function verifyCustomerPaymentController(req: Request, res: Respons
     );
 
     ok(res, data);
+    void logAuditRaw({
+      actorId:      session._id.toString(),
+      actorRole:    'CUSTOMER',
+      restaurantId: session.restaurantId.toString(),
+      entityType:   AuditEntity.PAYMENT,
+      entityId:     req.body.paymentId,
+      action:       AuditAction.PAYMENT_VERIFIED,
+      metadata: {
+        simulateStatus: req.body.simulateStatus,
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   } catch (error) {
     next(error);
   }
@@ -119,6 +147,15 @@ export async function markCashPaymentCollectedController(req: Request, res: Resp
     const payment = await PaymentsService.markCashPaymentCollected(restaurantId, req.params.paymentId);
 
     ok(res, { payment });
+     void logAudit(req, {
+      entityType: AuditEntity.PAYMENT,
+      entityId:   req.params.paymentId,
+      action:     AuditAction.PAYMENT_VERIFIED,
+      metadata: {
+        method: 'CASH',
+        collectedBy: req.user?.id,
+      },
+    });
   } catch (error) {
     next(error);
   }

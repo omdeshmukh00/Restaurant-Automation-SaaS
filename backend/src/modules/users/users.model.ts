@@ -41,6 +41,9 @@ export interface IUser extends Document {
   passwordResetToken?: string;
   passwordResetExpires?: Date;
 
+  // Theme preference persisted for authenticated users
+  themeMode?: 'light' | 'dark' | 'system';
+
   // Soft delete
   isDeleted: boolean;
   deletedAt?: Date;
@@ -168,6 +171,12 @@ const userSchema = new Schema<IUser>(
     passwordResetExpires: {
       type: Date,
       select: false,
+    },
+
+    themeMode: {
+      type: String,
+      enum: ['light', 'dark', 'system'],
+      default: 'system',
     },
 
     isDeleted: {

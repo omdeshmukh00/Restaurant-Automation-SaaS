@@ -35,6 +35,7 @@ export interface IRestaurant extends Document {
   cuisine: string;
   city: string;
   rating: number;
+  location_url?: string;
   settings: RestaurantSettings;
   createdAt: Date;
   updatedAt: Date;
@@ -104,6 +105,11 @@ const restaurantSchema = new Schema<IRestaurant>(
     cuisine: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     rating: { type: Number, default: 4.5, min: 0, max: 5 },
+    location_url: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     settings: {
       type: restaurantSettingsSchema,
       default: () => ({
