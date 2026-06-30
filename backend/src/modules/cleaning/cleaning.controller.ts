@@ -141,7 +141,7 @@ export class CleaningController {
 
       await updateTableStatus(
         task.tableId.toString(),
-        TableStatus.NEEDS_CLEANING,
+        TableStatus.AVAILABLE,
         task.restaurantId.toString()
       );
 

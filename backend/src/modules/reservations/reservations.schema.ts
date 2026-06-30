@@ -13,9 +13,9 @@ export const entityIdParamsSchema = z.object({
 });
 
 export const reservationAvailabilityQuerySchema = z.object({
-  restaurantId: objectIdSchema.optional(), // Can come from params or user
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional(),
-  guests: z.coerce.number().int().min(1).max(20).optional(),
+  restaurantId: objectIdSchema ,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  guests: z.coerce.number().int().min(1).max(20),
 });
 
 export const listReservationsQuerySchema = z.object({

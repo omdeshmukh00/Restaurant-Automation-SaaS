@@ -32,6 +32,7 @@ import loyaltyRouter from '../loyalty/loyalty.routes';
 import offersRouter from '../offers/offers.routes';
 import staffManagementRouter from '../staff/staff.routes';
 import supplierRouter from '../suppliers/supplier.routes';
+import reservationsRouter from '../reservations/reservations.routes';
 
 export const adminRouter = Router();
 
@@ -54,6 +55,7 @@ adminRouter.get('/tables/:id/qr', validate({ params: tableIdParamsSchema }), get
 adminRouter.use('/staff', staffManagementRouter);
 adminRouter.use('/offers', offersRouter);
 adminRouter.use('/loyalty', loyaltyRouter);
+adminRouter.use('/reservations', reservationsRouter);
 adminRouter.use('/inventory', inventoryRouter);
 adminRouter.use('/suppliers', supplierRouter);
 adminRouter.use('/analytics', analyticsRouter);

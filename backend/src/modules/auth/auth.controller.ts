@@ -236,7 +236,6 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 });
-
 export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body;
   const user = await UserModel.findOne({ email });
@@ -251,6 +250,8 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
   const { otp, expiresAt } = await otpService.createOTP(email, 'email');
   await sendOTPEmail(email, otp);
 
+  logger.warn(`OTP = ${otp}`);
+
   const responseData: any = {
     otpSent: true,
     otpExpiresAt: expiresAt,
@@ -262,6 +263,7 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
   }
 
   sendSuccess(res, responseData);
+
   void logAuditRaw({
     actorId: user._id.toString(),
     actorRole: user.role,

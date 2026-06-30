@@ -8,6 +8,8 @@ import { GuestDetailsPanel } from '../components/reservations/GuestDetailsPanel'
 import { TimeSlotsOverview } from '../components/reservations/TimeSlotsOverview';
 import { ReservationAnalyticsBar } from '../components/reservations/ReservationAnalyticsBar';
 import { useReservationsStore, type ReservationStatus } from '../store/reservations.store';
+import { useEffect } from "react";
+import { reservationApi } from "../api/reservation.api";
 
 const AVATAR_COLORS = [
   'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-pink-500',
@@ -29,6 +31,19 @@ const DATES = [
 export default function ReservationsPage(): JSX.Element {
   const { selectedDate, setSelectedDate, filterStatus, setFilterStatus, filterTime, setFilterTime, addReservation } =
     useReservationsStore();
+
+    useEffect(() => {
+  async function loadReservations() {
+    try {
+      const data = await reservationApi.getReservations();
+      console.log("Reservations API:", data);
+    } catch (error) {
+      console.error("Failed to load reservations:", error);
+    }
+  }
+
+  loadReservations();
+}, []);
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
