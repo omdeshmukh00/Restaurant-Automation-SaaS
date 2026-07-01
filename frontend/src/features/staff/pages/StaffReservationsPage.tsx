@@ -14,6 +14,10 @@ interface Reservation {
   assignedTable?: string;
 }
 
+const generateReservationId = () => Math.random();
+const generateOrderId = () => `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+const generateAlertId = () => Date.now();
+
 export default function StaffReservationsPage() {
   const { query } = useStaffSearch();
   const { tables, setTables, setAlerts, reservations, setReservations, orders, setOrders } = useStaffDashboard();
@@ -43,7 +47,7 @@ export default function StaffReservationsPage() {
     if (entryType === 'Walk-in') {
       const nextQueueNo = reservations.filter(r => r.type === 'Walk-in' && r.status === 'Confirmed').length + 1;
       const newWalkin: Reservation = {
-        id: Math.random(),
+        id: generateReservationId(),
         name: guestName,
         pax: parseInt(guestPax, 10),
         time: 'Just added',
@@ -69,7 +73,7 @@ export default function StaffReservationsPage() {
         } : t));
 
         const newReservation: Reservation = {
-          id: Math.random(),
+          id: generateReservationId(),
           name: guestName,
           pax: pax,
           time: bookingTime,
@@ -82,7 +86,7 @@ export default function StaffReservationsPage() {
         setToast({ message: `Reserved Table ${tableToReserve.name} for ${guestName} during ${bookingTime}!`, type: 'success' });
       } else {
         const newReservation: Reservation = {
-          id: Math.random(),
+          id: generateReservationId(),
           name: guestName,
           pax: pax,
           time: bookingTime,
@@ -118,7 +122,7 @@ export default function StaffReservationsPage() {
 
       // Automatically create a new order in order list as well!
       const newOrder = {
-        id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: generateOrderId(),
         table: tableToSeat.name,
         items: [{ name: 'No food ordered yet', qty: 1, price: 0 }],
         status: 'Pending' as const,
@@ -129,7 +133,7 @@ export default function StaffReservationsPage() {
 
       // Append success alert to central store alerts
       const newAlert = {
-        id: Date.now(),
+        id: generateAlertId(),
         message: `Guest Seated: ${guest.name} (${pax} Pax) has been seated at ${tableToSeat.name}.`,
         type: 'Reassigned' as const,
         severity: 'Info' as const,
@@ -140,7 +144,7 @@ export default function StaffReservationsPage() {
     } else {
       // Seating failed, do not change guest status, guest name stays in waitlist!
       const newAlert = {
-        id: Date.now(),
+        id: generateAlertId(),
         message: `Seating Failed: No available table of size ${pax} Pax for ${guest.name}.`,
         type: 'Delayed' as const,
         severity: 'Warning' as const,

@@ -13,6 +13,8 @@ interface Table {
   currentBill?: number;
 }
 
+const generateOrderId = () => `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+
 export default function StaffTablesPage() {
   const { query } = useStaffSearch();
   const [selectedSection, setSelectedSection] = useState<'All' | 'Zone A' | 'Zone B' | 'Outdoor'>('All');
@@ -54,7 +56,7 @@ export default function StaffTablesPage() {
         const orderExists = orders.some(o => o.table === tableObj.name && ['Pending', 'Preparing', 'Ready', 'Served'].includes(o.status));
         if (!orderExists) {
           const newOrder = {
-            id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+            id: generateOrderId(),
             table: tableObj.name,
             items: [{ name: 'No food ordered yet', qty: 1, price: 0 }],
             status: 'Pending' as const,

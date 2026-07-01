@@ -215,7 +215,7 @@ export default function StaffOrdersPage() {
                                 if (o.id === order.id) {
                                   const cleanItems = o.items.filter(i => i.name !== 'No food ordered yet');
                                   const existsIdx = cleanItems.findIndex(i => i.name === selectedMenuItem.name);
-                                  let nextItems = [...cleanItems];
+                                  const nextItems = [...cleanItems];
                                   
                                   if (existsIdx > -1) {
                                     nextItems[existsIdx] = {
