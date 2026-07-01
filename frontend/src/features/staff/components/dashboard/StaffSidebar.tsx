@@ -83,13 +83,18 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
           >
             {({ isActive }) => (
               <>
-                <div className={collapsed ? 'flex items-center justify-center' : 'flex items-center gap-3'}>
+                <div className={collapsed ? 'flex items-center justify-center relative' : 'flex items-center gap-3'}>
                   <span
                     className="material-symbols-outlined text-[20px]"
                     style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}
                   >
                     {icon}
                   </span>
+                  {collapsed && badge ? (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-dine-orange text-white text-[8px] flex items-center justify-center rounded-full font-bold shadow-sm border border-white">
+                      {badge}
+                    </span>
+                  ) : null}
                   {!collapsed && <span>{label}</span>}
                 </div>
                 {!collapsed && badge && (

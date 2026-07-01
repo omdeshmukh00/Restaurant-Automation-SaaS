@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
+import { useStaffDashboard } from '../hooks/useStaffDashboard';
 
 interface Reservation {
   id: number;
@@ -10,48 +11,144 @@ interface Reservation {
   status: 'Confirmed' | 'Seated' | 'Cancelled';
   type: 'Reservation' | 'Walk-in';
   queueNo?: number;
+  assignedTable?: string;
 }
 
 export default function StaffReservationsPage() {
   const { query } = useStaffSearch();
-  const [reservations, setReservations] = useState<Reservation[]>([
-    { id: 1, name: 'Ananya Roy', pax: 4, time: '07:30 PM', phone: '+91 98765 43210', status: 'Confirmed', type: 'Reservation' },
-    { id: 2, name: 'Vikram Singh', pax: 2, time: '08:00 PM', phone: '+91 87654 32109', status: 'Confirmed', type: 'Reservation' },
-    { id: 3, name: 'Siddharth Sen', pax: 5, time: '15 mins wait', phone: '+91 76543 21098', status: 'Confirmed', type: 'Walk-in', queueNo: 1 },
-    { id: 4, name: 'Megha Gupta', pax: 3, time: '25 mins wait', phone: '+91 65432 10987', status: 'Confirmed', type: 'Walk-in', queueNo: 2 },
-    { id: 5, name: 'Kabir Mehta', pax: 6, time: '09:00 PM', phone: '+91 54321 09876', status: 'Confirmed', type: 'Reservation' },
-  ]);
+  const { tables, setTables, setAlerts, reservations, setReservations, orders, setOrders } = useStaffDashboard();
 
-  // Form states for adding walk-in
-  const [walkinName, setWalkinName] = useState('');
-  const [walkinPax, setWalkinPax] = useState('2');
-  const [walkinPhone, setWalkinPhone] = useState('');
+  // Toast feedback state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  // Form states for adding entry
+  const [entryType, setEntryType] = useState<'Walk-in' | 'Reservation'>('Walk-in');
+  const [guestName, setGuestName] = useState('');
+  const [guestPax, setGuestPax] = useState('2');
+  const [guestPhone, setGuestPhone] = useState('');
+  const [bookingTime, setBookingTime] = useState('07:00 PM - 09:00 PM');
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const addWalkin = (e: React.FormEvent) => {
+  const addEntry = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!walkinName || !walkinPhone) return;
+    if (!guestName || !guestPhone) return;
 
-    const nextQueueNo = reservations.filter(r => r.type === 'Walk-in').length + 1;
-    const newWalkin: Reservation = {
-      id: Math.random(),
-      name: walkinName,
-      pax: parseInt(walkinPax, 10),
-      time: 'Just added',
-      phone: walkinPhone,
-      status: 'Confirmed',
-      type: 'Walk-in',
-      queueNo: nextQueueNo
-    };
+    if (entryType === 'Walk-in') {
+      const nextQueueNo = reservations.filter(r => r.type === 'Walk-in' && r.status === 'Confirmed').length + 1;
+      const newWalkin: Reservation = {
+        id: Math.random(),
+        name: guestName,
+        pax: parseInt(guestPax, 10),
+        time: 'Just added',
+        phone: guestPhone,
+        status: 'Confirmed',
+        type: 'Walk-in',
+        queueNo: nextQueueNo
+      };
+      setReservations([...reservations, newWalkin]);
+      setToast({ message: `Registered Walk-in: ${guestName} (Queue #${nextQueueNo})`, type: 'success' });
+    } else {
+      const pax = parseInt(guestPax, 10);
+      const tableToReserve = tables.find(t => t.status === 'Available' && t.capacity >= pax);
 
-    setReservations([...reservations, newWalkin]);
-    setWalkinName('');
-    setWalkinPhone('');
+      if (tableToReserve) {
+        // Automatically reserve table for guest name and time slot
+        setTables(prev => prev.map(t => t.id === tableToReserve.id ? {
+          ...t,
+          status: 'Reserved',
+          guests: pax,
+          assignedGuest: guestName,
+          elapsed: bookingTime
+        } : t));
+
+        const newReservation: Reservation = {
+          id: Math.random(),
+          name: guestName,
+          pax: pax,
+          time: bookingTime,
+          phone: guestPhone,
+          status: 'Confirmed',
+          type: 'Reservation',
+          assignedTable: tableToReserve.name
+        };
+        setReservations([...reservations, newReservation]);
+        setToast({ message: `Reserved Table ${tableToReserve.name} for ${guestName} during ${bookingTime}!`, type: 'success' });
+      } else {
+        const newReservation: Reservation = {
+          id: Math.random(),
+          name: guestName,
+          pax: pax,
+          time: bookingTime,
+          phone: guestPhone,
+          status: 'Confirmed',
+          type: 'Reservation'
+        };
+        setReservations([...reservations, newReservation]);
+        setToast({ message: `Reservation Registered: No available table of size ${pax} Pax for ${bookingTime}`, type: 'error' });
+      }
+    }
+
+    setGuestName('');
+    setGuestPhone('');
+    setBookingTime('07:00 PM - 09:00 PM');
     setShowAddForm(false);
   };
 
   const updateStatus = (id: number, status: Reservation['status']) => {
     setReservations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+  };
+
+  const seatGuest = (id: number, pax: number) => {
+    const guest = reservations.find(r => r.id === id);
+    if (!guest) return;
+
+    const tableToSeat = tables.find(t => t.status === 'Available' && t.capacity >= pax);
+
+    if (tableToSeat) {
+      // Seated on empty table successfully
+      setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'Seated' } : r));
+      setTables(prev => prev.map(t => t.id === tableToSeat.id ? { ...t, status: 'Occupied', guests: pax, currentBill: 0, assignedGuest: guest.name } : t));
+
+      // Automatically create a new order in order list as well!
+      const newOrder = {
+        id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+        table: tableToSeat.name,
+        items: [{ name: 'No food ordered yet', qty: 1, price: 0 }],
+        status: 'Pending' as const,
+        time: 'Just now',
+        total: 0
+      };
+      setOrders([newOrder, ...orders]);
+
+      // Append success alert to central store alerts
+      const newAlert = {
+        id: Date.now(),
+        message: `Guest Seated: ${guest.name} (${pax} Pax) has been seated at ${tableToSeat.name}.`,
+        type: 'Reassigned' as const,
+        severity: 'Info' as const,
+        time: 'Just now'
+      };
+      setAlerts(prev => [newAlert, ...prev]);
+      setToast({ message: `Seated ${guest.name} successfully at ${tableToSeat.name}!`, type: 'success' });
+    } else {
+      // Seating failed, do not change guest status, guest name stays in waitlist!
+      const newAlert = {
+        id: Date.now(),
+        message: `Seating Failed: No available table of size ${pax} Pax for ${guest.name}.`,
+        type: 'Delayed' as const,
+        severity: 'Warning' as const,
+        time: 'Just now'
+      };
+      setAlerts(prev => [newAlert, ...prev]);
+      setToast({ message: `Seating Failed: No available table of size ${pax} Pax for ${guest.name}.`, type: 'error' });
+    }
   };
 
   const filtered = reservations.filter(r => 
@@ -75,34 +172,59 @@ export default function StaffReservationsPage() {
           className="bg-dine-orange hover:bg-dine-orange/90 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5"
         >
           <span className="material-symbols-outlined text-[16px]">{showAddForm ? 'close' : 'add'}</span>
-          {showAddForm ? 'Cancel Form' : 'Register Walk-in'}
+          {showAddForm ? 'Cancel Form' : 'Register Walk-in / Reservation'}
         </button>
       </div>
 
-      {/* Walk-in Form Modal/Card */}
+      {/* Guest Form Modal/Card */}
       {showAddForm && (
-        <form onSubmit={addWalkin} className="bg-white border border-slate-150 p-6 rounded-2xl shadow-soft space-y-4 max-w-xl animate-fadeIn">
-          <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">Walk-in Registry</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form onSubmit={addEntry} className="bg-white border border-slate-150 p-6 rounded-2xl shadow-soft space-y-4 max-w-xl animate-fadeIn">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+            <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">Add Guest Entry</h2>
+            
+            {/* Entry Type Selector Segmented Controls */}
+            <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-fit">
+              <button
+                type="button"
+                onClick={() => setEntryType('Walk-in')}
+                className={`text-[10px] font-bold py-1 px-3 rounded-lg transition-all ${
+                  entryType === 'Walk-in' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-400 hover:text-slate-655'
+                }`}
+              >
+                Walk-in
+              </button>
+              <button
+                type="button"
+                onClick={() => setEntryType('Reservation')}
+                className={`text-[10px] font-bold py-1 px-3 rounded-lg transition-all ${
+                  entryType === 'Reservation' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white' : 'text-slate-400 hover:text-slate-655'
+                }`}
+              >
+                Reservation
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label htmlFor="walkin-name" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Guest Name</label>
+              <label htmlFor="guest-name" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Guest Name</label>
               <input
-                id="walkin-name"
+                id="guest-name"
                 type="text"
                 required
-                value={walkinName}
-                onChange={e => setWalkinName(e.target.value)}
+                value={guestName}
+                onChange={e => setGuestName(e.target.value)}
                 placeholder="Name"
                 className="w-full text-xs font-sans p-2 border border-slate-200 rounded-xl"
               />
             </div>
             <div>
-              <label htmlFor="walkin-pax" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Number of Guests</label>
+              <label htmlFor="guest-pax" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Number of Guests</label>
               <select
-                id="walkin-pax"
-                value={walkinPax}
-                onChange={e => setWalkinPax(e.target.value)}
-                className="w-full text-xs font-sans p-2 border border-slate-200 rounded-xl"
+                id="guest-pax"
+                value={guestPax}
+                onChange={e => setGuestPax(e.target.value)}
+                className="w-full text-xs font-sans p-2 border border-slate-200 rounded-xl bg-transparent"
               >
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                   <option key={n} value={n.toString()}>{n} Pax</option>
@@ -110,23 +232,46 @@ export default function StaffReservationsPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="walkin-phone" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Phone Number</label>
+              <label htmlFor="guest-phone" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Phone Number</label>
               <input
-                id="walkin-phone"
+                id="guest-phone"
                 type="tel"
                 required
-                value={walkinPhone}
-                onChange={e => setWalkinPhone(e.target.value)}
+                value={guestPhone}
+                onChange={e => setGuestPhone(e.target.value)}
                 placeholder="+91..."
                 className="w-full text-xs font-sans p-2 border border-slate-200 rounded-xl"
               />
             </div>
+            {entryType === 'Reservation' ? (
+              <div>
+                <label htmlFor="booking-time" className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Booking Slot</label>
+                <select
+                  id="booking-time"
+                  value={bookingTime}
+                  onChange={e => setBookingTime(e.target.value)}
+                  className="w-full text-xs font-sans p-2 border border-slate-200 rounded-xl bg-transparent"
+                >
+                  <option value="06:00 PM - 08:00 PM">06:00 PM - 08:00 PM</option>
+                  <option value="07:00 PM - 09:00 PM">07:00 PM - 09:00 PM</option>
+                  <option value="08:00 PM - 10:00 PM">08:00 PM - 10:00 PM</option>
+                  <option value="09:00 PM - 11:00 PM">09:00 PM - 11:00 PM</option>
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Queue Status</label>
+                <div className="w-full text-xs font-sans p-2 border border-slate-100 rounded-xl bg-slate-50 text-slate-450 select-none">
+                  Auto Queue Assigned
+                </div>
+              </div>
+            )}
           </div>
           <button
             type="submit"
             className="w-full bg-dine-orange hover:bg-dine-orange/95 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md transition-all"
           >
-            Add to Waitlist
+            {entryType === 'Walk-in' ? 'Register Guest & Add to Queue' : 'Register Booking Reservation'}
           </button>
         </form>
       )}
@@ -158,13 +303,13 @@ export default function StaffReservationsPage() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => updateStatus(q.id, 'Seated')}
+                      onClick={() => seatGuest(q.id, q.pax)}
                       className="bg-green-500 hover:bg-green-655 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg transition-all"
                     >
                       Seat
                     </button>
                     <button
-                      onClick={() => updateStatus(q.id, 'Seated')}
+                      onClick={() => updateStatus(q.id, 'Cancelled')}
                       className="border border-slate-100 text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition-all"
                       title="Remove"
                     >
@@ -208,13 +353,13 @@ export default function StaffReservationsPage() {
                       <td className="py-3.5 text-right">
                         <div className="flex justify-end gap-1.5">
                           <button
-                            onClick={() => updateStatus(res.id, 'Seated')}
+                            onClick={() => seatGuest(res.id, res.pax)}
                             className="bg-dine-orange hover:bg-dine-orange/95 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg transition-all"
                           >
                             Seat Guest
                           </button>
                           <button
-                            onClick={() => updateStatus(res.id, 'Seated')}
+                            onClick={() => updateStatus(res.id, 'Cancelled')}
                             className="border border-slate-100 text-slate-400 hover:text-red-500 p-1.5 rounded-lg transition-all"
                             title="Cancel Booking"
                           >
@@ -236,6 +381,18 @@ export default function StaffReservationsPage() {
           </div>
         </div>
       </div>
+
+      {/* Toast Alert */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-white font-bold font-sans text-xs flex items-center gap-2 animate-fadeIn z-55 ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-500'
+        }`}>
+          <span className="material-symbols-outlined text-[16px]">
+            {toast.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

@@ -36,73 +36,103 @@ const initialStaffNotifications: NotificationItem[] = [
   },
 ];
 
-export function useNotifications() {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialStaffNotifications);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+// Module-level global state variables
+let globalNotifications: NotificationItem[] = [...initialStaffNotifications];
+let globalLoading = false;
+let globalError: string | null = null;
+const listeners = new Set<() => void>();
 
-  const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications]);
+function notifyListeners() {
+  listeners.forEach(l => l());
+}
+
+export function useNotifications() {
+  const [state, setState] = useState({
+    notifications: globalNotifications,
+    loading: globalLoading,
+    error: globalError
+  });
+
+  useEffect(() => {
+    const handler = () => {
+      setState({
+        notifications: globalNotifications,
+        loading: globalLoading,
+        error: globalError
+      });
+    };
+    listeners.add(handler);
+    return () => {
+      listeners.delete(handler);
+    };
+  }, []);
+
+  const unreadCount = useMemo(() => state.notifications.filter((item) => !item.read).length, [state.notifications]);
 
   const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    globalLoading = true;
+    globalError = null;
+    notifyListeners();
     try {
       const res = await notificationsAPI.getNotifications();
       if (res.success && res.data && res.data.length > 0) {
-        setNotifications(res.data);
+        globalNotifications = res.data;
       } else {
-        setNotifications(initialStaffNotifications);
+        globalNotifications = [...initialStaffNotifications];
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch notifications');
-      setNotifications(initialStaffNotifications);
+      globalError = err instanceof Error ? err.message : 'Failed to fetch notifications';
+      globalNotifications = [...initialStaffNotifications];
     } finally {
-      setLoading(false);
+      globalLoading = false;
+      notifyListeners();
     }
   }, []);
 
   const markAsRead = useCallback(async (id: number) => {
-    setNotifications((current) =>
-      current.map((item) => (item.id === id ? { ...item, read: true } : item))
-    );
+    globalNotifications = globalNotifications.map((item) => (item.id === id ? { ...item, read: true } : item));
+    notifyListeners();
     void notificationsAPI.markAsRead(id);
   }, []);
 
   const toggleRead = useCallback(async (id: number) => {
     let targetState = false;
-    setNotifications((current) =>
-      current.map((item) => {
-        if (item.id === id) {
-          targetState = !item.read;
-          return { ...item, read: targetState };
-        }
-        return item;
-      })
-    );
+    globalNotifications = globalNotifications.map((item) => {
+      if (item.id === id) {
+        targetState = !item.read;
+        return { ...item, read: targetState };
+      }
+      return item;
+    });
+    notifyListeners();
     if (targetState) {
       void notificationsAPI.markAsRead(id);
     }
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    setNotifications((current) => current.map((item) => ({ ...item, read: true })));
+    globalNotifications = globalNotifications.map((item) => ({ ...item, read: true }));
+    notifyListeners();
     void notificationsAPI.markAllAsRead();
   }, []);
 
   const clearRead = useCallback(() => {
-    setNotifications((current) => current.filter((item) => !item.read));
+    globalNotifications = globalNotifications.filter((item) => !item.read);
+    notifyListeners();
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch on mount, setState is post-await
-    void fetchNotifications();
+    // Only fetch on mount if empty or default values are unchanged
+    if (globalNotifications.length === initialStaffNotifications.length && globalNotifications[0].id === 1 && !globalLoading) {
+      void fetchNotifications();
+    }
   }, [fetchNotifications]);
 
   return {
-    notifications,
+    notifications: state.notifications,
     unreadCount,
-    loading,
-    error,
+    loading: state.loading,
+    error: state.error,
     markAsRead,
     toggleRead,
     markAllAsRead,

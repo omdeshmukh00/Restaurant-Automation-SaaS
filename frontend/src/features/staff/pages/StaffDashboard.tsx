@@ -5,27 +5,38 @@ import { useStaffDashboard } from '../hooks/useStaffDashboard';
 
 export default function StaffDashboard() {
   const { query } = useStaffSearch();
-  const { orders, readyItems, requests } = useStaffDashboard();
+  const { orders, readyItems, requests, tables, setTables, reservations } = useStaffDashboard();
 
   const pendingRequestsCount = requests.filter(r => r.status !== 'Resolved').length;
   const readyFoodCount = readyItems.length;
   const activeOrdersCount = orders.filter(o => ['Pending', 'Preparing', 'Ready', 'Served'].includes(o.status)).length;
+  const billRequestsCount = tables.filter(t => t.status === 'Bill Requested').length;
+  const activeQueueCount = reservations.filter(r => r.type === 'Walk-in' && r.status === 'Confirmed').length;
 
   const stats = [
-    { label: 'Active Tables', value: '6/8', icon: 'table_restaurant', color: 'text-dine-orange bg-orange-50 dark:bg-orange-950/40', link: '/staff/tables' },
+    { label: 'Active Tables', value: `${tables.filter(t => t.status === 'Occupied' || t.status === 'Reserved' || t.status === 'Cleaning' || t.status === 'Bill Requested' || t.status === 'Food Served').length}/${tables.length}`, icon: 'table_restaurant', color: 'text-dine-orange bg-orange-50 dark:bg-orange-950/40', link: '/staff/tables' },
     { label: 'Pending Requests', value: `${pendingRequestsCount}`, icon: 'notifications_active', color: 'text-red-500 bg-red-50 dark:bg-red-950/45', link: '/staff/requests', badge: pendingRequestsCount > 0 ? 'Action Required' : undefined },
     { label: 'Food Ready', value: `${readyFoodCount} Item${readyFoodCount !== 1 ? 's' : ''}`, icon: 'restaurant', color: 'text-green-500 bg-green-50 dark:bg-green-950/40', link: '/staff/food-ready' },
     { label: "Today's Orders", value: `${orders.length}`, icon: 'receipt_long', color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/40', link: '/staff/orders' },
-    { label: 'Bill Requests', value: '2', icon: 'payments', color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/40', link: '/staff/orders' },
-    { label: 'Walk-in Queue', value: '4 Groups', icon: 'groups', color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/40', link: '/staff/reservations' },
+    { label: 'Bill Requests', value: `${billRequestsCount}`, icon: 'payments', color: 'text-purple-500 bg-purple-50 dark:bg-purple-950/40', link: '/staff/orders' },
+    { label: 'Walk-in Queue', value: `${activeQueueCount} Group${activeQueueCount !== 1 ? 's' : ''}`, icon: 'groups', color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/40', link: '/staff/reservations' },
   ];
 
-  const activeTables = [
-    { id: 1, name: 'Table 1', guests: 2, status: 'Occupied', bill: '₹1,240', elapsed: '45 mins', action: 'Order' },
-    { id: 2, name: 'Table 2', guests: 4, status: 'Bill Requested', bill: '₹3,450', elapsed: '1h 15m', action: 'Pay' },
-    { id: 3, name: 'Table 3', guests: 3, status: 'Food Served', bill: '₹2,100', elapsed: '30 mins', action: 'Service' },
-    { id: 4, name: 'Table 4', guests: 2, status: 'Cleaning', bill: '₹0', elapsed: '5 mins', action: 'Clean' },
-  ];
+  const zoneATables = tables.filter(t => t.id >= 1 && t.id <= 4);
+  const activeTables = zoneATables.map(t => {
+    let action = 'Order';
+    if (t.status === 'Cleaning') action = 'Clean';
+    else if (t.status === 'Occupied') {
+      if (t.id === 2) action = 'Pay';
+      else if (t.id === 3) action = 'Service';
+      else action = 'Order';
+    }
+    return {
+      ...t,
+      bill: t.currentBill ? `₹${t.currentBill}` : '₹0',
+      action
+    };
+  });
 
   const pendingRequests = requests.filter(r => r.status !== 'Resolved').slice(0, 3);
   const readyFood = readyItems.slice(0, 3);
@@ -129,7 +140,15 @@ export default function StaffDashboard() {
                 {filteredTables.length > 0 ? (
                   filteredTables.map((table) => (
                     <tr key={table.id} className="hover:bg-slate-55 dark:hover:bg-sd-surface-variant/50 transition-colors">
-                      <td className="py-3.5 font-bold text-slate-800 dark:text-slate-200 text-sm font-sans">{table.name}</td>
+                      <td className="py-3.5 font-sans">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">{table.name}</p>
+                        {table.assignedGuest && (
+                          <p className="text-[10px] text-slate-400 dark:text-slate-400">Guest: {table.assignedGuest}</p>
+                        )}
+                        {table.status === 'Reserved' && table.elapsed && (
+                          <p className="text-[9px] text-dine-orange font-bold">Slot: {table.elapsed}</p>
+                        )}
+                      </td>
                       <td className="py-3.5 text-slate-500 dark:text-slate-400 text-xs font-sans">{table.guests} Pax</td>
                       <td className="py-3.5">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
@@ -149,13 +168,26 @@ export default function StaffDashboard() {
                       </td>
                       <td className="py-3.5 font-semibold text-slate-700 dark:text-slate-350 text-xs font-sans">{table.bill}</td>
                       <td className="py-3.5 text-right">
-                        <Link
-                          to={table.status === 'Bill Requested' ? '/staff/orders' : '/staff/orders'}
-                          className="inline-flex items-center justify-center gap-1 text-[11px] font-extrabold text-dine-orange hover:bg-dine-light-orange dark:hover:bg-orange-950/30 px-3 py-1.5 rounded-lg transition-all"
-                        >
-                          {table.action === 'Clean' ? 'Mark Clean' : 'Manage'}
-                          <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                        </Link>
+                        {table.action === 'Clean' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTables(prev => prev.map(t => t.id === table.id ? { ...t, status: 'Available', currentBill: 0 } : t));
+                            }}
+                            className="inline-flex items-center justify-center gap-1 text-[11px] font-extrabold text-dine-orange hover:bg-dine-light-orange dark:hover:bg-orange-950/30 px-3 py-1.5 rounded-lg transition-all border-none outline-none cursor-pointer"
+                          >
+                            Mark Clean
+                            <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                          </button>
+                        ) : (
+                          <Link
+                            to="/staff/orders"
+                            className="inline-flex items-center justify-center gap-1 text-[11px] font-extrabold text-dine-orange hover:bg-dine-light-orange dark:hover:bg-orange-950/30 px-3 py-1.5 rounded-lg transition-all"
+                          >
+                            Manage
+                            <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   ))

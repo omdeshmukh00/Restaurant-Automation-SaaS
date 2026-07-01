@@ -3,13 +3,16 @@ import { useTheme, ThemeMode } from '../../../app/providers/ThemeProvider';
 
 export default function StaffSettingsPage() {
   const { theme, setTheme } = useTheme();
+  const [assistanceCalls, setAssistanceCalls] = React.useState(true);
+  const [foodReady, setFoodReady] = React.useState(true);
+  const [systemWarnings, setSystemWarnings] = React.useState(true);
 
   return (
     <div className="space-y-6 max-w-4xl animate-fadeIn">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">Settings</h1>
-        <p className="text-sm text-slate-550 mt-0.5">Customize preferences, theme, and profile settings.</p>
+        <p className="text-sm text-slate-555 mt-0.5">Customize preferences, theme, and profile settings.</p>
       </div>
 
       <div className="space-y-6">
@@ -52,8 +55,15 @@ export default function StaffSettingsPage() {
                 <p className="font-bold text-slate-800 dark:text-slate-200">Customer Assistance Calls</p>
                 <p className="text-[10px] text-slate-450 mt-0.5">Vibrate or sound when a guest calls the waiter.</p>
               </div>
-              <button className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-dine-orange">
-                <span className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out translate-x-4" />
+              <button
+                onClick={() => setAssistanceCalls(!assistanceCalls)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  assistanceCalls ? 'bg-dine-orange' : 'bg-slate-200 dark:bg-slate-700'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                  assistanceCalls ? 'translate-x-4' : 'translate-x-0'
+                }`} />
               </button>
             </div>
 
@@ -62,8 +72,15 @@ export default function StaffSettingsPage() {
                 <p className="font-bold text-slate-800 dark:text-slate-200">Food Ready Notifications</p>
                 <p className="text-[10px] text-slate-450 mt-0.5">Alert immediately when food items are ready at stations.</p>
               </div>
-              <button className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-dine-orange">
-                <span className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out translate-x-4" />
+              <button
+                onClick={() => setFoodReady(!foodReady)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  foodReady ? 'bg-dine-orange' : 'bg-slate-200 dark:bg-slate-700'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                  foodReady ? 'translate-x-4' : 'translate-x-0'
+                }`} />
               </button>
             </div>
 
@@ -72,8 +89,15 @@ export default function StaffSettingsPage() {
                 <p className="font-bold text-slate-800 dark:text-slate-200">System Warnings & Alerts</p>
                 <p className="text-[10px] text-slate-450 mt-0.5">Receive shift reassignments or high delay warnings.</p>
               </div>
-              <button className="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out bg-dine-orange">
-                <span className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out translate-x-4" />
+              <button
+                onClick={() => setSystemWarnings(!systemWarnings)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                  systemWarnings ? 'bg-dine-orange' : 'bg-slate-200 dark:bg-slate-700'
+                }`}
+              >
+                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                  systemWarnings ? 'translate-x-4' : 'translate-x-0'
+                }`} />
               </button>
             </div>
           </div>

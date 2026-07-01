@@ -1,17 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStaffSearch } from './StaffSearchContext';
 import { useStaffProfile } from '../../hooks/useStaffProfile';
+import { useNotifications } from '../../hooks/useNotifications';
+import { useStaffDashboard } from '../../hooks/useStaffDashboard';
 
-export default function StaffTopBar() {
+export default function StaffTopBar({ onNotificationClick }: { onNotificationClick?: () => void }) {
   const { query, setQuery } = useStaffSearch();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const { profile } = useStaffProfile();
+  const { unreadCount } = useNotifications();
+  const { requests, tables } = useStaffDashboard();
   const navigate = useNavigate();
 
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  const dateStr = now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+  const [timeStr, setTimeStr] = useState('');
+  const [dateStr, setDateStr] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeStr(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }));
+      setDateStr(now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const pendingRequestsCount = requests.filter(r => r.status !== 'Resolved').length;
 
   if (mobileSearchOpen) {
     return (
@@ -59,12 +75,14 @@ export default function StaffTopBar() {
         </div>
         <div className="hidden xl:flex gap-8 border-l border-slate-200 dark:border-sd-outline-variant/40 pl-8">
           <div>
-            <p className="text-[10px] text-slate-400 mb-0.5 font-sans">My Tables</p>
+            <p className="text-[10px] text-slate-405 mb-0.5 font-sans">My Tables</p>
             <p className="text-lg font-bold text-slate-800 dark:text-slate-200 font-sans">1, 2, 3, 4</p>
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 mb-0.5 font-sans">Active Tasks</p>
-            <p className="text-lg font-bold text-dine-orange font-sans">5 Pending</p>
+            <p className="text-[10px] text-slate-405 mb-0.5 font-sans">Active Tables</p>
+            <p className="text-lg font-bold text-dine-orange font-sans">
+              {tables.filter(t => ['Occupied', 'Reserved', 'Cleaning', 'Bill Requested', 'Food Served'].includes(t.status)).length} Active
+            </p>
           </div>
         </div>
       </div>
@@ -97,9 +115,16 @@ export default function StaffTopBar() {
         </button>
 
         {/* Notifications */}
-        <button className="relative p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-sd-surface-variant rounded-full transition-colors">
+        <button
+          onClick={onNotificationClick}
+          className="relative p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-sd-surface-variant rounded-full transition-colors cursor-pointer"
+        >
           <span className="material-symbols-outlined text-[22px]">notifications</span>
-          <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold">5</span>
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold">
+              {unreadCount}
+            </span>
+          )}
         </button>
 
         {/* Profile Avatar (placed on top-right) */}
