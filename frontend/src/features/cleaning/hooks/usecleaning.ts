@@ -19,10 +19,12 @@ export function useCleaning() {
   const [error] = useState<string | null>(null);
 
   const [profile, setProfile] = useState(() => cleaningStore.profile);
+  const [staffMembers, setStaffMembers] = useState(() => cleaningStore.staffMembers);
 
   useEffect(() => {
     const unsubscribe = cleaningStore.subscribe(() => {
       setProfile(cleaningStore.profile);
+      setStaffMembers(cleaningStore.staffMembers);
     });
     return () => {
       unsubscribe();
@@ -149,7 +151,9 @@ export function useCleaning() {
     washrooms: [],
     kitchenWashrooms: [],
     urgentTasks,
-    staffMembers: [],
+    staffMembers,
+    addStaffMember: (member: any) => cleaningStore.addStaffMember(member),
+    removeStaffMember: (id: string) => cleaningStore.removeStaffMember(id),
     activeJobs: [],
     recentActivity: [],
     weeklyRequests: [],

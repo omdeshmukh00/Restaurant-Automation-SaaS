@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { StaffSearchProvider } from '../features/staff/components/dashboard/StaffSearchContext';
 import StaffSidebar from '../features/staff/components/dashboard/StaffSidebar';
 import StaffTopBar from '../features/staff/components/dashboard/StaffTopBar';
 import { NotificationWindow } from '../features/staff/components/NotificationWindow';
+import { useStaffProfile } from '../features/staff/hooks/useStaffProfile';
+import { getRolePermissions } from '../features/staff/utils/roleAccess';
 
 export default function StaffLayout(): JSX.Element {
+  const { profile } = useStaffProfile();
+  const location = useLocation();
+
+  const allowedPaths = getRolePermissions(profile.role);
+  const currentPath = location.pathname.replace(/\/$/, '');
+
+  const isAllowed = allowedPaths.includes(currentPath);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('staff-sidebar-collapsed');
@@ -15,6 +25,10 @@ export default function StaffLayout(): JSX.Element {
   });
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  if (!isAllowed && allowedPaths.length > 0) {
+    return <Navigate to={allowedPaths[0]} replace />;
+  }
 
   return (
     <StaffSearchProvider>

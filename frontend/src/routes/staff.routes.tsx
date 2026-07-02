@@ -13,6 +13,7 @@ import StaffReportsPage from '../features/staff/pages/StaffReportsPage';
 import StaffAlertsPage from '../features/staff/pages/StaffAlertsPage';
 import StaffProfilePage from '../features/staff/pages/StaffProfilePage';
 import StaffSettingsPage from '../features/staff/pages/StaffSettingsPage';
+import StaffMonitorPage from '../features/staff/pages/StaffMonitorPage';
 
 export const staffRoutes: RouteObject[] = [
   {
@@ -66,6 +67,10 @@ export const staffRoutes: RouteObject[] = [
       {
         path: 'settings',
         element: <StaffSettingsPage />,
+      },
+      {
+        path: 'monitor',
+        element: <StaffMonitorPage />,
       },
     ],
   },

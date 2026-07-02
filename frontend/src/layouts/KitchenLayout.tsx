@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { KitchenSearchProvider } from '../features/kitchen/components/dashboard/KitchenSearchContext';
 import KitchenSidebar from '../features/kitchen/components/dashboard/KitchenSidebar';
 import KitchenTopBar from '../features/kitchen/components/dashboard/KitchenTopBar';
 import LiveAlertsBar from '../features/kitchen/components/dashboard/LiveAlertsBar';
 import KitchenProfilePanel from '../features/kitchen/components/dashboard/KitchenProfilePanel';
+import { useKitchenStore } from '../features/kitchen/store/kitchen.store';
+import { getKitchenRolePermissions } from '../features/kitchen/utils/kitchenRoleAccess';
 
 export default function KitchenLayout(): JSX.Element {
+  const { profile } = useKitchenStore();
+  const location = useLocation();
+
+  const allowedPaths = getKitchenRolePermissions(profile.role);
+  const currentPath = location.pathname.replace(/\/$/, '');
+
+  const isAllowed = allowedPaths.includes(currentPath);
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -39,6 +49,10 @@ export default function KitchenLayout(): JSX.Element {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  if (!isAllowed && allowedPaths.length > 0) {
+    return <Navigate to={allowedPaths[0]} replace />;
+  }
 
   return (
     <KitchenSearchProvider>

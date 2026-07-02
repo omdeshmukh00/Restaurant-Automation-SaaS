@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useStaffProfile } from '../../hooks/useStaffProfile';
 import { useStaffDashboard } from '../../hooks/useStaffDashboard';
+import { getRolePermissions } from '../../utils/roleAccess';
 
 interface Props {
   collapsed: boolean;
@@ -29,9 +30,14 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
     { to: '/staff/menu', icon: 'menu_book', label: 'Menu' },
     { to: '/staff/reports', icon: 'bar_chart', label: 'Reports' },
     { to: '/staff/alerts', icon: 'warning', label: 'Alerts', badge: alertsCount },
+    { to: '/staff/monitor', icon: 'group', label: 'Monitor Staff' },
     { to: '/staff/profile', icon: 'person', label: 'Profile' },
     { to: '/staff/settings', icon: 'settings', label: 'Settings' },
   ];
+
+  const allowedPaths = getRolePermissions(profile.role);
+  const filteredNavItems = navItems.filter(item => allowedPaths.includes(item.to));
+
   return (
     <aside
       className={`flex flex-col h-screen fixed left-0 top-0 bg-white border-r border-slate-200 z-50 transition-all duration-300 ${
@@ -62,7 +68,7 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto sd-no-scrollbar">
-        {navItems.map(({ to, icon, label, badge, end }) => (
+        {filteredNavItems.map(({ to, icon, label, badge, end }) => (
           <NavLink
             key={to}
             to={to}

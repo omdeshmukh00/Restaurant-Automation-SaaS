@@ -1,5 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useCleaning } from '../../hooks/usecleaning';
+import { getCleaningRolePermissions } from '../../utils/cleaningRoleAccess';
 
 interface NavItem {
   to: string;
@@ -14,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/cleaning/tables', icon: 'table_restaurant', label: 'Tables' },
   { to: '/cleaning/requests', icon: 'notification_important', label: 'Requests' },
   { to: '/cleaning/tasks', icon: 'assignment', label: 'Tasks' },
+  { to: '/cleaning/monitor', icon: 'supervised_user_circle', label: 'Monitor Staff' },
   { to: '/cleaning/profile', icon: 'person', label: 'Profile' },
   { to: '/cleaning/settings', icon: 'settings', label: 'Settings' },
 ];
@@ -25,6 +28,10 @@ interface Props {
 }
 
 export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Props) {
+  const { profile } = useCleaning();
+  const allowedPaths = getCleaningRolePermissions(profile.role);
+  const filteredNavItems = NAV_ITEMS.filter(({ to }) => allowedPaths.includes(to));
+
   return (
     <aside
       className={`flex flex-col h-screen fixed left-0 top-0 bg-white dark:bg-sd-surface-container border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-300 ${
@@ -55,7 +62,7 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
 
       {/* Navigation */}
       <nav className="flex-grow space-y-1 px-3 py-4 overflow-y-auto sd-no-scrollbar">
-        {NAV_ITEMS.map(({ to, icon, label, badge, end }) => (
+        {filteredNavItems.map(({ to, icon, label, badge, end }) => (
           <NavLink
             key={to}
             to={to}

@@ -5,6 +5,7 @@ import CleaningDashboard from '../features/cleaning/pages/CleaningDashboard';
 import CleaningTablesPage from '../features/cleaning/pages/CleaningTablesPage';
 import CleaningRequestsPage from '../features/cleaning/pages/CleaningRequestsPage';
 import CleaningTasksPage from '../features/cleaning/pages/CleaningTasksPage';
+import CleaningStaffMonitorPage from '../features/cleaning/pages/CleaningStaffMonitorPage';
 import CleaningProfilePage from '../features/cleaning/pages/CleaningProfilePage';
 import CleaningSettingsPage from '../features/cleaning/pages/CleaningSettingsPage';
 
@@ -28,6 +29,10 @@ export const cleaningRoutes: RouteObject[] = [
       {
         path: 'tasks',
         element: <CleaningTasksPage />,
+      },
+      {
+        path: 'monitor',
+        element: <CleaningStaffMonitorPage />,
       },
       {
         path: 'profile',
