@@ -81,6 +81,9 @@ export default function KitchenOrdersPage() {
 
         const minutes = bo.createdAt ? Math.round((Date.now() - new Date(bo.createdAt).getTime()) / 60000) : 0;
         const timeAgo = minutes <= 0 ? 'Just now' : `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+        const time = bo.createdAt
+          ? new Date(bo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : '';
 
         return {
           id: bo._id || bo.id,
@@ -88,6 +91,7 @@ export default function KitchenOrdersPage() {
           items,
           status,
           type: 'dine-in',
+          time,
           timeAgo,
         };
       });

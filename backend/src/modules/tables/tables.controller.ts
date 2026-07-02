@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
-import mongoose from 'mongoose';
 import { ErrorCode } from '../../constants/errors';
 import { AppError } from '../../utils/AppError';
 import { ok } from '../../utils/responses';
@@ -126,7 +125,7 @@ export async function listTablesController(req: Request, res: Response, next: Ne
 
     const populatedTables = await Promise.all(
       tables.map(async (table) => {
-        const tableObj = table.toObject ? table.toObject() : table;
+        const tableObj = (table.toObject ? table.toObject() : table) as any;
         if (table.currentSessionId && table.status !== 'AVAILABLE') {
           const orders = await OrderModel.find({
             sessionId: table.currentSessionId,
@@ -172,7 +171,7 @@ export async function getTableController(req: Request, res: Response, next: Next
       throw new AppError('Table not found', 404, ErrorCode.NOT_FOUND);
     }
 
-    const tableObj = table.toObject ? table.toObject() : table;
+    const tableObj = (table.toObject ? table.toObject() : table) as any;
     if (table.currentSessionId && table.status !== 'AVAILABLE') {
       const orders = await OrderModel.find({
         sessionId: table.currentSessionId,
