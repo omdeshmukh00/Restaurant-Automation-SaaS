@@ -3,12 +3,14 @@ import { Search, LayoutGrid, List, Map, ChevronDown } from 'lucide-react';
 import { useTablesStore } from '../../store/tables.store';
 import type { TableSection, TableStatus } from '../../store/tables.store';
 
-const sections: (TableSection | 'All')[] = ['All', 'Indoor', 'Outdoor', 'Bar', 'Private'];
 const statuses: (TableStatus | 'All')[]  = ['All', 'Available', 'Occupied', 'Reserved', 'Cleaning', 'Blocked'];
-const floors:   (number | 'All')[]       = ['All', 1, 2];
 
 export function TableFilterBar(): JSX.Element {
-  const { filter, viewMode, setFilter, setViewMode } = useTablesStore();
+  const { filter, viewMode, setFilter, setViewMode, floors: storeFloors, sections: storeSections } = useTablesStore();
+  
+  const floors: (number | 'All')[] = ['All', ...storeFloors.map((f) => f.number)];
+  const sections: (string | 'All')[] = ['All', ...storeSections];
+  
   const [showSectionMenu, setShowSectionMenu] = useState(false);
 
   return (

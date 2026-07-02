@@ -57,8 +57,8 @@ export const mockPerformance: KitchenPerformance = {
 // API calls with safe fallback to mock data on error/failure
 export const getKitchenOrders = async (): Promise<KitchenOrder[]> => {
   try {
-    const res = await apiClient.get('/api/v1/kitchen/orders');
-    return res.data?.data || res.data || mockOrders;
+    const res = await apiClient.get('/kitchen/orders');
+    return res.data?.data?.orders || res.data?.orders || res.data?.data || res.data || mockOrders;
   } catch (err) {
     console.warn('Using mock kitchen orders due to API error:', err);
     return mockOrders;
@@ -67,7 +67,7 @@ export const getKitchenOrders = async (): Promise<KitchenOrder[]> => {
 
 export const acceptOrder = async (id: string): Promise<KitchenOrder> => {
   try {
-    const res = await apiClient.patch(`/api/v1/kitchen/orders/${id}/accept`);
+    const res = await apiClient.patch(`/kitchen/orders/${id}/accept`);
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Accepted order ${id}`);
@@ -79,7 +79,7 @@ export const acceptOrder = async (id: string): Promise<KitchenOrder> => {
 
 export const startOrder = async (id: string): Promise<KitchenOrder> => {
   try {
-    const res = await apiClient.patch(`/api/v1/kitchen/orders/${id}/start`);
+    const res = await apiClient.patch(`/kitchen/orders/${id}/start`);
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Started preparing order ${id}`);
@@ -91,7 +91,7 @@ export const startOrder = async (id: string): Promise<KitchenOrder> => {
 
 export const readyOrder = async (id: string): Promise<KitchenOrder> => {
   try {
-    const res = await apiClient.patch(`/api/v1/kitchen/orders/${id}/ready`);
+    const res = await apiClient.patch(`/kitchen/orders/${id}/ready`);
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Marked order ${id} as ready`);
@@ -103,7 +103,7 @@ export const readyOrder = async (id: string): Promise<KitchenOrder> => {
 
 export const delayOrder = async (id: string): Promise<KitchenOrder> => {
   try {
-    const res = await apiClient.patch(`/api/v1/kitchen/orders/${id}/delay`);
+    const res = await apiClient.patch(`/kitchen/orders/${id}/delay`);
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Delayed order ${id}`);
@@ -115,7 +115,7 @@ export const delayOrder = async (id: string): Promise<KitchenOrder> => {
 
 export const rejectOrder = async (id: string): Promise<KitchenOrder> => {
   try {
-    const res = await apiClient.patch(`/api/v1/kitchen/orders/${id}/reject`);
+    const res = await apiClient.patch(`/kitchen/orders/${id}/reject`);
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Rejected order ${id}`);
@@ -127,7 +127,7 @@ export const rejectOrder = async (id: string): Promise<KitchenOrder> => {
 
 export const getKitchenBatches = async (): Promise<KitchenBatch[]> => {
   try {
-    const res = await apiClient.get('/api/v1/kitchen/batches');
+    const res = await apiClient.get('/kitchen/batches');
     return res.data?.data || res.data || mockBatches;
   } catch (err) {
     console.warn('Using mock kitchen batches due to API error:', err);
@@ -137,7 +137,7 @@ export const getKitchenBatches = async (): Promise<KitchenBatch[]> => {
 
 export const createKitchenBatch = async (data: { item: string; orders: string[] }): Promise<KitchenBatch> => {
   try {
-    const res = await apiClient.post('/api/v1/kitchen/batches', data);
+    const res = await apiClient.post('/kitchen/batches', data);
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Created batch for ${data.item}`);
@@ -155,7 +155,7 @@ export const createKitchenBatch = async (data: { item: string; orders: string[] 
 
 export const updateKitchenBatchStatus = async (id: string, status: 'PENDING' | 'PREPARING' | 'READY'): Promise<KitchenBatch> => {
   try {
-    const res = await apiClient.patch(`/api/v1/kitchen/batches/${id}`, { status });
+    const res = await apiClient.patch(`/kitchen/batches/${id}`, { status });
     return res.data?.data || res.data;
   } catch (err) {
     console.warn(`[Mock] Updated batch ${id} status to ${status}`);
@@ -177,7 +177,7 @@ export const updateKitchenBatchStatus = async (id: string, status: 'PENDING' | '
 
 export const getKitchenLoad = async (): Promise<KitchenLoad> => {
   try {
-    const res = await apiClient.get('/api/v1/kitchen/load');
+    const res = await apiClient.get('/kitchen/load');
     return res.data?.data || res.data || mockLoad;
   } catch (err) {
     const activeOrders = mockOrders.filter(o => o.status !== 'READY' && o.status !== 'REJECTED');
@@ -196,7 +196,7 @@ export const getKitchenLoad = async (): Promise<KitchenLoad> => {
 
 export const getKitchenPerformance = async (): Promise<KitchenPerformance> => {
   try {
-    const res = await apiClient.get('/api/v1/kitchen/performance');
+    const res = await apiClient.get('/kitchen/performance');
     return res.data?.data || res.data || mockPerformance;
   } catch (err) {
     return mockPerformance;
@@ -205,7 +205,7 @@ export const getKitchenPerformance = async (): Promise<KitchenPerformance> => {
 
 export const acceptAllOrders = async (): Promise<KitchenOrder[]> => {
   try {
-    const res = await apiClient.post('/api/v1/kitchen/orders/accept-all');
+    const res = await apiClient.post('/kitchen/orders/accept-all');
     return res.data?.data || res.data || mockOrders;
   } catch (err) {
     console.warn('[Mock] Accepted all placed orders');
@@ -218,7 +218,7 @@ export const acceptAllOrders = async (): Promise<KitchenOrder[]> => {
 
 export const delayAllOrders = async (): Promise<KitchenOrder[]> => {
   try {
-    const res = await apiClient.post('/api/v1/kitchen/orders/delay-all');
+    const res = await apiClient.post('/kitchen/orders/delay-all');
     return res.data?.data || res.data || mockOrders;
   } catch (err) {
     console.warn('[Mock] Delayed all preparing orders');

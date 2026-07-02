@@ -164,6 +164,22 @@ export const CATEGORIES = [
   { name: 'Main', icon: 'dinner_dining' },
 ];
 
+import { useCustomerStore } from '../../store/customer.store';
+import { apiClient } from '../../../../shared/services/apiClient';
+import { getSocket } from '../../../../lib/socket';
+import { useEffect, useCallback } from 'react';
+
+function getCategoryIcon(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.includes('biryani') || lower.includes('rice')) return 'soup_kitchen';
+  if (lower.includes('pizza')) return 'local_pizza';
+  if (lower.includes('burger')) return 'lunch_dining';
+  if (lower.includes('dessert') || lower.includes('cake') || lower.includes('sweet')) return 'cake';
+  if (lower.includes('drink') || lower.includes('beverage') || lower.includes('lassi')) return 'local_bar';
+  if (lower.includes('starter') || lower.includes('soup') || lower.includes('appetizer')) return 'skillet';
+  return 'dinner_dining';
+}
+
 // ── Search / Filter context ──────────────────────────────────
 interface SearchContextType {
   query: string;
@@ -177,19 +193,82 @@ interface SearchContextType {
   spicyOnly: boolean;
   setSpicyOnly: (s: boolean) => void;
   filteredItems: MenuItem[];
+  categories: { name: string; icon: string }[];
 }
 
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 export function SearchProvider({ children }: { children: React.ReactNode }) {
+  const { diningSession } = useCustomerStore();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Recommended');
   const [vegOnly, setVegOnly] = useState(false);
   const [spicyOnly, setSpicyOnly] = useState(false);
 
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<{ name: string; icon: string }[]>(CATEGORIES);
+
+  const fetchMenu = useCallback(async () => {
+    if (!diningSession?.restaurantId) return;
+    try {
+      const res = await apiClient.get(`/public/menu?restaurantId=${diningSession.restaurantId}`);
+      const data = res.data?.data || res.data;
+      if (data) {
+        const catMap = new Map(data.categories.map((c: any) => [c._id.toString(), c.name]));
+        
+        const mappedItems: MenuItem[] = data.menuItems
+          .filter((item: any) => item.isAvailable)
+          .map((item: any) => ({
+            id: item._id,
+            name: item.name,
+            price: item.price,
+            image: item.image || '',
+            description: item.description || '',
+            category: catMap.get(item.categoryId?.toString() || '') || 'Main',
+            rating: item.rating || 4.5,
+            reviews: item.reviews || 10,
+            isVeg: item.isVeg,
+            isSpicy: item.isSpicy,
+          }));
+
+        const mappedCats = [
+          { name: 'All', icon: 'grid_view' },
+          ...data.categories.map((c: any) => ({
+            name: c.name,
+            icon: getCategoryIcon(c.name),
+          })),
+        ];
+
+        setMenuItems(mappedItems);
+        setCategories(mappedCats);
+      }
+    } catch (err) {
+      console.error('Failed to fetch menu', err);
+    }
+  }, [diningSession]);
+
+  useEffect(() => {
+    fetchMenu();
+  }, [fetchMenu]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleMenuUpdate = () => {
+      fetchMenu();
+    };
+
+    socket.on('menu.updated', handleMenuUpdate);
+    return () => {
+      socket.off('menu.updated', handleMenuUpdate);
+    };
+  }, [fetchMenu]);
+
   const filteredItems = useMemo(() => {
-    let result = [...MENU_ITEMS];
+    const sourceItems = menuItems.length > 0 ? menuItems : MENU_ITEMS;
+    let result = [...sourceItems];
 
     // Category filter
     if (activeCategory !== 'All') {
@@ -227,11 +306,24 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     }
 
     return result;
-  }, [query, activeCategory, sortBy, vegOnly, spicyOnly]);
+  }, [menuItems, query, activeCategory, sortBy, vegOnly, spicyOnly]);
 
   const value = useMemo(
-    () => ({ query, setQuery, activeCategory, setActiveCategory, sortBy, setSortBy, vegOnly, setVegOnly, spicyOnly, setSpicyOnly, filteredItems }),
-    [query, activeCategory, sortBy, vegOnly, spicyOnly, filteredItems]
+    () => ({
+      query,
+      setQuery,
+      activeCategory,
+      setActiveCategory,
+      sortBy,
+      setSortBy,
+      vegOnly,
+      setVegOnly,
+      spicyOnly,
+      setSpicyOnly,
+      filteredItems,
+      categories,
+    }),
+    [query, activeCategory, sortBy, vegOnly, spicyOnly, filteredItems, categories]
   );
 
   return <SearchContext.Provider value={value}>{children}</SearchContext.Provider>;

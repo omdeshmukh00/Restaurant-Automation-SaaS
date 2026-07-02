@@ -47,7 +47,7 @@ export default function StaffDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
-            Hello, Rahul! 👋
+            Hello, Om!
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-455 mt-1">
             Here is what&apos;s happening in your section (Zone A) today.

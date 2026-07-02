@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { ErrorCode } from '../../constants/errors';
 import { AppError } from '../../utils/AppError';
 import { ok } from '../../utils/responses';
@@ -13,6 +14,7 @@ import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { socketService } from '../../sockets/socket.service';
 import { SocketEvent } from '../../constants/events';
+import { OrderModel } from '../orders/orders.model';
 
 function resolveRestaurantId(
   req: Request,
@@ -112,11 +114,45 @@ export async function bulkCreateTablesController(req: Request, res: Response, ne
 
 export async function listTablesController(req: Request, res: Response, next: NextFunction) {
   try {
-    const tables = await tablesService.getTablesByRestaurant(getRestaurantId(req));
+    const restaurantId = getRestaurantId(req);
+    const tables = await tablesService.getTablesByRestaurant(restaurantId);
+    const restaurant = await RestaurantModel.findById(restaurantId).lean();
+    
+    const floors = restaurant?.settings?.floors || [
+      { name: 'Floor 1', number: 1 },
+      { name: 'Floor 2', number: 2 },
+    ];
+    const sections = restaurant?.settings?.sections || ['Indoor', 'Outdoor', 'Bar', 'Private'];
+
+    const populatedTables = await Promise.all(
+      tables.map(async (table) => {
+        const tableObj = table.toObject ? table.toObject() : table;
+        if (table.currentSessionId && table.status !== 'AVAILABLE') {
+          const orders = await OrderModel.find({
+            sessionId: table.currentSessionId,
+            status: { $nin: ['CANCELLED', 'REJECTED'] },
+          }).lean();
+
+          const amount = orders.reduce((sum, o) => sum + (o.finalAmount || o.totalAmount || 0), 0);
+          const itemCount = orders.reduce((sum, o) => sum + (o.items?.length || 0), 0);
+
+          tableObj.currentOrder = {
+            id: 'ORD-ACTIVE',
+            time: orders.length > 0 ? 'Active' : '',
+            amount,
+            items: itemCount,
+          };
+        }
+        return tableObj;
+      })
+    );
+
     ok(res, {
-      tables,
+      tables: populatedTables,
+      floors,
+      sections,
       meta: {
-        count: tables.length,
+        count: populatedTables.length,
       },
     });
   } catch (error) {
@@ -126,16 +162,35 @@ export async function listTablesController(req: Request, res: Response, next: Ne
 
 export async function getTableController(req: Request, res: Response, next: NextFunction) {
   try {
+    const restaurantId = getRestaurantId(req);
     const table = await TableModel.findOne({
       _id: req.params.id,
-      restaurantId: getRestaurantId(req),
+      restaurantId,
     });
 
     if (!table) {
       throw new AppError('Table not found', 404, ErrorCode.NOT_FOUND);
     }
 
-    ok(res, { table });
+    const tableObj = table.toObject ? table.toObject() : table;
+    if (table.currentSessionId && table.status !== 'AVAILABLE') {
+      const orders = await OrderModel.find({
+        sessionId: table.currentSessionId,
+        status: { $nin: ['CANCELLED', 'REJECTED'] },
+      }).lean();
+
+      const amount = orders.reduce((sum, o) => sum + (o.finalAmount || o.totalAmount || 0), 0);
+      const itemCount = orders.reduce((sum, o) => sum + (o.items?.length || 0), 0);
+
+      tableObj.currentOrder = {
+        id: 'ORD-ACTIVE',
+        time: orders.length > 0 ? 'Active' : '',
+        amount,
+        items: itemCount,
+      };
+    }
+
+    ok(res, { table: tableObj });
   } catch (error) {
     next(error);
   }

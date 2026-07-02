@@ -9,20 +9,19 @@ interface Props {
 }
 
 const shapes:   TableShape[]   = ['Round', 'Square', 'Rectangle'];
-const sections: TableSection[] = ['Indoor', 'Outdoor', 'Bar', 'Private'];
 const statuses: TableStatus[]  = ['Available', 'Occupied', 'Reserved', 'Cleaning', 'Blocked'];
 
 export function TableModal({ mode, onClose }: Props): JSX.Element {
-  const { tables, selectedTableId, addTable, updateTable } = useTablesStore();
+  const { tables, selectedTableId, addTable, updateTable, sections, floors } = useTablesStore();
   const existing = tables.find(t => t.id === selectedTableId);
 
   const [form, setForm] = useState({
     label:   existing?.label   ?? '',
     shape:   existing?.shape   ?? 'Square' as TableShape,
-    section: existing?.section ?? 'Indoor' as TableSection,
+    section: existing?.section ?? (sections[0] || 'Indoor'),
     status:  existing?.status  ?? 'Available' as TableStatus,
     seats:   existing?.seats   ?? 4,
-    floor:   existing?.floor   ?? 1,
+    floor:   existing?.floor   ?? (floors[0]?.number || 1),
     x:       existing?.x       ?? 20,
     y:       existing?.y       ?? 20,
     notes:   existing?.notes   ?? '',
@@ -84,10 +83,10 @@ export function TableModal({ mode, onClose }: Props): JSX.Element {
               <select
                 id="table-section"
                 value={form.section}
-                onChange={e => update({ section: e.target.value as TableSection })}
+                onChange={e => update({ section: e.target.value })}
                 className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none text-gray-800 dark:text-gray-100"
               >
-                {sections.map(s => <option key={s}>{s}</option>)}
+                {sections.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
 
@@ -125,8 +124,9 @@ export function TableModal({ mode, onClose }: Props): JSX.Element {
                 onChange={e => update({ floor: Number(e.target.value) })}
                 className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none text-gray-800 dark:text-gray-100"
               >
-                <option value={1}>Floor 1</option>
-                <option value={2}>Floor 2</option>
+                {floors.map(f => (
+                  <option key={f.number} value={f.number}>{f.name}</option>
+                ))}
               </select>
             </div>
           </div>

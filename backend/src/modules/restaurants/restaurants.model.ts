@@ -23,6 +23,8 @@ type RestaurantSettings = {
   timezone: string;
   dateFormat: string;
   timeFormat: string;
+  floors?: { name: string; number: number }[];
+  sections?: string[];
 };
 
 export interface IRestaurant extends Document {
@@ -71,6 +73,20 @@ const restaurantSettingsSchema = new Schema<RestaurantSettings>(
     timezone: { type: String, default: 'UTC' },
     dateFormat: { type: String, default: 'YYYY-MM-DD' },
     timeFormat: { type: String, default: 'HH:mm' },
+    floors: {
+      type: [{
+        name: { type: String, required: true },
+        number: { type: Number, required: true },
+      }],
+      default: () => [
+        { name: 'Floor 1', number: 1 },
+        { name: 'Floor 2', number: 2 },
+      ],
+    },
+    sections: {
+      type: [String],
+      default: () => ['Indoor', 'Outdoor', 'Bar', 'Private'],
+    },
   },
   { _id: false },
 );

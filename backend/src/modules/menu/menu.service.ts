@@ -3,6 +3,7 @@ import { Category, MenuItem, ICategory, IMenuItem } from './menu.model';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { buildPaginationMeta } from '../../utils/pagination';
+import { socketService } from '../../sockets/socket.service';
 
 export class MenuService {
   /*
@@ -32,6 +33,7 @@ export class MenuService {
     });
 
     await category.save();
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return category;
   }
 
@@ -72,6 +74,7 @@ export class MenuService {
     if (!category) {
       throw new AppError('Category not found', 404, ErrorCode.NOT_FOUND);
     }
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return category;
   }
 
@@ -91,6 +94,7 @@ export class MenuService {
       await MenuItem.deleteMany({ categoryId, restaurantId }).session(session);
       
       await session.commitTransaction();
+      socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     } catch (error) {
       await session.abortTransaction();
       throw error;
@@ -112,6 +116,7 @@ export class MenuService {
     }));
 
     await Category.bulkWrite(bulkOps);
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
   }
 
   /*
@@ -144,6 +149,7 @@ export class MenuService {
     });
 
     await item.save();
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return item;
   }
 
@@ -285,6 +291,7 @@ export class MenuService {
     if (!item) {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return item;
   }
 
@@ -296,6 +303,7 @@ export class MenuService {
     if (!item) {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
   }
 
   static async toggleItemAvailability(
@@ -313,6 +321,7 @@ export class MenuService {
     if (!item) {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return item;
   }
 
@@ -331,6 +340,7 @@ export class MenuService {
     if (!item) {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return item;
   }
 
@@ -351,6 +361,7 @@ export class MenuService {
     item.updatedBy = userId as Types.ObjectId;
 
     await item.save();
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
     return item;
   }
 
@@ -367,5 +378,6 @@ export class MenuService {
     }));
 
     await MenuItem.bulkWrite(bulkOps);
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
   }
 }

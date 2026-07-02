@@ -1,12 +1,11 @@
-import React from 'react';
-import { useSearch, CATEGORIES } from './SearchContext';
+import { useSearch } from './SearchContext';
 
 export default function CategoryFilter() {
-  const { activeCategory, setActiveCategory } = useSearch();
+  const { activeCategory, setActiveCategory, categories } = useSearch();
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-3 sd-no-scrollbar">
-      {CATEGORIES.map(({ name, icon }) => {
+      {categories.map(({ name, icon }) => {
         const isActive = activeCategory === name;
         return (
           <button

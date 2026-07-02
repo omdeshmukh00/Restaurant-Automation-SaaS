@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { generateTableCode, getRecommendedItems } from '../utils/customer.utils';
 import { apiClient } from '../../../shared/services/apiClient';
+import { connectSocket, disconnectSocket, getSocket } from '../../../lib/socket';
 
 export type DiningSession = {
   sessionId: string;
@@ -165,7 +166,7 @@ type CustomerStore = {
   removeFromCart: (id: number) => void;
   clearCart: () => void;
   toggleFavourite: (id: number) => void;
-  placeOrder: () => TrackedOrder | null;
+  placeOrder: (specialInstructions?: string) => Promise<any>;
   reorder: (order: TrackedOrder) => void;
   requestService: (request: ServiceRequestItem) => void;
   getCartQuantity: (id: number) => number;
@@ -176,6 +177,7 @@ type CustomerStore = {
   assignRandomTable: () => void;
   setTableCode: (code: string) => void;
   addOrder: (order: TrackedOrder) => void;
+  fetchOrders: () => Promise<void>;
 
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
@@ -197,6 +199,28 @@ type CustomerStore = {
   addNotification: (title: string, message: string, type: 'info' | 'order' | 'offer', redirectTo?: string) => void;
 };
 
+function mapBackendOrderStatusToFrontend(status: string): TrackedOrder['status'] {
+  switch (status) {
+    case 'PENDING':
+    case 'CONFIRMED':
+      return 'Placed';
+    case 'PREPARING':
+    case 'DELAYED':
+      return 'Preparing';
+    case 'READY':
+    case 'PICKED':
+      return 'Ready';
+    case 'SERVED':
+    case 'BILLED':
+    case 'PAID':
+      return 'Served';
+    case 'COMPLETED':
+      return 'Completed';
+    default:
+      return 'Placed';
+  }
+}
+
 export const useCustomerStore = create<CustomerStore>()(
   persist(
     (set, get) => ({
@@ -206,23 +230,20 @@ export const useCustomerStore = create<CustomerStore>()(
       vegOnly: false,
       cart: [],
       favourites: [],
-      orders: [
-        { id: '#ORD-2841', items: 'Hyderabadi Biryani x1, Mango Lassi x1', total: 338, status: 'Preparing', eta: '12 min', date: '23 Jun, 08:49 PM' },
-        { id: '#ORD-2840', items: 'Smash Burger x2', total: 518, status: 'Served', eta: '-', date: '23 Jun, 08:15 PM' },
-      ],
+      orders: [],
       serviceRequests: [],
       diningSession: null,
       lastActivity: null,
 
       // Initializing Profile Features State
       profile: {
-        name: 'Rahul Sharma',
-        phone: '+91 98765 43210',
-        email: 'rahul.sharma@example.com',
-        isSmartMember: true,
+        name: '',
+        phone: '',
+        email: '',
+        isSmartMember: false,
       },
-      loyaltyPoints: 450,
-      loyaltyHistory: DEFAULT_LOYALTY_HISTORY,
+      loyaltyPoints: 0,
+      loyaltyHistory: [],
       offers: DEFAULT_OFFERS,
       notificationPreferences: {
         email: true,
@@ -230,7 +251,7 @@ export const useCustomerStore = create<CustomerStore>()(
         whatsapp: false,
         push: true,
       },
-      notifications: DEFAULT_NOTIFICATIONS,
+      notifications: [],
 
       setCategory: (category) => set({ category }),
       setSearch: (search) => set({ search }),
@@ -261,67 +282,62 @@ export const useCustomerStore = create<CustomerStore>()(
           ? state.favourites.filter((favouriteId) => favouriteId !== id)
           : [...state.favourites, id],
       })),
-      placeOrder: () => {
+      placeOrder: async (specialInstructions?: string) => {
         get().recordActivity();
-        const { cart } = get();
-        if (cart.length === 0) return null;
+        try {
+          const res = await apiClient.post('/customer/orders', { specialInstructions });
+          const order = res.data?.data?.order || res.data?.order;
+          
+          await get().fetchOrders();
+          
+          if (order) {
+            const total = order.finalAmount || order.totalAmount || 0;
+            const pointsEarned = Math.floor(total / 10);
+            
+            const updatedNotifications = [
+              {
+                id: `n-${Date.now()}`,
+                title: 'Order Placed! 🍽️',
+                message: `Your order was successfully placed. You earned ${pointsEarned} reward points!`,
+                timestamp: 'Just now',
+                read: false,
+                type: 'order' as const,
+              }
+            ];
 
-        const items = cart.map((cartItem) => {
-          const item = MENU_ITEMS.find((menuItem) => menuItem.id === cartItem.id);
-          return `${item?.name ?? 'Item'} x${cartItem.qty}`;
-        }).join(', ');
-
-        const total = get().getTotalPrice();
-        const orderId = `#ORD-${Math.floor(3000 + Math.random() * 6000)}`;
-        const now = new Date();
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const formattedDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}, ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
-        const order: TrackedOrder = {
-          id: orderId,
-          items,
-          total,
-          status: 'Placed',
-          eta: '18 min',
-          date: formattedDate,
-        };
-
-        // Calculate reward points earned: 1 point per 10 Rupees
-        const pointsEarned = Math.floor(total / 10);
-
-        set((state) => {
-          const updatedHistory = pointsEarned > 0 ? [
-            {
-              id: `h-${Date.now()}`,
-              points: pointsEarned,
-              type: 'earn' as const,
-              description: `Points earned from Order ${orderId}`,
-              date: 'Just now',
-            },
-            ...state.loyaltyHistory
-          ] : state.loyaltyHistory;
-
-          const updatedNotifications = [
-            {
-              id: `n-${Date.now()}`,
-              title: 'Order Placed! 🍽️',
-              message: `Your order ${orderId} (Total: ₹${total}) was placed. You earned ${pointsEarned} reward points!`,
-              timestamp: 'Just now',
-              read: false,
-              type: 'order' as const,
-            },
-            ...state.notifications
-          ];
-
-          return {
-            orders: [order, ...state.orders],
-            cart: [],
-            loyaltyPoints: state.loyaltyPoints + pointsEarned,
-            loyaltyHistory: updatedHistory,
-            notifications: updatedNotifications,
-          };
-        });
-
-        return order;
+            set((state) => ({
+              cart: [],
+              loyaltyPoints: state.loyaltyPoints + pointsEarned,
+              notifications: [...updatedNotifications, ...state.notifications],
+            }));
+          }
+          return order;
+        } catch (err) {
+          console.error('Failed to place order via API', err);
+          throw err;
+        }
+      },
+      fetchOrders: async () => {
+        try {
+          const res = await apiClient.get('/customer/orders');
+          const data = res.data?.data || res.data;
+          if (data && data.orders) {
+            const mapped: TrackedOrder[] = data.orders.map((o: any) => {
+              const itemsStr = o.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ');
+              return {
+                id: o.orderNumber || o._id,
+                items: itemsStr,
+                total: o.finalAmount || o.totalAmount,
+                status: mapBackendOrderStatusToFrontend(o.status),
+                eta: o.preparationTime ? `${o.preparationTime} min` : '15 min',
+                date: new Date(o.createdAt).toLocaleString('en-IN'),
+              };
+            });
+            set({ orders: mapped });
+          }
+        } catch (err) {
+          console.error('Failed to fetch customer orders', err);
+        }
       },
       reorder: (order) => {
         get().recordActivity();
@@ -403,12 +419,24 @@ export const useCustomerStore = create<CustomerStore>()(
             tableCode: diningSession.tableNumber,
             lastActivity: Date.now(),
           });
+          disconnectSocket();
+          connectSocket();
+
+          const socket = getSocket();
+          if (socket) {
+            const handleOrderUpdate = () => {
+              get().fetchOrders();
+            };
+            socket.on('order.updated', handleOrderUpdate);
+            socket.on('order.new', handleOrderUpdate);
+          }
         } else {
           localStorage.removeItem('x-session-token');
           set({
             diningSession: null,
             lastActivity: null,
           });
+          disconnectSocket();
         }
       },
       clearDiningSession: async () => {
@@ -425,6 +453,7 @@ export const useCustomerStore = create<CustomerStore>()(
           diningSession: null,
           lastActivity: null,
         });
+        disconnectSocket();
       },
       recordActivity: () => {
         if (get().diningSession) {

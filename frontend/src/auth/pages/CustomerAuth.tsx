@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthProvider';
 import { apiClient } from '../../shared/services/apiClient';
 import { setAccessToken, setStoredRole, setStoredUser } from '../tokenStore';
@@ -11,6 +11,8 @@ const CustomerAuth: React.FC = () => {
   const { signInAs, setAccessTokenState, setUser, switchPanel } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const tableToken = searchParams.get('table_token');
   const from = (location.state as any)?.from?.pathname || '/customer';
 
   const [mobile, setMobile] = useState('');
@@ -185,7 +187,11 @@ const CustomerAuth: React.FC = () => {
 
         setSuccess('Logged in successfully!');
         setTimeout(() => {
-          navigate(from, { replace: true });
+          if (tableToken) {
+            navigate(`/table?token=${tableToken}`, { replace: true });
+          } else {
+            navigate(from, { replace: true });
+          }
         }, 800);
       } else {
         // Registration flow: do not redirect, ask for name first
@@ -252,7 +258,11 @@ const CustomerAuth: React.FC = () => {
 
       setSuccess('Registration completed successfully!');
       setTimeout(() => {
-        navigate(from, { replace: true });
+        if (tableToken) {
+          navigate(`/table?token=${tableToken}`, { replace: true });
+        } else {
+          navigate(from, { replace: true });
+        }
       }, 1000);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to complete registration. Please try again.');
@@ -447,18 +457,6 @@ const CustomerAuth: React.FC = () => {
       </form>
 
       {/* Footer */}
-      {!showNamePrompt && (
-        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-zinc-800 flex justify-center items-center space-x-2 text-sm font-sans">
-          <span className="text-slate-400 dark:text-zinc-500">New to Flavoroast?</span>
-          <button
-            type="button"
-            onClick={handleGuestContinue}
-            className="text-orange-600 dark:text-orange-500 hover:text-orange-700 font-semibold hover:underline"
-          >
-            Continue as Guest
-          </button>
-        </div>
-      )}
     </motion.div>
   );
 };
