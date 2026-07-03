@@ -53,6 +53,19 @@ export const updateRestaurantSettingsSchema = z.object({
   timezone: z.string().trim().optional(),
   dateFormat: z.string().trim().optional(),
   timeFormat: z.string().trim().optional(),
+
+  floors: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, 'Floor name is required'),
+        number: z.number().int().min(0, 'Floor number must be positive'),
+      })
+    )
+    .optional(),
+
+  sections: z
+    .array(z.string().trim().min(1, 'Section name is required'))
+    .optional(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field is required',
   path: ['unknown'],

@@ -74,7 +74,7 @@ const legend: { status: TableStatus; dot: string }[] = [
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export function FloorMap(): JSX.Element {
-  const { tables, selectedTableId, selectedFloor, selectTable, updateTable } = useTablesStore();
+  const { tables, selectedTableId, selectedFloor, selectTable, updateTable, floors } = useTablesStore();
 
   const [isDark, setIsDark] = React.useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
@@ -243,7 +243,7 @@ export function FloorMap(): JSX.Element {
       <div className="relative w-full" style={{ paddingBottom: '56%', minHeight: 280 }}>
         <div className="absolute inset-0 p-3 sm:p-4">
           <div className="absolute top-3 left-5 text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
-            {selectedFloor === 1 ? 'Floor 1' : 'Floor 2 – Private'}
+            {floors.find(f => f.number === selectedFloor)?.name || `Floor ${selectedFloor}`}
           </div>
 
           <div

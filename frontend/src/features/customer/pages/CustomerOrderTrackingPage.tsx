@@ -13,7 +13,11 @@ const STEPS = [
 export default function CustomerOrderTrackingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { orders, reorder, tableCode, diningSession } = useCustomerStore();
+  const { orders, reorder, tableCode, diningSession, fetchOrders } = useCustomerStore();
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
   
   // Read invoice query param: e.g. ?invoice=ORD-2840
   const invoiceOrderId = searchParams.get('invoice');

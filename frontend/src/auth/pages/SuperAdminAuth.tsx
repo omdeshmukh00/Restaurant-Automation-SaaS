@@ -10,7 +10,7 @@ const SuperAdminAuth: React.FC = () => {
   const { signIn, signInAs } = useAuth();
   const navigate = useNavigate();
 
-  const [adminId, setAdminId] = useState('superadmin@graphura.com');
+  const [adminId, setAdminId] = useState('adminsuper22@gmail.com');
   const [password, setPassword] = useState('Super@123');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -204,10 +204,6 @@ const SuperAdminAuth: React.FC = () => {
     }
   };
 
-  const handleDemoBypass = () => {
-    signInAs('super-admin');
-    navigate('/superadmin', { replace: true });
-  };
 
   return (
     <motion.div
@@ -333,14 +329,6 @@ const SuperAdminAuth: React.FC = () => {
             >
               <span>{loading ? 'Logging in...' : 'Login'}</span>
               <ArrowRight className="w-5 h-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDemoBypass}
-              className="w-full py-2.5 text-xs text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/15 border border-dashed border-orange-300 dark:border-orange-900/40 font-semibold rounded-xl transition-all"
-            >
-              ⚡ Quick Demo Bypass (Login instantly without API)
             </button>
           </div>
         </form>

@@ -33,7 +33,6 @@ export function ProtectedRoute(): JSX.Element {
 
   const searchParams = new URLSearchParams(location.search);
   const qrToken = searchParams.get('qr_token');
-  const isBypassed = matched?.panel === 'customer' && !!qrToken;
 
   useEffect(() => {
     if (matched && isPanelAuthenticated(matched.panel)) {
@@ -45,7 +44,10 @@ export function ProtectedRoute(): JSX.Element {
     return <Navigate replace state={{ from: location }} to="/auth/restaurant" />;
   }
 
-  if (!isPanelAuthenticated(matched.panel) && !isBypassed) {
+  if (!isPanelAuthenticated(matched.panel)) {
+    if (matched.panel === 'customer' && qrToken) {
+      return <Navigate replace to={`/auth/customer?table_token=${qrToken}`} />;
+    }
     return <Navigate replace state={{ from: location }} to={matched.loginPath} />;
   }
 

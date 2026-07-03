@@ -25,7 +25,7 @@ const ROLES: RoleConfig[] = [
     icon: ChefHat,
     iconBg: 'bg-orange-50 dark:bg-orange-950/20',
     iconColor: 'text-orange-500',
-    seedEmail: 'kitchen@ambertable.com',
+    seedEmail: 'kitchenpanel1@gmail.com',
     seedPassword: 'Kitchen@123',
   },
   {
@@ -35,7 +35,7 @@ const ROLES: RoleConfig[] = [
     icon: HandPlatter,
     iconBg: 'bg-emerald-50 dark:bg-emerald-950/20',
     iconColor: 'text-emerald-500',
-    seedEmail: 'staff@ambertable.com',
+    seedEmail: 'staffpanel320@gmail.com',
     seedPassword: 'Staff@123',
   },
   {
@@ -45,7 +45,7 @@ const ROLES: RoleConfig[] = [
     icon: Brush,
     iconBg: 'bg-blue-50 dark:bg-blue-950/20',
     iconColor: 'text-blue-500',
-    seedEmail: 'cleaning@ambertable.com',
+    seedEmail: 'cleaningpanel14@gmail.com',
     seedPassword: 'Cleaning@123',
   },
   {
@@ -55,7 +55,7 @@ const ROLES: RoleConfig[] = [
     icon: Shield,
     iconBg: 'bg-amber-50 dark:bg-amber-950/20',
     iconColor: 'text-amber-500',
-    seedEmail: 'admin@ambertable.com',
+    seedEmail: 'adminpanel16@gmail.com',
     seedPassword: 'Admin@123',
   },
 ];
@@ -293,10 +293,6 @@ const RestaurantAuth: React.FC = () => {
     }
   };
 
-  const handleDemoBypass = () => {
-    signInAs(selectedRole);
-    navigate(`/${selectedRole === 'super-admin' ? 'superadmin' : selectedRole}`, { replace: true });
-  };
 
   return (
     <motion.div
@@ -373,7 +369,7 @@ const RestaurantAuth: React.FC = () => {
                     <div className={`p-2.5 rounded-xl ${config.iconBg} ${config.iconColor} mb-3 group-hover:scale-105 transition-transform duration-200`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <h4 className="font-semibold text-slate-800 dark:text-zinc-200 text-sm">{config.title}</h4>
+                    <h4 className="font-sans font-semibold text-slate-800 dark:text-zinc-100 text-sm">{config.title}</h4>
                     <p className="text-[11px] text-slate-400 dark:text-zinc-500 leading-tight mt-1">
                       {config.subtitle}
                     </p>
@@ -468,14 +464,6 @@ const RestaurantAuth: React.FC = () => {
             >
               <span>{loading ? 'Logging in...' : 'Login'}</span>
               <ArrowRight className="w-5 h-5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDemoBypass}
-              className="w-full py-2.5 text-xs text-orange-600 dark:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/15 border border-dashed border-orange-300 dark:border-orange-900/40 font-semibold rounded-xl transition-all"
-            >
-              ⚡ Quick Demo Bypass (Login instantly without API)
             </button>
           </div>
         </form>

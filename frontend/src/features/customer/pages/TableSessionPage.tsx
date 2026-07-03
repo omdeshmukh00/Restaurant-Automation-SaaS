@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { apiClient, setSessionToken } from '../../../shared/services/apiClient';
+import { useAuth } from '../../../auth/AuthProvider';
 
 type InitResponse = {
   success: true;
@@ -23,6 +24,7 @@ type InitResponse = {
 export default function TableSessionPage(): JSX.Element {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isPanelAuthenticated } = useAuth();
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,11 @@ export default function TableSessionPage(): JSX.Element {
     if (!token) {
       setError('Invalid QR code — no token found in URL.');
       setLoading(false);
+      return;
+    }
+
+    if (!isPanelAuthenticated('customer')) {
+      navigate(`/auth/customer?table_token=${token}`, { replace: true });
       return;
     }
 

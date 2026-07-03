@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { OfferCoupon } from '../../store/customer.store';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { OfferCoupon, useCustomerStore } from '../../store/customer.store';
+import { apiClient } from '../../../../shared/services/apiClient';
 
 export interface CartItem {
   id: string;
+  cartItemId?: string;
   name: string;
   price: number;
   quantity: number;
@@ -12,7 +14,7 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity'>) => void;
+  addItem: (item: Omit<CartItem, 'quantity' | 'cartItemId'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -33,32 +35,77 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<OfferCoupon | null>(null);
+  const { diningSession } = useCustomerStore();
 
-  const addItem = useCallback((item: Omit<CartItem, 'quantity'>) => {
-    setItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
-        return prev.map((i) => (i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i));
+  const fetchCart = useCallback(async () => {
+    if (!diningSession) return;
+    try {
+      const res = await apiClient.get('/customer/cart');
+      const cart = res.data?.data || res.data;
+      if (cart && cart.items) {
+        const mappedItems: CartItem[] = cart.items.map((i: any) => ({
+          id: i.menuItem?._id || i.menuItem || '',
+          cartItemId: i._id,
+          name: i.menuItem?.name || 'Item',
+          price: i.unitPrice,
+          quantity: i.quantity,
+          image: i.menuItem?.image || '',
+          description: i.menuItem?.description || '',
+        }));
+        setItems(mappedItems);
       }
-      return [...prev, { ...item, quantity: 1 }];
-    });
-  }, []);
-
-  const removeItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-  }, []);
-
-  const updateQuantity = useCallback((id: string, quantity: number) => {
-    if (quantity <= 0) {
-      setItems((prev) => prev.filter((i) => i.id !== id));
-    } else {
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)));
+    } catch (err) {
+      console.error('Failed to fetch cart', err);
     }
-  }, []);
+  }, [diningSession]);
 
-  const clearCart = useCallback(() => {
-    setItems([]);
-    setAppliedCoupon(null);
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+
+  const addItem = useCallback(async (item: Omit<CartItem, 'quantity' | 'cartItemId'>) => {
+    try {
+      await apiClient.post('/customer/cart/items', { menuItem: item.id, quantity: 1 });
+      await fetchCart();
+    } catch (err) {
+      console.error('Failed to add item', err);
+    }
+  }, [fetchCart]);
+
+  const removeItem = useCallback(async (id: string) => {
+    const existing = items.find((i) => i.id === id);
+    if (!existing?.cartItemId) return;
+    try {
+      await apiClient.delete(`/customer/cart/items/${existing.cartItemId}`);
+      await fetchCart();
+    } catch (err) {
+      console.error('Failed to remove item', err);
+    }
+  }, [items, fetchCart]);
+
+  const updateQuantity = useCallback(async (id: string, quantity: number) => {
+    const existing = items.find((i) => i.id === id);
+    if (!existing?.cartItemId) return;
+    try {
+      if (quantity <= 0) {
+        await apiClient.delete(`/customer/cart/items/${existing.cartItemId}`);
+      } else {
+        await apiClient.patch(`/customer/cart/items/${existing.cartItemId}`, { quantity });
+      }
+      await fetchCart();
+    } catch (err) {
+      console.error('Failed to update quantity', err);
+    }
+  }, [items, fetchCart]);
+
+  const clearCart = useCallback(async () => {
+    try {
+      await apiClient.delete('/customer/cart');
+      setItems([]);
+      setAppliedCoupon(null);
+    } catch (err) {
+      console.error('Failed to clear cart', err);
+    }
   }, []);
 
   const itemCount = useMemo(() => items.length, [items]);

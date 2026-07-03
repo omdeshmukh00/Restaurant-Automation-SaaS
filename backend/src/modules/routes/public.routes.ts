@@ -18,6 +18,8 @@ import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { z } from 'zod';
 
+import { attachUser } from '../../middleware/requireAuth';
+
 export const publicRouter = Router();
 
 // ── POST /api/v1/public/table-session/init ───────────────────────────
@@ -30,6 +32,7 @@ const initSessionBodySchema = z.object({
 publicRouter.post(
   '/table-session/init',
   sessionLimiter,
+  attachUser,
   validate({ body: initSessionBodySchema }),
   initTableSessionController,
 );

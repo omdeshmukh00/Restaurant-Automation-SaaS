@@ -7,3 +7,4 @@ export { TableList }            from './TableList';
 export { TableFilterBar }       from './TableFilterBar';
 export { TableModal }           from './TableModal';
 export { TableOccupancySummary } from './TableOccupancySummary';
+export { ManageLayoutModal }     from './ManageLayoutModal';

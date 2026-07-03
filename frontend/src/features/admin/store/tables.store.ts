@@ -9,7 +9,7 @@ import { apiClient } from '../../../shared/services/apiClient';
 
 export type TableStatus = 'Available' | 'Occupied' | 'Reserved' | 'Cleaning' | 'Blocked';
 export type TableShape = 'Round' | 'Square' | 'Rectangle';
-export type TableSection = 'Indoor' | 'Outdoor' | 'Bar' | 'Private';
+export type TableSection = string;
 
 export interface Table {
   id: string; // MongoDB ObjectId
@@ -46,6 +46,8 @@ interface TablesStore {
   // Data
   tables: Table[];
   tablePositions: Record<string, { x: number; y: number }>;
+  floors: { name: string; number: number }[];
+  sections: string[];
 
   // UI state
   viewMode: ViewMode;
@@ -81,6 +83,7 @@ interface TablesStore {
   setShowEditModal: (show: boolean) => void;
   setFilter: (patch: Partial<TableFilter>) => void;
   setSearchQuery: (query: string) => void;
+  updateRestaurantSettings: (settings: { floors?: { name: string; number: number }[]; sections?: string[] }) => Promise<void>;
 }
 
 // ── Default layout mapping (to preserve map coordinates in UI) ────────────────
@@ -171,11 +174,21 @@ export const useTablesStore = create<TablesStore>()(
       showAddModal: false,
       showEditModal: false,
       filter: { section: 'All', status: 'All', floor: 'All', search: '' },
+      floors: [
+        { name: 'Floor 1', number: 1 },
+        { name: 'Floor 2', number: 2 },
+      ],
+      sections: ['Indoor', 'Outdoor', 'Bar', 'Private'],
 
       fetchTables: async () => {
         try {
           const res = await apiClient.get('/admin/tables');
           const backendTables = res.data?.data?.tables || [];
+          const floors = res.data?.data?.floors || [
+            { name: 'Floor 1', number: 1 },
+            { name: 'Floor 2', number: 2 },
+          ];
+          const sections = res.data?.data?.sections || ['Indoor', 'Outdoor', 'Bar', 'Private'];
           
           const tablePositions = get().tablePositions || {};
           const mappedTables: Table[] = backendTables.map((t: any) => {
@@ -185,11 +198,10 @@ export const useTablesStore = create<TablesStore>()(
               x: 50,
               y: 50,
               shape: t.capacity > 4 ? 'Rectangle' : 'Square',
-              section: (t.section as TableSection) || 'Indoor',
+              section: t.section || 'Indoor',
               floor: t.floor || 1,
             };
 
-            // Retrieve from persistent tablePositions first
             let x = layout.x;
             let y = layout.y;
             if (tablePositions[tableId]) {
@@ -197,14 +209,13 @@ export const useTablesStore = create<TablesStore>()(
               y = tablePositions[tableId].y;
             }
 
-            // Parse optional order details if occupied
             let currentOrder = undefined;
-            if (t.status === 'OCCUPIED' && t.currentSessionId) {
+            if (t.currentOrder) {
               currentOrder = {
-                id: 'ORD-ACTIVE',
-                time: 'Just now',
-                amount: 0,
-                items: 0,
+                id: t.currentOrder.id,
+                time: t.currentOrder.time,
+                amount: t.currentOrder.amount,
+                items: t.currentOrder.items,
               };
             }
 
@@ -212,8 +223,8 @@ export const useTablesStore = create<TablesStore>()(
               id: tableId,
               label: tableNumber,
               seats: t.capacity,
-              shape: layout.shape,
-              section: (t.section as TableSection) || layout.section,
+              shape: layout.shape || (t.capacity > 4 ? 'Rectangle' : 'Square'),
+              section: t.section || layout.section,
               floor: t.floor || layout.floor,
               status: mapBackendStatusToFrontendStatus(t.status, t.isActive !== false),
               x,
@@ -224,9 +235,24 @@ export const useTablesStore = create<TablesStore>()(
             };
           });
 
-          set({ tables: mappedTables, stats: computeStats(mappedTables) });
+          set({ 
+            tables: mappedTables, 
+            floors, 
+            sections, 
+            stats: computeStats(mappedTables) 
+          });
         } catch (err) {
           console.error('Failed to fetch tables from API', err);
+        }
+      },
+
+      updateRestaurantSettings: async (settings) => {
+        try {
+          await apiClient.patch('/admin/restaurant/settings', settings);
+          await get().fetchTables();
+        } catch (err) {
+          console.error('Failed to update restaurant settings', err);
+          throw err;
         }
       },
 
