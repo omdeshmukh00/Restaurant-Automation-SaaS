@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { CleaningSearchProvider } from '../features/cleaning/components/dashboard/CleaningSearchContext';
 import CleaningSidebar from '../features/cleaning/components/dashboard/CleaningSidebar';
 import CleaningTopBar from '../features/cleaning/components/dashboard/CleaningTopBar';
 import { ToastProvider } from '../features/cleaning/components/dashboard/Toast';
+import { useCleaning } from '../features/cleaning/hooks/usecleaning';
+import { getCleaningRolePermissions } from '../features/cleaning/utils/cleaningRoleAccess';
 
 export default function CleaningLayout(): JSX.Element {
+  const { profile } = useCleaning();
+  const location = useLocation();
+
+  const allowedPaths = getCleaningRolePermissions(profile.role);
+  const currentPath = location.pathname.replace(/\/$/, '');
+
+  const isAllowed = allowedPaths.includes(currentPath);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('cleaning-sidebar-collapsed');
@@ -13,7 +23,6 @@ export default function CleaningLayout(): JSX.Element {
     }
     return true;
   });
-  const location = useLocation();
 
   // Determine page title based on path
   const getPageDetails = (): { title: string; subtitle: string; badge?: React.ReactNode } => {
@@ -39,6 +48,10 @@ export default function CleaningLayout(): JSX.Element {
   };
 
   const { title, subtitle, badge } = getPageDetails();
+
+  if (!isAllowed && allowedPaths.length > 0) {
+    return <Navigate to={allowedPaths[0]} replace />;
+  }
 
   return (
     <ToastProvider>

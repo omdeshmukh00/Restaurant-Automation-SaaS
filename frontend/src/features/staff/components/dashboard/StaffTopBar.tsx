@@ -8,7 +8,7 @@ import { useStaffDashboard } from '../../hooks/useStaffDashboard';
 export default function StaffTopBar({ onNotificationClick }: { onNotificationClick?: () => void }) {
   const { query, setQuery } = useStaffSearch();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const { profile } = useStaffProfile();
+  const { profile, updateProfile } = useStaffProfile();
   const { unreadCount } = useNotifications();
   const { requests, tables } = useStaffDashboard();
   const navigate = useNavigate();
@@ -126,6 +126,26 @@ export default function StaffTopBar({ onNotificationClick }: { onNotificationCli
             </span>
           )}
         </button>
+
+        {/* Dynamic Role Switcher (Temporary Dropdown) */}
+        <div className="relative flex items-center">
+          <span className="material-symbols-outlined absolute left-2.5 text-[18px] text-slate-400 pointer-events-none">
+            shield_person
+          </span>
+          <select
+            value={['Waiter', 'Floor Staff', 'Floor Supervisor'].includes(profile.role) ? profile.role : 'Waiter'}
+            onChange={(e) => updateProfile({ role: e.target.value })}
+            className="pl-8 pr-7 py-1.5 border border-slate-200 dark:border-sd-outline-variant/40 rounded-full text-xs font-semibold bg-slate-50 dark:bg-sd-surface-container-low text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-dine-orange cursor-pointer appearance-none font-sans"
+            title="Switch staff role (Testing)"
+          >
+            <option value="Waiter">Waiter</option>
+            <option value="Floor Staff">Floor Staff</option>
+            <option value="Floor Supervisor">Floor Supervisor</option>
+          </select>
+          <span className="material-symbols-outlined absolute right-2 text-[18px] text-slate-405 pointer-events-none">
+            keyboard_arrow_down
+          </span>
+        </div>
 
         {/* Profile Avatar (placed on top-right) */}
         <button
