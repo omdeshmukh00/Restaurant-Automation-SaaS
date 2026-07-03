@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
+import { useStaffDashboard } from '../hooks/useStaffDashboard';
 
 interface MenuItem {
   id: number;
@@ -15,19 +16,50 @@ interface MenuItem {
 export default function StaffMenuPage() {
   const { query } = useStaffSearch();
   const [selectedCategory, setSelectedCategory] = useState<'All' | 'Starters' | 'Mains' | 'Desserts' | 'Beverages'>('All');
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([
-    { id: 1, name: 'Paneer Tikka Masala', category: 'Mains', price: 340, available: true, spicy: true, veg: true, description: 'Clay-oven roasted cottage cheese cubes cooked in spicy rich tomato-based gravy.' },
-    { id: 2, name: 'Butter Naan', category: 'Mains', price: 60, available: true, veg: true, description: 'Leavened flatbread made of white flour, baked in tandoor and brushed with butter.' },
-    { id: 3, name: 'Virgin Mojito', category: 'Beverages', price: 160, available: true, veg: true, description: 'Refreshing cocktail containing lime juice, mint leaves, sugar syrup, and soda.' },
-    { id: 4, name: 'Chocolate Lava Cake', category: 'Desserts', price: 190, available: true, veg: true, description: 'Rich chocolate cake with a molten chocolate core, served with vanilla ice cream.' },
-    { id: 5, name: 'Spring Rolls', category: 'Starters', price: 180, available: true, veg: true, description: 'Crispy fried rolled pastry filled with seasoned vegetables.' },
-    { id: 6, name: 'Chicken Biryani', category: 'Mains', price: 420, available: true, spicy: true, veg: false, description: 'Slow-cooked aromatic basmati rice layered with marinated chicken, saffron, and spices.' },
-    { id: 7, name: 'Dal Makhani', category: 'Mains', price: 280, available: false, veg: true, description: 'Creamy black lentils slow-cooked overnight with spices, butter, and cream.' },
-    { id: 8, name: 'French Fries', category: 'Starters', price: 120, available: true, veg: true, description: 'Golden, crispy, lightly salted deep-fried potato strips.' },
-  ]);
+  const { menuItems, setMenuItems } = useStaffDashboard();
+
+  // Modal addition states
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemDesc, setNewItemDesc] = useState('');
+  const [newItemPrice, setNewItemPrice] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState<MenuItem['category']>('Starters');
+  const [newItemVeg, setNewItemVeg] = useState(true);
+  const [newItemSpicy, setNewItemSpicy] = useState(false);
 
   const toggleAvailability = (id: number) => {
     setMenuItems(prev => prev.map(item => item.id === id ? { ...item, available: !item.available } : item));
+  };
+
+  const handleAddItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemName || !newItemPrice) return;
+
+    const addedItem: MenuItem = {
+      id: Date.now(),
+      name: newItemName,
+      description: newItemDesc,
+      price: parseFloat(newItemPrice),
+      category: newItemCategory,
+      veg: newItemVeg,
+      spicy: newItemSpicy,
+      available: true
+    };
+
+    setMenuItems([addedItem, ...menuItems]);
+    setNewItemName('');
+    setNewItemDesc('');
+    setNewItemPrice('');
+    setNewItemCategory('Starters');
+    setNewItemVeg(true);
+    setNewItemSpicy(false);
+    setShowAddModal(false);
+  };
+
+  const deleteItem = (id: number) => {
+    if (confirm("Are you sure you want to delete this menu item?")) {
+      setMenuItems(prev => prev.filter(item => item.id !== id));
+    }
   };
 
   const filteredByCategory = menuItems.filter(item => 
@@ -45,22 +77,31 @@ export default function StaffMenuPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">Menu</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Browse menu items and manage real-time availability status.</p>
+          <p className="text-sm text-slate-550 mt-0.5">Browse menu items and manage real-time availability status.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(['All', 'Starters', 'Mains', 'Desserts', 'Beverages'] as const).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`text-xs font-bold py-2 px-3 rounded-lg border transition-all ${
-                selectedCategory === cat
-                  ? 'bg-dine-orange text-white border-dine-orange shadow-sm'
-                  : 'bg-white text-slate-655 border border-slate-100 hover:bg-slate-55'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(['All', 'Starters', 'Mains', 'Desserts', 'Beverages'] as const).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`text-xs font-bold py-2 px-3 rounded-lg border transition-all ${
+                  selectedCategory === cat
+                    ? 'bg-dine-orange text-white border-dine-orange shadow-sm'
+                    : 'bg-white text-slate-655 border border-slate-100 hover:bg-slate-55'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-dine-orange hover:bg-dine-orange/90 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all border-none outline-none cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Add Item
+          </button>
         </div>
       </div>
 
@@ -92,8 +133,15 @@ export default function StaffMenuPage() {
                       </svg>
                     )}
                     {item.spicy && (
-                      <img src="/spicy-chili.jpg" alt="Spicy" className="w-4.5 h-4.5 object-contain shrink-0" style={{ width: '18px', height: '18px' }} />
+                      <span className="material-symbols-outlined text-red-500 text-[18px]" title="Spicy">local_fire_department</span>
                     )}
+                    <button
+                      onClick={() => deleteItem(item.id)}
+                      className="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg border-none bg-transparent cursor-pointer flex items-center justify-center focus:outline-none"
+                      title="Delete Item"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
                   </div>
                 </div>
 
@@ -129,6 +177,104 @@ export default function StaffMenuPage() {
           </div>
         )}
       </div>
+
+      {/* Add Item Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Add Menu Item</h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
+              Create a new food or beverage item.
+            </p>
+            <form onSubmit={handleAddItem} className="space-y-4 font-sans text-xs">
+              <div>
+                <label htmlFor="new-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Item Name</label>
+                <input
+                  id="new-name"
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="new-desc" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Description</label>
+                <textarea
+                  id="new-desc"
+                  value={newItemDesc}
+                  onChange={(e) => setNewItemDesc(e.target.value)}
+                  rows={2}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="new-price" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Price (₹)</label>
+                  <input
+                    id="new-price"
+                    type="number"
+                    value={newItemPrice}
+                    onChange={(e) => setNewItemPrice(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="new-cat" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Category</label>
+                  <select
+                    id="new-cat"
+                    value={newItemCategory}
+                    onChange={(e) => setNewItemCategory(e.target.value as MenuItem['category'])}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-850 dark:text-slate-200"
+                  >
+                    <option value="Starters">Starters</option>
+                    <option value="Mains">Mains</option>
+                    <option value="Desserts">Desserts</option>
+                    <option value="Beverages">Beverages</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-6 py-1">
+                <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newItemVeg}
+                    onChange={(e) => setNewItemVeg(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-200 text-dine-orange focus:ring-dine-orange cursor-pointer"
+                  />
+                  Vegetarian
+                </label>
+                <label className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newItemSpicy}
+                    onChange={(e) => setNewItemSpicy(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-200 text-dine-orange focus:ring-dine-orange cursor-pointer"
+                  />
+                  Spicy
+                </label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95 cursor-pointer"
+                >
+                  Add Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ export interface Order {
   status: 'Pending' | 'Preparing' | 'Ready' | 'Served' | 'Completed' | 'Cancelled';
   time: string;
   total: number;
+  rating?: number;
 }
 
 export interface ReadyItem {
@@ -55,6 +56,43 @@ export interface AlertItem {
   time: string;
 }
 
+export interface StaffTable {
+  id: number;
+  name: string;
+  section: 'Zone A' | 'Zone B' | 'Outdoor';
+  capacity: number;
+  guests: number;
+  status: 'Available' | 'Reserved' | 'Occupied' | 'Cleaning' | 'Bill Requested' | 'Food Served';
+  currentBill?: number;
+  elapsed?: string;
+  action?: string;
+  assignedGuest?: string;
+  turns?: number;
+}
+
+export interface StaffReservation {
+  id: number;
+  name: string;
+  pax: number;
+  time: string;
+  phone: string;
+  status: 'Confirmed' | 'Seated' | 'Cancelled';
+  type: 'Reservation' | 'Walk-in';
+  queueNo?: number;
+  assignedTable?: string;
+}
+
+export interface MenuItem {
+  id: number;
+  name: string;
+  category: 'Starters' | 'Mains' | 'Desserts' | 'Beverages';
+  price: number;
+  available: boolean;
+  spicy?: boolean;
+  veg: boolean;
+  description: string;
+}
+
 class StaffStore {
   private static instance: StaffStore;
   
@@ -63,6 +101,9 @@ class StaffStore {
   public readyItems: ReadyItem[] = this.loadReadyItems();
   public requests: RequestItem[] = this.loadRequests();
   public alerts: AlertItem[] = this.loadAlerts();
+  public tables: StaffTable[] = this.loadTables();
+  public reservations: StaffReservation[] = this.loadReservations();
+  public menuItems: MenuItem[] = this.loadMenuItems();
 
   private listeners: Set<() => void> = new Set();
 
@@ -236,6 +277,28 @@ class StaffStore {
     return defaults;
   }
 
+  private loadTables(): StaffTable[] {
+    const defaults: StaffTable[] = [
+      { id: 1, name: 'Table 1', section: 'Zone A', capacity: 2, guests: 2, status: 'Occupied', currentBill: 1240, elapsed: '45 mins', action: 'Order', assignedGuest: 'Rajesh Kumar', turns: 6 },
+      { id: 2, name: 'Table 2', section: 'Zone A', capacity: 4, guests: 4, status: 'Bill Requested', currentBill: 3450, elapsed: '1h 15m', action: 'Pay', assignedGuest: 'Priya Sharma', turns: 4 },
+      { id: 3, name: 'Table 3', section: 'Zone A', capacity: 4, guests: 3, status: 'Food Served', currentBill: 2100, elapsed: '30 mins', action: 'Service', assignedGuest: 'Amit Patel', turns: 5 },
+      { id: 4, name: 'Table 4', section: 'Zone A', capacity: 2, guests: 0, status: 'Cleaning', currentBill: 0, elapsed: '5 mins', action: 'Clean', turns: 3 },
+      { id: 5, name: 'Table 5', section: 'Zone B', capacity: 6, guests: 5, status: 'Occupied', currentBill: 4800, elapsed: '2 hours', assignedGuest: 'Neha Gupta', turns: 3 },
+      { id: 6, name: 'Table 6', section: 'Zone B', capacity: 4, guests: 0, status: 'Reserved', elapsed: '10 mins', turns: 5 },
+      { id: 7, name: 'Table 7', section: 'Zone B', capacity: 2, guests: 0, status: 'Available', turns: 7 },
+      { id: 8, name: 'Table 8', section: 'Zone B', capacity: 4, guests: 0, status: 'Available', turns: 2 },
+      { id: 9, name: 'Table 9', section: 'Outdoor', capacity: 4, guests: 4, status: 'Occupied', currentBill: 1950, elapsed: '50 mins', assignedGuest: 'Sanjay Dutt', turns: 4 },
+      { id: 10, name: 'Table 10', section: 'Outdoor', capacity: 2, guests: 0, status: 'Available', turns: 1 },
+    ];
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dineease-staff-tables');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { return defaults; }
+      }
+    }
+    return defaults;
+  }
+
   public setOrders(orders: Order[] | ((prev: Order[]) => Order[])) {
     this.orders = typeof orders === 'function' ? orders(this.orders) : orders;
     if (typeof window !== 'undefined') {
@@ -264,6 +327,67 @@ class StaffStore {
     this.alerts = typeof alerts === 'function' ? alerts(this.alerts) : alerts;
     if (typeof window !== 'undefined') {
       localStorage.setItem('dineease-staff-alerts', JSON.stringify(this.alerts));
+    }
+    this.notify();
+  }
+
+  public setTables(tables: StaffTable[] | ((prev: StaffTable[]) => StaffTable[])) {
+    this.tables = typeof tables === 'function' ? tables(this.tables) : tables;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dineease-staff-tables', JSON.stringify(this.tables));
+    }
+    this.notify();
+  }
+
+  private loadReservations(): StaffReservation[] {
+    const defaults: StaffReservation[] = [
+      { id: 1, name: 'Ananya Roy', pax: 4, time: '07:30 PM', phone: '+91 98765 43210', status: 'Confirmed', type: 'Reservation' },
+      { id: 2, name: 'Vikram Singh', pax: 2, time: '08:00 PM', phone: '+91 87654 32109', status: 'Confirmed', type: 'Reservation' },
+      { id: 3, name: 'Siddharth Sen', pax: 5, time: '15 mins wait', phone: '+91 76543 21098', status: 'Confirmed', type: 'Walk-in', queueNo: 1 },
+      { id: 4, name: 'Megha Gupta', pax: 3, time: '25 mins wait', phone: '+91 65432 10987', status: 'Confirmed', type: 'Walk-in', queueNo: 2 },
+      { id: 5, name: 'Kabir Mehta', pax: 6, time: '09:00 PM', phone: '+91 54321 09876', status: 'Confirmed', type: 'Reservation' },
+    ];
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dineease-staff-reservations');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { return defaults; }
+      }
+    }
+    return defaults;
+  }
+
+  public setReservations(reservations: StaffReservation[] | ((prev: StaffReservation[]) => StaffReservation[])) {
+    this.reservations = typeof reservations === 'function' ? reservations(this.reservations) : reservations;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dineease-staff-reservations', JSON.stringify(this.reservations));
+    }
+    this.notify();
+  }
+
+  private loadMenuItems(): MenuItem[] {
+    const defaults: MenuItem[] = [
+      { id: 1, name: 'Paneer Tikka Masala', category: 'Mains', price: 340, available: true, spicy: true, veg: true, description: 'Clay-oven roasted cottage cheese cubes cooked in spicy rich tomato-based gravy.' },
+      { id: 2, name: 'Butter Naan', category: 'Mains', price: 60, available: true, veg: true, description: 'Leavened flatbread made of white flour, baked in tandoor and brushed with butter.' },
+      { id: 3, name: 'Virgin Mojito', category: 'Beverages', price: 160, available: true, veg: true, description: 'Refreshing cocktail containing lime juice, mint leaves, sugar syrup, and soda.' },
+      { id: 4, name: 'Chocolate Lava Cake', category: 'Desserts', price: 190, available: true, veg: true, description: 'Rich chocolate cake with a molten chocolate core, served with vanilla ice cream.' },
+      { id: 5, name: 'Spring Rolls', category: 'Starters', price: 180, available: true, veg: true, description: 'Crispy fried rolled pastry filled with seasoned vegetables.' },
+      { id: 6, name: 'Chicken Biryani', category: 'Mains', price: 420, available: true, spicy: true, veg: false, description: 'Slow-cooked aromatic basmati rice layered with marinated chicken, saffron, and spices.' },
+      { id: 7, name: 'Dal Makhani', category: 'Mains', price: 280, available: false, veg: true, description: 'Creamy black lentils slow-cooked overnight with spices, butter, and cream.' },
+      { id: 8, name: 'French Fries', category: 'Starters', price: 120, available: true, veg: true, description: 'Golden, crispy, lightly salted deep-fried potato strips.' },
+    ];
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dineease-staff-menu');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { return defaults; }
+      }
+    }
+    return defaults;
+  }
+
+  public setMenuItems(menu: MenuItem[] | ((prev: MenuItem[]) => MenuItem[])) {
+    this.menuItems = typeof menu === 'function' ? menu(this.menuItems) : menu;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dineease-staff-menu', JSON.stringify(this.menuItems));
     }
     this.notify();
   }

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { StaffSearchProvider } from '../features/staff/components/dashboard/StaffSearchContext';
 import StaffSidebar from '../features/staff/components/dashboard/StaffSidebar';
 import StaffTopBar from '../features/staff/components/dashboard/StaffTopBar';
+import { NotificationWindow } from '../features/staff/components/NotificationWindow';
 
 export default function StaffLayout(): JSX.Element {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -12,6 +13,8 @@ export default function StaffLayout(): JSX.Element {
     }
     return true;
   });
+
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   return (
     <StaffSearchProvider>
@@ -47,7 +50,7 @@ export default function StaffLayout(): JSX.Element {
             sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
           }`}
         >
-          <StaffTopBar />
+          <StaffTopBar onNotificationClick={() => setIsNotificationOpen(true)} />
 
           {/* Page Content */}
           <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
@@ -55,6 +58,20 @@ export default function StaffLayout(): JSX.Element {
           </main>
         </div>
       </div>
+
+      <NotificationWindow
+        open={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        theme={{
+          cardBg: '#1e293b', // slate-800
+          cardBorder: '#334155', // slate-700
+          miniCardBg: '#0f172a', // slate-900
+          textPrimary: '#ffffff',
+          textSecondary: '#cbd5e1', // slate-300
+          textMuted: '#94a3b8', // slate-400
+          font: 'sans-serif'
+        }}
+      />
     </StaffSearchProvider>
   );
 }

@@ -71,15 +71,62 @@ export default function StaffProfilePage() {
     setShowCropModal(false);
   };
 
-  const schedule = [
-    { day: 'Monday (Today)', shift: '04:00 PM - 11:00 PM', status: 'Active' },
-    { day: 'Tuesday', shift: '04:00 PM - 11:00 PM', status: 'Upcoming' },
-    { day: 'Wednesday', shift: '04:00 PM - 11:00 PM', status: 'Upcoming' },
-    { day: 'Thursday', shift: 'Weekly Off', status: 'Off' },
-    { day: 'Friday', shift: '04:00 PM - 11:00 PM', status: 'Upcoming' },
-    { day: 'Saturday', shift: '12:00 PM - 11:00 PM (Double Shift)', status: 'Upcoming' },
-    { day: 'Sunday', shift: '12:00 PM - 09:00 PM', status: 'Upcoming' },
-  ];
+  interface ScheduleItem {
+    day: string;
+    shift: string;
+    defaultStatus: string;
+  }
+
+  const [scheduleData, setScheduleData] = useState<ScheduleItem[]>(() => {
+    const defaults = [
+      { day: 'Monday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
+      { day: 'Tuesday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
+      { day: 'Wednesday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
+      { day: 'Thursday', shift: 'Weekly Off', defaultStatus: 'Off' },
+      { day: 'Friday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
+      { day: 'Saturday', shift: '12:00 PM - 11:00 PM (Double Shift)', defaultStatus: 'Upcoming' },
+      { day: 'Sunday', shift: '12:00 PM - 09:00 PM', defaultStatus: 'Upcoming' },
+    ];
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dineease-staff-schedule');
+      if (saved) {
+        try { return JSON.parse(saved); } catch (e) { return defaults; }
+      }
+    }
+    return defaults;
+  });
+
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [tempShifts, setTempShifts] = useState<Record<string, string>>({});
+
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday...
+
+  const schedule = scheduleData.map(item => {
+    const itemDayIndex = weekdays.indexOf(item.day);
+    const adjustedItemIdx = itemDayIndex === 0 ? 7 : itemDayIndex;
+    const adjustedTodayIdx = todayIndex === 0 ? 7 : todayIndex;
+
+    let status = 'Upcoming';
+    let dayLabel = item.day;
+
+    const isOff = item.shift.toLowerCase().includes('off');
+
+    if (isOff) {
+      status = 'Off';
+    } else if (adjustedItemIdx === adjustedTodayIdx) {
+      status = 'Active';
+      dayLabel = `${item.day} (Today)`;
+    } else if (adjustedItemIdx < adjustedTodayIdx) {
+      status = 'Completed';
+    }
+
+    return {
+      day: dayLabel,
+      shift: item.shift,
+      status
+    };
+  });
 
   return (
     <>
@@ -182,9 +229,21 @@ export default function StaffProfilePage() {
 
           {/* Right Side: Shift Schedule */}
           <div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm dark:bg-sd-surface-container dark:border-sd-outline-variant/40">
-            <div className="flex items-center gap-2 pb-4 border-b border-slate-100 dark:border-sd-outline-variant/40">
-              <span className="material-symbols-outlined text-dine-orange">calendar_month</span>
-              <h2 className="font-bold text-base text-slate-850 dark:text-slate-150 font-sans">Shift Schedule</h2>
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-sd-outline-variant/40">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-dine-orange">calendar_month</span>
+                <h2 className="font-bold text-base text-slate-850 dark:text-slate-150 font-sans">Shift Schedule</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setTempShifts(scheduleData.reduce((acc: Record<string, string>, curr) => ({ ...acc, [curr.day]: curr.shift }), {}));
+                  setShowScheduleModal(true);
+                }}
+                className="text-dine-orange hover:text-orange-655 font-bold text-xs flex items-center gap-1 transition-all border-none bg-transparent cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
+                Edit Schedule
+              </button>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -204,6 +263,7 @@ export default function StaffProfilePage() {
                   <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
                     sch.status === 'Active' ? 'bg-orange-100 text-dine-orange dark:bg-orange-950/50 dark:text-orange-400 animate-pulse' :
                     sch.status === 'Off' ? 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
+                    sch.status === 'Completed' ? 'bg-green-105 text-green-600 dark:bg-green-950/40 dark:text-green-400' :
                     'bg-blue-50 text-blue-600 dark:bg-blue-950/40'
                   }`}>
                     {sch.status}
@@ -317,6 +377,58 @@ export default function StaffProfilePage() {
         onClose={() => setShowCropModal(false)}
         onConfirm={handleCropConfirm}
       />
+
+      {/* Edit Shift Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-md">
+            <h3 className="font-extrabold text-sm text-slate-850 dark:text-slate-100 mb-1 font-sans">Modify Shift Schedule</h3>
+            <p className="text-[11px] text-slate-400 mb-4 font-sans leading-relaxed">
+              Update your shift durations for each weekday.
+            </p>
+            <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
+              {scheduleData.map(item => (
+                <div key={item.day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="font-bold text-xs text-slate-700 dark:text-slate-350 w-24 shrink-0 font-sans">{item.day}</span>
+                  <input
+                    type="text"
+                    value={tempShifts[item.day] || ''}
+                    onChange={e => setTempShifts({ ...tempShifts, [item.day]: e.target.value })}
+                    className="w-full sm:flex-1 p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs"
+                    placeholder="e.g. 04:00 PM - 11:00 PM or Weekly Off"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowScheduleModal(false)}
+                className="flex-1 py-2 bg-slate-105 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const updatedData = scheduleData.map(item => ({
+                    ...item,
+                    shift: tempShifts[item.day] || item.shift
+                  }));
+                  setScheduleData(updatedData);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('dineease-staff-schedule', JSON.stringify(updatedData));
+                  }
+                  setShowScheduleModal(false);
+                }}
+                className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all cursor-pointer border-none"
+              >
+                Save Shifts
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
