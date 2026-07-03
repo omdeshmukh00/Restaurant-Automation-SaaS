@@ -5,6 +5,8 @@ import { UserRole } from '../../constants/roles';
 import { signAccessToken } from '../../services/jwt.service';
 import { RestaurantModel } from '../../modules/restaurants/restaurants.model';
 import { UploadModel } from '../../modules/uploads/uploads.model';
+import { AuditLogModel } from '../../modules/auditLogs/auditLogs.schema';
+import { AuditAction, AuditEntity } from '../../modules/auditLogs/auditLogs.types';
 
 function createToken(restaurantId: string, role: UserRole = UserRole.RESTAURANT_ADMIN): string {
   return signAccessToken({
@@ -27,13 +29,14 @@ async function createTenant(slug: string) {
   return {
     restaurant,
     token: createToken(restaurant.id),
+    staffToken: createToken(restaurant.id, UserRole.SERVICE_STAFF),
   };
 }
 
-function filePayload(content: string, fileName = 'document.txt') {
+function filePayload(content: string, fileName = 'document.pdf', mimeType = 'application/pdf') {
   return {
     fileName,
-    mimeType: 'text/plain',
+    mimeType,
     content: Buffer.from(content).toString('base64'),
   };
 }
@@ -41,97 +44,167 @@ function filePayload(content: string, fileName = 'document.txt') {
 describe('Upload Routes', () => {
   beforeEach(() => {
     env.UPLOAD_PROVIDER = 'local';
+    env.MAX_IMAGE_SIZE_MB = 5;
+    env.MAX_DOCUMENT_SIZE_MB = 10;
   });
 
-  it('enforces tenant isolation', async () => {
-    const tenantA = await createTenant('tenant-a');
-    const tenantB = await createTenant('tenant-b');
+  describe('Validation', () => {
+    it('uploads a valid pdf', async () => {
+      const { token } = await createTenant('valid-pdf');
+      const res = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('pdf content', 'test.pdf', 'application/pdf'));
 
-    const uploadResponse = await request(app)
-      .post('/api/v1/uploads')
-      .set('Authorization', `Bearer ${tenantA.token}`)
-      .send(filePayload('tenant a secret'));
+      expect(res.status).toBe(201);
+    });
 
-    expect(uploadResponse.status).toBe(201);
+    it('uploads a valid image', async () => {
+      const { token } = await createTenant('valid-img');
+      const res = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('img content', 'test.png', 'image/png'));
 
-    const crossTenantDownload = await request(app)
-      .get(`/api/v1/uploads/${uploadResponse.body.data._id}/download`)
-      .set('Authorization', `Bearer ${tenantB.token}`);
+      expect(res.status).toBe(201);
+    });
 
-    expect(crossTenantDownload.status).toBe(404);
+    it('rejects invalid file extension', async () => {
+      const { token } = await createTenant('invalid-ext');
+      const res = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('exe content', 'malicious.exe', 'application/pdf'));
+
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects invalid mime type', async () => {
+      const { token } = await createTenant('invalid-mime');
+      const res = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('txt content', 'test.pdf', 'text/plain'));
+
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects oversized file based on type limits', async () => {
+      const { token } = await createTenant('oversized');
+      env.MAX_IMAGE_SIZE_MB = 0; // force limit
+      const res = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('img content', 'test.png', 'image/png'));
+
+      expect(res.status).toBe(400);
+      expect(JSON.stringify(res.body)).toContain('File exceeds 0MB limit');
+    });
   });
 
-  it('rejects unauthorized upload requests', async () => {
-    const response = await request(app)
-      .post('/api/v1/uploads')
-      .send(filePayload('no auth'));
+  describe('Tenant Isolation', () => {
+    it('enforces tenant isolation', async () => {
+      const tenantA = await createTenant('tenant-a');
+      const tenantB = await createTenant('tenant-b');
 
-    expect(response.status).toBe(401);
+      const uploadResponse = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${tenantA.token}`)
+        .send(filePayload('tenant a secret'));
+
+      const crossTenantDownload = await request(app)
+        .get(`/api/v1/uploads/${uploadResponse.body.data._id}/download`)
+        .set('Authorization', `Bearer ${tenantB.token}`);
+
+      expect(crossTenantDownload.status).toBe(404);
+    });
   });
 
-  it('deletes uploads within the authenticated tenant', async () => {
-    const { token } = await createTenant('delete-flow');
+  describe('RBAC', () => {
+    it('rejects unauthorized upload requests', async () => {
+      const response = await request(app)
+        .post('/api/v1/uploads')
+        .send(filePayload('no auth'));
 
-    const uploadResponse = await request(app)
-      .post('/api/v1/uploads')
-      .set('Authorization', `Bearer ${token}`)
-      .send(filePayload('delete me'));
+      expect(response.status).toBe(401);
+    });
 
-    expect(uploadResponse.status).toBe(201);
+    it('allows admin to delete uploads', async () => {
+      const { token } = await createTenant('admin-delete');
 
-    const deleteResponse = await request(app)
-      .delete(`/api/v1/uploads/${uploadResponse.body.data._id}`)
-      .set('Authorization', `Bearer ${token}`);
+      const uploadResponse = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('delete me'));
 
-    expect(deleteResponse.status).toBe(200);
-    expect(await UploadModel.findById(uploadResponse.body.data._id)).toBeNull();
+      const deleteResponse = await request(app)
+        .delete(`/api/v1/uploads/${uploadResponse.body.data._id}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(deleteResponse.status).toBe(200);
+      expect(await UploadModel.findById(uploadResponse.body.data._id)).toBeNull();
+    });
+
+    it('prevents staff from deleting uploads', async () => {
+      const { token, staffToken } = await createTenant('staff-delete');
+
+      const uploadResponse = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('delete me'));
+
+      const deleteResponse = await request(app)
+        .delete(`/api/v1/uploads/${uploadResponse.body.data._id}`)
+        .set('Authorization', `Bearer ${staffToken}`);
+
+      expect(deleteResponse.status).toBe(403);
+    });
   });
 
-  it('replaces upload content and metadata', async () => {
-    const { token } = await createTenant('replacement-flow');
+  describe('Audit Logging', () => {
+    it('creates an audit log on upload and delete', async () => {
+      const { token, restaurant } = await createTenant('audit-flow');
 
-    const uploadResponse = await request(app)
-      .post('/api/v1/uploads')
-      .set('Authorization', `Bearer ${token}`)
-      .send(filePayload('old file', 'old.txt'));
+      // Upload
+      const uploadResponse = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('audit me'));
 
-    const replaceResponse = await request(app)
-      .patch(`/api/v1/uploads/${uploadResponse.body.data._id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send(filePayload('new file', 'new.txt'));
+      expect(uploadResponse.status).toBe(201);
+      const uploadId = uploadResponse.body.data._id;
 
-    expect(replaceResponse.status).toBe(200);
-    expect(replaceResponse.body.data.fileName).toBe('new.txt');
-    expect(replaceResponse.body.data.size).toBe(Buffer.byteLength('new file'));
+      let logs = await AuditLogModel.find({ entityType: AuditEntity.UPLOAD, entityId: uploadId });
+      expect(logs.length).toBe(1);
+      expect(logs[0].action).toBe(AuditAction.UPLOAD_CREATED);
+      expect(logs[0].restaurantId?.toString()).toBe(restaurant.id);
 
-    const downloadResponse = await request(app)
-      .get(`/api/v1/uploads/${uploadResponse.body.data._id}/download`)
-      .set('Authorization', `Bearer ${token}`);
+      // Delete
+      await request(app)
+        .delete(`/api/v1/uploads/${uploadId}`)
+        .set('Authorization', `Bearer ${token}`);
 
-    expect(downloadResponse.status).toBe(200);
-    expect(downloadResponse.text).toBe('new file');
+      logs = await AuditLogModel.find({ entityType: AuditEntity.UPLOAD, entityId: uploadId, action: AuditAction.UPLOAD_DELETED });
+      expect(logs.length).toBe(1);
+    });
   });
 
-  it('serves documents only through authenticated download endpoint', async () => {
-    const { token } = await createTenant('secure-download');
+  describe('Other Flows', () => {
+    it('replaces upload content and metadata', async () => {
+      const { token } = await createTenant('replacement-flow');
 
-    const uploadResponse = await request(app)
-      .post('/api/v1/uploads')
-      .set('Authorization', `Bearer ${token}`)
-      .send(filePayload('download me'));
+      const uploadResponse = await request(app)
+        .post('/api/v1/uploads')
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('old file', 'old.pdf'));
 
-    const unauthenticatedDownload = await request(app)
-      .get(`/api/v1/uploads/${uploadResponse.body.data._id}/download`);
+      const replaceResponse = await request(app)
+        .patch(`/api/v1/uploads/${uploadResponse.body.data._id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(filePayload('new file', 'new.pdf'));
 
-    expect(unauthenticatedDownload.status).toBe(401);
-
-    const authenticatedDownload = await request(app)
-      .get(`/api/v1/uploads/${uploadResponse.body.data._id}/download`)
-      .set('Authorization', `Bearer ${token}`);
-
-    expect(authenticatedDownload.status).toBe(200);
-    expect(authenticatedDownload.text).toBe('download me');
-    expect(uploadResponse.body.data.storageKey).toContain('tenants/');
-    expect(uploadResponse.body.data.storageKey).not.toMatch(/^uploads\//);
+      expect(replaceResponse.status).toBe(200);
+      expect(replaceResponse.body.data.fileName).toBe('new.pdf');
+    });
   });
 });

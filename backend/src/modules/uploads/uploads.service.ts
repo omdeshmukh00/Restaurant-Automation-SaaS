@@ -7,6 +7,7 @@ import { env } from '../../config/env';
 import { ErrorCode } from '../../constants/errors';
 import { AppError } from '../../utils/AppError';
 import { IUpload, UploadModel } from './uploads.model';
+import { ALLOWED_IMAGE_MIMES } from './uploads.schema';
 
 type FileInput = {
   fileName: string;
@@ -185,9 +186,14 @@ async function readLocal(storageKey: string): Promise<Buffer> {
 
 async function storeFile(tenantId: string, input: FileInput): Promise<StoredFile> {
   const buffer = decodeContent(input.content);
-  const maxBytes = env.MAX_FILE_SIZE_MB * 1024 * 1024;
+  
+  // Validate maximum payload size based on type
+  const isImage = ALLOWED_IMAGE_MIMES.includes(input.mimeType);
+  const maxMb = isImage ? env.MAX_IMAGE_SIZE_MB : env.MAX_DOCUMENT_SIZE_MB;
+  const maxBytes = maxMb * 1024 * 1024;
+  
   if (buffer.length > maxBytes) {
-    throw new AppError(`File exceeds ${env.MAX_FILE_SIZE_MB}MB limit`, 400, ErrorCode.INVALID_REQUEST);
+    throw new AppError(`File exceeds ${maxMb}MB limit`, 400, ErrorCode.INVALID_REQUEST);
   }
 
   const storageKey = buildStorageKey(tenantId, input.fileName);

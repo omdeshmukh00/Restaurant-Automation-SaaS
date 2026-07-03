@@ -10,25 +10,36 @@ import { createUploadSchema, replaceUploadSchema, uploadIdParamSchema } from './
 
 const uploadRouter = Router();
 
+// Security: Define fine-grained RBAC roles
 const uploadRoles = [
   UserRole.RESTAURANT_ADMIN,
+  UserRole.SUPER_ADMIN,
   UserRole.SERVICE_STAFF,
-  UserRole.KITCHEN_STAFF,
-  UserRole.CLEANING_STAFF,
+];
+
+const deleteRoles = [
+  UserRole.RESTAURANT_ADMIN,
   UserRole.SUPER_ADMIN,
 ];
 
-uploadRouter.use(requireAuth, roleGuard(...uploadRoles), tenantGuard);
+// All endpoints require authentication and tenant isolation checks
+uploadRouter.use(requireAuth, tenantGuard);
 
+// List and Download: Allow any authenticated user within the same tenant
 uploadRouter.get('/uploads', UploadController.list);
-uploadRouter.post('/uploads', uploadLimiter, validate({ body: createUploadSchema }), UploadController.create);
 uploadRouter.get('/uploads/:id/download', validate({ params: uploadIdParamSchema }), UploadController.download);
+
+// Upload and Replace: Restricted to uploadRoles
+uploadRouter.post('/uploads', roleGuard(...uploadRoles), uploadLimiter, validate({ body: createUploadSchema }), UploadController.create);
 uploadRouter.patch(
   '/uploads/:id',
+  roleGuard(...uploadRoles),
   uploadLimiter,
   validate({ params: uploadIdParamSchema, body: replaceUploadSchema }),
   UploadController.replace,
 );
-uploadRouter.delete('/uploads/:id', validate({ params: uploadIdParamSchema }), UploadController.delete);
+
+// Delete: Restricted to deleteRoles only (prevents staff/cleaning staff from deleting)
+uploadRouter.delete('/uploads/:id', roleGuard(...deleteRoles), validate({ params: uploadIdParamSchema }), UploadController.delete);
 
 export default uploadRouter;

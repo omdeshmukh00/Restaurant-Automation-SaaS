@@ -45,6 +45,8 @@ const envSchema = z.object({
   UPLOAD_PROVIDER: z.enum(['local', 's3', 'cloudinary']).default('local'),
   UPLOAD_PATH: z.string().default('uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().int().positive().default(10),
+  MAX_IMAGE_SIZE_MB: z.coerce.number().int().positive().default(5),
+  MAX_DOCUMENT_SIZE_MB: z.coerce.number().int().positive().default(10),
   UPLOAD_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(20),
   AWS_REGION: z.string().optional(),
   AWS_S3_BUCKET: z.string().optional(),

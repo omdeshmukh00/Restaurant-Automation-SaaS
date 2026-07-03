@@ -18,6 +18,7 @@ export enum AuditEntity {
   BILL         = 'BILL',
   INVENTORY_ITEM = 'INVENTORY_ITEM',
   SUPPLIER     = 'SUPPLIER',
+  UPLOAD       = 'UPLOAD',
 }
 
 // ── Actions per entity ────────────────────────────────────────────────
@@ -87,6 +88,11 @@ export enum AuditAction {
   QR_REGENERATED             = 'QR_REGENERATED',
   QR_SCANNED                 = 'QR_SCANNED',
   INVALID_QR_ATTEMPT         = 'INVALID_QR_ATTEMPT',
+
+  // Uploads
+  UPLOAD_CREATED             = 'UPLOAD_CREATED',
+  UPLOAD_UPDATED             = 'UPLOAD_UPDATED',
+  UPLOAD_DELETED             = 'UPLOAD_DELETED',
 }
 
 // ── Payload passed to the log helper ─────────────────────────────────
