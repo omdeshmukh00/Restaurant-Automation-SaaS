@@ -32,14 +32,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.connection.close();
-  }
+  // Force close any pending queries/timers for mongoose
   await disconnectDB();
-  await mongoose.disconnect();
+  
   if (mongoServer) {
     await mongoServer.stop();
   }
+  
+  jest.clearAllTimers();
+  
+
 });
 
 afterEach(async () => {

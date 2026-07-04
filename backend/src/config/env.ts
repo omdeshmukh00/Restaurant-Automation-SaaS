@@ -103,7 +103,9 @@ const envSchema = z.object({
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
-  console.error('Invalid environment configuration', parsedEnv.error.flatten().fieldErrors);
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { logger } = require('./logger');
+  logger.error('Invalid environment configuration', parsedEnv.error.flatten().fieldErrors);
   process.exit(1);
 }
 

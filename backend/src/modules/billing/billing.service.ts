@@ -411,7 +411,7 @@ export class BillingService {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
     } catch (notifError) {
-      console.error('Failed to trigger payment success notification:', notifError);
+      logger.error('Failed to trigger payment success notification:', notifError);
     }
 
     // Stock deduction is now handled by OrdersService.startCooking() during the kitchen workflow.
