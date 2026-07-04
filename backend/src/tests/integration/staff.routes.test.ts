@@ -1,3 +1,18 @@
+jest.mock('express-rate-limit', () => {
+  return jest.fn().mockReturnValue((req: any, res: any, next: any) => next());
+});
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+    verify: jest.fn().mockResolvedValue(true),
+    close: jest.fn(),
+  }),
+}));
+
+jest.mock('../../services/mail.service', () => ({
+  sendStaffInvitationEmail: jest.fn().mockResolvedValue(true),
+}));
+
 import request from 'supertest';
 import app from '../../app';
 import { UserRole } from '../../constants/roles';
@@ -5,12 +20,7 @@ import { signAccessToken } from '../../services/jwt.service';
 import { RestaurantModel } from '../../modules/restaurants/restaurants.model';
 import { UserModel } from '../../modules/users/users.model';
 
-jest.mock('../../services/mail.service', () => ({
-  sendStaffInvitationEmail: jest.fn().mockResolvedValue(true),
-  sendOTPEmail: jest.fn().mockResolvedValue(true),
-  sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
-  verifySmtpConnection: jest.fn().mockResolvedValue(true),
-}));
+
 
 import { sendStaffInvitationEmail } from '../../services/mail.service';
 
@@ -57,9 +67,6 @@ describe('Staff Routes', () => {
         // Notice password is intentionally omitted
       });
 
-    if (createResponse.status !== 201) {
-        console.error(createResponse.body);
-    }
 
     expect(createResponse.status).toBe(201);
     expect(createResponse.body.success).toBe(true);

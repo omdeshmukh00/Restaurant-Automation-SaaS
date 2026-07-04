@@ -30,7 +30,6 @@ let transporter: nodemailer.Transporter | null = null;
 export function getTransporter(): nodemailer.Transporter | null {
   if (transporter) return transporter;
 
-  console.log('getTransporter called. NODE_ENV:', env.NODE_ENV, 'SMTP_HOST:', env.SMTP_HOST);
 
   if (env.NODE_ENV !== 'test' && (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS)) {
     logger.warn('SMTP not configured - email sending disabled');
@@ -61,7 +60,7 @@ export async function verifySmtpConnection(): Promise<boolean> {
     logger.info('📧 SMTP Connection Verified - Ready to send emails');
     return true;
   } catch (error) {
-    console.error('SMTP Connection Failed ERROR', error);
+
     logger.error('❌ SMTP Connection Failed:', { error });
     return false;
   }
@@ -170,7 +169,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         restaurantId: options.restaurantId,
       }).catch(e => logger.error('Failed to save email log', e));
     }
-    console.error('sendEmail catch block error:', error);
+
 
     logger.error('Failed to send email:', {
       error: error.message,
@@ -386,7 +385,18 @@ export async function sendDailySalesReportEmail(
   }
 }
 
-export function resetTransporterForTests() { transporter = null; }
+export function closeTransporter() {
+  if (transporter) {
+    if (typeof transporter.close === 'function') {
+      transporter.close();
+    }
+    transporter = null;
+  }
+}
+
+export function resetTransporterForTests() { 
+  closeTransporter(); 
+}
 
 /**
  * Send Receipt Email

@@ -118,7 +118,6 @@ export class LoyaltyController {
       if (!req.user?.restaurantId) {
   throw new Error('Restaurant context not found');
   }
-  console.log('REQ USER =>', req.user);
       const rule =
         await LoyaltyService.createRule(
           req.user!.restaurantId.toString(),

@@ -132,7 +132,6 @@ export async function updateTableStatus(
   const currentStatus = table.status as TableStatus;
   const allowed = TABLE_TRANSITIONS[currentStatus];
   
-  console.error(`[DEBUG] updateTableStatus: tableId=${tableId}, currentStatus=${currentStatus}, newStatus=${newStatus}, allowed=[${allowed?.join(',')}]`);
   
   if (!allowed || !allowed.includes(newStatus)) {
     throw new AppError(
