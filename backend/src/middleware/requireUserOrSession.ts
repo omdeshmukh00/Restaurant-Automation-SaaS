@@ -6,6 +6,8 @@ import * as sessionService from '../modules/tableSessions/tableSessions.service'
 import { AppError } from '../utils/AppError';
 import { ErrorCode } from '../constants/errors';
 
+import { tenantContext } from '../utils/tenantContext';
+
 /**
  * Middleware supporting hybrid authentication:
  * Validates either an `x-session-token` (customer session) or a JWT Bearer token (staff/admin).
@@ -21,14 +23,18 @@ export async function requireUserOrSession(req: Request, res: Response, next: Ne
       const session = await sessionService.validateSession(sessionToken);
       await sessionService.touchActivity(session._id.toString());
       
+      const tenantId = (session as any).tenantId?.toString() || session.restaurantId.toString();
+
       req.tableSession = {
         _id: session._id.toString(),
         restaurantId: session.restaurantId.toString(),
+        tenantId,
         tableId: session.tableId.toString(),
         customerName: session.customerName,
         mobile: session.mobile,
       };
-      return next();
+      
+      return tenantContext.run({ tenantId }, () => next());
     } catch (error) {
       // If there is no fallback auth header, return the session error immediately
       if (!authHeader) {
@@ -49,7 +55,12 @@ export async function requireUserOrSession(req: Request, res: Response, next: Ne
           email: decoded.email,
           role: decoded.role,
           restaurantId: decoded.restaurantId,
+          tenantId: decoded.tenantId,
         };
+        
+        if (decoded.tenantId) {
+          return tenantContext.run({ tenantId: decoded.tenantId }, () => next());
+        }
         return next();
       } catch (error) {
         if (error instanceof jwt.TokenExpiredError) {

@@ -9,11 +9,14 @@ export interface JwtPayload {
   email: string;
   role: AppRole;
   restaurantId?: string;
+  tenantId?: string;
   /** The panel this token was issued for (e.g. 'kitchen', 'staff', 'admin') */
   panel: Panel;
   /** Internal sub-role within the panel (e.g. 'HEAD_CHEF', 'FLOOR_SUPERVISOR') */
   internal_role?: string;
   mustChangePassword?: boolean;
+  mustResetPassword?: boolean;
+  firstLogin?: boolean;
 }
 
 export interface TokenPair {

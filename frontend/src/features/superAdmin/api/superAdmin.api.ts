@@ -26,7 +26,7 @@ export const placeholderRestaurantRequests: RestaurantRequest[] = [
     email: "rohan@noodlestreet.in",
     phone: "+91 99001 22002",
     location: "Kolkata, West Bengal",
-    plan: "Basic",
+    plan: "Free",
     requestedAt: "Today, 09:58 AM",
     message: "Needs onboarding for QR ordering across one high-footfall outlet.",
   },
@@ -43,7 +43,7 @@ export const placeholderRestaurantRequests: RestaurantRequest[] = [
   },
 ];
 
-const USE_PLACEHOLDER_RESTAURANT_REQUESTS = true;
+const USE_PLACEHOLDER_RESTAURANT_REQUESTS = false;
 
 export const superAdminRestaurantRequestsApi = {
   async getRequests(): Promise<RestaurantRequest[]> {
@@ -51,10 +51,10 @@ export const superAdminRestaurantRequestsApi = {
       return Promise.resolve(placeholderRestaurantRequests);
     }
 
-    const response = await apiClient.get<RestaurantRequest[]>(
+    const response = await apiClient.get<{ success: boolean; data: RestaurantRequest[] }>(
       superAdminRestaurantRequestEndpoints.list
     );
-    return response.data;
+    return response.data.data;
   },
 
   async approveRequest(id: string): Promise<void> {
@@ -65,11 +65,11 @@ export const superAdminRestaurantRequestsApi = {
     await apiClient.post(superAdminRestaurantRequestEndpoints.approve(id));
   },
 
-  async denyRequest(id: string): Promise<void> {
+  async denyRequest(id: string, reason: string): Promise<void> {
     if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
       return Promise.resolve();
     }
 
-    await apiClient.post(superAdminRestaurantRequestEndpoints.deny(id));
+    await apiClient.post(superAdminRestaurantRequestEndpoints.deny(id), { reason });
   },
 };

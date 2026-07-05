@@ -1,5 +1,6 @@
 // src/features/superAdmin/pages/SuperadminDashboard.tsx
 
+import { useState, useEffect } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import StatsGrid from "../components/dashboard/Statsgrid";
 import RevenueChart from "../components/dashboard/RevenueChart";
@@ -14,8 +15,11 @@ import {
   Phone,
   RefreshCw,
   X,
+  Compass,
+  ExternalLink,
 } from "lucide-react";
-import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
+import { useRestaurantRequestsStore, type RestaurantRequest } from "../store/RestaurantRequests";
+import { getSocket, connectSocket } from "../../../lib/socket";
 
 interface OutletContext {
   darkMode: boolean;
@@ -27,9 +31,55 @@ export default function SuperAdminDashboard() {
   const { darkMode } = useOutletContext<OutletContext>();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestsOpen = searchParams.get("requests") === "new";
+  
   const requests = useRestaurantRequestsStore((state) => state.requests);
+  const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
   const approveRequest = useRestaurantRequestsStore((state) => state.approveRequest);
   const denyRequest = useRestaurantRequestsStore((state) => state.denyRequest);
+
+  // Rejection Dialog State
+  const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("Incomplete Information");
+  const [customRejectionReason, setCustomRejectionReason] = useState("");
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [viewingRequest, setViewingRequest] = useState<RestaurantRequest | null>(null);
+
+  useEffect(() => {
+    fetchRequests();
+
+    connectSocket();
+    const socket = getSocket();
+    if (socket) {
+      socket.on('restaurant_request_created', (newReq) => {
+        useRestaurantRequestsStore.setState((state) => {
+          const exists = state.requests.some((r) => r.id === newReq.id);
+          if (exists) return state;
+          return { requests: [newReq, ...state.requests] };
+        });
+      });
+
+      socket.on('restaurant_request_approved', ({ id }) => {
+        useRestaurantRequestsStore.setState((state) => ({
+          requests: state.requests.filter((r) => r.id !== id),
+        }));
+      });
+
+      socket.on('restaurant_request_rejected', ({ id }) => {
+        useRestaurantRequestsStore.setState((state) => ({
+          requests: state.requests.filter((r) => r.id !== id),
+        }));
+      });
+    }
+
+    return () => {
+      const socket = getSocket();
+      if (socket) {
+        socket.off('restaurant_request_created');
+        socket.off('restaurant_request_approved');
+        socket.off('restaurant_request_rejected');
+      }
+    };
+  }, [fetchRequests]);
 
   const closeRequests = () => {
     setSearchParams({});
@@ -202,99 +252,383 @@ export default function SuperAdminDashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {requests.map((request) => (
-                    <div
-                      key={request.id}
-                      className={`rounded-xl border p-4 ${
-                        darkMode
-                          ? "bg-slate-900/50 border-slate-800"
-                          : "bg-slate-50 border-slate-200"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold truncate">
-                            {request.name}
-                          </p>
-                          <p
-                            className={`text-xs mt-1 ${
-                              darkMode ? "text-slate-400" : "text-slate-500"
-                            }`}
-                          >
-                            Owner: {request.owner}
-                          </p>
-                        </div>
-                        <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
-                            darkMode
-                              ? "bg-orange-500/10 text-orange-300"
-                              : "bg-orange-100 text-orange-700"
-                          }`}
-                        >
-                          {request.plan}
-                        </span>
-                      </div>
-
-                      <p
-                        className={`mt-3 text-xs leading-relaxed ${
-                          darkMode ? "text-slate-400" : "text-slate-600"
-                        }`}
-                      >
-                        {request.message}
-                      </p>
-
-                      <div className="mt-4 space-y-2 text-xs">
-                        <p className="flex items-center gap-2">
-                          <Mail size={13} className="text-orange-500" />
-                          <span className="truncate">{request.email}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <Phone size={13} className="text-orange-500" />
-                          <span>{request.phone}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <MapPin size={13} className="text-orange-500" />
-                          <span className="truncate">{request.location}</span>
-                        </p>
-                      </div>
-
+                  {requests.map((request) => {
+                    const isProcessing = processingId === request.id;
+                    return (
                       <div
-                        className={`mt-4 pt-4 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-                          darkMode ? "border-slate-800" : "border-slate-200"
+                        key={request.id}
+                        onClick={() => setViewingRequest(request)}
+                        className={`rounded-xl border p-4 cursor-pointer hover:border-orange-500/50 hover:shadow-md transition-all ${
+                          darkMode
+                            ? "bg-slate-900/50 border-slate-800"
+                            : "bg-slate-50 border-slate-200"
                         }`}
                       >
-                        <span
-                          className={`text-[11px] ${
-                            darkMode ? "text-slate-500" : "text-slate-400"
-                          }`}
-                        >
-                          Requested {request.requestedAt}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => denyRequest(request.id)}
-                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border ${
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold truncate">
+                              {request.name}
+                            </p>
+                            <p
+                              className={`text-xs mt-1 ${
+                                darkMode ? "text-slate-400" : "text-slate-500"
+                              }`}
+                            >
+                              Owner: {request.owner}
+                            </p>
+                          </div>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
                               darkMode
-                                ? "border-slate-700 text-slate-300 hover:bg-slate-800"
-                                : "border-slate-200 text-slate-600 hover:bg-white"
+                                ? "bg-orange-500/10 text-orange-300"
+                               : "bg-orange-100 text-orange-700"
                             }`}
                           >
-                            <X size={13} />
-                            Deny
-                          </button>
-                          <button
-                            onClick={() => approveRequest(request.id)}
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700"
+                            {request.plan}
+                          </span>
+                        </div>
+
+                        <p
+                          className={`mt-3 text-xs leading-relaxed ${
+                            darkMode ? "text-slate-400" : "text-slate-600"
+                          }`}
+                        >
+                          {request.message}
+                        </p>
+
+                        <div className="mt-4 space-y-2 text-xs">
+                          <p className="flex items-center gap-2">
+                            <Mail size={13} className="text-orange-500" />
+                            <span className="truncate">{request.email}</span>
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <Phone size={13} className="text-orange-500" />
+                            <span>{request.phone}</span>
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <MapPin size={13} className="text-orange-500" />
+                            <span className="truncate">{request.location}</span>
+                          </p>
+                          {request.latitude && request.longitude && (
+                            <p className="flex items-center gap-2">
+                              <Compass size={13} className="text-orange-500" />
+                              <a
+                                href={request.googleMapsUrl || `https://www.google.com/maps?q=${request.latitude},${request.longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-orange-400 hover:text-orange-300 hover:underline truncate font-semibold"
+                              >
+                                {request.googleMapsUrl ? "Google Maps Link" : `Map View: ${request.latitude.toFixed(5)}, ${request.longitude.toFixed(5)}`}
+                              </a>
+                            </p>
+                          )}
+                        </div>
+
+                        <div
+                          className={`mt-4 pt-4 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+                            darkMode ? "border-slate-800" : "border-slate-200"
+                          }`}
+                        >
+                          <span
+                            className={`text-[11px] ${
+                              darkMode ? "text-slate-500" : "text-slate-400"
+                            }`}
                           >
-                            <Check size={13} />
-                            Approve
-                          </button>
+                            Requested {request.requestedAt}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              disabled={isProcessing}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRejectingRequestId(request.id);
+                              }}
+                              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border ${
+                                darkMode
+                                  ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                                  : "border-slate-200 text-slate-600 hover:bg-white"
+                              } disabled:opacity-55`}
+                            >
+                              <X size={13} />
+                              Deny
+                            </button>
+                            <button
+                              disabled={isProcessing}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setProcessingId(request.id);
+                                try {
+                                  await approveRequest(request.id);
+                                } catch (err) {
+                                  console.error(err);
+                                } finally {
+                                  setProcessingId(null);
+                                }
+                              }}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-55"
+                            >
+                              {isProcessing ? (
+                                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Check size={13} />
+                              )}
+                              Approve
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Reason Modal */}
+      {rejectingRequestId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/60 backdrop-blur-sm">
+          <div className={`w-full max-w-md p-6 rounded-2xl border shadow-2xl ${
+            darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          }`}>
+            <h3 className="text-base font-bold mb-2">Reject Partner Application</h3>
+            <p className="text-xs text-slate-400 mb-4">Select the reason for rejecting this application. An automated email will be sent explaining the reason.</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Reason</label>
+                <select
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500/50"
+                >
+                  <option value="Duplicate Application">Duplicate Application</option>
+                  <option value="Incomplete Information">Incomplete Information</option>
+                  <option value="Verification Failed">Verification Failed</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {rejectionReason === "Other" && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Custom Reason</label>
+                  <input
+                    type="text"
+                    value={customRejectionReason}
+                    onChange={(e) => setCustomRejectionReason(e.target.value)}
+                    placeholder="Enter custom rejection reason"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500/50"
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setRejectingRequestId(null);
+                    setCustomRejectionReason("");
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const finalReason = rejectionReason === "Other" ? customRejectionReason : rejectionReason;
+                    if (!finalReason.trim()) return;
+                    await denyRequest(rejectingRequestId, finalReason);
+                    setRejectingRequestId(null);
+                    setCustomRejectionReason("");
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                >
+                  Confirm Rejection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Detailed Request Modal */}
+      {viewingRequest && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-6 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className={`w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 border shadow-2xl ${
+            darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+          }`}>
+            {/* Header */}
+            <div className="flex items-start justify-between border-b pb-4 mb-4 border-slate-800/10">
+              <div>
+                <span className={`text-[9px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full border mb-1.5 inline-block ${
+                  darkMode ? "text-orange-400 border-orange-500/20 bg-orange-500/10" : "text-orange-700 border-orange-200 bg-orange-50"
+                }`}>
+                  {viewingRequest.plan} Plan
+                </span>
+                <h3 className="text-lg font-bold">{viewingRequest.name}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Submitted: {new Date(viewingRequest.requestedAt).toLocaleString()}</p>
+              </div>
+              <button
+                onClick={() => setViewingRequest(null)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Information Grid */}
+            <div className="space-y-5 text-xs">
+              {/* Business Overview */}
+              <div>
+                <h4 className="font-extrabold uppercase tracking-wider text-[10px] text-orange-500 mb-2">Business Information</h4>
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-500/5 border border-slate-500/10">
+                  <div>
+                    <span className="text-slate-500 block">Owner Name</span>
+                    <span className="font-semibold">{viewingRequest.owner}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Cuisine Category</span>
+                    <span className="font-semibold">{viewingRequest.cuisine || 'Not Specified'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Total Branches</span>
+                    <span className="font-semibold">{viewingRequest.branches || 1} outlet(s)</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Expected Monthly Orders</span>
+                    <span className="font-semibold">{viewingRequest.expectedMonthlyOrders?.toLocaleString() || '0'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">GST Number</span>
+                    <span className="font-semibold tracking-wider font-mono">{viewingRequest.gstNumber || 'None Provided'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Details */}
+              <div>
+                <h4 className="font-extrabold uppercase tracking-wider text-[10px] text-orange-500 mb-2">Contact Details</h4>
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-500/5 border border-slate-500/10">
+                  <div>
+                    <span className="text-slate-500 block">Email Address</span>
+                    <span className="font-semibold font-mono">{viewingRequest.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Phone Number</span>
+                    <span className="font-semibold font-mono">{viewingRequest.phone}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Address & Geography */}
+              <div>
+                <h4 className="font-extrabold uppercase tracking-wider text-[10px] text-orange-500 mb-2">Address & Location</h4>
+                <div className="space-y-2 p-3 rounded-2xl bg-slate-500/5 border border-slate-500/10">
+                  <div>
+                    <span className="text-slate-500">Street Address: </span>
+                    <span className="font-semibold">{viewingRequest.address || viewingRequest.location}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 pt-1">
+                    <div>
+                      <span className="text-slate-500 block">City</span>
+                      <span className="font-semibold">{viewingRequest.city || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">State</span>
+                      <span className="font-semibold">{viewingRequest.state || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">PIN Code</span>
+                      <span className="font-semibold font-mono">{viewingRequest.pinCode || '-'}</span>
+                    </div>
+                  </div>
+                  {viewingRequest.latitude && viewingRequest.longitude && (
+                    <div className="pt-2 border-t border-slate-800/10 flex items-center justify-between flex-wrap gap-2 text-[11px]">
+                      <span className="text-slate-500 font-mono">Coords: {viewingRequest.latitude.toFixed(5)}, {viewingRequest.longitude.toFixed(5)}</span>
+                      <a
+                        href={viewingRequest.googleMapsUrl || `https://www.google.com/maps?q=${viewingRequest.latitude},${viewingRequest.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-orange-500 hover:underline font-bold flex items-center gap-1"
+                      >
+                        Open Google Maps <ExternalLink size={11} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Details (For Paid Plans) */}
+              {viewingRequest.plan !== 'Free' && viewingRequest.paymentId && (
+                <div>
+                  <h4 className="font-extrabold uppercase tracking-wider text-[10px] text-orange-500 mb-2">Billing & Payment Info</h4>
+                  <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
+                    <div>
+                      <span className="text-slate-500 block">Payment ID</span>
+                      <span className="font-semibold font-mono tracking-wider text-emerald-500">{viewingRequest.paymentId}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Amount Paid</span>
+                      <span className="font-extrabold text-emerald-500">₹{viewingRequest.paymentAmount || '0'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Payment Status</span>
+                      <span className="font-bold text-[10px] uppercase text-emerald-500">{viewingRequest.paymentStatus || 'CAPTURED'}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Message */}
+              {viewingRequest.message && (
+                <div>
+                  <h4 className="font-extrabold uppercase tracking-wider text-[10px] text-orange-500 mb-2">Application Message</h4>
+                  <p className={`p-3 rounded-2xl border leading-relaxed whitespace-pre-wrap ${
+                    darkMode ? 'bg-slate-950/40 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
+                    {viewingRequest.message}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+              <button
+                disabled={processingId === viewingRequest.id}
+                onClick={() => {
+                  setRejectingRequestId(viewingRequest.id);
+                  setViewingRequest(null);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 text-xs font-semibold disabled:opacity-50"
+              >
+                Deny Application
+              </button>
+              <button
+                disabled={processingId === viewingRequest.id}
+                onClick={async () => {
+                  setProcessingId(viewingRequest.id);
+                  try {
+                    await approveRequest(viewingRequest.id);
+                    setViewingRequest(null);
+                  } catch (err) {
+                    console.error(err);
+                  } finally {
+                    setProcessingId(null);
+                  }
+                }}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5 disabled:opacity-55"
+              >
+                {processingId === viewingRequest.id ? (
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check size={13} />
+                )}
+                Approve Application
+              </button>
             </div>
           </div>
         </div>

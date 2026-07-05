@@ -101,9 +101,22 @@ superAdminRouter.delete('/restaurants/:id', async (req, res, next) => {
 superAdminRouter.post('/plans', async (req, res, next) => {
   try {
     const plan = await PlatformPlanModel.create({
-      name: req.body?.name ?? 'ENTERPRISE',
-      priceMonthly: Number(req.body?.priceMonthly ?? 24999),
-      tenantLimit: Number(req.body?.tenantLimit ?? 20),
+      name: req.body?.name,
+      priceMonthly: Number(req.body?.priceMonthly ?? 0),
+      originalPriceMonthly: req.body?.originalPriceMonthly ? Number(req.body.originalPriceMonthly) : null,
+      tenantLimit: Number(req.body?.tenantLimit ?? 5),
+      description: req.body?.description || '',
+      features: Array.isArray(req.body?.features) ? req.body.features : [],
+      isActive: req.body?.isActive !== false,
+      tableLimit: req.body?.tableLimit ? Number(req.body.tableLimit) : null,
+      monthlyOrderLimit: req.body?.monthlyOrderLimit ? Number(req.body.monthlyOrderLimit) : null,
+      staffLimit: req.body?.staffLimit ? Number(req.body.staffLimit) : null,
+      inventoryLimit: req.body?.inventoryLimit ? Number(req.body.inventoryLimit) : null,
+      reservationAccess: req.body?.reservationAccess !== false,
+      queueAccess: req.body?.queueAccess !== false,
+      advancedAnalytics: req.body?.advancedAnalytics === true,
+      smartAutomation: req.body?.smartAutomation === true,
+      dynamicDiscountEngine: req.body?.dynamicDiscountEngine === true,
     });
 
     ok(res, { plan }, 201);
@@ -125,6 +138,15 @@ superAdminRouter.patch('/plans/:id', async (req, res, next) => {
   try {
     const plan = await PlatformPlanModel.findByIdAndUpdate(req.params.id, req.body, { new: true });
     ok(res, { plan });
+  } catch (error) {
+    next(error);
+  }
+});
+
+superAdminRouter.delete('/plans/:id', async (req, res, next) => {
+  try {
+    await PlatformPlanModel.findByIdAndDelete(req.params.id);
+    ok(res, { deletedPlanId: req.params.id });
   } catch (error) {
     next(error);
   }
@@ -230,4 +252,8 @@ superAdminRouter.patch('/feature-flags/:id', async (req, res, next) => {
     next(error);
   }
 });
+
+// Mount module-level superAdmin routes (restaurant-requests, etc.)
+import superAdminModuleRouter from '../superAdmin/superAdmin.routes';
+superAdminRouter.use('/', superAdminModuleRouter);
 

@@ -41,11 +41,19 @@ const DROPDOWN_STYLES: Record<TableStatus, string> = {
   Blocked:   'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800',
 };
 
-function TableCard({ tableId, label, seats, status }: {
+const getDurationStr = (createdAt: string | null) => {
+  if (!createdAt) return '0 min';
+  const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (mins < 60) return `${mins} min`;
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+};
+
+function TableCard({ tableId, label, seats, status, sessionDetails }: {
   tableId: string;
   label: string;
   seats: number;
   status: TableStatus;
+  sessionDetails?: any;
 }) {
   const { updateTableStatus } = useTablesStore();
   const [open, setOpen] = React.useState(false);
@@ -76,7 +84,22 @@ function TableCard({ tableId, label, seats, status }: {
       </button>
 
       {open && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-xl py-1 w-36">
+        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-xl py-1 w-48">
+          {sessionDetails && (
+            <div className="px-3 py-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-850 text-[10px] text-gray-500 dark:text-gray-400 space-y-1 rounded-t-xl text-left">
+              <p className="font-bold text-gray-700 dark:text-gray-300">Active Session</p>
+              <p>Guest: <span className="font-semibold text-gray-800 dark:text-gray-200">{sessionDetails.customerName}</span></p>
+              <p>Duration: <span className="font-semibold text-gray-800 dark:text-gray-200">{getDurationStr(sessionDetails.sessionCreatedAt)}</span></p>
+              <p>Total Bill: <span className="font-semibold text-gray-850 dark:text-gray-200">₹{sessionDetails.totalBill}</span></p>
+              <div className="border-t border-gray-100 dark:border-gray-800 my-1 pt-1 space-y-0.5">
+                <p>Total Orders: <span className="font-semibold text-gray-805 dark:text-gray-200">{sessionDetails.totalOrders}</span></p>
+                <p>Active Order: <span className="font-semibold text-gray-805 dark:text-gray-200">{sessionDetails.currentActiveOrderNumber}</span></p>
+                <p>Pending: <span className="font-semibold text-gray-805 dark:text-gray-200">{sessionDetails.pendingOrdersCount}</span> | Ready: <span className="font-semibold text-gray-805 dark:text-gray-200">{sessionDetails.readyOrdersCount}</span></p>
+                <p>Served: <span className="font-semibold text-gray-805 dark:text-gray-200">{sessionDetails.servedOrdersCount}</span></p>
+              </div>
+            </div>
+          )}
+          
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide px-3 pt-1.5 pb-1">
             Set status
           </p>
@@ -144,6 +167,7 @@ export function TableOverview(): JSX.Element {
             label={table.label}
             seats={table.seats}
             status={table.status}
+            sessionDetails={table.sessionDetails}
           />
         ))}
       </div>

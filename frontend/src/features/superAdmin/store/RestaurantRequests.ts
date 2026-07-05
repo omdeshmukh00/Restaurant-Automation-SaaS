@@ -14,16 +14,32 @@ export interface RestaurantRequest {
   email: string;
   phone: string;
   location: string;
-  plan: "Premium" | "Standard" | "Basic";
+  plan: "Free" | "Standard" | "Premium" | "Enterprise";
   requestedAt: string;
   message: string;
+  latitude?: number;
+  longitude?: number;
+  googleMapsUrl?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pinCode?: string;
+  gstNumber?: string;
+  cuisine?: string;
+  branches?: number;
+  expectedMonthlyOrders?: number;
+  paymentId?: string;
+  paymentAmount?: number;
+  paymentStatus?: string;
 }
 
 interface RestaurantRequestsState {
   restaurants: RestaurantsRow[];
   requests: RestaurantRequest[];
-  approveRequest: (id: string) => void;
-  denyRequest: (id: string) => void;
+  fetchRequests: () => Promise<void>;
+  approveRequest: (id: string) => Promise<void>;
+  denyRequest: (id: string, reason: string) => Promise<void>;
   addRestaurant: (restaurant: RestaurantsRow) => void;
   updateRestaurantStatus: (
     id: string,
@@ -31,56 +47,71 @@ interface RestaurantRequestsState {
   ) => void;
   updateRestaurantPlan: (
     id: string,
-    plan: "Premium" | "Standard" | "Basic"
+    plan: "Premium" | "Standard" | "Basic" | "Free"
   ) => void;
   deleteRestaurant: (id: string) => void;
 }
 
 const requestToRestaurant = (request: RestaurantRequest): RestaurantsRow => ({
-  id: `RST-${request.id.replace("REQ-", "")}`,
+  id: `RST-${request.id.slice(-6)}`,
   name: request.name,
   owner: request.owner,
   email: request.email,
   phone: request.phone,
   location: request.location,
-  plan: request.plan,
-  status: "Trial",
+  plan: request.plan as any,
+  status: "Active",
   revenue: "Rs. 0",
   branches: 1,
 });
 
 export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       restaurants: restaurantData,
-      requests: placeholderRestaurantRequests,
-      approveRequest: (id) =>
-        set((state) => {
-          const request = state.requests.find((item) => item.id === id);
-          if (!request) return state;
+      requests: [],
+      fetchRequests: async () => {
+        try {
+          const reqs = await superAdminRestaurantRequestsApi.getRequests();
+          set({ requests: reqs });
+        } catch (error) {
+          console.error("Failed to fetch requests", error);
+        }
+      },
+      approveRequest: async (id) => {
+        try {
+          const request = get().requests.find((item) => item.id === id);
+          if (!request) return;
 
-          void superAdminRestaurantRequestsApi.approveRequest(id);
+          await superAdminRestaurantRequestsApi.approveRequest(id);
 
           const restaurant = requestToRestaurant(request);
-          const alreadyAdded = state.restaurants.some(
-            (item) => item.id === restaurant.id || item.name === restaurant.name
+          const alreadyAdded = get().restaurants.some(
+            (item) => item.name === restaurant.name
           );
 
-          return {
+          set((state) => ({
             restaurants: alreadyAdded
               ? state.restaurants
               : [restaurant, ...state.restaurants],
             requests: state.requests.filter((item) => item.id !== id),
-          };
-        }),
-      denyRequest: (id) =>
-        set((state) => {
-          void superAdminRestaurantRequestsApi.denyRequest(id);
-
-          return {
+          }));
+        } catch (error) {
+          console.error("Failed to approve request", error);
+          throw error;
+        }
+      },
+      denyRequest: async (id, reason) => {
+        try {
+          await superAdminRestaurantRequestsApi.denyRequest(id, reason);
+          set((state) => ({
             requests: state.requests.filter((item) => item.id !== id),
-          };
-        }),
+          }));
+        } catch (error) {
+          console.error("Failed to deny request", error);
+          throw error;
+        }
+      },
       addRestaurant: (restaurant) =>
         set((state) => ({ restaurants: [restaurant, ...state.restaurants] })),
       updateRestaurantStatus: (id, status) =>
@@ -92,7 +123,7 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
       updateRestaurantPlan: (id, plan) =>
         set((state) => ({
           restaurants: state.restaurants.map((restaurant) =>
-            restaurant.id === id ? { ...restaurant, plan } : restaurant
+            restaurant.id === id ? { ...restaurant, plan: plan as any } : restaurant
           ),
         })),
       deleteRestaurant: (id) =>

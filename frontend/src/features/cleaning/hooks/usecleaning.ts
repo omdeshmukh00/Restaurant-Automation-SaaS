@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cleaningStore, type StaffProfile } from '../store/cleaning.store';
 import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleaning.api';
+import { connectSocket, getSocket } from '../../../lib/socket';
 
 // Hum yahan temporary interface bana rahe hain taaki TypeScript error na de
 interface ProcessedTask extends UrgentTask {
@@ -142,6 +143,26 @@ export function useCleaning() {
     const timer = setTimeout(() => loadDashboard(), 0);
     return () => clearTimeout(timer);
   }, [loadDashboard]); // <--- Yahan 'loadDashboard' daal diya
+
+  // Socket sync effect
+  useEffect(() => {
+    connectSocket();
+    const socket = getSocket();
+    if (socket) {
+      const handleSync = () => {
+        loadDashboard();
+      };
+      socket.on('cleaning.started', handleSync);
+      socket.on('cleaning.completed', handleSync);
+      socket.on('table.status.changed', handleSync);
+
+      return () => {
+        socket.off('cleaning.started', handleSync);
+        socket.off('cleaning.completed', handleSync);
+        socket.off('table.status.changed', handleSync);
+      };
+    }
+  }, [loadDashboard]);
 
   return {
     metrics,

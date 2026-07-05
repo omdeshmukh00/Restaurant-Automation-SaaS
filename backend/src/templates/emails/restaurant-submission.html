@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333333;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      border: 1px solid #eeeeee;
+      border-radius: 8px;
+    }
+    .header {
+      background-color: #FF6B1A;
+      color: #ffffff;
+      padding: 20px;
+      text-align: center;
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+    }
+    .content {
+      padding: 20px;
+    }
+    .footer {
+      font-size: 12px;
+      color: #888888;
+      text-align: center;
+      padding: 20px;
+      border-top: 1px solid #eeeeee;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>Application Received</h2>
+    </div>
+    <div class="content">
+      <p>Hi {{ownerName}},</p>
+      <p>Thank you for your interest in partnering with us! We have successfully received your application for <strong>{{restaurantName}}</strong>.</p>
+      <p>Our team is currently reviewing your application details (Plan: {{selectedPlan}}). We will verify your geolocation coordinates and get in touch with you shortly.</p>
+      <p>Once approved, you will receive another email containing your temporary admin credentials and dashboard access details.</p>
+      <p>If you have any questions in the meantime, please feel free to reply directly to this email.</p>
+      <p>Best regards,<br>The RestoHub Team</p>
+    </div>
+    <div class="footer">
+      <p>&copy; 2026 RestoHub Technologies Private Limited. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>

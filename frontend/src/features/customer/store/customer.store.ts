@@ -444,8 +444,9 @@ export const useCustomerStore = create<CustomerStore>()(
         if (diningSession) {
           try {
             await apiClient.post('/customer/session/end');
-          } catch (e) {
+          } catch (e: any) {
             console.error('Failed to end dining session on backend', e);
+            throw new Error(e.response?.data?.message || 'Failed to end dining session');
           }
         }
         localStorage.removeItem('x-session-token');
@@ -466,7 +467,11 @@ export const useCustomerStore = create<CustomerStore>()(
           const inactiveMs = Date.now() - lastActivity;
           if (inactiveMs > 20 * 60 * 1000) {
             console.log('Inactivity timeout reached (20 minutes). Clearing session.');
-            await clearDiningSession();
+            try {
+              await clearDiningSession();
+            } catch (e) {
+              console.error('Failed to auto-expire session', e);
+            }
           }
         }
       },

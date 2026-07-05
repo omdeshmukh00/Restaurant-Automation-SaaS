@@ -137,13 +137,43 @@ cleaningRouter.patch(
     task.verifiedBy = null;
     await task.save();
 
-    await TableModel.findOneAndUpdate(
-      { _id: task.tableId, restaurantId: task.restaurantId },
-      {
-        status: TableStatus.AVAILABLE,
-        currentSessionId: null,
-      },
-    );
+    const table = await TableModel.findOne({ _id: task.tableId, restaurantId: task.restaurantId });
+    const { TableSessionModel } = await import('../tableSessions/tableSessions.model');
+    const { SessionStatus } = await import('../../constants/statuses');
+    const { socketService } = await import('../../sockets/socket.service');
+
+    let activeSessionExists = false;
+    if (table && table.currentSessionId) {
+      const activeSession = await TableSessionModel.findOne({
+        _id: table.currentSessionId,
+        status: SessionStatus.ACTIVE,
+      });
+      if (activeSession) {
+        activeSessionExists = true;
+      }
+    }
+
+    if (activeSessionExists) {
+      if (table) {
+        table.status = TableStatus.OCCUPIED;
+        await table.save();
+      }
+    } else {
+      if (table) {
+        table.status = TableStatus.AVAILABLE;
+        table.currentSessionId = null;
+        await table.save();
+      }
+    }
+
+    if (table) {
+      socketService.emitToRestaurant(task.restaurantId.toString(), 'cleaning.completed', { task });
+      socketService.emitToRestaurant(task.restaurantId.toString(), 'table.status.changed', {
+        tableId: table._id,
+        tableNumber: table.tableNumber,
+        status: table.status,
+      });
+    }
 
     ok(res, { task });
   } catch (error) {
@@ -172,13 +202,43 @@ cleaningRouter.patch(
     task.verifiedBy = req.body?.verifiedBy ?? req.user?.id ?? null;
     await task.save();
 
-    await TableModel.findOneAndUpdate(
-      { _id: task.tableId, restaurantId: task.restaurantId },
-      {
-        status: TableStatus.AVAILABLE,
-        currentSessionId: null,
-      },
-    );
+    const table = await TableModel.findOne({ _id: task.tableId, restaurantId: task.restaurantId });
+    const { TableSessionModel } = await import('../tableSessions/tableSessions.model');
+    const { SessionStatus } = await import('../../constants/statuses');
+    const { socketService } = await import('../../sockets/socket.service');
+
+    let activeSessionExists = false;
+    if (table && table.currentSessionId) {
+      const activeSession = await TableSessionModel.findOne({
+        _id: table.currentSessionId,
+        status: SessionStatus.ACTIVE,
+      });
+      if (activeSession) {
+        activeSessionExists = true;
+      }
+    }
+
+    if (activeSessionExists) {
+      if (table) {
+        table.status = TableStatus.OCCUPIED;
+        await table.save();
+      }
+    } else {
+      if (table) {
+        table.status = TableStatus.AVAILABLE;
+        table.currentSessionId = null;
+        await table.save();
+      }
+    }
+
+    if (table) {
+      socketService.emitToRestaurant(task.restaurantId.toString(), 'cleaning.completed', { task });
+      socketService.emitToRestaurant(task.restaurantId.toString(), 'table.status.changed', {
+        tableId: table._id,
+        tableNumber: table.tableNumber,
+        status: table.status,
+      });
+    }
 
     ok(res, { task });
   } catch (error) {

@@ -21,6 +21,7 @@ function normalizePayload(payload: DecodedAccessToken): JwtPayload {
     email: payload.email,
     role,
     restaurantId: payload.restaurantId,
+    tenantId: payload.tenantId,
     panel: payload.panel ?? USER_ROLE_TO_PANEL[role],
     internal_role: payload.internal_role,
     mustChangePassword: payload.mustChangePassword,

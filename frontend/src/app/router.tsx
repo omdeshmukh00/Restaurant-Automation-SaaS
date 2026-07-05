@@ -18,6 +18,7 @@ import { superAdminRoutes } from '../routes/superAdmin.routes';
 import LandingPage from '../features/customer/pages/LandingPage';
 import RestaurantsPage from '../features/customer/pages/RestaurantsPage';
 import OffersPage from '../features/customer/pages/OffersPage';
+import PartnerWithUs from '../pages/public/PartnerWithUs';
 import { lazy, Suspense } from 'react';
 
 // Lazy-loaded table session page (QR scan entry)
@@ -30,6 +31,13 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <LandingPage />,
+    errorElement: <RootErrorBoundary />,
+  },
+
+  // ── Public Partner Onboarding ──────────────────────────────────────
+  {
+    path: '/partner',
+    element: <PartnerWithUs />,
     errorElement: <RootErrorBoundary />,
   },
 

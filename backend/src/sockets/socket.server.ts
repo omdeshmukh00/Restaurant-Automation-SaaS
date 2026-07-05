@@ -6,6 +6,8 @@ import { verifyAccessToken } from '../services/jwt.service';
 import { validateSession } from '../modules/tableSessions/tableSessions.service';
 import { socketService } from './socket.service';
 
+import { initSessionEvents } from '../services/sessionEvents';
+
 let io: Server | null = null;
 
 export function createSocketServer(server: HttpServer): Server {
@@ -52,6 +54,7 @@ export function createSocketServer(server: HttpServer): Server {
   });
 
   socketService.setIO(io);
+  initSessionEvents(io);
 
   return io;
 }

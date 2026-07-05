@@ -53,4 +53,5 @@ apiRouter.use('/kitchen', authenticateKitchen, roleGuard(roles.kitchenStaff, rol
 apiRouter.use('/cleaning', authenticateCleaning, roleGuard(roles.cleaningStaff, roles.restaurantAdmin), tenantGuard, cleaningRouter);
 apiRouter.use('/admin', authenticateAdmin, roleGuard(roles.restaurantAdmin, roles.superAdmin), tenantGuard, adminRouter);
 apiRouter.use('/super-admin', authenticateSuperAdmin, roleGuard(roles.superAdmin), superAdminRouter);
+apiRouter.use('/superadmin', authenticateSuperAdmin, roleGuard(roles.superAdmin), superAdminRouter);
 apiRouter.use('/', requireAuth, sharedRouter);

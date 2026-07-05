@@ -20,6 +20,11 @@ class SocketService {
         logger.info(`👤 Auto-joined Socket ${socket.id} to restaurant room: ${restaurantId}`);
       }
 
+      if (socket.data.user && socket.data.user.role === 'super-admin') {
+        socket.join('super-admin');
+        logger.info(`👤 Auto-joined Socket ${socket.id} to super-admin room`);
+      }
+
       if (socket.data.session && socket.data.session._id) {
         const sessionId = socket.data.session._id.toString();
         socket.join(`session:${sessionId}`);
@@ -95,6 +100,14 @@ class SocketService {
   public emitToRestaurant(restaurantId: string, event: string, data: any): void {
     if (!this.io) return;
     this.io.to(`restaurant:${restaurantId}`).emit(event, data);
+  }
+
+  /**
+   * Emit event to the super-admin room
+   */
+  public emitToSuperAdmin(event: string, data: any): void {
+    if (!this.io) return;
+    this.io.to('super-admin').emit(event, data);
   }
 
   /**

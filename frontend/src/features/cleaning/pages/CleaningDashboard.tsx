@@ -84,7 +84,7 @@ export default function CleaningDashboard() {
       priority: t.priority,
       priorityClass: t.priority === 'High' ? 'bg-red-50 text-red-650' : 'bg-orange-50 text-orange-600',
       iconColor: t.priority === 'High' ? 'text-red-500' : 'text-orange-500',
-      rawId: t.id,
+      rawId: t.taskId || t.id,
       section: t.section || 'Indoor',
       floor: t.floor || 1,
     }));
@@ -95,7 +95,7 @@ export default function CleaningDashboard() {
       id: t.id,
       progress: t.progress || 45,
       timeAgo: t.timeAgo,
-      rawId: t.id,
+      rawId: t.taskId || t.id,
       section: t.section || 'Indoor',
       floor: t.floor || 1,
     }));
@@ -431,7 +431,7 @@ export default function CleaningDashboard() {
                       {item.rawStatus === 'COMPLETED' ? (
                         <button
                          onClick={() => {
-       cleaningStore.verifyInspection(item.rawId);
+       verifyTask(item.rawId || '');
     }}
                           className="bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-150 active:scale-95 cursor-pointer"
                         >

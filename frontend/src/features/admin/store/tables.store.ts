@@ -31,6 +31,18 @@ export interface Table {
   };
   reservedFor?: string;
   reservedAt?: string;
+  sessionDetails?: {
+    sessionId: string;
+    customerName: string;
+    sessionCreatedAt: string | null;
+    totalOrders: number;
+    pendingOrdersCount: number;
+    readyOrdersCount: number;
+    servedOrdersCount: number;
+    currentActiveOrderNumber: string;
+    totalBill: number;
+    status: string;
+  };
 }
 
 export interface TableFilter {
@@ -232,6 +244,7 @@ export const useTablesStore = create<TablesStore>()(
               qr_token: t.qrToken,
               notes: t.notes || '',
               currentOrder,
+              sessionDetails: t.sessionDetails,
             };
           });
 

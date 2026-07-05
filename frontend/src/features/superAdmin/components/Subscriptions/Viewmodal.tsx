@@ -27,7 +27,7 @@ const TAG_STYLES: Record<string, string> = {
 };
 
 export default function ViewModal({ restaurant, darkMode, onClose, onEditClick }: ViewModalProps) {
-  const planColors = PLAN_COLORS[restaurant.plan];
+  const planColors = PLAN_COLORS[restaurant.plan] || PLAN_COLORS['Basic'];
 
   const formatJoinedDate = (dateString: string): string => {
     const parsedDate = new Date(dateString);
@@ -138,7 +138,7 @@ export default function ViewModal({ restaurant, darkMode, onClose, onEditClick }
             <div className="text-center">
               <p className={`text-[9px] font-bold uppercase tracking-wider ${darkMode ? "text-slate-500" : "text-slate-400"}`}>Plan</p>
               <span className={`inline-flex items-center gap-1 mt-1 text-[11px] font-extrabold ${planColors.text}`}>
-                {PLAN_ICONS[restaurant.plan]}{restaurant.plan}
+                {PLAN_ICONS[restaurant.plan] || <Package size={13} />}{restaurant.plan}
               </span>
             </div>
             <div className={`text-center sm:border-l ${darkMode ? "sm:border-slate-800" : "sm:border-slate-200"}`}>

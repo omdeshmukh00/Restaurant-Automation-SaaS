@@ -46,6 +46,9 @@ export interface IUser extends Document {
   deletedAt?: Date;
 
   mustChangePassword?: boolean;
+  mustResetPassword?: boolean;
+  firstLogin?: boolean;
+  tenantId?: string;
 
   avatar?: string | null;
   lastLoginAt?: Date;
@@ -178,6 +181,16 @@ const userSchema = new Schema<IUser>(
     },
 
     mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
+
+    mustResetPassword: {
+      type: Boolean,
+      default: false,
+    },
+
+    firstLogin: {
       type: Boolean,
       default: false,
     },

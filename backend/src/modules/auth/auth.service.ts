@@ -33,7 +33,10 @@ function buildPayload(user: IUser): JwtPayload {
     panel: USER_ROLE_TO_PANEL[user.role],
     internal_role: getInternalRole(user),
     mustChangePassword: user.mustChangePassword,
+    mustResetPassword: user.mustResetPassword,
+    firstLogin: user.firstLogin,
     ...(user.restaurantId && { restaurantId: user.restaurantId.toString() }),
+    ...(user.tenantId && { tenantId: user.tenantId }),
   };
 }
 

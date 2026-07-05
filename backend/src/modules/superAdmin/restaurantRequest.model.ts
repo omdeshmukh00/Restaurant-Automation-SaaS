@@ -1,0 +1,88 @@
+import mongoose, { Document, Schema, Types } from 'mongoose';
+
+export interface IRestaurantRequest extends Document {
+  restaurantName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  pinCode: string;
+  gstNumber?: string;
+  cuisine: string;
+  branches: number;
+  expectedMonthlyOrders: number;
+  selectedPlan: string;
+  latitude: number;
+  longitude: number;
+  googleMapsUrl?: string;
+  message?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  submittedAt: Date;
+  reviewedBy?: Types.ObjectId;
+  reviewedAt?: Date;
+  rejectionReason?: string;
+  
+  // Payment Details
+  paymentId?: string;
+  orderId?: string;
+  paymentAmount?: number;
+  paymentCurrency?: string;
+  paymentStatus?: string;
+}
+
+const restaurantRequestSchema = new Schema<IRestaurantRequest>(
+  {
+    restaurantName: { type: String, required: true, trim: true },
+    ownerName: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true, lowercase: true },
+    phone: { type: String, required: true, trim: true },
+    address: { type: String, required: true, trim: true },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    country: { type: String, required: true, trim: true },
+    pinCode: { type: String, required: true, trim: true },
+    gstNumber: { type: String, trim: true },
+    cuisine: { type: String, required: true, trim: true },
+    branches: { type: Number, required: true, default: 1 },
+    expectedMonthlyOrders: { type: Number, required: true },
+    selectedPlan: {
+      type: String,
+      required: true,
+    },
+    latitude: { type: Number, required: true },
+    longitude: { type: Number, required: true },
+    googleMapsUrl: { type: String, trim: true },
+    message: { type: String, trim: true },
+    status: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'REJECTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    submittedAt: { type: Date, default: Date.now },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: { type: Date },
+    rejectionReason: { type: String, trim: true },
+
+    paymentId: { type: String },
+    orderId: { type: String },
+    paymentAmount: { type: Number },
+    paymentCurrency: { type: String },
+    paymentStatus: { type: String },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+    collection: 'restaurant_requests',
+  }
+);
+
+// Optimize query performance for Super Admin listing
+restaurantRequestSchema.index({ status: 1, submittedAt: -1 });
+
+export const RestaurantRequestModel =
+  mongoose.models.RestaurantRequest ||
+  mongoose.model<IRestaurantRequest>('RestaurantRequest', restaurantRequestSchema);

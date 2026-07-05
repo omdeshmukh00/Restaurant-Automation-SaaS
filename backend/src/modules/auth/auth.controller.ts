@@ -381,3 +381,80 @@ export const revokeSession = asyncHandler(async (req: Request, res: Response) =>
     metadata: { sessionId: req.params.sessionId },
   });
 });
+
+import { comparePassword, hashPassword } from '../../utils/crypto';
+
+export const resetFirstLoginPassword = asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user!._id;
+  const { temporaryPassword, newPassword, confirmPassword } = req.body;
+
+  if (!temporaryPassword || !newPassword || !confirmPassword) {
+    throw new AppError('Please fill in all fields', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  if (newPassword !== confirmPassword) {
+    throw new AppError('Passwords do not match', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const user = await UserModel.findById(userId).select('+password');
+  if (!user) {
+    throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  if (!user.mustResetPassword && !user.mustChangePassword) {
+    throw new AppError('Password reset is not required for this account.', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const isMatch = await comparePassword(temporaryPassword, user.password);
+  if (!isMatch) {
+    throw new AppError('Invalid temporary password', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const hasLowercase = /[a-z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
+  const hasSpecial = /[!@#$%^&*()_+\-=[\]{}|;:',.<>/?~`]/.test(newPassword);
+  if (newPassword.length < 8 || !hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+    throw new AppError('New password is not strong enough. It must be at least 8 characters long and contain uppercase, lowercase, numbers, and special characters.', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const hashedPassword = await hashPassword(newPassword);
+  user.password = hashedPassword;
+  user.mustResetPassword = false;
+  user.firstLogin = false;
+  user.mustChangePassword = false;
+  user.refreshTokens = [];
+  await user.save();
+
+  void logAuditRaw({
+    actorId: user._id.toString(),
+    actorRole: user.role,
+    restaurantId: user.restaurantId?.toString(),
+    entityType: AuditEntity.USER,
+    entityId: user._id.toString(),
+    action: 'PASSWORD_RESET' as any,
+    metadata: { source: 'first_login_reset' },
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  void logAuditRaw({
+    actorId: user._id.toString(),
+    actorRole: user.role,
+    restaurantId: user.restaurantId?.toString(),
+    entityType: AuditEntity.USER,
+    entityId: user._id.toString(),
+    action: 'FIRST_LOGIN' as any,
+    metadata: {},
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
+
+  const panel = USER_ROLE_TO_PANEL[user.role as UserRole] ?? undefined;
+  clearRefreshCookie(res, panel);
+
+  sendSuccess(res, {
+    success: true,
+    message: 'Password changed successfully. Please log in with your new password.',
+  });
+});

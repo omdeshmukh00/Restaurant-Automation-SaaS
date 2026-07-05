@@ -1,6 +1,12 @@
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
+import mongoose from 'mongoose';
+import { tenantPlugin } from './utils/tenantPlugin';
+
+// Apply tenant plugin globally before any models are loaded
+mongoose.plugin(tenantPlugin);
+
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
 import morgan from 'morgan';

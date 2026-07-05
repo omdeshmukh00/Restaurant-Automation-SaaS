@@ -61,7 +61,7 @@ export async function startSession(
 
 // ── Validate an existing session token ───────────────────────────────
 export async function validateSession(token: string): Promise<ITableSession> {
-  const session = await TableSessionModel.findOne({ sessionToken: token }).select('+sessionToken');
+  const session = await TableSessionModel.findOne({ sessionToken: token }).select('+sessionToken').setOptions({ bypassTenant: true });
   if (!session) {
     throw new AppError('Invalid session token', 401, ErrorCode.SESSION_INVALID);
   }
@@ -77,17 +77,48 @@ export async function validateSession(token: string): Promise<ITableSession> {
     await session.save();
     await updateTableStatus(session.tableId.toString(), TableStatus.NEEDS_CLEANING, session.restaurantId.toString());
     await TableModel.findByIdAndUpdate(session.tableId, { currentSessionId: null });
+
+    const { ensureCleaningTaskForTable } = await import('../cleaning/cleaning.service');
+    await ensureCleaningTaskForTable({
+      restaurantId: session.restaurantId,
+      tableId: session.tableId,
+      sessionId: session._id,
+    });
+
     throw new AppError('Session has expired', 401, ErrorCode.TABLE_SESSION_EXPIRED);
   }
 
-  // Idle timeout check
-  const idleLimit = env.SESSION_IDLE_TIMEOUT_MINUTES * 60_000;
-  if (Date.now() - session.lastActivityAt.getTime() > idleLimit) {
-    session.status = SessionStatus.EXPIRED;
-    await session.save();
-    await updateTableStatus(session.tableId.toString(), TableStatus.NEEDS_CLEANING, session.restaurantId.toString());
-    await TableModel.findByIdAndUpdate(session.tableId, { currentSessionId: null });
-    throw new AppError('Session idle timeout exceeded', 401, ErrorCode.SESSION_IDLE_TIMEOUT);
+  // Idle timeout check (5 minutes, bypassed if order placed)
+  const { OrderModel } = await import('../orders/orders.model');
+  const { OrderStatus } = await import('../../constants/statuses');
+  const hasOrders = await OrderModel.exists({
+    sessionId: session._id,
+    status: { $ne: OrderStatus.CANCELLED }
+  });
+
+  if (!hasOrders) {
+    const idleLimit = 5 * 60_000; // 5 minutes
+    if (Date.now() - session.lastActivityAt.getTime() > idleLimit) {
+      session.status = SessionStatus.EXPIRED;
+      await session.save();
+      await updateTableStatus(session.tableId.toString(), TableStatus.NEEDS_CLEANING, session.restaurantId.toString());
+      await TableModel.findByIdAndUpdate(session.tableId, { currentSessionId: null });
+
+      const { ensureCleaningTaskForTable } = await import('../cleaning/cleaning.service');
+      await ensureCleaningTaskForTable({
+        restaurantId: session.restaurantId,
+        tableId: session.tableId,
+        sessionId: session._id,
+      });
+
+      emitSessionEvent(session.restaurantId.toString(), SocketEvent.SESSION_EXPIRED, {
+        sessionId: session._id,
+        tableId: session.tableId,
+        reason: 'idle_timeout_no_order',
+      });
+
+      throw new AppError('Session expired due to inactivity (no order placed within 5 minutes)', 401, ErrorCode.SESSION_IDLE_TIMEOUT);
+    }
   }
 
   return session;
@@ -117,12 +148,41 @@ export async function endSession(
     throw new AppError('Session not found', 404, ErrorCode.NOT_FOUND);
   }
 
+  // Validation: cannot finish dining if there are active (uncompleted/unpaid) orders
+  const { OrderModel } = await import('../orders/orders.model');
+  const { OrderStatus } = await import('../../constants/statuses');
+  const activeOrderExists = await OrderModel.exists({
+    sessionId: session._id,
+    status: { $in: [
+      OrderStatus.PENDING,
+      OrderStatus.CONFIRMED,
+      OrderStatus.PREPARING,
+      OrderStatus.DELAYED,
+      OrderStatus.READY,
+      OrderStatus.PICKED,
+      OrderStatus.SERVED,
+      OrderStatus.BILLED
+    ]}
+  });
+
+  if (activeOrderExists) {
+    throw new AppError('Cannot finish dining. You have active or unpaid orders.', 400, ErrorCode.INVALID_REQUEST);
+  }
+
   session.status = SessionStatus.CLOSED;
   await session.save();
 
   // Mark table for cleaning
   await updateTableStatus(session.tableId.toString(), TableStatus.NEEDS_CLEANING, restaurantId);
   await TableModel.findByIdAndUpdate(session.tableId, { currentSessionId: null });
+
+  // Create cleaning task
+  const { ensureCleaningTaskForTable } = await import('../cleaning/cleaning.service');
+  await ensureCleaningTaskForTable({
+    restaurantId: session.restaurantId,
+    tableId: session.tableId,
+    sessionId: session._id,
+  });
 
   emitSessionEvent(restaurantId, SocketEvent.SESSION_CLOSED, {
     sessionId: session._id,
@@ -151,6 +211,14 @@ export async function expireSession(sessionId: string): Promise<ITableSession> {
   await updateTableStatus(session.tableId.toString(), TableStatus.NEEDS_CLEANING, session.restaurantId.toString());
   await TableModel.findByIdAndUpdate(session.tableId, { currentSessionId: null });
 
+  // Create cleaning task
+  const { ensureCleaningTaskForTable } = await import('../cleaning/cleaning.service');
+  await ensureCleaningTaskForTable({
+    restaurantId: session.restaurantId,
+    tableId: session.tableId,
+    sessionId: session._id,
+  });
+
   emitSessionEvent(session.restaurantId.toString(), SocketEvent.SESSION_EXPIRED, {
     sessionId: session._id,
     tableId: session.tableId,
@@ -178,9 +246,9 @@ export async function initTableSession(
   clientSessionToken?: string,
 ): Promise<{ session: ITableSession; sessionToken: string; tableNumber: string }> {
   // 1. Look up table by qrToken (consistently camelCase)
-  let table = await TableModel.findOne({ qrToken });
+  let table = await TableModel.findOne({ qrToken }).setOptions({ bypassTenant: true });
   if (!table && mongoose.Types.ObjectId.isValid(qrToken)) {
-    table = await TableModel.findOne({ _id: qrToken });
+    table = await TableModel.findOne({ _id: qrToken }).setOptions({ bypassTenant: true });
   }
   if (!table) {
     // Log invalid QR attempt
@@ -214,7 +282,7 @@ export async function initTableSession(
   }
 
   // 3. Check if restaurant is active
-  const restaurant = await RestaurantModel.findById(table.restaurantId);
+  const restaurant = await RestaurantModel.findById(table.restaurantId).setOptions({ bypassTenant: true });
   if (!restaurant || restaurant.status !== RestaurantStatus.ACTIVE) {
     void logAuditRaw({
       actorId: new mongoose.Types.ObjectId('000000000000000000000000').toString(),
@@ -235,7 +303,7 @@ export async function initTableSession(
     tableId: table._id,
     restaurantId: table.restaurantId,
     status: SessionStatus.ACTIVE,
-  }).select('+sessionToken');
+  }).select('+sessionToken').setOptions({ bypassTenant: true });
 
   if (existingSession) {
     // Check if the existing session is expired or idle timed out

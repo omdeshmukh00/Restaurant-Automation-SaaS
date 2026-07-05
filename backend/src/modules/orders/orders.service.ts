@@ -314,6 +314,10 @@ export class OrdersService {
 
     await order.save();
 
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(sessionId.toString(), 'order.cancelled', { order });
+
     return order;
   }
 
@@ -362,7 +366,7 @@ export class OrdersService {
       }
     }
 
-    return OrderModel.find(query).sort({ createdAt: 1 });
+    return OrderModel.find(query).populate('tableId').sort({ createdAt: 1 });
   }
 
   static async getKitchenOrderDetails(restaurantId: string | Types.ObjectId, orderId: string | Types.ObjectId) {
@@ -405,6 +409,10 @@ export class OrdersService {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.accepted', { order });
+
     return order;
   }
 
@@ -427,6 +435,11 @@ export class OrdersService {
     }
 
     await order.save();
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.preparing', { order });
+
     return order;
   }
 
@@ -457,6 +470,11 @@ export class OrdersService {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.ready', { order });
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_READY, { orderId: order._id });
+
     return order;
   }
 
@@ -482,6 +500,11 @@ export class OrdersService {
     }
 
     await order.save();
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.rejected', { order, reason });
+
     return order;
   }
 
@@ -505,11 +528,15 @@ export class OrdersService {
     order.kitchenStaffId = toNullableObjectId(actorId);
 
     await order.save();
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+
     return order;
   }
 
   static async getReadyOrders(restaurantId: string | Types.ObjectId) {
-    return OrderModel.find({ restaurantId, status: OrderStatus.READY }).sort({ updatedAt: 1 });
+    return OrderModel.find({ restaurantId, status: OrderStatus.READY }).populate('tableId').sort({ updatedAt: 1 });
   }
 
   static async pickFood(
@@ -525,6 +552,11 @@ export class OrdersService {
     order.pickedAt = new Date();
     order.serviceStaffId = toNullableObjectId(actorId);
     await order.save();
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.serving', { order });
+
     return order;
   }
 
@@ -542,6 +574,11 @@ export class OrdersService {
     order.servedAt = new Date();
     order.serviceStaffId = toNullableObjectId(actorId);
     await order.save();
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.served', { order });
+
     return order;
   }
 
@@ -559,6 +596,11 @@ export class OrdersService {
     order.serviceStaffId = toNullableObjectId(actorId);
     await order.save();
     await creditPoints(order);
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
+    socketService.emitToSession(order.sessionId!.toString(), 'order.completed', { order });
+
     return order;
   }
 }

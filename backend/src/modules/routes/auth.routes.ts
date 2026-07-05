@@ -15,6 +15,7 @@ import {
   revokeSession,
   verifyOtp,
   verifyResetOtp,
+  resetFirstLoginPassword,
 } from '../auth/auth.controller';
 import {
   forgotPasswordSchema,
@@ -40,5 +41,6 @@ authRouter.get('/me', requireAuth, getMe);
 authRouter.post('/forgot-password', validate({ body: forgotPasswordSchema }), forgotPassword);
 authRouter.post('/verify-reset-otp', validate({ body: verifyResetOtpSchema }), verifyResetOtp);
 authRouter.post('/reset-password', validate({ body: resetPasswordSchema }), resetPassword);
+authRouter.post('/reset-first-login-password', requireAuth, resetFirstLoginPassword);
 authRouter.get('/sessions', requireAuth, getSessions);
 authRouter.delete('/sessions/:sessionId', requireAuth, revokeSession);

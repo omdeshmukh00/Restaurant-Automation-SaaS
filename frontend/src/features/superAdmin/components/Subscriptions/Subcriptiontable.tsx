@@ -80,10 +80,10 @@ function EditDropdownContent({
           key={p}
           onClick={() => { onPlanUpdate(row.id, p); onClose(); }}
           className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-slate-500/5 flex items-center gap-2 ${
-            row.plan === p ? PLAN_COLORS[p].text : darkMode ? "text-slate-300" : "text-slate-700"
+            row.plan === p ? (PLAN_COLORS[p] || PLAN_COLORS['Basic']).text : darkMode ? "text-slate-300" : "text-slate-700"
           }`}
         >
-          <span className={PLAN_COLORS[p].text}>{PLAN_ICONS[p]}</span>
+          <span className={(PLAN_COLORS[p] || PLAN_COLORS['Basic']).text}>{PLAN_ICONS[p] || <Package size={12} />}</span>
           {p}
           {row.plan === p && <span className="ml-auto text-[9px] text-orange-500 font-bold">CURRENT</span>}
         </button>
@@ -105,7 +105,7 @@ function MobileRestaurantCard({
   const [expanded, setExpanded] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showMore, setShowMore] = useState(false);
-  const planColors = PLAN_COLORS[row.plan];
+  const planColors = PLAN_COLORS[row.plan] || PLAN_COLORS['Basic'];
 
   return (
     <div className={`rounded-2xl border transition-all ${
@@ -365,7 +365,7 @@ export default function SubscriptionTable({
 
             <tbody className={`divide-y text-sm ${darkMode ? "divide-slate-900/80" : "divide-slate-100"}`}>
               {restaurants.map((row) => {
-                const planColors = PLAN_COLORS[row.plan];
+                const planColors = PLAN_COLORS[row.plan] || PLAN_COLORS['Basic'];
                 return (
                   <tr
                     key={row.id}
@@ -422,7 +422,7 @@ export default function SubscriptionTable({
                     {/* Plan Badge */}
                     <td className="py-4 px-5 whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide border ${planColors.text} ${planColors.border} ${planColors.icon.replace("text-", "bg-").replace("400", "500/10")}`}>
-                        {PLAN_ICONS[row.plan]}
+                        {PLAN_ICONS[row.plan] || <Package size={12} />}
                         {row.plan}
                       </span>
                     </td>

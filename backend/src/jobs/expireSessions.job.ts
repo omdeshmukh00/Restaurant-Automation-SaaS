@@ -1,9 +1,9 @@
 import cron from 'node-cron';
 import { TableSessionModel } from '../modules/tableSessions/tableSessions.model';
 import { expireSession } from '../modules/tableSessions/tableSessions.service';
-import { env } from '../config/env';
 import { logger } from '../config/logger';
-import { SessionStatus } from '../constants/statuses';
+import { SessionStatus, OrderStatus } from '../constants/statuses';
+import { OrderModel } from '../modules/orders/orders.model';
 
 /**
  * Scans for and cleanly expires any table sessions that have passed
@@ -18,25 +18,39 @@ export async function runSessionCleanup(): Promise<void> {
 
   try {
     const now = new Date();
-    const idleTimeoutMs = env.SESSION_IDLE_TIMEOUT_MINUTES * 60_000;
-    const idleThreshold = new Date(Date.now() - idleTimeoutMs);
 
-    // Query active sessions exceeding limits, batched at 100 to prevent memory pressure
+    // Query active sessions, batched at 100 to prevent memory pressure
     const sessions = await TableSessionModel.find({
       status: SessionStatus.ACTIVE,
-      $or: [
-        { expiresAt: { $lt: now } },
-        { lastActivityAt: { $lt: idleThreshold } },
-      ],
     }).limit(100);
 
     scannedCount = sessions.length;
 
     for (const session of sessions) {
       try {
-        // Isolated try/catch: one failure won't halt the entire batch cleanup
-        await expireSession(session._id.toString());
-        expiredCount++;
+        const isHardExpired = session.expiresAt.getTime() < now.getTime();
+        let shouldExpire = isHardExpired;
+
+        if (!shouldExpire) {
+          // Check order immunity: if no order has been placed within 5 minutes, expire session
+          const hasOrders = await OrderModel.exists({
+            sessionId: session._id,
+            status: { $ne: OrderStatus.CANCELLED },
+          });
+
+          if (!hasOrders) {
+            const idleLimitMs = 5 * 60_000; // 5 minutes
+            if (now.getTime() - session.lastActivityAt.getTime() > idleLimitMs) {
+              shouldExpire = true;
+            }
+          }
+        }
+
+        if (shouldExpire) {
+          // Isolated try/catch: one failure won't halt the entire batch cleanup
+          await expireSession(session._id.toString());
+          expiredCount++;
+        }
       } catch (error) {
         failedCount++;
         errors.push({ sessionId: session._id, error });

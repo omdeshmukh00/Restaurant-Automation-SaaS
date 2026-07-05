@@ -37,21 +37,23 @@ export async function ensureCleaningTaskForTable(input: EnsureCleaningTaskInput)
     tableId: input.tableId,
   }).sort({ createdAt: -1 });
 
-  if (
-    existingTask &&
-    existingTask.status !== CleaningStatus.VERIFIED &&
-    existingTask.status !== CleaningStatus.COMPLETED
-  ) {
-    existingTask.priority = priority;
-    existingTask.status = CleaningStatus.PENDING;
-    existingTask.startedBy = null;
-    existingTask.completedBy = null;
-    existingTask.verifiedBy = null;
-    existingTask.startedAt = null;
-    existingTask.completedAt = null;
-    existingTask.verifiedAt = null;
-    await existingTask.save();
-    return existingTask;
+  if (existingTask) {
+    if (existingTask.status === CleaningStatus.COMPLETED) {
+      return existingTask;
+    }
+
+    if (existingTask.status !== CleaningStatus.VERIFIED) {
+      existingTask.priority = priority;
+      existingTask.status = CleaningStatus.PENDING;
+      existingTask.startedBy = null;
+      existingTask.completedBy = null;
+      existingTask.verifiedBy = null;
+      existingTask.startedAt = null;
+      existingTask.completedAt = null;
+      existingTask.verifiedAt = null;
+      await existingTask.save();
+      return existingTask;
+    }
   }
 
   return CleaningTaskModel.create({

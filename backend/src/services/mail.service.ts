@@ -19,6 +19,9 @@ export const EMAIL_SUBJECTS = {
   DAILY_SALES_REPORT: 'Daily Sales Report',
   RECEIPT: 'Your Payment Receipt',
   PASSWORD_CHANGED_ALERT: 'Security Alert: Your Password Was Changed',
+  RESTAURANT_APPROVAL: 'Welcome to RestoHub - Your Restaurant Has Been Approved',
+  RESTAURANT_REJECTION: 'Your RestoHub Partner Application Status',
+  RESTAURANT_SUBMISSION: 'Your RestoHub Partner Application Received',
 };
 
 let transporter: nodemailer.Transporter | null = null;
@@ -473,6 +476,99 @@ export async function sendPasswordChangedAlertEmail(
     });
   } catch (error) {
     logger.error('Failed to prepare or send password changed alert email', { error, email });
+    return false;
+  }
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+export async function sendRestaurantApprovalEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  temporaryPassword: string,
+  loginUrl: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('restaurant-approval');
+
+    html = html.replace(/\{\{ownerName\}\}/g, escapeHtml(ownerName));
+    html = html.replace(/\{\{restaurantName\}\}/g, escapeHtml(restaurantName));
+    html = html.replace(/\{\{loginEmail\}\}/g, escapeHtml(email));
+    html = html.replace(/\{\{temporaryPassword\}\}/g, escapeHtml(temporaryPassword));
+    html = html.replace(/\{\{loginUrl\}\}/g, escapeHtml(loginUrl));
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.RESTAURANT_APPROVAL,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send restaurant approval email', { error, email });
+    return false;
+  }
+}
+
+/**
+ * Send Restaurant Rejection Email
+ */
+export async function sendRestaurantRejectionEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  rejectionReason: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('restaurant-rejection');
+
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{restaurantName\}\}/g, restaurantName);
+    html = html.replace(/\{\{rejectionReason\}\}/g, rejectionReason);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.RESTAURANT_REJECTION,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send restaurant rejection email', { error, email });
+    return false;
+  }
+}
+
+/**
+ * Send Restaurant Submission Email
+ */
+export async function sendRestaurantSubmissionEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  selectedPlan: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('restaurant-submission');
+
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{restaurantName\}\}/g, restaurantName);
+    html = html.replace(/\{\{selectedPlan\}\}/g, selectedPlan);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.RESTAURANT_SUBMISSION,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send restaurant submission email', { error, email });
     return false;
   }
 }

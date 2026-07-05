@@ -17,6 +17,12 @@ import {
   createRazorpayRefund,
 } from '../../services/razorpay.service';
 import { env } from '../../config/env';
+import { TableSessionModel } from '../tableSessions/tableSessions.model';
+import { TableModel } from '../tables/tables.model';
+import { TableStatus } from '../../constants/statuses';
+import { socketService } from '../../sockets/socket.service';
+import { SocketEvent } from '../../constants/events';
+import { logger } from '../../config/logger';
 
 function toObjectId(value: string): mongoose.Types.ObjectId {
   if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -71,62 +77,73 @@ function buildPaymentFilter(restaurantId: string, query: ListPaymentsQuery) {
 
 export class PaymentsService {
   static async createCustomerPayment(restaurantId: string, sessionId: string, method: PaymentMethod) {
-    // Step 1: Build the bill via BillingService (creates/updates Bill document)
-    const result = await BillingService.createPayment(restaurantId, sessionId, method);
+    const { Cart } = await import('../cart/cart.model');
+    const cart = await Cart.findOne({
+      restaurantId: toObjectId(restaurantId),
+      sessionId: toObjectId(sessionId)
+    });
 
     const isCashPayment = method === PaymentMethod.CASH;
     const isRazorpayEnabled = !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
 
-    let razorpayOrderId: string | null = null;
-    let providerPaymentId = result.paymentIntentId; // default: mock intent id
+    let amount = 0;
+    let isCartCheckout = false;
 
-    // Step 2: For online methods (UPI, CARD, ONLINE, WALLET) + Razorpay configured
-    //         → create a real Razorpay order
+    if (cart && cart.items && cart.items.length > 0) {
+      amount = cart.grandTotal;
+      isCartCheckout = true;
+    } else {
+      // Fallback: cumulative bill for already placed orders
+      const liveBill = await BillingService.getLiveBill(restaurantId, sessionId);
+      amount = liveBill.finalAmount;
+    }
+
+    if (amount <= 0) {
+      throw new AppError('Cannot create a payment for ₹0 or empty cart/bill', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    let razorpayOrderId: string | null = null;
+    let providerPaymentId = `pay_mock_${restaurantId}_${Date.now()}`;
+
+    // Create Razorpay order if enabled
     if (!isCashPayment && isRazorpayEnabled) {
       const rzpOrder = await createRazorpayOrder({
-        amount: result.amount,           // in ₹ — service converts to paise
-        currency: result.currency ?? 'INR',
-        receipt: String(result.billId),  // your internal bill ID as receipt
+        amount: amount,
+        currency: 'INR',
+        receipt: `rcpt_${sessionId.slice(-6)}_${Date.now().toString().slice(-4)}`,
         notes: {
           restaurantId,
           sessionId,
-          billId: String(result.billId),
           method,
+          isCartCheckout: String(isCartCheckout),
         },
       });
 
-      razorpayOrderId = rzpOrder.id;     // e.g. "order_Abc123XYZ"
-      providerPaymentId = rzpOrder.id;   // store Razorpay order ID as provider ref
-
-      await BillingModel.findByIdAndUpdate(result.billId, {
-        paymentId: rzpOrder.id,
-      });
+      razorpayOrderId = rzpOrder.id;
+      providerPaymentId = rzpOrder.id;
     }
 
-    // Step 3: Update the PaymentModel record created by BillingService
-    const payment = await PaymentModel.findOneAndUpdate(
-      {
-        restaurantId: toObjectId(restaurantId),
-        sessionId: toObjectId(sessionId),
-        status: PaymentStatus.PENDING,
+    // Create the PaymentModel record
+    const payment = await PaymentModel.create({
+      restaurantId: toObjectId(restaurantId),
+      sessionId: toObjectId(sessionId),
+      amount,
+      currency: 'INR',
+      method,
+      provider: isRazorpayEnabled && !isCashPayment ? 'razorpay' : 'mock',
+      providerPaymentId,
+      razorpayOrderId,
+      status: PaymentStatus.PENDING as any,
+      metadata: {
+        isCartCheckout,
+        source: 'customer_payment_create',
       },
-      {
-        provider: isRazorpayEnabled && !isCashPayment ? 'razorpay' : 'mock',
-        providerPaymentId,
-        razorpayOrderId,
-        currency: result.currency ?? 'INR',
-        metadata: {
-          billId: result.billId,
-          source: 'customer_payment_create',
-        },
-      },
-      { new: true, sort: { createdAt: -1 } },
-    ).lean();
+    });
 
     return {
-      ...result,
-      paymentId: razorpayOrderId ?? result.paymentIntentId,
-      // Key fields the frontend needs to open Razorpay checkout
+      paymentId: providerPaymentId,
+      amount,
+      currency: 'INR',
       razorpayOrderId,
       razorpayKeyId: isRazorpayEnabled && !isCashPayment ? env.RAZORPAY_KEY_ID : null,
       provider: isRazorpayEnabled && !isCashPayment ? 'razorpay' : 'mock',
@@ -147,12 +164,9 @@ export class PaymentsService {
   ) {
     const isRazorpayEnabled = !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
 
-    // --- RAZORPAY SIGNATURE VERIFICATION ---
-    // If Razorpay fields are provided, verify signature before anything else.
-    // This is the most important security step — prevents fake payment confirmations.
+    // 1. Razorpay signature verification
     if (razorpayFields && isRazorpayEnabled) {
       const isValid = verifyRazorpaySignature(razorpayFields);
-
       if (!isValid) {
         throw new AppError(
           'Payment signature verification failed. Possible tampered request.',
@@ -160,36 +174,10 @@ export class PaymentsService {
           ErrorCode.PAYMENT_FAILED,
         );
       }
-
-      // Update PaymentModel with real Razorpay payment ID
-      await PaymentModel.findOneAndUpdate(
-        {
-          restaurantId: toObjectId(restaurantId),
-          sessionId: toObjectId(sessionId),
-          $or: [
-            { razorpayOrderId: razorpayFields.razorpay_order_id },
-            { providerPaymentId: razorpayFields.razorpay_order_id },
-          ],
-        },
-        {
-          razorpayPaymentId: razorpayFields.razorpay_payment_id,
-          razorpaySignature: razorpayFields.razorpay_signature,
-          providerPaymentId: razorpayFields.razorpay_payment_id,
-        },
-        { new: true },
-      );
     }
 
-    // --- MARK BILL PAID ---
-    // paymentId here is either the mock intentId or Razorpay order_id
-    const bill = await BillingService.verifyPayment(
-      restaurantId,
-      sessionId,
-      paymentId,
-      mapVerificationStatus(simulateStatus),
-    );
-
-    const payment = await PaymentModel.findOne({
+    // 2. Fetch payment record
+    const paymentRecord = await PaymentModel.findOne({
       restaurantId: toObjectId(restaurantId),
       sessionId: toObjectId(sessionId),
       $or: [
@@ -197,12 +185,197 @@ export class PaymentsService {
         { razorpayOrderId: paymentId },
         { _id: mongoose.Types.ObjectId.isValid(paymentId) ? toObjectId(paymentId) : null },
       ],
-    }).lean();
+    });
 
-    return {
-      bill,
-      payment,
+    if (!paymentRecord) {
+      throw new AppError('Payment record not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    // 3. Idempotency Check
+    if (paymentRecord.status === PaymentStatus.COMPLETED) {
+      return {
+        success: true,
+        payment: paymentRecord,
+      };
+    }
+
+    if (simulateStatus === 'FAILED' || paymentId.includes('fail')) {
+      paymentRecord.status = PaymentStatus.FAILED as any;
+      paymentRecord.failureReason = 'Simulated payment failure';
+      await paymentRecord.save();
+      throw new AppError('Payment processing failed.', 400, ErrorCode.PAYMENT_FAILED);
+    }
+
+    // 4. Wrap the rest in transaction
+    let dbSession: mongoose.ClientSession | null = null;
+    try {
+      dbSession = await mongoose.startSession();
+      dbSession.startTransaction();
+    } catch (e) {
+      dbSession = null;
+    }
+
+    const executeVerification = async (session: mongoose.ClientSession | null) => {
+      const options = session ? { session } : undefined;
+
+      // Update payment record details
+      paymentRecord.status = PaymentStatus.COMPLETED as any;
+      paymentRecord.verifiedAt = new Date();
+      if (razorpayFields) {
+        paymentRecord.razorpayPaymentId = razorpayFields.razorpay_payment_id;
+        paymentRecord.razorpaySignature = razorpayFields.razorpay_signature;
+        paymentRecord.providerPaymentId = razorpayFields.razorpay_payment_id;
+      }
+      await paymentRecord.save(options);
+
+      const isCartCheckout = paymentRecord.metadata?.isCartCheckout === true;
+
+      if (isCartCheckout) {
+        // Place the order from cart items inside transaction
+        const { Cart } = await import('../cart/cart.model');
+        const cart = await Cart.findOne({
+          restaurantId: toObjectId(restaurantId),
+          sessionId: toObjectId(sessionId)
+        }).session(session ? session : null as any);
+
+        if (!cart || !cart.items || cart.items.length === 0) {
+          throw new AppError('Cart empty or not found during payment verification', 400, ErrorCode.VALIDATION_ERROR);
+        }
+
+        // Map cart items to order items
+        const menuItemIds = cart.items.map(i => i.menuItem);
+        const menuItems = await mongoose.model('MenuItem').find({
+          _id: { $in: menuItemIds },
+          restaurantId: toObjectId(restaurantId)
+        }).populate('ingredients.inventoryItemId').session(session ? session : null as any);
+
+        const menuItemMap = new Map(menuItems.map(m => [m._id.toString(), m]));
+
+        const orderItems = cart.items.map((item: any) => {
+          const menuItemIdStr = item.menuItem.toString();
+          const fullMenuItem = menuItemMap.get(menuItemIdStr);
+          if (!fullMenuItem) {
+            throw new AppError('Invalid menu item in cart', 400, ErrorCode.VALIDATION_ERROR);
+          }
+          const ingredientsSnapshot = fullMenuItem.ingredients ? fullMenuItem.ingredients.map((ing: any) => ({
+            inventoryItemId: ing.inventoryItemId && ing.inventoryItemId._id ? ing.inventoryItemId._id : ing.inventoryItemId,
+            inventoryItemName: (ing.inventoryItemId && ing.inventoryItemId.name) || 'Unknown Item',
+            quantity: ing.quantity
+          })) : [];
+
+          return {
+            menuItemId: fullMenuItem._id,
+            name: fullMenuItem.name,
+            quantity: item.quantity,
+            price: item.unitPrice,
+            totalPrice: item.subtotal,
+            notes: item.notes || '',
+            ingredients: ingredientsSnapshot,
+          };
+        });
+
+        const timestamp = Date.now().toString().slice(-6);
+        const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const orderNumber = `ORD-${timestamp}-${randomChars}`;
+
+        const { OrderModel } = await import('../orders/orders.model');
+        const { OrderStatus } = await import('../../constants/statuses');
+        
+        const sessionDoc = await TableSessionModel.findById(sessionId).session(session ? session : null as any);
+        if (!sessionDoc) {
+          throw new AppError('Table session not found', 404, ErrorCode.NOT_FOUND);
+        }
+
+        const order = await OrderModel.create([{
+          restaurantId: toObjectId(restaurantId),
+          tableId: sessionDoc.tableId,
+          sessionId: toObjectId(sessionId),
+          orderNumber,
+          items: orderItems,
+          totalAmount: cart.subtotal,
+          taxAmount: cart.tax,
+          discountAmount: cart.discount,
+          finalAmount: cart.grandTotal,
+          status: OrderStatus.PENDING,
+          paymentStatus: 'PAID', // mark as paid since checkout completed
+          priority: 'NORMAL',
+          specialInstructions: '',
+        }], options);
+
+        const createdOrder = order[0];
+
+        // Link order and payment
+        paymentRecord.orderId = createdOrder._id;
+        await paymentRecord.save(options);
+
+        // Transition table status to ORDERING if it is currently OCCUPIED
+        const table = await TableModel.findById(createdOrder.tableId).session(session ? session : null as any);
+        if (table && table.status === TableStatus.OCCUPIED) {
+          table.status = TableStatus.ORDERING;
+          await table.save(options);
+        }
+
+        // Clear cart
+        cart.items = [] as any;
+        cart.subtotal = 0;
+        cart.tax = 0;
+        cart.discount = 0;
+        cart.grandTotal = 0;
+        await cart.save(options);
+
+        // Emit Socket.IO event for new paid order
+        socketService.emitToRestaurant(restaurantId, SocketEvent.ORDER_NEW, { orderId: createdOrder._id });
+        socketService.emitToSession(sessionId, 'order.new', { order: createdOrder });
+
+        return {
+          success: true,
+          payment: paymentRecord,
+          order: createdOrder,
+        };
+      } else {
+        // Dine-and-pay-later model: verify final bill
+        const bill = await BillingService.verifyPayment(
+          restaurantId,
+          sessionId,
+          paymentId,
+          mapVerificationStatus(simulateStatus),
+        );
+
+        return {
+          success: true,
+          bill,
+          payment: paymentRecord,
+        };
+      }
     };
+
+    try {
+      let result;
+      try {
+        result = await executeVerification(dbSession);
+        if (dbSession) {
+          await dbSession.commitTransaction();
+        }
+      } catch (err: any) {
+        if (dbSession) {
+          await dbSession.abortTransaction();
+        }
+        if (err.name === 'MongoServerError' && err.message.includes('Transaction numbers')) {
+          logger.warn('[Mongoose Transaction Fallback] Retrying verifyCustomerPayment without transaction.');
+          result = await executeVerification(null);
+        } else {
+          throw err;
+        }
+      } finally {
+        if (dbSession) {
+          dbSession.endSession();
+        }
+      }
+      return result;
+    } catch (error) {
+      logger.error('Failed to verify customer payment', { error });
+      throw error;
+    }
   }
 
   static async getCustomerPaymentStatus(restaurantId: string, sessionId: string, paymentId: string) {

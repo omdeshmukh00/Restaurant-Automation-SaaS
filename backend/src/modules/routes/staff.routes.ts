@@ -174,7 +174,7 @@ staffRouter.get('/requests', async (req, res, next) => {
   try {
     const requests = await StaffRequestModel.find({
       restaurantId: req.user?.restaurantId,
-    }).sort({ createdAt: -1 });
+    }).populate('tableId').sort({ createdAt: -1 });
 
     ok(res, {
       requests,

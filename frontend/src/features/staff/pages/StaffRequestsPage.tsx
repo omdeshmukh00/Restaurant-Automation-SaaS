@@ -9,8 +9,18 @@ export default function StaffRequestsPage() {
   const { query } = useStaffSearch();
   const { requests, setRequests } = useStaffDashboard();
 
-  const updateRequestStatus = (id: number, status: Request['status']) => {
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+  const updateRequestStatus = async (id: any, status: Request['status']) => {
+    try {
+      const { requestsAPI } = await import('../api/staff.api');
+      if (status === 'InProgress') {
+        await requestsAPI.accept(id);
+      } else {
+        await requestsAPI.complete(id);
+      }
+      setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    } catch (err) {
+      console.error('Failed to update request status', err);
+    }
   };
 
   const filteredRequests = requests.filter(r => 

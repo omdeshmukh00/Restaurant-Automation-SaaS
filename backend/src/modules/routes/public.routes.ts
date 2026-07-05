@@ -104,3 +104,23 @@ publicRouter.get('/menu', async (req, res, next) => {
     next(error);
   }
 });
+
+// ── Onboarding / Partner Application Routes ──────────────────────────
+import {
+  createRazorpayOrderForPlan,
+  submitPartnerRequest,
+} from '../superAdmin/restaurantRequest.controller';
+
+publicRouter.post('/partner-request/create-order', createRazorpayOrderForPlan);
+publicRouter.post('/partner-request', submitPartnerRequest);
+
+import { PlatformPlanModel } from '../superAdmin/superAdmin.model';
+publicRouter.get('/plans', async (_req, res, next) => {
+  try {
+    const plans = await PlatformPlanModel.find({ isActive: { $ne: false } }).sort({ priceMonthly: 1 });
+    ok(res, { plans });
+  } catch (error) {
+    next(error);
+  }
+});
+

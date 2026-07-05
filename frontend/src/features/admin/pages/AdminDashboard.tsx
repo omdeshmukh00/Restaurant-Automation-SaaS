@@ -6,8 +6,57 @@ import { RevenueChart } from '../components/dashboard/RevenueChart';
 import { ActivityFeed } from '../components/dashboard/ActivityFeed';
 import { TableOverview } from '../components/dashboard/TableOverview';
 import { TopMenuItems } from '../components/dashboard/TopMenuItems';
+import { connectSocket, getSocket } from '../../../lib/socket';
+import { useTablesStore } from '../store/tables.store';
 
 const AdminDashboard = () => {
+  React.useEffect(() => {
+    connectSocket();
+    useTablesStore.getState().fetchTables();
+
+    const interval = setInterval(() => {
+      useTablesStore.getState().fetchTables();
+    }, 15000);
+
+    const socket = getSocket();
+    if (socket) {
+      const handleSync = () => {
+        useTablesStore.getState().fetchTables();
+      };
+
+      socket.on('table.status.changed', handleSync);
+      socket.on('table.session.created', handleSync);
+      socket.on('table.session.closed', handleSync);
+      socket.on('table.session.expired', handleSync);
+      socket.on('order.created', handleSync);
+      socket.on('order.updated', handleSync);
+      socket.on('order.ready', handleSync);
+      socket.on('bill.requested', handleSync);
+      socket.on('bill.paid', handleSync);
+      socket.on('cleaning.started', handleSync);
+      socket.on('cleaning.completed', handleSync);
+      socket.on('staff:request-new', handleSync);
+
+      return () => {
+        clearInterval(interval);
+        socket.off('table.status.changed', handleSync);
+        socket.off('table.session.created', handleSync);
+        socket.off('table.session.closed', handleSync);
+        socket.off('table.session.expired', handleSync);
+        socket.off('order.created', handleSync);
+        socket.off('order.updated', handleSync);
+        socket.off('order.ready', handleSync);
+        socket.off('bill.requested', handleSync);
+        socket.off('bill.paid', handleSync);
+        socket.off('cleaning.started', handleSync);
+        socket.off('cleaning.completed', handleSync);
+        socket.off('staff:request-new', handleSync);
+      };
+    }
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>

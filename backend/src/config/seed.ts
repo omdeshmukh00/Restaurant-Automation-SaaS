@@ -209,6 +209,26 @@ export async function seedDevelopmentData(): Promise<void> {
       { $set: { name: 'ENTERPRISE', priceMonthly: 24999, tenantLimit: 20, usageLimit: 10000 } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
+    PlatformPlanModel.findOneAndUpdate(
+      { name: 'Free' },
+      { $set: { name: 'Free', priceMonthly: 0, tenantLimit: 1, usageLimit: 100, staffLimit: 5 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    PlatformPlanModel.findOneAndUpdate(
+      { name: 'Standard' },
+      { $set: { name: 'Standard', priceMonthly: 599, tenantLimit: 15, usageLimit: 500, staffLimit: 15 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    PlatformPlanModel.findOneAndUpdate(
+      { name: 'Premium' },
+      { $set: { name: 'Premium', priceMonthly: 999, tenantLimit: 30, usageLimit: 2000, staffLimit: 30 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    PlatformPlanModel.findOneAndUpdate(
+      { name: 'Enterprise' },
+      { $set: { name: 'Enterprise', priceMonthly: 1999, tenantLimit: 100, usageLimit: 10000, staffLimit: null } },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
     FeatureFlagModel.findOneAndUpdate(
       { key: 'smart-recommendations' },
       { $set: { key: 'smart-recommendations', enabled: true } },

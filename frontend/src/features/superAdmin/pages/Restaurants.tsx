@@ -2,6 +2,8 @@
 // Fully responsive restaurants management page
 
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { Building2 } from "lucide-react";
 import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
 import type {
   RestaurantsRow,
@@ -36,9 +38,11 @@ export default function Restaurant() {
     return false;
   });
 
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const restaurants = useRestaurantRequestsStore((state) => state.restaurants);
+  const requests = useRestaurantRequestsStore((state) => state.requests);
   const addRestaurant = useRestaurantRequestsStore((state) => state.addRestaurant);
   const updateRestaurantStatus = useRestaurantRequestsStore(
     (state) => state.updateRestaurantStatus
@@ -142,17 +146,37 @@ export default function Restaurant() {
       }`}
     >
       {/* Page header */}
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Restaurant Management
-        </h1>
-        <p
-          className={`text-sm mt-1 ${
-            darkMode ? "text-slate-400" : "text-slate-600"
-          }`}
-        >
-          Monitor and manage all restaurant accounts
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Restaurant Management
+          </h1>
+          <p
+            className={`text-sm mt-1 ${
+              darkMode ? "text-slate-400" : "text-slate-600"
+            }`}
+          >
+            Monitor and manage all restaurant accounts
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/superadmin?requests=new')}
+            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <Building2 size={13} />
+            New Requests
+            {requests.length > 0 && (
+              <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
+                {requests.length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Metric Cards */}

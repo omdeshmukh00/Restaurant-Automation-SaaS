@@ -68,8 +68,20 @@ apiClient.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response;
       const errorCode = data?.error?.code;
+      const url = error.config?.url || '';
+
+      const isAuthAction =
+        url.includes('/auth/login') ||
+        url.includes('/auth/verify-otp') ||
+        url.includes('/auth/forgot-password') ||
+        url.includes('/auth/verify-reset-otp') ||
+        url.includes('/auth/reset-password') ||
+        url.includes('/auth/request-otp') ||
+        url.includes('/logout') ||
+        url.includes('/session/end');
 
       if (
+        !isAuthAction &&
         status === 401 &&
         (errorCode === 'TOKEN_EXPIRED' ||
           errorCode === 'TOKEN_INVALID' ||

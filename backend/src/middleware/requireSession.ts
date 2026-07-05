@@ -7,6 +7,8 @@ import * as sessionService from '../modules/tableSessions/tableSessions.service'
 import { AppError } from '../utils/AppError';
 import { ErrorCode } from '../constants/errors';
 
+import { tenantContext } from '../utils/tenantContext';
+
 /**
  * Middleware: validates x-session-token header and attaches session to req.
  * - Checks session exists and is ACTIVE
@@ -34,16 +36,21 @@ export async function requireSession(req: Request, _res: Response, next: NextFun
     // Touch activity timestamp
     await sessionService.touchActivity(session._id.toString());
 
+    const tenantId = (session as any).tenantId?.toString() || session.restaurantId.toString();
+
     // Attach session to request for downstream handlers
     req.tableSession = {
       _id: session._id.toString(),
       restaurantId: session.restaurantId.toString(),
+      tenantId,
       tableId: session.tableId.toString(),
       customerName: session.customerName,
       mobile: session.mobile,
     };
 
-    next();
+    tenantContext.run({ tenantId }, () => {
+      next();
+    });
   } catch (error) {
     next(error);
   }

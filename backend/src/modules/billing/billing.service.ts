@@ -357,18 +357,28 @@ export class BillingService {
       await payment.save();
     }
 
-    // Transition all BILLED orders to PAID
+    // Transition all BILLED and SERVED orders to PAID
     const billedOrders = await OrderModel.find({
       restaurantId,
       sessionId,
-      status: OrderStatus.BILLED
+      status: { $in: [OrderStatus.BILLED, OrderStatus.SERVED] }
     });
+
+    const { socketService } = await import('../../sockets/socket.service');
+    const { SocketEvent } = await import('../../constants/events');
 
     for (const order of billedOrders) {
       order.status = OrderStatus.PAID;
       order.paymentStatus = 'PAID' as any;
       await order.save();
+
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+      socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
     }
+
+    // Emit bill.paid to restaurant and session
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.PAYMENT_CONFIRMED, { billId: bill._id, sessionId });
+    socketService.emitToSession(sessionId.toString(), 'payment.success', { billId: bill._id });
 
     // Send HTML Receipt Email
     if (bill.customerEmail && bill.wantsReceipt) {

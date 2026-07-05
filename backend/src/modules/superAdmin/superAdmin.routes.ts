@@ -29,9 +29,22 @@ import {
   getActiveTenantAnalytics,
   getSystemMonitoring,
   getPlatformAuditLogs,
+  listRestaurantRequests,
+  approveRestaurantRequest,
+  rejectRestaurantRequest,
 } from './superAdmin.controller';
 
 const router = Router();
+
+/*
+|--------------------------------------------------------------------------
+| RESTAURANT REQUESTS
+|--------------------------------------------------------------------------
+*/
+
+router.get('/restaurant-requests', listRestaurantRequests);
+router.post('/restaurant-requests/:id/approve', approveRestaurantRequest);
+router.post('/restaurant-requests/:id/deny', rejectRestaurantRequest);
 
 /*
 |--------------------------------------------------------------------------

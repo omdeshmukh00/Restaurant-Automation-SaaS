@@ -25,6 +25,8 @@ export type AuthUser = {
   restaurantId?: string;
   email?: string;
   mobile?: string;
+  mustResetPassword?: boolean;
+  firstLogin?: boolean;
 };
 
 type AuthContextValue = {
@@ -67,6 +69,8 @@ type LoginResponse = {
       restaurantId?: string;
       restaurantName?: string;
       internal_role?: string;
+      mustResetPassword?: boolean;
+      firstLogin?: boolean;
     };
     accessToken: string;
     refreshToken: string;
@@ -124,6 +128,8 @@ function toAuthUser(user: StoredAuthUser, panelOverride?: Panel): AuthUser {
     restaurantName: user.restaurantName ?? 'Restaurant',
     email: user.email,
     mobile: user.mobile,
+    mustResetPassword: (user as any).mustResetPassword,
+    firstLogin: (user as any).firstLogin,
   };
 }
 

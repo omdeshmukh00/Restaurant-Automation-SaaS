@@ -7,7 +7,7 @@ import { TableSessionModel } from '../tableSessions/tableSessions.model';
 import { FeedbackModel } from '../feedback/feedback.model';
 import { OfferModel } from '../offers/offers.model';
 import { StaffRequestModel } from '../staff/staffRequest.model';
-import { Priority, RequestStatus, RequestType } from '../../constants/statuses';
+import { Priority, RequestStatus, RequestType, TableStatus } from '../../constants/statuses';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { feedbackBodySchema } from './customer.schema';
@@ -79,8 +79,8 @@ const requestTypeMap: Record<string, RequestType> = {
   waiter: RequestType.WAITER,
   water: RequestType.WATER,
   cutlery: RequestType.CUTLERY,
-  cleaning: RequestType.CLEANING,
   help: RequestType.HELP,
+  bill: RequestType.BILL,
 };
 
 for (const [path, type] of Object.entries(requestTypeMap)) {
@@ -95,12 +95,49 @@ for (const [path, type] of Object.entries(requestTypeMap)) {
         priority: type === RequestType.WAITER || type === RequestType.HELP ? Priority.HIGH : Priority.NORMAL,
       });
 
+      const { socketService } = await import('../../sockets/socket.service');
+      const { SocketEvent } = await import('../../constants/events');
+
+      socketService.emitToRestaurant(req.tableSession!.restaurantId.toString(), SocketEvent.STAFF_REQUEST_NEW, { request });
+
       ok(res, { request }, 201);
     } catch (error) {
       next(error);
     }
   });
 }
+
+// Route cleaning directly to CleaningTaskModel
+customerRouter.post('/requests/cleaning', async (req, res, next) => {
+  try {
+    const { CleaningTaskModel } = await import('../cleaning/cleaning.model');
+    const { CleaningStatus } = await import('../../constants/statuses');
+    const { updateTableStatus } = await import('../tables/tables.service');
+    const { socketService } = await import('../../sockets/socket.service');
+    const { SocketEvent } = await import('../../constants/events');
+
+    const task = await CleaningTaskModel.create({
+      restaurantId: req.tableSession!.restaurantId,
+      tableId: req.tableSession!.tableId,
+      sessionId: req.tableSession!._id,
+      priority: Priority.NORMAL,
+      status: CleaningStatus.PENDING,
+      reason: 'customer_request',
+    });
+
+    await updateTableStatus(
+      req.tableSession!.tableId.toString(),
+      TableStatus.NEEDS_CLEANING,
+      req.tableSession!.restaurantId.toString(),
+    );
+
+    socketService.emitToRestaurant(req.tableSession!.restaurantId.toString(), SocketEvent.CLEANING_STARTED, { task });
+
+    ok(res, { task }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
 
 
 

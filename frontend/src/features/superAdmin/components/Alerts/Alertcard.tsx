@@ -1,5 +1,6 @@
 // components/AlertCard.tsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, AlertCircle, Info,
   Building2, Clock, Trash2, CheckCheck,
@@ -31,6 +32,7 @@ const ENTITY_TYPE_ICONS = {
 };
 
 export default function AlertCard({ alert, darkMode, onDismiss, onAcknowledge, onResolve }: AlertCardProps) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const tc = getTypeConfig(alert.type);
   const sc = getStatusConfig(alert.status);
@@ -213,6 +215,11 @@ export default function AlertCard({ alert, darkMode, onDismiss, onAcknowledge, o
               </button>
               {alert.actionLabel && (
                 <button
+                  onClick={() => {
+                    if (alert.actionHref) {
+                      navigate(alert.actionHref);
+                    }
+                  }}
                   className={cx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                     'bg-[#ff5a1f] hover:bg-[#e04d1a] text-white shadow-sm shadow-orange-500/20'

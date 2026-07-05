@@ -127,6 +127,8 @@ export async function listTablesController(req: Request, res: Response, next: Ne
       tables.map(async (table) => {
         const tableObj = (table.toObject ? table.toObject() : table) as any;
         if (table.currentSessionId && table.status !== 'AVAILABLE') {
+          const { TableSessionModel } = await import('../tableSessions/tableSessions.model');
+          const session = await TableSessionModel.findById(table.currentSessionId).lean();
           const orders = await OrderModel.find({
             sessionId: table.currentSessionId,
             status: { $nin: ['CANCELLED', 'REJECTED'] },
@@ -135,11 +137,29 @@ export async function listTablesController(req: Request, res: Response, next: Ne
           const amount = orders.reduce((sum, o) => sum + (o.finalAmount || o.totalAmount || 0), 0);
           const itemCount = orders.reduce((sum, o) => sum + (o.items?.length || 0), 0);
 
+          const pendingCount = orders.filter(o => ['PENDING', 'CONFIRMED', 'PREPARING', 'DELAYED'].includes(o.status)).length;
+          const readyCount = orders.filter(o => ['READY', 'PICKED'].includes(o.status)).length;
+          const servedCount = orders.filter(o => ['SERVED', 'BILLED', 'PAID', 'COMPLETED'].includes(o.status)).length;
+          const activeOrder = orders.find(o => !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(o.status));
+
           tableObj.currentOrder = {
             id: 'ORD-ACTIVE',
             time: orders.length > 0 ? 'Active' : '',
             amount,
             items: itemCount,
+          };
+
+          tableObj.sessionDetails = {
+            sessionId: table.currentSessionId,
+            customerName: session?.customerName || 'Guest',
+            sessionCreatedAt: session?.createdAt || null,
+            totalOrders: orders.length,
+            pendingOrdersCount: pendingCount,
+            readyOrdersCount: readyCount,
+            servedOrdersCount: servedCount,
+            currentActiveOrderNumber: activeOrder?.orderNumber || 'None',
+            totalBill: amount,
+            status: table.status,
           };
         }
         return tableObj;
@@ -173,6 +193,8 @@ export async function getTableController(req: Request, res: Response, next: Next
 
     const tableObj = (table.toObject ? table.toObject() : table) as any;
     if (table.currentSessionId && table.status !== 'AVAILABLE') {
+      const { TableSessionModel } = await import('../tableSessions/tableSessions.model');
+      const session = await TableSessionModel.findById(table.currentSessionId).lean();
       const orders = await OrderModel.find({
         sessionId: table.currentSessionId,
         status: { $nin: ['CANCELLED', 'REJECTED'] },
@@ -181,11 +203,29 @@ export async function getTableController(req: Request, res: Response, next: Next
       const amount = orders.reduce((sum, o) => sum + (o.finalAmount || o.totalAmount || 0), 0);
       const itemCount = orders.reduce((sum, o) => sum + (o.items?.length || 0), 0);
 
+      const pendingCount = orders.filter(o => ['PENDING', 'CONFIRMED', 'PREPARING', 'DELAYED'].includes(o.status)).length;
+      const readyCount = orders.filter(o => ['READY', 'PICKED'].includes(o.status)).length;
+      const servedCount = orders.filter(o => ['SERVED', 'BILLED', 'PAID', 'COMPLETED'].includes(o.status)).length;
+      const activeOrder = orders.find(o => !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(o.status));
+
       tableObj.currentOrder = {
         id: 'ORD-ACTIVE',
         time: orders.length > 0 ? 'Active' : '',
         amount,
         items: itemCount,
+      };
+
+      tableObj.sessionDetails = {
+        sessionId: table.currentSessionId,
+        customerName: session?.customerName || 'Guest',
+        sessionCreatedAt: session?.createdAt || null,
+        totalOrders: orders.length,
+        pendingOrdersCount: pendingCount,
+        readyOrdersCount: readyCount,
+        servedOrdersCount: servedCount,
+        currentActiveOrderNumber: activeOrder?.orderNumber || 'None',
+        totalBill: amount,
+        status: table.status,
       };
     }
 

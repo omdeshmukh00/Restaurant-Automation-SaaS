@@ -39,6 +39,36 @@ export const approveRestaurant = asyncHandler(async (req: Request, res: Response
   ok(res, { restaurant });
 });
 
+import { AppError } from '../../utils/AppError';
+import { ErrorCode } from '../../constants/errors';
+import { socketService } from '../../sockets/socket.service';
+
+export const listRestaurantRequests = asyncHandler(async (req: Request, res: Response) => {
+  const requests = await superAdminService.listRestaurantRequests();
+  ok(res, requests);
+});
+
+export const approveRestaurantRequest = asyncHandler(async (req: Request, res: Response) => {
+  const reviewerId = req.user!.id;
+  const result = await superAdminService.approveRestaurantRequest(req.params.id, reviewerId);
+  
+  socketService.emitToSuperAdmin('restaurant_request_approved', { id: req.params.id });
+  ok(res, { success: true, ...result });
+});
+
+export const rejectRestaurantRequest = asyncHandler(async (req: Request, res: Response) => {
+  const reviewerId = req.user!.id;
+  const { reason } = req.body;
+  if (!reason) {
+    throw new AppError('Rejection reason is required', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const result = await superAdminService.rejectRestaurantRequest(req.params.id, reviewerId, reason);
+  
+  socketService.emitToSuperAdmin('restaurant_request_rejected', { id: req.params.id });
+  ok(res, { success: true, request: result });
+});
+
 export const suspendRestaurant = asyncHandler(async (req: Request, res: Response) => {
   const restaurant = await superAdminService.suspendRestaurant(req.params.id);
   ok(res, { restaurant });

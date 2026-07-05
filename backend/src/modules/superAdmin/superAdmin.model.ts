@@ -20,6 +20,8 @@ export interface IPlatformPlan extends Document {
   reservationLimit?: number | null;
   queueLimit?: number | null;
   features: string[];
+  isActive: boolean;
+  originalPriceMonthly?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,6 +47,8 @@ const platformPlanSchema = new Schema<IPlatformPlan>(
     reservationLimit: { type: Number, min: 0, default: null },
     queueLimit: { type: Number, min: 0, default: null },
     features: [{ type: String, trim: true }],
+    isActive: { type: Boolean, default: true },
+    originalPriceMonthly: { type: Number, min: 0, default: null },
   },
   {
     timestamps: true,

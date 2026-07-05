@@ -614,16 +614,20 @@ export default function CustomerProfilePage() {
           {/* Logout */}
           <button
             onClick={async () => {
-              await clearDiningSession();
-              signOut();
-              // Reset profile store
-              updateProfile({
-                name: '',
-                phone: '',
-                email: '',
-                avatar: 'person',
-              });
-              navigate('/');
+              try {
+                await clearDiningSession();
+                signOut();
+                // Reset profile store
+                updateProfile({
+                  name: '',
+                  phone: '',
+                  email: '',
+                  avatar: 'person',
+                });
+                navigate('/');
+              } catch (err: any) {
+                alert(err.message || 'Cannot finish dining. Please check that you have no active or unpaid orders.');
+              }
             }}
             className="w-full flex items-center justify-between p-4 bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/40 rounded-xl border border-red-100 dark:border-red-900/50 transition-all group"
           >

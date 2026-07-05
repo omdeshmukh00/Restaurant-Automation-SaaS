@@ -19,7 +19,7 @@ const FOOTER_LINKS = {
     { label: 'Refund Policy', href: '#refund' },
   ],
   forRestaurants: [
-    { label: 'Partner With Us', href: '#partner' },
+    { label: 'Partner With Us', href: '/partner' },
     { label: 'Restaurant Login', href: '/login' },
     { label: 'Business Solutions', href: '#solutions' },
     { label: 'Pricing', href: '#pricing' },

@@ -75,21 +75,22 @@ export default function CustomerCheckoutPage() {
   const navigate = useNavigate();
   const { addNotification, tableCode, offers, loyaltyPoints, claimOffer, addOrder } = useCustomerStore();
 
-  const completeLocalOrder = () => {
+  const completeLocalOrder = (verifiedOrder?: any) => {
     if (items.length === 0) return;
 
-    const orderId = `#ORD-${Math.floor(3000 + Math.random() * 6000)}`;
     const itemsStr = items.map((i) => `${i.name} x${i.quantity}`).join(', ');
     
-    const newOrder = {
-      id: orderId,
-      items: itemsStr,
-      total: total,
-      status: 'Placed' as const,
-      eta: '15 min'
-    };
-
-    addOrder(newOrder);
+    if (verifiedOrder) {
+      const parsedItemsStr = verifiedOrder.items ? verifiedOrder.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ') : itemsStr;
+      const newOrder = {
+        id: verifiedOrder.orderNumber || verifiedOrder._id,
+        items: parsedItemsStr,
+        total: verifiedOrder.finalAmount || verifiedOrder.totalAmount || total,
+        status: 'Placed' as const,
+        eta: verifiedOrder.preparationTime ? `${verifiedOrder.preparationTime} min` : '15 min'
+      };
+      addOrder(newOrder);
+    }
 
     addNotification(
       'Order Placed! 🍽️',
@@ -135,13 +136,13 @@ export default function CustomerCheckoutPage() {
           order_id: payment.razorpayOrderId,
           handler: async (response) => {
             try {
-              await verifyCustomerPayment({
+              const res = await verifyCustomerPayment({
                 paymentId,
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
               });
-              completeLocalOrder();
+              completeLocalOrder((res as any)?.order);
             } catch (error) {
               setPaymentError(error instanceof Error ? error.message : 'Payment verification failed.');
             } finally {
@@ -162,11 +163,11 @@ export default function CustomerCheckoutPage() {
         return;
       }
 
-      await verifyCustomerPayment({
+      const res = await verifyCustomerPayment({
         paymentId,
         simulateStatus: 'COMPLETED',
       });
-      completeLocalOrder();
+      completeLocalOrder((res as any)?.order);
       setIsPaying(false);
     } catch (error) {
       setPaymentError(error instanceof Error ? error.message : 'Unable to start payment. Please try again.');

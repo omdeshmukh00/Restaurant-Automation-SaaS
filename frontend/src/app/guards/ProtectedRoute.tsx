@@ -25,7 +25,7 @@ const PATH_PANEL_MAP: Array<{ prefix: string; panel: Panel; loginPath: string }>
  * time without one session blocking or overwriting the other.
  */
 export function ProtectedRoute(): JSX.Element {
-  const { isPanelAuthenticated, switchPanel, signInAs } = useAuth();
+  const { user, isPanelAuthenticated, switchPanel } = useAuth();
   const location = useLocation();
 
   // Find the matching panel config for the current path
@@ -60,6 +60,11 @@ export function ProtectedRoute(): JSX.Element {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
       </div>
     );
+  }
+
+  // Redirect first-time Restaurant Admins who must reset their password
+  if (user && user.mustResetPassword && matched.panel === 'admin' && location.pathname !== '/admin/reset-password') {
+    return <Navigate replace to="/admin/reset-password" />;
   }
 
   return <Outlet />;

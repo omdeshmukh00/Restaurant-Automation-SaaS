@@ -9,6 +9,7 @@ import CartSidebar from '../features/customer/components/dashboard/CartSidebar';
 import { useCustomerStore } from '../features/customer/store/customer.store';
 import { useAuth } from '../auth/AuthProvider';
 import { apiClient } from '../shared/services/apiClient';
+import { connectSocket, getSocket } from '../lib/socket';
 
 export default function CustomerLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -50,6 +51,111 @@ export default function CustomerLayout() {
     }, 15000);
     return () => clearInterval(interval);
   }, [checkSessionInactivity]);
+
+  // Connect socket and listen to real-time events for customer session
+  useEffect(() => {
+    if (diningSession) {
+      connectSocket();
+      
+      const store = useCustomerStore.getState();
+      store.fetchOrders(); // Recover active orders on load/refresh
+
+      const socket = getSocket();
+      if (socket) {
+        const handleOrderUpdate = () => {
+          useCustomerStore.getState().fetchOrders();
+        };
+
+        socket.on('order.updated', handleOrderUpdate);
+        socket.on('order.new', handleOrderUpdate);
+        
+        socket.on('order.accepted', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().addNotification(
+            'Order Confirmed! 👨‍🍳',
+            `Your order ${data.order.orderNumber} has been confirmed.`,
+            'order'
+          );
+        });
+
+        socket.on('order.preparing', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().addNotification(
+            'Preparing Food! 🍳',
+            `Chef has started cooking your order ${data.order.orderNumber}.`,
+            'order'
+          );
+        });
+
+        socket.on('order.ready', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().addNotification(
+            'Order Ready! 🛎️',
+            `Your food for order ${data.order.orderNumber} is ready for pickup!`,
+            'order'
+          );
+        });
+
+        socket.on('order.serving', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().addNotification(
+            'Serving Food! 🏃‍♂️',
+            `Staff is serving your order ${data.order.orderNumber}.`,
+            'order'
+          );
+        });
+
+        socket.on('order.served', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().addNotification(
+            'Order Served! 🍽️',
+            `Your order ${data.order.orderNumber} has been served! Enjoy your meal!`,
+            'order'
+          );
+        });
+
+        socket.on('order.completed', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+        });
+
+        socket.on('order.rejected', (data: any) => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().addNotification(
+            'Order Rejected ❌',
+            `Your order ${data.order.orderNumber} was rejected: ${data.reason}`,
+            'order'
+          );
+        });
+
+        socket.on('table.session.expired', () => {
+          useCustomerStore.getState().addNotification(
+            'Session Expired ⏰',
+            `Your session has expired due to inactivity.`,
+            'info'
+          );
+          useCustomerStore.getState().setDiningSession(null);
+        });
+
+        socket.on('table.session.closed', () => {
+          useCustomerStore.getState().setDiningSession(null);
+        });
+
+        return () => {
+          socket.off('order.updated', handleOrderUpdate);
+          socket.off('order.new', handleOrderUpdate);
+          socket.off('order.accepted');
+          socket.off('order.preparing');
+          socket.off('order.ready');
+          socket.off('order.serving');
+          socket.off('order.served');
+          socket.off('order.completed');
+          socket.off('order.rejected');
+          socket.off('table.session.expired');
+          socket.off('table.session.closed');
+        };
+      }
+    }
+  }, [diningSession]);
 
   // Init session from URL token
   useEffect(() => {

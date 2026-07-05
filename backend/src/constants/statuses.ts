@@ -94,6 +94,7 @@ export enum RequestType {
   CUTLERY = 'CUTLERY',
   CLEANING = 'CLEANING',
   HELP = 'HELP',
+  BILL = 'BILL',
 }
 
 export enum RestaurantStatus {

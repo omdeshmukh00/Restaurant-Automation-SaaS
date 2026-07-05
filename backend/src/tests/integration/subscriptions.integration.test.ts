@@ -7,9 +7,21 @@ import { UserModel } from '../../modules/users/users.model';
 import { generateTokenPair } from '../../services/jwt.service';
 import { UserRole } from '../../constants/roles';
 
-process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT = 'true';
-
 describe('Subscriptions Integration Tests', () => {
+  let originalEnforcement: string | undefined;
+
+  beforeAll(() => {
+    originalEnforcement = process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT;
+    process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT = 'true';
+  });
+
+  afterAll(() => {
+    if (originalEnforcement === undefined) {
+      delete process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT;
+    } else {
+      process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT = originalEnforcement;
+    }
+  });
   let restaurantId: string;
   let ownerToken: string;
   let expiredRestaurantId: string;

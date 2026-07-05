@@ -5,6 +5,8 @@ import { AppError } from '../utils/AppError';
 import type { Panel } from '../constants/roles';
 import { KitchenRole, StaffInternalRole, CleaningRole } from '../constants/roles';
 
+import { tenantContext } from '../utils/tenantContext';
+
 // ── Generic auth (unchanged behaviour, now also maps panel/internal_role) ──
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
@@ -31,12 +33,21 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
       email: payload.email,
       role: payload.role,
       restaurantId: payload.restaurantId,
+      tenantId: payload.tenantId,
       panel: payload.panel,
       internal_role: payload.internal_role,
       mustChangePassword: payload.mustChangePassword,
+      mustResetPassword: payload.mustResetPassword,
+      firstLogin: payload.firstLogin,
     };
 
-    next();
+    if (payload.tenantId) {
+      tenantContext.run({ tenantId: payload.tenantId }, () => {
+        next();
+      });
+    } else {
+      next();
+    }
   } catch (error) {
     next(error as Error);
   }
@@ -58,9 +69,18 @@ export function attachUser(req: Request, _res: Response, next: NextFunction): vo
           email: decoded.email,
           role: decoded.role,
           restaurantId: decoded.restaurantId,
+          tenantId: decoded.tenantId,
           panel: decoded.panel,
           internal_role: decoded.internal_role,
+          mustResetPassword: decoded.mustResetPassword,
+          firstLogin: decoded.firstLogin,
         };
+
+        if (decoded.tenantId) {
+          return tenantContext.run({ tenantId: decoded.tenantId }, () => {
+            next();
+          });
+        }
       } catch {
         // Silent fail; req.user remains undefined.
       }

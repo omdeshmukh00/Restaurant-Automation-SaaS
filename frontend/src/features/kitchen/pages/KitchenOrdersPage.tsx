@@ -8,7 +8,7 @@ import {
   readyOrder,
   rejectOrder,
 } from '../api/kitchen.api';
-import { getSocket } from '../../../lib/socket';
+import { connectSocket, getSocket } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
 
 const STATUS_TABS: { label: string; value: OrderStatus | 'all' }[] = [
@@ -85,9 +85,12 @@ export default function KitchenOrdersPage() {
           ? new Date(bo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           : '';
 
+        const tableNum = bo.tableNumber || bo.tableId?.tableNumber || bo.tableId;
+        const tableStr = tableNum ? (String(tableNum).startsWith('Table') ? tableNum : `Table ${tableNum}`) : 'Table ?';
+
         return {
           id: bo._id || bo.id,
-          table: bo.tableNumber || bo.tableId?.tableNumber || `Table ${bo.tableId || '?'}`,
+          table: tableStr,
           items,
           status,
           type: 'dine-in',
@@ -108,6 +111,7 @@ export default function KitchenOrdersPage() {
   }, [loadOrders]);
 
   useEffect(() => {
+    connectSocket();
     const socket = getSocket();
     if (!socket) return;
 
@@ -115,10 +119,12 @@ export default function KitchenOrdersPage() {
       loadOrders();
     };
 
+    socket.on('order.created', handleOrderUpdate);
     socket.on('order.new', handleOrderUpdate);
     socket.on('order.updated', handleOrderUpdate);
 
     return () => {
+      socket.off('order.created', handleOrderUpdate);
       socket.off('order.new', handleOrderUpdate);
       socket.off('order.updated', handleOrderUpdate);
     };

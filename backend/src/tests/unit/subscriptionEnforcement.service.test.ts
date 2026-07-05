@@ -3,9 +3,21 @@ import { assertFeatureAccess, assertPlanLimit } from '../../modules/subscription
 import { SubscriptionModel, SubscriptionStatus } from '../../modules/subscriptions/subscriptions.model';
 import { PlatformPlanModel } from '../../modules/superAdmin/superAdmin.model';
 
-process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT = 'true';
-
 describe('Subscription Enforcement Service', () => {
+  let originalEnforcement: string | undefined;
+
+  beforeAll(() => {
+    originalEnforcement = process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT;
+    process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT = 'true';
+  });
+
+  afterAll(() => {
+    if (originalEnforcement === undefined) {
+      delete process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT;
+    } else {
+      process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT = originalEnforcement;
+    }
+  });
   const restaurantId = new mongoose.Types.ObjectId().toString();
 
   beforeEach(() => {

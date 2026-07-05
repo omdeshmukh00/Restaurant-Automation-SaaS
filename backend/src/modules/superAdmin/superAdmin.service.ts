@@ -380,3 +380,231 @@ export async function getPlatformAuditLogs(filters: SuperAdminAuditLogQuery) {
     },
   };
 }
+
+// ── Partner Onboarding Request Services ──────────────────────────────────
+import { RestaurantRequestModel } from './restaurantRequest.model';
+import { logAuditRaw } from '../auditLogs/auditLogs.helper';
+import {AuditEntity } from '../auditLogs/auditLogs.types';
+import crypto from 'crypto';
+import { slugify, uniqueSlug } from '../../utils/slugify';
+import { hashPassword } from '../../utils/crypto';
+import { sendRestaurantApprovalEmail, sendRestaurantRejectionEmail } from '../../services/mail.service';
+import { env } from '../../config/env';
+import { logger } from '../../config/logger';
+
+export async function listRestaurantRequests() {
+  const requests = await RestaurantRequestModel.find({ status: 'PENDING' })
+    .sort({ submittedAt: -1 })
+    .setOptions({ bypassTenant: true })
+    .lean();
+
+  return requests.map((req: any) => ({
+    id: req._id.toString(),
+    name: req.restaurantName,
+    owner: req.ownerName,
+    email: req.email,
+    phone: req.phone,
+    location: `${req.city}, ${req.state}, ${req.country}`,
+    plan: req.selectedPlan,
+    requestedAt: req.submittedAt.toISOString(),
+    message: req.message ?? '',
+    latitude: req.latitude,
+    longitude: req.longitude,
+    googleMapsUrl: req.googleMapsUrl ?? '',
+    address: req.address,
+    city: req.city,
+    state: req.state,
+    country: req.country,
+    pinCode: req.pinCode,
+    gstNumber: req.gstNumber ?? '',
+    cuisine: req.cuisine,
+    branches: req.branches,
+    expectedMonthlyOrders: req.expectedMonthlyOrders,
+    paymentId: req.paymentId ?? '',
+    paymentAmount: req.paymentAmount ?? 0,
+    paymentStatus: req.paymentStatus ?? '',
+  }));
+}
+
+export async function approveRestaurantRequest(requestId: string, reviewerId: string) {
+  const request = await RestaurantRequestModel.findById(requestId).setOptions({ bypassTenant: true });
+  if (!request) {
+    throw new AppError('Restaurant request not found', 404, ErrorCode.NOT_FOUND);
+  }
+  if (request.status !== 'PENDING') {
+    throw new AppError('Request is already processed', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const restaurantId = new mongoose.Types.ObjectId();
+    const tenantId = `tenant_${crypto.randomBytes(6).toString('hex')}`;
+    
+    // Generate unique slug
+    let slug = slugify(request.restaurantName);
+    const existingRest = await RestaurantModel.findOne({ slug }).setOptions({ bypassTenant: true });
+    if (existingRest) {
+      slug = uniqueSlug(request.restaurantName);
+    }
+
+    // Step 1: Create Restaurant
+    const [restaurant] = await RestaurantModel.create([{
+      _id: restaurantId,
+      slug,
+      name: request.restaurantName,
+      status: 'ACTIVE',
+      plan: request.selectedPlan,
+      cuisine: request.cuisine,
+      city: request.city,
+      rating: 4.5,
+      tenantId: tenantId,
+    }], { session });
+
+    // Step 2: Generate temporary password
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^*()_+-=';
+    const allChars = lowercase + uppercase + numbers + symbols;
+
+    let tempPassword = '';
+    tempPassword += lowercase[crypto.randomInt(lowercase.length)];
+    tempPassword += uppercase[crypto.randomInt(uppercase.length)];
+    tempPassword += numbers[crypto.randomInt(numbers.length)];
+    tempPassword += symbols[crypto.randomInt(symbols.length)];
+
+    for (let i = 4; i < 18; i++) {
+      tempPassword += allChars[crypto.randomInt(allChars.length)];
+    }
+    // Shuffle temp password
+    tempPassword = tempPassword.split('').sort(() => crypto.randomInt(3) - 1).join('');
+
+    const hashedPassword = await hashPassword(tempPassword);
+
+    // Step 3: Create Restaurant Admin User
+    const [adminUser] = await UserModel.create([{
+      name: request.ownerName,
+      email: request.email,
+      mobile: request.phone,
+      password: hashedPassword,
+      role: 'restaurant-admin',
+      status: 'ACTIVE',
+      restaurantId: restaurantId,
+      tenantId: tenantId,
+      isEmailVerified: true,
+      isMobileVerified: true,
+      mustResetPassword: true,
+      firstLogin: true,
+      mustChangePassword: true,
+    }], { session });
+
+    // Step 4: Update RestaurantRequest status
+    request.status = 'APPROVED';
+    request.reviewedBy = new mongoose.Types.ObjectId(reviewerId);
+    request.reviewedAt = new Date();
+    await request.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Log Audits
+    void logAuditRaw({
+      actorId: reviewerId,
+      actorRole: 'super-admin',
+      entityType: AuditEntity.RESTAURANT,
+      entityId: restaurantId.toString(),
+      action: 'SUPER_RESTAURANT_APPROVED' as any,
+      metadata: { requestId, tenantId, slug },
+    });
+
+    void logAuditRaw({
+      actorId: adminUser._id.toString(),
+      actorRole: 'restaurant-admin',
+      restaurantId: restaurantId.toString(),
+      entityType: AuditEntity.USER,
+      entityId: adminUser._id.toString(),
+      action: 'ADMIN_CREATED' as any,
+      metadata: { source: 'onboarding_approval' },
+    });
+
+    // Send welcome email in background to avoid blocking request approval
+    const loginUrl = `${env.CLIENT_URL}/auth/admin`;
+    void sendRestaurantApprovalEmail(
+      request.email,
+      request.ownerName,
+      request.restaurantName,
+      tempPassword,
+      loginUrl
+    ).then((emailSent) => {
+      if (emailSent) {
+        void logAuditRaw({
+          actorId: reviewerId,
+          actorRole: 'super-admin',
+          entityType: AuditEntity.USER,
+          entityId: request.email,
+          action: 'APPROVAL_EMAIL_SENT' as any,
+          metadata: { recipient: request.email },
+        });
+      }
+    }).catch((err) => {
+      logger.error('Failed to send restaurant approval email:', { error: err, email: request.email });
+    });
+
+    return { restaurant, adminUser };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+}
+
+export async function rejectRestaurantRequest(requestId: string, reviewerId: string, rejectionReason: string) {
+  const request = await RestaurantRequestModel.findById(requestId).setOptions({ bypassTenant: true });
+  if (!request) {
+    throw new AppError('Restaurant request not found', 404, ErrorCode.NOT_FOUND);
+  }
+  if (request.status !== 'PENDING') {
+    throw new AppError('Request is already processed', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  request.status = 'REJECTED';
+  request.rejectionReason = rejectionReason;
+  request.reviewedBy = new mongoose.Types.ObjectId(reviewerId);
+  request.reviewedAt = new Date();
+  await request.save();
+
+  // Log Audit
+  void logAuditRaw({
+    actorId: reviewerId,
+    actorRole: 'super-admin',
+    entityType: AuditEntity.RESTAURANT,
+    entityId: requestId,
+    action: 'RESTAURANT_REJECTED' as any,
+    metadata: { reason: rejectionReason },
+  });
+
+  // Send Rejection Email in background to avoid blocking request rejection
+  void sendRestaurantRejectionEmail(
+    request.email,
+    request.ownerName,
+    request.restaurantName,
+    rejectionReason
+  ).then((emailSent) => {
+    if (emailSent) {
+      void logAuditRaw({
+        actorId: reviewerId,
+        actorRole: 'super-admin',
+        entityType: AuditEntity.USER,
+        entityId: request.email,
+        action: 'REJECTION_EMAIL_SENT' as any,
+        metadata: { recipient: request.email, reason: rejectionReason },
+      });
+    }
+  }).catch((err) => {
+    logger.error('Failed to send restaurant rejection email:', { error: err, email: request.email });
+  });
+
+  return request;
+}

@@ -2,7 +2,9 @@
 // Main orchestrator — all state lives here; components are pure/presentational.
 
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { BarChart3, Trash, Plus, Sparkles, Building2, X } from "lucide-react";
+import { apiClient } from "../../../shared/services/apiClient";
 
 import type {
   RestaurantNode,
@@ -44,6 +46,109 @@ export default function Subscriptions() {
     return false;
   });
 
+  // ── Plan Pricing State ───────────────────────────────────────────────────
+  const [planPrices, setPlanPrices] = useState<Record<string, number>>(() => {
+    const saved = localStorage.getItem('ra/subscription-prices');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {
+      Basic: 299,
+      Standard: 599,
+      Premium: 999,
+      Enterprise: 1999,
+    };
+  });
+  const [editingPlan, setEditingPlan] = useState<any | null>(null);
+  const [dbPlans, setDbPlans] = useState<any[]>([]);
+
+  // Fetch plans from backend
+  const fetchPlans = async () => {
+    try {
+      const response = await apiClient.get('/superadmin/plans');
+      const plansList = response.data?.data?.plans || [];
+      setDbPlans(plansList);
+
+      const prices: Record<string, number> = {};
+      plansList.forEach((plan: any) => {
+        if (plan.name === 'Free') {
+          prices['Basic'] = plan.priceMonthly;
+        } else {
+          prices[plan.name] = plan.priceMonthly;
+        }
+      });
+
+      if (Object.keys(prices).length > 0) {
+        setPlanPrices((prev) => {
+          const merged = { ...prev, ...prices };
+          localStorage.setItem('ra/subscription-prices', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch plans from backend', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  const handleEditPlanClick = (planName: string) => {
+    const plan = dbPlans.find(p => p.name === planName);
+    if (plan) {
+      setEditingPlan({ ...plan });
+    }
+  };
+
+  const handleSavePlan = async () => {
+    if (!editingPlan) return;
+    try {
+      if (editingPlan.isNew) {
+        await apiClient.post('/superadmin/plans', {
+          name: editingPlan.name,
+          priceMonthly: editingPlan.priceMonthly,
+          originalPriceMonthly: editingPlan.originalPriceMonthly,
+          tenantLimit: editingPlan.tenantLimit,
+          staffLimit: editingPlan.staffLimit,
+          isActive: editingPlan.isActive,
+          features: editingPlan.features
+        });
+      } else {
+        await apiClient.patch(`/superadmin/plans/${editingPlan._id}`, {
+          name: editingPlan.name,
+          priceMonthly: editingPlan.priceMonthly,
+          originalPriceMonthly: editingPlan.originalPriceMonthly,
+          tenantLimit: editingPlan.tenantLimit,
+          staffLimit: editingPlan.staffLimit,
+          isActive: editingPlan.isActive,
+          features: editingPlan.features
+        });
+      }
+      setEditingPlan(null);
+      await fetchPlans();
+    } catch (err) {
+      console.error('Failed to save plan', err);
+    }
+  };
+
+  const handleDeletePlan = async () => {
+    if (!editingPlan || !editingPlan._id) return;
+    if (window.confirm(`Are you sure you want to delete the ${editingPlan.name} plan?`)) {
+      try {
+        await apiClient.delete(`/superadmin/plans/${editingPlan._id}`);
+        setEditingPlan(null);
+        await fetchPlans();
+      } catch (err) {
+        console.error('Failed to delete plan', err);
+      }
+    }
+  };
+
   // ── Modal state ───────────────────────────────────────────────────────────
   const [viewingNode, setViewingNode] = useState<RestaurantNode | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -71,8 +176,10 @@ export default function Subscriptions() {
   }, []);
 
   // ── Data state ────────────────────────────────────────────────────────────
+  const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState<RestaurantNode[]>(restaurantData);
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
+  const requests = useRestaurantRequestsStore((state) => state.requests);
   const updateApprovedRestaurantStatus = useRestaurantRequestsStore(
     (state) => state.updateRestaurantStatus
   );
@@ -182,6 +289,25 @@ export default function Subscriptions() {
 
   const tierMetrics = useMemo(() => computeTierMetrics(linkedRestaurants), [linkedRestaurants]);
 
+  const dynamicTierMetrics = useMemo(() => {
+    return dbPlans.map(plan => {
+      const matchingRestaurants = linkedRestaurants.filter(
+        r => r.plan.toLowerCase() === plan.name.toLowerCase() || (plan.name === 'Free' && r.plan === 'Basic')
+      );
+      const revenue = matchingRestaurants.reduce((acc, r) => acc + parseRevenue(r.revenue), 0);
+      return {
+        name: plan.name,
+        price: plan.priceMonthly,
+        isActive: plan.isActive,
+        count: matchingRestaurants.length,
+        revenue,
+        formattedRevenue: formatCurrency(revenue),
+        activeCount: matchingRestaurants.filter(r => r.status === 'Active').length,
+        trialCount: matchingRestaurants.filter(r => r.status === 'Trial').length,
+      };
+    });
+  }, [dbPlans, linkedRestaurants]);
+
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return linkedRestaurants.filter((r) => {
@@ -227,23 +353,66 @@ export default function Subscriptions() {
           </p>
         </div>
 
-        <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold shrink-0 ${
-          darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"
-        }`}>
-          <BarChart3 size={15} className="text-orange-500" />
-          <span className={darkMode ? "text-slate-400" : "text-slate-500"}>Platform MRR</span>
-          <span className="text-emerald-500 font-extrabold text-sm">
-            {formatCurrency(tierMetrics.totalRevenue)}
-          </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/superadmin?requests=new')}
+            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <Building2 size={13} />
+            New Requests
+            {requests.length > 0 && (
+              <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
+                {requests.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingPlan({
+                name: '',
+                priceMonthly: 0,
+                originalPriceMonthly: null,
+                tenantLimit: 1,
+                staffLimit: 5,
+                isActive: true,
+                features: [],
+                isNew: true
+              });
+            }}
+            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <Plus size={13} />
+            Add New Plan
+          </button>
+
+          <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold shrink-0 ${
+            darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+          }`}>
+            <BarChart3 size={15} className="text-orange-500" />
+            <span className={darkMode ? "text-slate-400" : "text-slate-500"}>Platform MRR</span>
+            <span className="text-emerald-500 font-extrabold text-sm">
+              {formatCurrency(tierMetrics.totalRevenue)}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Tier Cards */}
       <TierCards
-        metrics={tierMetrics}
+        plans={dynamicTierMetrics}
         tierFilter={tierFilter}
         darkMode={darkMode}
-        onTierChange={setTierFilter}
+        onTierChange={(tier) => setTierFilter(tier as TierFilter)}
+        onEditClick={handleEditPlanClick}
       />
 
       {/* Controls */}
@@ -321,6 +490,162 @@ export default function Subscriptions() {
           onSubmit={handleAddSubmit}
           onClose={() => { setIsAddModalOpen(false); setFormData(EMPTY_FORM); }}
         />
+      )}
+
+      {/* Edit Plan Modal */}
+      {editingPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className={`w-full max-w-lg rounded-3xl p-6 border shadow-2xl flex flex-col ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
+              <div>
+                <h3 className="text-base font-bold">
+                  {editingPlan.isNew ? 'Create Subscription Plan' : `Edit ${editingPlan.name} Plan`}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Configure pricing, limits, and core features for this plan tier.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingPlan(null)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 flex-1 overflow-y-auto pr-1">
+              {/* Plan Name & Active status */}
+              <div className="flex gap-4 items-center">
+                <div className="flex-1">
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Plan Name</label>
+                  <input
+                    type="text"
+                    disabled={!editingPlan.isNew && ['Free', 'Standard', 'Premium', 'Enterprise'].includes(editingPlan.name)}
+                    value={editingPlan.name}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })}
+                    className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 disabled:opacity-50 ${
+                      darkMode ? 'border-slate-800 text-white bg-slate-950/45' : 'border-slate-200 text-slate-800 bg-slate-50/45'
+                    }`}
+                  />
+                </div>
+                <div className="pt-5 shrink-0">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={editingPlan.isActive !== false}
+                      onChange={(e) => setEditingPlan({ ...editingPlan, isActive: e.target.checked })}
+                      className="rounded text-orange-500 focus:ring-orange-500 border-slate-350"
+                    />
+                    Active Plan
+                  </label>
+                </div>
+              </div>
+
+              {/* Pricing Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Offer Price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    disabled={editingPlan.name.toLowerCase() === 'free'}
+                    value={editingPlan.priceMonthly}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, priceMonthly: parseInt(e.target.value) || 0 })}
+                    className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 disabled:opacity-50 ${
+                      darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Original Price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="No discount"
+                    value={editingPlan.originalPriceMonthly || ''}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, originalPriceMonthly: e.target.value === '' ? null : (parseInt(e.target.value) || null) })}
+                    className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                      darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Limits Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Max Staff Limit</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Unlimited"
+                    value={editingPlan.staffLimit === null || editingPlan.staffLimit === undefined ? '' : editingPlan.staffLimit}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, staffLimit: e.target.value === '' ? null : (parseInt(e.target.value) || 0) })}
+                    className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                      darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Max Restaurants</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingPlan.tenantLimit}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, tenantLimit: parseInt(e.target.value) || 1 })}
+                    className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                      darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Features List */}
+              <div>
+                <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Features (comma-separated)</label>
+                <input
+                  type="text"
+                  placeholder="eg. 15 Staff, Advanced Reports"
+                  value={editingPlan.features ? editingPlan.features.join(', ') : ''}
+                  onChange={(e) => setEditingPlan({ ...editingPlan, features: e.target.value.split(',').map(f => f.trim()).filter(Boolean) })}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+              {!editingPlan.isNew && (
+                <button
+                  onClick={handleDeletePlan}
+                  disabled={['Free', 'Standard', 'Premium', 'Enterprise'].includes(editingPlan.name)}
+                  className={`py-2.5 px-4 rounded-xl text-xs font-semibold border border-red-500/20 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-30`}
+                >
+                  Delete Plan
+                </button>
+              )}
+              <button
+                onClick={() => setEditingPlan(null)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border ${
+                  darkMode ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSavePlan}
+                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md shadow-orange-500/10"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

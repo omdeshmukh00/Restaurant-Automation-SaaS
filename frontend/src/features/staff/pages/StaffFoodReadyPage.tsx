@@ -7,12 +7,24 @@ export default function StaffFoodReadyPage() {
   const { query } = useStaffSearch();
   const { readyItems: items, setReadyItems: setItems } = useStaffDashboard();
 
-  const markServed = (id: number) => {
-    setItems(prev => prev.filter(item => item.id !== id));
+  const markServed = async (id: any) => {
+    try {
+      const { ordersAPI } = await import('../api/staff.api');
+      await ordersAPI.serveOrder(id);
+      setItems(prev => prev.filter(item => item.id !== id));
+    } catch (err) {
+      console.error('Failed to mark order served', err);
+    }
   };
 
-  const markAllServed = () => {
-    setItems([]);
+  const markAllServed = async () => {
+    try {
+      const { ordersAPI } = await import('../api/staff.api');
+      await Promise.all(items.map(item => ordersAPI.serveOrder(item.id as any)));
+      setItems([]);
+    } catch (err) {
+      console.error('Failed to mark all served', err);
+    }
   };
 
   const filteredItems = items.filter(item =>
