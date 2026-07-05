@@ -1,3 +1,18 @@
+jest.mock('express-rate-limit', () => {
+  return jest.fn().mockReturnValue((req: any, res: any, next: any) => next());
+});
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+    verify: jest.fn().mockResolvedValue(true),
+    close: jest.fn(),
+  }),
+}));
+
+jest.mock('../../services/mail.service', () => ({
+  sendLowStockAlertEmail: jest.fn().mockResolvedValue(true),
+}));
+
 import request from 'supertest';
 import { signAccessToken } from '../../services/jwt.service';
 import { UserRole } from '../../constants/roles';
@@ -6,9 +21,7 @@ import { RestaurantModel } from '../../modules/restaurants/restaurants.model';
 import { InventoryItemModel } from '../../modules/inventory/inventory.model';
 import { UserModel } from '../../modules/users/users.model';
 
-jest.mock('../../services/mail.service', () => ({
-  sendLowStockAlertEmail: jest.fn().mockResolvedValue(true),
-}));
+
 
 import { sendLowStockAlertEmail } from '../../services/mail.service';
 

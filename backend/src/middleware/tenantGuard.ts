@@ -26,8 +26,11 @@ export function tenantGuard(req: Request, _res: Response, next: NextFunction): v
 
   let candidateRestaurantId =
     req.params.restaurantId ||
+    req.params.tenantId ||
     req.query.restaurantId ||
+    req.query.tenantId ||
     req.body.restaurantId ||
+    req.body.tenantId ||
     req.headers['x-restaurant-id'];
 
   if (req.body?.tables && Array.isArray(req.body.tables)) {

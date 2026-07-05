@@ -1,3 +1,14 @@
+jest.mock('express-rate-limit', () => {
+  return jest.fn().mockReturnValue((req: any, res: any, next: any) => next());
+});
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+    verify: jest.fn().mockResolvedValue(true),
+    close: jest.fn(),
+  }),
+}));
+
 import mongoose from 'mongoose';
 import request from 'supertest';
 import app from '../../app'; // Assumes app is exported from src/app.ts or similar

@@ -65,7 +65,7 @@ const logger = winston.createLogger({
   format: env.isProduction ? prodFormat : devFormat,
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: 'app.log' })
+    ...(env.NODE_ENV !== 'test' ? [new winston.transports.File({ filename: 'app.log' })] : [])
   ],
 });
 

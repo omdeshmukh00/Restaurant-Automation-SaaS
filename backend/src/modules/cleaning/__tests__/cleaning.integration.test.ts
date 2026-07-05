@@ -1,3 +1,14 @@
+jest.mock('express-rate-limit', () => {
+  return jest.fn().mockReturnValue((req: any, res: any, next: any) => next());
+});
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn().mockReturnValue({
+    sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
+    verify: jest.fn().mockResolvedValue(true),
+    close: jest.fn(),
+  }),
+}));
+
 import request from 'supertest';
 import mongoose from 'mongoose';
 import app from '../../../app';
@@ -89,8 +100,6 @@ describe('Cleaning Lifecycle Integration', () => {
     expect(startRes.body.data.task.status).toBe(CleaningStatus.IN_PROGRESS);
 
     const tableAfterStart = await TableModel.findById(tableId);
-    console.error("TABLE AFTER START:", tableAfterStart?.status);
-    console.error("EMIT CALLS:", (emitSessionEvent as jest.Mock).mock.calls);
     // Verify emission for Task Started -> CLEANING_IN_PROGRESS
     expect(emitSessionEvent).toHaveBeenCalledWith(
       restaurantId.toString(),
@@ -162,10 +171,6 @@ describe('Cleaning Lifecycle Integration', () => {
       .patch(`/api/v1/cleaning/tasks/${maintTask._id}/verify`)
       .set('Authorization', `Bearer ${cleaningStaffToken}`)
       .send();
-
-    console.error("SCENARIO 3 RESPONSE:", res.body);
-    const tbl = await TableModel.findById(maintTableId);
-    console.error("MAINT TABLE STATUS IN DB:", tbl?.status);
     
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();

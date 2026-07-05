@@ -45,6 +45,18 @@ const envSchema = z.object({
   UPLOAD_PROVIDER: z.enum(['local', 's3', 'cloudinary']).default('local'),
   UPLOAD_PATH: z.string().default('uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().int().positive().default(10),
+  MAX_IMAGE_SIZE_MB: z.coerce.number().int().positive().default(5),
+  MAX_DOCUMENT_SIZE_MB: z.coerce.number().int().positive().default(10),
+  UPLOAD_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(20),
+  AWS_REGION: z.string().optional(),
+  AWS_S3_BUCKET: z.string().optional(),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_S3_ENDPOINT: z.string().url().optional(),
+  AWS_S3_FORCE_PATH_STYLE: z
+    .union([z.boolean(), z.string()])
+    .transform((value) => value === true || value === 'true')
+    .default(false),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().optional(),
   SMTP_USER: z.string().optional(),
@@ -91,7 +103,9 @@ const envSchema = z.object({
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
-  console.error('Invalid environment configuration', parsedEnv.error.flatten().fieldErrors);
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { logger } = require('./logger');
+  logger.error('Invalid environment configuration', parsedEnv.error.flatten().fieldErrors);
   process.exit(1);
 }
 

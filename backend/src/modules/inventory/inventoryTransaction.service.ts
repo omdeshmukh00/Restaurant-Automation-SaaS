@@ -4,6 +4,7 @@ import {
   TransactionAction,
   TransactionSource,
 } from './inventoryTransaction.model';
+import logger from '../../config/logger';
 
 export interface CreateTransactionInput {
   restaurantId: string | Types.ObjectId;
@@ -27,7 +28,7 @@ export class InventoryTransactionService {
     } catch (err) {
       // Intentionally not failing the entire workflow if logging fails,
       // but in an enterprise app, this should be caught properly or logged
-      console.error('[InventoryTransactionService] Failed to record transaction:', err);
+      logger.error('[InventoryTransactionService] Failed to record transaction:', err);
     }
   }
 
@@ -39,7 +40,7 @@ export class InventoryTransactionService {
     try {
       await InventoryTransactionModel.insertMany(inputs);
     } catch (err) {
-      console.error('[InventoryTransactionService] Failed to record bulk transactions:', err);
+      logger.error('[InventoryTransactionService] Failed to record bulk transactions:', err);
     }
   }
 

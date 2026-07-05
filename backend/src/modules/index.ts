@@ -29,7 +29,10 @@ import feedbackRouter from './feedback/feedback.routes';
 import loyaltyRouter from './loyalty/loyalty.routes';
 import paymentsRouter from './payments/payments.routes';
 import restaurantsRouter from './restaurants/restaurants.routes';
+
 import subscriptionRoutes from './subscriptions/subscriptions.routes';
+import uploadRouter from './uploads/uploads.routes';
+
 
 export const apiRouter = Router();
 
@@ -45,6 +48,7 @@ apiRouter.use(ordersRouter);
 apiRouter.use(loyaltyRouter);
 apiRouter.use('/payments', paymentsRouter);
 apiRouter.use('/subscriptions', requireAuth, subscriptionRoutes);
+apiRouter.use(uploadRouter);
 apiRouter.use('/customer/cart', cartRouter);
 apiRouter.use('/customer/feedback', feedbackRouter);
 apiRouter.use('/customer', customerRouter);

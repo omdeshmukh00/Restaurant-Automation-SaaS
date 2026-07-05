@@ -56,5 +56,19 @@ export const sessionLimiter = rateLimit({
   },
 });
 
+export const uploadLimiter = rateLimit({
+  windowMs: 60_000,
+  max: env.UPLOAD_RATE_LIMIT_MAX_REQUESTS,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: ErrorCode.RATE_LIMIT_EXCEEDED,
+      message: 'Too many upload requests, please try again later',
+    },
+  },
+});
+
 export const apiRateLimiter = globalLimiter;
 export const authRateLimiter = authLimiter;
