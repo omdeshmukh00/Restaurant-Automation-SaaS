@@ -7,6 +7,10 @@ import { ArrowRight, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCustomerStore } from '../../features/customer/store/customer.store';
 
+const getOtpExpiryDate = (durationSeconds: number): string => {
+  return new Date(Date.now() + durationSeconds * 1000).toISOString();
+};
+
 const CustomerAuth: React.FC = () => {
   const { signInAs, setAccessTokenState, setUser, switchPanel } = useAuth();
   const navigate = useNavigate();
@@ -102,9 +106,8 @@ const CustomerAuth: React.FC = () => {
       const payload = response.data.data;
       setUserExists(Boolean(payload.exists));
       setOtpSent(true);
-      
       const durationSeconds = payload.otpExpiresIn || 120;
-      const clientExpiresAt = new Date(Date.now() + durationSeconds * 1000).toISOString();
+      const clientExpiresAt = getOtpExpiryDate(durationSeconds);
       setOtpExpiresAt(clientExpiresAt);
       localStorage.setItem('customerOtpExpiresAt', clientExpiresAt);
       setCountdown(durationSeconds);
