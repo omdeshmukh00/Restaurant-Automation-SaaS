@@ -9,7 +9,25 @@
 }
 
 .landing-font-hero {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Override all standard headers in landing/customer layout to use Inter to match staff, cleaning, and kitchen panels */
+.landing-page-container h1,
+.landing-page-container h2,
+.landing-page-container h3,
+.landing-page-container h4,
+.landing-page-container h5,
+.landing-page-container h6,
+.landing-page-container .landing-font-hero,
+.landing-page-container .font-display,
+.landing-font-inter h1,
+.landing-font-inter h2,
+.landing-font-inter h3,
+.landing-font-inter h4,
+.landing-font-inter h5,
+.landing-font-inter h6 {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 
 /* ─── Shiny Shimmer Hover Effect ──────────────────────────── */
