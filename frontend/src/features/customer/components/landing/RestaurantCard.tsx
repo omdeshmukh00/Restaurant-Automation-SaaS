@@ -37,7 +37,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
     <div
       className="landing-card-hover landing-shiny flex flex-col bg-white overflow-hidden"
       style={{
-        borderRadius: '20px',
+        borderRadius: '12px',
         border: '1px solid #E5E7EB',
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
@@ -163,7 +163,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
             className="h-[42px] text-[13px] font-semibold transition-all duration-150 landing-btn-press landing-focus-ring"
             style={{
               border: '1px solid #E5E7EB',
-              borderRadius: '14px',
+              borderRadius: '10px',
               color: '#222222',
               backgroundColor: 'transparent',
             }}
@@ -183,7 +183,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
             className="h-[42px] text-[13px] font-semibold text-white transition-colors duration-150 landing-btn-press landing-focus-ring"
             style={{
               backgroundColor: '#FF6B1A',
-              borderRadius: '14px',
+              borderRadius: '10px',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#E65A0A'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FF6B1A'; }}
@@ -191,6 +191,45 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
             Reserve Table
           </button>
         </div>
+
+        {/* Locate Restaurant Button */}
+        <button
+          onClick={onLoginOpen}
+          className="w-full mt-3 h-[42px] text-[13px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 landing-btn-press landing-focus-ring"
+          style={{
+            border: '1px solid #E5E7EB',
+            borderRadius: '10px',
+            color: '#222222',
+            backgroundColor: '#F9FAFB',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#FF6B1A';
+            e.currentTarget.style.backgroundColor = '#FFF5F0';
+            e.currentTarget.style.color = '#FF6B1A';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#E5E7EB';
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
+            e.currentTarget.style.color = '#222222';
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="shrink-0"
+          >
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          Locate Restaurant
+        </button>
       </div>
     </div>
   );

@@ -208,7 +208,7 @@ export default function RestaurantsPage() {
             <div
               key={r.id}
               className="group landing-card-hover landing-shiny overflow-hidden"
-              style={{ borderRadius: '20px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              style={{ borderRadius: '12px', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
               {/* Image */}
               <div className="relative h-[200px] overflow-hidden">
