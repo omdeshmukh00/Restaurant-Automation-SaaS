@@ -102,15 +102,19 @@ const CustomerAuth: React.FC = () => {
       const payload = response.data.data;
       setUserExists(Boolean(payload.exists));
       setOtpSent(true);
-      if (payload.otpExpiresAt) {
-        const expiresAt = payload.otpExpiresAt;
-        setOtpExpiresAt(expiresAt);
-        localStorage.setItem('customerOtpExpiresAt', expiresAt);
-        const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - new Date().getTime()) / 1000));
-        setCountdown(remaining);
+      
+      const durationSeconds = payload.otpExpiresIn || 120;
+      const clientExpiresAt = new Date(Date.now() + durationSeconds * 1000).toISOString();
+      setOtpExpiresAt(clientExpiresAt);
+      localStorage.setItem('customerOtpExpiresAt', clientExpiresAt);
+      setCountdown(durationSeconds);
+
+      if (payload.devOtp) {
+        setSuccess(`OTP sent successfully!`);
+      } else {
+        setSuccess('OTP sent successfully!');
       }
-      setSuccess('OTP sent successfully!');
-      setTimeout(() => setSuccess(null), 3000);
+      setTimeout(() => setSuccess(null), 8000);
       // Focus first OTP field
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     } catch (err: any) {

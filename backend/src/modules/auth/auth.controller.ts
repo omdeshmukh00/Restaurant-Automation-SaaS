@@ -192,10 +192,17 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
   const { otp, expiresAt } = await otpService.createOTP(email, 'email');
   await sendOTPEmail(email, otp);
 
-  sendSuccess(res, {
+  const responseData: any = {
     otpSent: true,
     otpExpiresAt: expiresAt,
-  });
+    otpExpiresIn: 120,
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    responseData.devOtp = otp;
+  }
+
+  sendSuccess(res, responseData);
   void logAuditRaw({
     actorId: user._id.toString(),
     actorRole: user.role,
@@ -289,10 +296,22 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
 export const requestOtp = asyncHandler(async (req: Request, res: Response) => {
   const { mobile } = req.body;
 
-  const { expiresAt } = await otpService.createOTP(mobile, 'mobile');
+  const { expiresAt, otp } = await otpService.createOTP(mobile, 'mobile');
 
   const userExists = await UserModel.exists({ mobile });
-  sendSuccess(res, { otpSent: true, exists: !!userExists, otpExpiresAt: expiresAt });
+  
+  const responseData: any = {
+    otpSent: true,
+    exists: !!userExists,
+    otpExpiresAt: expiresAt,
+    otpExpiresIn: 120,
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    responseData.devOtp = otp;
+  }
+
+  sendSuccess(res, responseData);
 });
 
 export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
@@ -300,7 +319,12 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   await otpService.verifyOTP(mobile, 'mobile', otp);
 
-  let user = await UserModel.findOne({ mobile });
+  let user = await UserModel.findOne({
+    $or: [
+      { mobile },
+      { email: `otp_${mobile}@placeholder.com` }
+    ]
+  });
 
   if (!user) {
     const customerName = name || 'Guest Customer';
@@ -319,6 +343,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     }
 
     user.isMobileVerified = true;
+    user.mobile = mobile;
     if (name) {
       user.name = name;
     }
