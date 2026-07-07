@@ -6,18 +6,22 @@ import bcrypt from 'bcryptjs';
 import { env } from '../config/env';
 
 /**
- * Hash a refresh token with bcrypt before storing in DB.
- * Per instruction.md: refresh tokens must be hashed, not stored plain.
+ * Hash a refresh token with SHA-256 before storing in DB.
+ * Highly optimized, secure one-way hash suitable for high-entropy tokens.
  */
 export async function hashToken(token: string): Promise<string> {
-  return bcrypt.hash(token, env.BCRYPT_SALT_ROUNDS);
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 /**
- * Compare a plain token against a bcrypt hash.
+ * Compare a plain token against a stored hash (supports both legacy bcrypt and optimized SHA-256).
  */
 export async function compareToken(plain: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(plain, hash);
+  if (hash.startsWith('$2')) {
+    return bcrypt.compare(plain, hash);
+  }
+  const plainHash = crypto.createHash('sha256').update(plain).digest('hex');
+  return safeCompare(plainHash, hash);
 }
 
 /**
@@ -58,4 +62,13 @@ export function generateOTP(length: number = 6): string {
   const max = Math.pow(10, length);
   const otp = crypto.randomInt(0, max);
   return otp.toString().padStart(length, '0');
+}
+
+/**
+ * Normalize a mobile number by removing all formatting characters.
+ * Keeps digits and a leading '+' if present.
+ */
+export function normalizeMobile(mobile: string): string {
+  if (!mobile) return '';
+  return mobile.replace(/[^\d+]/g, '').trim();
 }

@@ -22,7 +22,41 @@ import logger from '../../config/logger';
 // ── Panel-aware cookie helpers ────────────────────────────────────────
 
 function panelRefreshCookieName(panel: Panel): string {
-  return `ra_${panel}_refresh_token`;
+  switch (panel) {
+    case 'customer':
+      return env.CUSTOMER_REFRESH_COOKIE;
+    case 'kitchen':
+      return env.KITCHEN_REFRESH_COOKIE;
+    case 'staff':
+      return env.STAFF_REFRESH_COOKIE;
+    case 'cleaning':
+      return env.CLEANING_REFRESH_COOKIE;
+    case 'admin':
+      return env.ADMIN_REFRESH_COOKIE;
+    case 'superadmin':
+      return env.SUPERADMIN_REFRESH_COOKIE;
+    default:
+      return env.REFRESH_COOKIE_NAME;
+  }
+}
+
+function panelAccessCookieName(panel: Panel): string {
+  switch (panel) {
+    case 'customer':
+      return env.CUSTOMER_ACCESS_COOKIE;
+    case 'kitchen':
+      return env.KITCHEN_ACCESS_COOKIE;
+    case 'staff':
+      return env.STAFF_ACCESS_COOKIE;
+    case 'cleaning':
+      return env.CLEANING_ACCESS_COOKIE;
+    case 'admin':
+      return env.ADMIN_ACCESS_COOKIE;
+    case 'superadmin':
+      return env.SUPERADMIN_ACCESS_COOKIE;
+    default:
+      return env.ACCESS_COOKIE_NAME;
+  }
 }
 
 function setRefreshCookie(res: Response, refreshToken: string, panel?: Panel): void {
@@ -34,8 +68,25 @@ function setRefreshCookie(res: Response, refreshToken: string, panel?: Panel): v
   });
 }
 
+function setAccessCookie(res: Response, accessToken: string, panel?: Panel): void {
+  const cookieName = panel ? panelAccessCookieName(panel) : env.ACCESS_COOKIE_NAME;
+  res.cookie(cookieName, accessToken, {
+    ...COOKIE_OPTIONS,
+    domain: env.COOKIE_DOMAIN,
+    maxAge: parseExpiry(env.JWT_ACCESS_EXPIRES_IN),
+  });
+}
+
 function clearRefreshCookie(res: Response, panel?: Panel): void {
   const cookieName = panel ? panelRefreshCookieName(panel) : env.REFRESH_COOKIE_NAME;
+  res.clearCookie(cookieName, {
+    ...COOKIE_OPTIONS,
+    domain: env.COOKIE_DOMAIN,
+  });
+}
+
+function clearAccessCookie(res: Response, panel?: Panel): void {
+  const cookieName = panel ? panelAccessCookieName(panel) : env.ACCESS_COOKIE_NAME;
   res.clearCookie(cookieName, {
     ...COOKIE_OPTIONS,
     domain: env.COOKIE_DOMAIN,
@@ -49,6 +100,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   const panel = USER_ROLE_TO_PANEL[(result.user as any).role as UserRole] ?? undefined;
 
   setRefreshCookie(res, result.refreshToken, panel);
+  setAccessCookie(res, result.accessToken, panel);
 
   sendSuccess(
     res,
@@ -81,6 +133,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const panel = USER_ROLE_TO_PANEL[(result.user as any).role as UserRole] ?? undefined;
 
   setRefreshCookie(res, result.refreshToken, panel);
+  setAccessCookie(res, result.accessToken, panel);
 
   sendSuccess(res, {
     user: result.user,
@@ -104,19 +157,16 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 const ALL_PANELS: Panel[] = ['customer', 'kitchen', 'staff', 'cleaning', 'admin', 'superadmin'];
 
 export const refresh = asyncHandler(async (req: Request, res: Response) => {
-  // Try panel-specific cookies first, then legacy cookie, then body
+  // Read panel from body if provided, allowing strict cookie lookup
+  const reqPanel = req.body?.panel as Panel | undefined;
   let oldToken: string | undefined;
-  let sourcePanel: Panel | undefined;
 
-  for (const p of ALL_PANELS) {
-    const cookieVal = req.cookies?.[panelRefreshCookieName(p)];
-    if (cookieVal) {
-      oldToken = cookieVal;
-      sourcePanel = p;
-      break;
-    }
+  if (reqPanel && ALL_PANELS.includes(reqPanel)) {
+    oldToken = req.cookies?.[panelRefreshCookieName(reqPanel)];
   }
 
+  // If not found in panel-specific cookies, check body.refreshToken or default refresh cookie
+  // but DO NOT fall back to scanning other panel-specific cookies!
   if (!oldToken) {
     oldToken = req.cookies?.[env.REFRESH_COOKIE_NAME] || req.body?.refreshToken;
   }
@@ -127,10 +177,17 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
 
   const result = await authService.refresh(oldToken);
 
-  // Determine panel from the refreshed user if we don't already know
-  const panel = sourcePanel ?? USER_ROLE_TO_PANEL[(result.user as any).role as UserRole] ?? undefined;
+  const userPanel = USER_ROLE_TO_PANEL[(result.user as any).role as UserRole];
+
+  // Role Isolation validation: If a panel was requested, the user's role must match it.
+  if (reqPanel && userPanel !== reqPanel) {
+    throw new AppError('Access Denied: Role mismatch for requested panel', 401, ErrorCode.UNAUTHORIZED);
+  }
+
+  const panel = reqPanel || userPanel || undefined;
 
   setRefreshCookie(res, result.refreshToken, panel);
+  setAccessCookie(res, result.accessToken, panel);
 
   sendSuccess(res, {
     accessToken: result.accessToken,
@@ -159,12 +216,14 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
     await authService.logout(req.user._id, refreshToken);
   }
 
-  // Clear the panel-specific cookie
+  // Clear the panel-specific cookies
   if (panel) {
     clearRefreshCookie(res, panel);
+    clearAccessCookie(res, panel);
   }
-  // Also clear legacy cookie for backwards compatibility
+  // Also clear legacy cookies for backwards compatibility
   clearRefreshCookie(res);
+  clearAccessCookie(res);
 
   sendSuccess(res, { message: 'Logged out successfully' });
 
@@ -319,19 +378,15 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   await otpService.verifyOTP(mobile, 'mobile', otp);
 
-  let user = await UserModel.findOne({
-    $or: [
-      { mobile },
-      { email: `otp_${mobile}@placeholder.com` }
-    ]
-  });
+  let user = await UserModel.findOne({ mobile });
 
   if (!user) {
-    const customerName = name || 'Guest Customer';
+    if (!name || !name.trim()) {
+      throw new AppError('Name is required for registration', 400, ErrorCode.INVALID_REQUEST);
+    }
     user = await UserModel.create({
-      name: customerName,
+      name: name.trim(),
       mobile,
-      email: `otp_${mobile}@placeholder.com`,
       role: UserRole.CUSTOMER,
       isMobileVerified: true,
     });
@@ -345,7 +400,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     user.isMobileVerified = true;
     user.mobile = mobile;
     if (name) {
-      user.name = name;
+      user.name = name.trim();
     }
     await user.save();
   }
@@ -369,7 +424,8 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  setRefreshCookie(res, tokens.refreshToken);
+  setRefreshCookie(res, tokens.refreshToken, 'customer');
+  setAccessCookie(res, tokens.accessToken, 'customer');
 
   void logAuditRaw({
     actorId: user._id.toString(),
@@ -385,8 +441,16 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   sendSuccess(res, {
     customerId: user._id,
+    user: {
+      id: user._id.toString(),
+      name: user.name,
+      mobile: user.mobile,
+      role: user.role,
+      restaurantId: user.restaurantId?.toString(),
+    },
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
+    panel: 'customer',
   });
 });
 

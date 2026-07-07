@@ -29,18 +29,16 @@ import {
 
 export const authRouter = Router();
 
-authRouter.use(authLimiter);
-
-authRouter.post('/register', validate({ body: registerSchema }), register);
-authRouter.post('/login', validate({ body: loginSchema }), login);
-authRouter.post('/request-otp', validate({ body: requestOtpSchema }), requestOtp);
-authRouter.post('/verify-otp', validate({ body: verifyOtpSchema }), verifyOtp);
+authRouter.post('/register', authLimiter, validate({ body: registerSchema }), register);
+authRouter.post('/login', authLimiter, validate({ body: loginSchema }), login);
+authRouter.post('/request-otp', authLimiter, validate({ body: requestOtpSchema }), requestOtp);
+authRouter.post('/verify-otp', authLimiter, validate({ body: verifyOtpSchema }), verifyOtp);
 authRouter.post('/refresh', refresh);
 authRouter.post('/logout', requireAuth, logout);
 authRouter.get('/me', requireAuth, getMe);
-authRouter.post('/forgot-password', validate({ body: forgotPasswordSchema }), forgotPassword);
-authRouter.post('/verify-reset-otp', validate({ body: verifyResetOtpSchema }), verifyResetOtp);
-authRouter.post('/reset-password', validate({ body: resetPasswordSchema }), resetPassword);
+authRouter.post('/forgot-password', authLimiter, validate({ body: forgotPasswordSchema }), forgotPassword);
+authRouter.post('/verify-reset-otp', authLimiter, validate({ body: verifyResetOtpSchema }), verifyResetOtp);
+authRouter.post('/reset-password', authLimiter, validate({ body: resetPasswordSchema }), resetPassword);
 authRouter.post('/reset-first-login-password', requireAuth, resetFirstLoginPassword);
 authRouter.get('/sessions', requireAuth, getSessions);
 authRouter.delete('/sessions/:sessionId', requireAuth, revokeSession);

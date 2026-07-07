@@ -55,7 +55,7 @@ async function upsertUser(input: SeedUserInput) {
   const password = await hashPassword(input.password);
 
   return UserModel.findOneAndUpdate(
-    { email: input.email.toLowerCase() },
+    { mobile: input.mobile },
     {
       $set: {
         name: input.name,
@@ -143,7 +143,7 @@ export async function seedDevelopmentData(): Promise<void> {
   const [adminUser, customerUser, staffUser, , , superAdminUser] = await Promise.all([
     upsertUser({
       name: 'Admin',
-      email: 'admin@ambertable.com',
+      email: 'adminpanel16@gmail.com',
       mobile: '5555555555',
       password: 'Admin@123',
       role: UserRole.RESTAURANT_ADMIN,
@@ -159,7 +159,7 @@ export async function seedDevelopmentData(): Promise<void> {
     }),
     upsertUser({
       name: 'Riya Service',
-      email: 'staff@ambertable.com',
+      email: 'staffpanel320@gmail.com',
       mobile: '8888888888',
       password: 'Staff@123',
       role: UserRole.SERVICE_STAFF,
@@ -168,7 +168,7 @@ export async function seedDevelopmentData(): Promise<void> {
     }),
     upsertUser({
       name: 'Kabir Kitchen',
-      email: 'kitchen@ambertable.com',
+      email: 'kitchenpanel1@gmail.com',
       mobile: '7777777777',
       password: 'Kitchen@123',
       role: UserRole.KITCHEN_STAFF,
@@ -177,7 +177,7 @@ export async function seedDevelopmentData(): Promise<void> {
     }),
     upsertUser({
       name: 'Meera Cleaning',
-      email: 'cleaning@ambertable.com',
+      email: 'cleaningpanel14@gmail.com',
       mobile: '6666666666',
       password: 'Cleaning@123',
       role: UserRole.CLEANING_STAFF,
@@ -186,7 +186,7 @@ export async function seedDevelopmentData(): Promise<void> {
     }),
     upsertUser({
       name: 'Platform Owner',
-      email: 'superadmin@graphura.com',
+      email: 'adminsuper22@gmail.com',
       mobile: '4444444444',
       password: 'Super@123',
       role: UserRole.SUPER_ADMIN,

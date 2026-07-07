@@ -4,10 +4,18 @@
 import { z } from 'zod';
 import { UserRole } from '../../constants/roles';
 
+export const mobileSchema = z
+  .string()
+  .trim()
+  .transform((val) => val.replace(/[^\d+]/g, ''))
+  .refine((val) => val.length >= 10 && val.length <= 15, {
+    message: 'Mobile number must be between 10 and 15 digits',
+  });
+
 export const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100).trim(),
-  email: z.string().email('Invalid email address').toLowerCase().trim(),
-  mobile: z.string().min(10, 'Mobile must be at least 10 digits').max(15).trim(),
+  email: z.string().email('Invalid email address').toLowerCase().trim().optional(),
+  mobile: mobileSchema,
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
@@ -22,7 +30,7 @@ export const registerSchema = z.object({
 
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address').toLowerCase().trim().optional(),
-  mobile: z.string().min(10).max(15).trim().optional(),
+  mobile: mobileSchema.optional(),
   password: z.string().min(1, 'Password is required'),
 }).refine(
   (data) => data.email || data.mobile,
@@ -46,11 +54,11 @@ export const resetPasswordSchema = z.object({
 });
 
 export const requestOtpSchema = z.object({
-  mobile: z.string().min(10).max(15).trim(),
+  mobile: mobileSchema,
 });
 
 export const verifyOtpSchema = z.object({
-  mobile: z.string().min(10).max(15).trim(),
+  mobile: mobileSchema,
   otp: z.string().min(4).max(6, 'OTP must be between 4 and 6 digits'),
   name: z.string().trim().min(2).max(100).optional(),
 });
@@ -62,9 +70,10 @@ export const verifyResetOtpSchema = z.object({
 
 export const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
-  mobile: z.string().min(10).max(15).trim().optional(),
+  mobile: mobileSchema.optional(),
   avatar: z.string().optional(),
 });
+
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),

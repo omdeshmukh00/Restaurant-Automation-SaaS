@@ -3,7 +3,7 @@ import fs from 'fs';
 import logger from '../config/logger';
 import { ErrorCode } from '../constants/errors';
 import { AppError } from '../utils/AppError';
-import { comparePassword, generateOTP, hashPassword } from '../utils/crypto';
+import { comparePassword, generateOTP, hashPassword, normalizeMobile } from '../utils/crypto';
 import { sendOTPEmail } from './mail.service';
 
 interface IOtp extends Document {
@@ -32,13 +32,18 @@ otpSchema.index({ identifier: 1, type: 1 });
 
 const OtpModel = mongoose.model<IOtp>('Otp', otpSchema);
 
-export const OTP_EXPIRY_MINUTES = 2;
+export const OTP_EXPIRY_MINUTES = 5;
 const MAX_OTP_ATTEMPTS = 5;
 const OTP_COOLDOWN_SECONDS = 60;
 const OTP_BLOCK_MINUTES = 15;
 
 export async function createOTP(identifier: string, type: 'email' | 'mobile'): Promise<{ otp: string; expiresAt: Date }> {
   const now = new Date();
+  
+  if (type === 'mobile') {
+    identifier = normalizeMobile(identifier);
+  }
+
   const existing = await OtpModel.findOne({ identifier, type }).sort({ createdAt: -1 });
 
   if (existing?.blockedUntil && existing.blockedUntil > now) {
@@ -58,13 +63,13 @@ export async function createOTP(identifier: string, type: 'email' | 'mobile'): P
   const plainOtp = generateOTP(type === 'mobile' ? 4 : 6);
   const otpHash = await hashPassword(plainOtp);
 
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
   await OtpModel.create({
     identifier,
     type,
     otpHash,
-    expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
+    expiresAt,
   });
-  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
   logger.info(`OTP generated for ${type}: ${identifier}`);
 
@@ -75,11 +80,28 @@ export async function createOTP(identifier: string, type: 'email' | 'mobile'): P
     }
   }
 
+  if (type === 'mobile') {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('\n====================================================');
+      console.log('OTP GENERATED');
+      console.log(`Mobile : ${identifier}`);
+      console.log(`OTP : ${plainOtp}`);
+      console.log(`Expires : ${OTP_EXPIRY_MINUTES} Minutes`);
+      console.log('====================================================\n');
+    } else {
+      try {
+        const { MessagingService } = await import('./messaging.service');
+        await MessagingService.sendSMS(identifier, 'customer-otp', { otp: plainOtp, expiry: String(OTP_EXPIRY_MINUTES) });
+      } catch (err) {
+        logger.error('Failed to send production SMS OTP', err);
+      }
+    }
+  }
+
   if (!process.env.NODE_ENV || process.env.NODE_ENV !== 'production') {
     logger.warn(`[DEV ONLY] OTP for ${identifier}: ${plainOtp}`);
     try {
       fs.writeFileSync('otp.txt', `OTP for ${identifier}: ${plainOtp}\n`);
-      // Also write to workspace root if possible
       try {
         fs.writeFileSync('../otp.txt', `OTP for ${identifier}: ${plainOtp}\n`);
       } catch (rootErr) {
@@ -94,6 +116,10 @@ export async function createOTP(identifier: string, type: 'email' | 'mobile'): P
 }
 
 export async function verifyOTP(identifier: string, type: 'email' | 'mobile', otp: string): Promise<boolean> {
+  if (type === 'mobile') {
+    identifier = normalizeMobile(identifier);
+  }
+
   const record = await OtpModel.findOne({ identifier, type }).sort({ createdAt: -1 });
 
   if (!record) {
@@ -135,4 +161,4 @@ export async function verifyOTP(identifier: string, type: 'email' | 'mobile', ot
   await record.save();
 
   return true;
-}
+}

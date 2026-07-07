@@ -19,6 +19,7 @@ import { tenantContext } from '../utils/tenantContext';
  * Usage: router.post('/customer/orders', requireSession, handler)
  */
 export async function requireSession(req: Request, _res: Response, next: NextFunction) {
+  console.log(`[requireSession Debug] Running for ${req.method} ${req.originalUrl}. Token: ${req.headers['x-session-token']}`);
   try {
     const token = req.headers['x-session-token'] as string;
 

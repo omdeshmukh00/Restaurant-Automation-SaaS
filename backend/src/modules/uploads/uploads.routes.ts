@@ -26,13 +26,13 @@ const deleteRoles = [
 uploadRouter.use(requireAuth, tenantGuard);
 
 // List and Download: Allow any authenticated user within the same tenant
-uploadRouter.get('/uploads', UploadController.list);
-uploadRouter.get('/uploads/:id/download', validate({ params: uploadIdParamSchema }), UploadController.download);
+uploadRouter.get('/', UploadController.list);
+uploadRouter.get('/:id/download', validate({ params: uploadIdParamSchema }), UploadController.download);
 
 // Upload and Replace: Restricted to uploadRoles
-uploadRouter.post('/uploads', roleGuard(...uploadRoles), uploadLimiter, validate({ body: createUploadSchema }), UploadController.create);
+uploadRouter.post('/', roleGuard(...uploadRoles), uploadLimiter, validate({ body: createUploadSchema }), UploadController.create);
 uploadRouter.patch(
-  '/uploads/:id',
+  '/:id',
   roleGuard(...uploadRoles),
   uploadLimiter,
   validate({ params: uploadIdParamSchema, body: replaceUploadSchema }),
@@ -40,6 +40,6 @@ uploadRouter.patch(
 );
 
 // Delete: Restricted to deleteRoles only (prevents staff/cleaning staff from deleting)
-uploadRouter.delete('/uploads/:id', roleGuard(...deleteRoles), validate({ params: uploadIdParamSchema }), UploadController.delete);
+uploadRouter.delete('/:id', roleGuard(...deleteRoles), validate({ params: uploadIdParamSchema }), UploadController.delete);
 
 export default uploadRouter;

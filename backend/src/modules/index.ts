@@ -38,6 +38,11 @@ export const apiRouter = Router();
 
 apiRouter.use(requirePasswordChange);
 
+apiRouter.get('/customer/session', (req, res, next) => {
+  console.log(`[apiRouter Debug] GET /customer/session matched. headers:`, JSON.stringify(req.headers));
+  next();
+});
+
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/users', usersRouter);
 apiRouter.use('/audit-logs', requireAuth, roleGuard(roles.restaurantAdmin, roles.superAdmin), auditLogRoutes);
@@ -48,7 +53,7 @@ apiRouter.use(ordersRouter);
 apiRouter.use(loyaltyRouter);
 apiRouter.use('/payments', paymentsRouter);
 apiRouter.use('/subscriptions', requireAuth, subscriptionRoutes);
-apiRouter.use(uploadRouter);
+apiRouter.use('/uploads', uploadRouter);
 apiRouter.use('/customer/cart', cartRouter);
 apiRouter.use('/customer/feedback', feedbackRouter);
 apiRouter.use('/customer', customerRouter);

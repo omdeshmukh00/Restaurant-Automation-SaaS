@@ -1,12 +1,6 @@
 import axios from 'axios';
 import { env } from '../../lib/env';
-import { getAccessToken, clearPanelSession, type Panel } from '../../auth/tokenStore';
-
-const ACTIVE_PANEL_KEY = 'ra/active-panel';
-
-function getActivePanel(): Panel {
-  return (localStorage.getItem(ACTIVE_PANEL_KEY) as Panel) ?? 'customer';
-}
+import { getAccessToken, setAccessToken, clearPanelSession, getPanelFromPath, type Panel } from '../../auth/tokenStore';
 
 function getPanelFromUrl(url: string | undefined): Panel | null {
   if (!url) return null;
@@ -45,8 +39,8 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
-  // Resolve the access token from the URL prefix or the currently active panel
-  const panel = getPanelFromUrl(config.url) || getActivePanel();
+  // Resolve the access token from the URL prefix or the current page path (tab-isolated)
+  const panel = getPanelFromUrl(config.url) || getPanelFromPath(window.location.pathname);
   const token = getAccessToken(panel);
 
   if (token) {
@@ -61,42 +55,114 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Interceptor Queue variables for token refresh
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: any) => void;
+  reject: (reason: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 // Response interceptor to handle token expiration (401 with code TOKEN_EXPIRED, TOKEN_INVALID, UNAUTHORIZED)
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response) {
-      const { status, data } = error.response;
-      const errorCode = data?.error?.code;
-      const url = error.config?.url || '';
+  async (error) => {
+    const originalRequest = error.config;
 
-      const isAuthAction =
-        url.includes('/auth/login') ||
-        url.includes('/auth/verify-otp') ||
-        url.includes('/auth/forgot-password') ||
-        url.includes('/auth/verify-reset-otp') ||
-        url.includes('/auth/reset-password') ||
-        url.includes('/auth/request-otp') ||
-        url.includes('/logout') ||
-        url.includes('/session/end');
+    if (!error.response) {
+      return Promise.reject(error);
+    }
 
-      if (
-        !isAuthAction &&
-        status === 401 &&
-        (errorCode === 'TOKEN_EXPIRED' ||
-          errorCode === 'TOKEN_INVALID' ||
-          errorCode === 'UNAUTHORIZED')
-      ) {
-        const panel = getPanelFromUrl(error.config?.url) || getActivePanel();
-        clearPanelSession(panel);
+    const { status, data } = error.response;
+    const errorCode = data?.error?.code;
+    const url = originalRequest.url || '';
 
-        // Redirect to login page for that panel
-        const loginPath = panel === 'customer' ? '/auth/customer' : `/auth/${panel}`;
-        window.location.href = loginPath;
+    const isAuthAction =
+      url.includes('/auth/login') ||
+      url.includes('/auth/verify-otp') ||
+      url.includes('/auth/forgot-password') ||
+      url.includes('/auth/verify-reset-otp') ||
+      url.includes('/auth/reset-password') ||
+      url.includes('/auth/request-otp') ||
+      url.includes('/auth/refresh') ||
+      url.includes('/logout') ||
+      url.includes('/session/end');
+
+    if (
+      !isAuthAction &&
+      status === 401 &&
+      (errorCode === 'TOKEN_EXPIRED' ||
+        errorCode === 'TOKEN_INVALID' ||
+        errorCode === 'UNAUTHORIZED') &&
+      !originalRequest._retry
+    ) {
+      const panel = getPanelFromUrl(originalRequest.url) || getPanelFromPath(window.location.pathname);
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const refreshResponse = await axios.post(
+          `${env.apiUrl}/auth/refresh`,
+          { panel },
+          {
+            withCredentials: true,
+            timeout: 5000,
+          }
+        );
+        const newAccessToken = refreshResponse.data.data.accessToken;
+
+        setAccessToken(panel, newAccessToken);
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+
+        processQueue(null, newAccessToken);
+        isRefreshing = false;
+
+        return apiClient(originalRequest);
+      } catch (refreshError: any) {
+        processQueue(refreshError, null);
+        isRefreshing = false;
+
+        const isNetworkError = !refreshError.response || refreshError.code === 'ECONNABORTED';
+        const isServerError = refreshError.response && refreshError.response.status >= 500;
+
+        if (!isNetworkError && !isServerError) {
+          clearPanelSession(panel);
+
+          // Redirect to login page for that panel
+          const loginPath = panel === 'customer' ? '/auth/customer' : `/auth/${panel}`;
+          window.location.href = loginPath;
+        }
+
+        return Promise.reject(refreshError);
       }
     }
     return Promise.reject(error);
   }
 );
+
 
 

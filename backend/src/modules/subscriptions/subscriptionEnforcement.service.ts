@@ -98,7 +98,10 @@ async function logEnforcementEvent(
 export async function getActiveSubscriptionWithPlan(
   restaurantId: string | Types.ObjectId,
 ): Promise<SubscriptionWithPlan | null> {
-  if (process.env.NODE_ENV === 'test' && !process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT) {
+  const isEnforced = process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT === 'true' ||
+    (process.env.NODE_ENV === 'production' && process.env.ENABLE_SUBSCRIPTION_ENFORCEMENT !== 'false');
+
+  if (!isEnforced) {
     return {
       subscription: { plan: 'Premium', status: 'active', _id: 'test' } as any,
       plan: { 

@@ -15,6 +15,11 @@ import { feedbackBodySchema } from './customer.schema';
 
 export const customerRouter = Router();
 
+customerRouter.use((req, res, next) => {
+  console.log(`[customerRouter Debug] customerRouter entered for path: ${req.url} (original: ${req.originalUrl})`);
+  next();
+});
+
 customerRouter.use(requireSession);
 
 function ensureFound<T>(value: T | null | undefined, message: string): T {

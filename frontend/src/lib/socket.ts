@@ -3,16 +3,10 @@
 
 import { io, Socket } from 'socket.io-client';
 import { env } from './env';
-import { getAccessToken, type Panel } from '../auth/tokenStore';
+import { getAccessToken, getPanelFromPath, type Panel } from '../auth/tokenStore';
 import { getSessionToken } from '../shared/services/apiClient';
 
-const ACTIVE_PANEL_KEY = 'ra/active-panel';
-
 let socket: Socket | null = null;
-
-function getActivePanel(): Panel {
-  return (localStorage.getItem(ACTIVE_PANEL_KEY) as Panel) ?? 'customer';
-}
 
 /**
  * Connect or reconnect the Socket.IO client.
@@ -21,7 +15,7 @@ function getActivePanel(): Panel {
 export function connectSocket(): void {
   if (socket?.connected) return;
 
-  const panel = getActivePanel();
+  const panel = getPanelFromPath(window.location.pathname);
   const token = getAccessToken(panel);
   const sessionToken = getSessionToken();
 

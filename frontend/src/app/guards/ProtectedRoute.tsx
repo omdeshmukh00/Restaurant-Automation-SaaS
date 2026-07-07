@@ -25,7 +25,7 @@ const PATH_PANEL_MAP: Array<{ prefix: string; panel: Panel; loginPath: string }>
  * time without one session blocking or overwriting the other.
  */
 export function ProtectedRoute(): JSX.Element {
-  const { user, isPanelAuthenticated, switchPanel } = useAuth();
+  const { user, isPanelAuthenticated, switchPanel, initializing, activePanel } = useAuth();
   const location = useLocation();
 
   // Find the matching panel config for the current path
@@ -40,6 +40,15 @@ export function ProtectedRoute(): JSX.Element {
     }
   }, [location.pathname, matched, isPanelAuthenticated, switchPanel]);
 
+  if (initializing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-200">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-amber-500 border-t-transparent mb-4" />
+        <p className="animate-pulse text-sm font-medium">Restoring session...</p>
+      </div>
+    );
+  }
+
   if (!matched) {
     return <Navigate replace state={{ from: location }} to="/auth/restaurant" />;
   }
@@ -53,7 +62,6 @@ export function ProtectedRoute(): JSX.Element {
 
   // To prevent rendering children with the wrong/stale user context during
   // the transition, only render Outlet after the active panel has switched.
-  const activePanel = localStorage.getItem('ra/active-panel') || 'customer';
   if (activePanel !== matched.panel) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">

@@ -15,7 +15,10 @@ const AdminDashboard = () => {
     useTablesStore.getState().fetchTables();
 
     const interval = setInterval(() => {
-      useTablesStore.getState().fetchTables();
+      const socket = getSocket();
+      if (!socket || !socket.connected) {
+        useTablesStore.getState().fetchTables();
+      }
     }, 15000);
 
     const socket = getSocket();

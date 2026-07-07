@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
+
 import { StaffSearchProvider } from '../features/staff/components/dashboard/StaffSearchContext';
 import StaffSidebar from '../features/staff/components/dashboard/StaffSidebar';
 import StaffTopBar from '../features/staff/components/dashboard/StaffTopBar';
 import { NotificationWindow } from '../features/staff/components/NotificationWindow';
 import { useStaffProfile } from '../features/staff/hooks/useStaffProfile';
 import { getRolePermissions } from '../features/staff/utils/roleAccess';
+
 import { connectSocket, getSocket } from '../lib/socket';
 import { staffStore } from '../features/staff/store/staff.store';
 import { requestsAPI, ordersAPI } from '../features/staff/api/staff.api';
@@ -28,7 +30,6 @@ export default function StaffLayout(): JSX.Element {
   });
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-
   useEffect(() => {
     // 1. Establish Socket Connection
     connectSocket();
@@ -135,8 +136,13 @@ export default function StaffLayout(): JSX.Element {
     // Load initial data
     fetchAllStaffData();
 
-    // Set polling fallback
-    const interval = setInterval(fetchAllStaffData, 15000);
+    // Set polling fallback (only if socket is not connected)
+    const interval = setInterval(() => {
+      const socket = getSocket();
+      if (!socket || !socket.connected) {
+        fetchAllStaffData();
+      }
+    }, 15000);
 
     // Set up Socket listeners
     const socket = getSocket();

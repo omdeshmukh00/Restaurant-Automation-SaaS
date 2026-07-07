@@ -134,12 +134,18 @@ const CustomerAuth: React.FC = () => {
       return;
     }
 
+    if (!userExists && !name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       const response = await apiClient.post('/auth/verify-otp', {
         mobile,
         otp: otpCode,
+        name: !userExists ? name.trim() : undefined,
       });
 
       const data = response.data.data;
@@ -154,72 +160,39 @@ const CustomerAuth: React.FC = () => {
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.removeItem('customerOtpExpiresAt');
 
-      if (userExists) {
-        // Fetch profile to get correct name
-        try {
-          const profileRes = await apiClient.get('/users/me');
-          const user = profileRes.data.data.user;
-          const userPayload = {
-            id: data.customerId,
-            name: user.name || 'Customer',
-            role: 'customer' as const,
-            panel: 'customer' as const,
-            restaurantName: 'Amber Table',
-            mobile,
-          };
-          setStoredUser('customer', userPayload);
-          if (setUser) {
-            setUser(userPayload);
-          }
-          const { updateProfile } = useCustomerStore.getState();
-          updateProfile({
-            name: user.name || 'Customer',
-            phone: mobile,
-            avatar: user.avatar || 'person',
-          });
-        } catch (fetchErr) {
-          const userPayload = {
-            id: data.customerId,
-            name: 'Customer',
-            role: 'customer' as const,
-            panel: 'customer' as const,
-            restaurantName: 'Amber Table',
-            mobile,
-          };
-          setStoredUser('customer', userPayload);
-          if (setUser) {
-            setUser(userPayload);
-          }
-        }
+      const userPayload = {
+        id: data.user?.id || data.customerId,
+        name: data.user?.name || 'Customer',
+        role: 'customer' as const,
+        panel: 'customer' as const,
+        restaurantName: 'Amber Table',
+        mobile,
+      };
 
-        setSuccess('Logged in successfully!');
-        setTimeout(() => {
-          if (tableToken) {
-            navigate(`/table?token=${tableToken}`, { replace: true });
-          } else {
-            navigate(from, { replace: true });
-          }
-        }, 800);
-      } else {
-        // Registration flow: do not redirect, ask for name first
-        const userPayload = {
-          id: data.customerId,
-          name: 'Guest Customer',
-          role: 'customer' as const,
-          panel: 'customer' as const,
-          restaurantName: 'Amber Table',
-          mobile,
-        };
-        setStoredUser('customer', userPayload);
-        if (setUser) {
-          setUser(userPayload);
-        }
-        setSuccess('OTP verified successfully!');
-        setTimeout(() => {
-          setSuccess(null);
-          setShowNamePrompt(true);
-        }, 1000);
+      setStoredUser('customer', userPayload);
+      if (setUser) {
+        setUser(userPayload);
       }
+
+      // Sync customer store
+      const { updateProfile } = useCustomerStore.getState();
+      updateProfile({
+        name: userPayload.name,
+        phone: mobile,
+        avatar: 'person',
+      });
+
+      // Switch active panel context immediately
+      switchPanel('customer');
+
+      setSuccess('Logged in successfully!');
+      setTimeout(() => {
+        if (tableToken) {
+          navigate(`/table?token=${tableToken}`, { replace: true });
+        } else {
+          navigate(from, { replace: true });
+        }
+      }, 800);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid OTP code. Please try again.');
     } finally {
@@ -227,62 +200,9 @@ const CustomerAuth: React.FC = () => {
     }
   };
 
-  const handleRegisterName = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError('Please enter your name');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiClient.patch('/users/me', {
-        name: name.trim(),
-      });
-      const updatedUser = response.data.data.user;
-
-      const storedUser = {
-        id: updatedUser._id || updatedUser.id,
-        name: updatedUser.name,
-        role: 'customer' as const,
-        panel: 'customer' as const,
-        restaurantName: 'Amber Table',
-        mobile,
-      };
-      setStoredUser('customer', storedUser);
-      if (setUser) {
-        setUser(storedUser);
-      }
-
-      // Sync customer store
-      const { updateProfile } = useCustomerStore.getState();
-      updateProfile({
-        name: updatedUser.name,
-        phone: mobile,
-        avatar: updatedUser.avatar || 'person',
-      });
-
-      setSuccess('Registration completed successfully!');
-      setTimeout(() => {
-        if (tableToken) {
-          navigate(`/table?token=${tableToken}`, { replace: true });
-        } else {
-          navigate(from, { replace: true });
-        }
-      }, 1000);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to complete registration. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (showNamePrompt) {
-      handleRegisterName(e);
-    } else if (!otpSent) {
+    if (!otpSent) {
       handleRequestOtp();
     } else {
       handleVerifyOtp();
@@ -318,36 +238,8 @@ const CustomerAuth: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {showNamePrompt ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="space-y-4"
-          >
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 mb-1.5 font-sans">
-                What is your name?
-              </label>
-              <p className="text-xs text-slate-400 dark:text-zinc-500 mb-3 font-sans">
-                Please enter your name to complete your profile
-              </p>
-              <div className="flex items-center border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all duration-200">
-                <input
-                  type="text"
-                  placeholder="Enter your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="flex-1 w-full px-4 py-3.5 text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-600 bg-transparent border-0 outline-none focus:ring-0 text-base font-sans"
-                  required
-                  autoFocus
-                />
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          <>
-            {/* Mobile Input */}
-            <div className={otpSent ? 'opacity-50 pointer-events-none' : ''}>
+        {/* Mobile Input */}
+        <div className={otpSent ? 'opacity-50 pointer-events-none' : ''}>
               <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 mb-1 font-sans">
                 Enter Mobile Number
               </label>
@@ -384,6 +276,28 @@ const CustomerAuth: React.FC = () => {
                   exit={{ opacity: 0, height: 0 }}
                   className="space-y-3 overflow-hidden"
                 >
+                  {!userExists && (
+                    <div className="space-y-1.5 mt-2">
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 font-sans">
+                        What is your name?
+                      </label>
+                      <p className="text-xs text-slate-400 dark:text-zinc-500 font-sans">
+                        Please enter your name to complete your registration
+                      </p>
+                      <div className="flex items-center border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all duration-200 bg-slate-50 dark:bg-zinc-800">
+                        <input
+                          type="text"
+                          placeholder="Enter your name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="flex-1 w-full px-4 py-3 text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-600 bg-transparent border-0 outline-none focus:ring-0 text-base font-sans"
+                          required
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 font-sans">
                     Enter OTP
                   </label>
@@ -433,8 +347,6 @@ const CustomerAuth: React.FC = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-          </>
-        )}
 
         {/* Feedback alerts */}
         {error && (
@@ -451,13 +363,13 @@ const CustomerAuth: React.FC = () => {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={loading || (otpSent && !showNamePrompt && (otp.some((d) => !d) || countdown <= 0)) || (showNamePrompt && !name.trim())}
+          disabled={loading || (otpSent && (otp.some((d) => !d) || countdown <= 0 || (!userExists && !name.trim())))}
           className={`w-full flex items-center justify-center space-x-2 py-3.5 text-white font-semibold rounded-2xl shadow-soft transition-all active:scale-[0.98] disabled:pointer-events-none font-sans ${
-            (otpSent && !showNamePrompt && countdown <= 0) ? 'bg-slate-400 cursor-not-allowed opacity-100' : 'bg-orange-600 hover:bg-orange-700 hover:shadow-md disabled:opacity-50'
+            (otpSent && countdown <= 0) ? 'bg-slate-400 cursor-not-allowed opacity-100' : 'bg-orange-600 hover:bg-orange-700 hover:shadow-md disabled:opacity-50'
           }`}
         >
           <span>
-            {showNamePrompt ? 'Continue' : !otpSent ? 'Get OTP' : 'Verify & Login'}
+            {!otpSent ? 'Get OTP' : 'Verify & Login'}
           </span>
           <ArrowRight className="w-5 h-5" />
         </button>

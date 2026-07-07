@@ -4,22 +4,77 @@ import { verifyAccessToken } from '../services/jwt.service';
 import { AppError } from '../utils/AppError';
 import type { Panel } from '../constants/roles';
 import { KitchenRole, StaffInternalRole, CleaningRole } from '../constants/roles';
-
+import { env } from '../config/env';
 import { tenantContext } from '../utils/tenantContext';
 
-// ── Generic auth (unchanged behaviour, now also maps panel/internal_role) ──
+// ── Helpers for panel cookie matching ──────────────────────────────────
+
+function panelAccessCookieName(panel: Panel): string {
+  switch (panel) {
+    case 'customer':
+      return env.CUSTOMER_ACCESS_COOKIE;
+    case 'kitchen':
+      return env.KITCHEN_ACCESS_COOKIE;
+    case 'staff':
+      return env.STAFF_ACCESS_COOKIE;
+    case 'cleaning':
+      return env.CLEANING_ACCESS_COOKIE;
+    case 'admin':
+      return env.ADMIN_ACCESS_COOKIE;
+    case 'superadmin':
+      return env.SUPERADMIN_ACCESS_COOKIE;
+    default:
+      return env.ACCESS_COOKIE_NAME;
+  }
+}
+
+function getPanelFromUrl(url: string): Panel | null {
+  if (url.includes('/admin')) return 'admin';
+  if (url.includes('/superadmin') || url.includes('/super-admin')) return 'superadmin';
+  if (url.includes('/kitchen')) return 'kitchen';
+  if (url.includes('/staff')) return 'staff';
+  if (url.includes('/cleaning')) return 'cleaning';
+  if (url.includes('/customer')) return 'customer';
+  return null;
+}
+
+// ── Generic auth (with cookie fallback) ────────────────────────────────
 
 export function requireAuth(req: Request, _res: Response, next: NextFunction): void {
-  const authHeader = req.header('authorization');
+  let token: string | undefined;
 
-  if (!authHeader?.startsWith('Bearer ')) {
-    next(new AppError('Authentication required', 401, ErrorCode.UNAUTHORIZED));
-    return;
+  const authHeader = req.header('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
   }
 
-  const token = authHeader.slice(7).trim();
+  if (!token) {
+    // Try to get token from panel-specific access token cookie
+    const panel = getPanelFromUrl(req.originalUrl);
+    if (panel) {
+      const cookieName = panelAccessCookieName(panel);
+      token = req.cookies?.[cookieName];
+    }
+  }
 
   if (!token) {
+    // Fallback: try ALL panel access cookies
+    const ALL_PANELS: Panel[] = ['customer', 'kitchen', 'staff', 'cleaning', 'admin', 'superadmin'];
+    for (const p of ALL_PANELS) {
+      const cookieName = panelAccessCookieName(p);
+      const cookieVal = req.cookies?.[cookieName];
+      if (cookieVal) {
+        token = cookieVal;
+        break;
+      }
+    }
+  }
+
+  if (!token) {
+    if (req.originalUrl.includes('/customer')) {
+      console.trace('[requireAuth Debug Trace]');
+    }
+    console.log(`[requireAuth Debug] No token for ${req.method} ${req.originalUrl}. Headers:`, JSON.stringify(req.headers));
     next(new AppError('Authentication required', 401, ErrorCode.UNAUTHORIZED));
     return;
   }
@@ -54,36 +109,44 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 }
 
 export function attachUser(req: Request, _res: Response, next: NextFunction): void {
+  let token: string | undefined;
+
   const authHeader = req.headers.authorization;
-
   if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
+    token = authHeader.split(' ')[1];
+  }
 
-    if (token) {
-      try {
-        const decoded = verifyAccessToken(token);
+  if (!token) {
+    const panel = getPanelFromUrl(req.originalUrl);
+    if (panel) {
+      token = req.cookies?.[panelAccessCookieName(panel)];
+    }
+  }
 
-        req.user = {
-          _id: decoded._id,
-          id: decoded._id,
-          email: decoded.email,
-          role: decoded.role,
-          restaurantId: decoded.restaurantId,
-          tenantId: decoded.tenantId,
-          panel: decoded.panel,
-          internal_role: decoded.internal_role,
-          mustResetPassword: decoded.mustResetPassword,
-          firstLogin: decoded.firstLogin,
-        };
+  if (token) {
+    try {
+      const decoded = verifyAccessToken(token);
 
-        if (decoded.tenantId) {
-          return tenantContext.run({ tenantId: decoded.tenantId }, () => {
-            next();
-          });
-        }
-      } catch {
-        // Silent fail; req.user remains undefined.
+      req.user = {
+        _id: decoded._id,
+        id: decoded._id,
+        email: decoded.email,
+        role: decoded.role,
+        restaurantId: decoded.restaurantId,
+        tenantId: decoded.tenantId,
+        panel: decoded.panel,
+        internal_role: decoded.internal_role,
+        mustResetPassword: decoded.mustResetPassword,
+        firstLogin: decoded.firstLogin,
+      };
+
+      if (decoded.tenantId) {
+        return tenantContext.run({ tenantId: decoded.tenantId }, () => {
+          next();
+        });
       }
+    } catch {
+      // Silent fail; req.user remains undefined.
     }
   }
 
@@ -92,6 +155,7 @@ export function attachUser(req: Request, _res: Response, next: NextFunction): vo
 
 // ── Panel-specific authentication middlewares ──────────────────────────
 // Each one calls requireAuth first, then verifies the token's `panel` claim.
+// STRICT ISOLATION: No role fallbacks.
 
 const PANEL_HIERARCHY: Record<Panel, Panel[]> = {
   customer: ['customer'],
@@ -101,6 +165,7 @@ const PANEL_HIERARCHY: Record<Panel, Panel[]> = {
   admin: ['admin', 'superadmin'],
   superadmin: ['superadmin'],
 };
+
 
 function authenticatePanel(expectedPanel: Panel) {
   return (req: Request, res: Response, next: NextFunction): void => {

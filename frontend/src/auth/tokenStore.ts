@@ -5,6 +5,25 @@ export type Panel = 'customer' | 'kitchen' | 'staff' | 'cleaning' | 'admin' | 's
 
 const ALL_PANELS: Panel[] = ['customer', 'kitchen', 'staff', 'cleaning', 'admin', 'superadmin'];
 
+export function getPanelFromPath(pathname: string): Panel {
+  if (pathname.startsWith('/customer')) return 'customer';
+  if (pathname.startsWith('/kitchen')) return 'kitchen';
+  if (pathname.startsWith('/staff')) return 'staff';
+  if (pathname.startsWith('/cleaning')) return 'cleaning';
+  if (pathname.startsWith('/admin')) return 'admin';
+  if (pathname.startsWith('/superadmin')) return 'superadmin';
+  
+  if (pathname.startsWith('/auth/customer')) return 'customer';
+  if (pathname.startsWith('/auth/kitchen')) return 'kitchen';
+  if (pathname.startsWith('/auth/staff')) return 'staff';
+  if (pathname.startsWith('/auth/cleaning')) return 'cleaning';
+  if (pathname.startsWith('/auth/admin')) return 'admin';
+  if (pathname.startsWith('/auth/superadmin')) return 'superadmin';
+  if (pathname.startsWith('/auth/super-admin')) return 'superadmin';
+  
+  return 'customer'; // Default fallback
+}
+
 function accessTokenKey(panel: Panel) {
   return `ra/${panel}/access-token`;
 }
@@ -22,6 +41,40 @@ const LEGACY_ACCESS_TOKEN_KEY = 'restaurant-automation/access-token';
 const LEGACY_ROLE_KEY = 'restaurant-automation/demo-role';
 const LEGACY_USER_KEY = 'restaurant-automation/user';
 
+type TokenListener = (panel: Panel, token: string | null) => void;
+const tokenListeners = new Set<TokenListener>();
+
+export function addTokenListener(listener: TokenListener): () => void {
+  tokenListeners.add(listener);
+  return () => {
+    tokenListeners.delete(listener);
+  };
+}
+
+function notifyTokenListeners(panel: Panel, token: string | null): void {
+  tokenListeners.forEach((listener) => {
+    try {
+      listener(panel, token);
+    } catch (e) {
+      console.error('Error in token listener', e);
+    }
+  });
+}
+
+// Synchronize token state changes across browser tabs in real-time
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (!event.key) return;
+    
+    // We only care about keys like: ra/customer/access-token
+    const parts = event.key.split('/');
+    if (parts.length === 3 && parts[0] === 'ra' && parts[2] === 'access-token') {
+      const panel = parts[1] as Panel;
+      notifyTokenListeners(panel, event.newValue);
+    }
+  });
+}
+
 // ── Panel-scoped access token ─────────────────────────────────────────
 
 export function getAccessToken(panel: Panel): string | null {
@@ -31,9 +84,10 @@ export function getAccessToken(panel: Panel): string | null {
 export function setAccessToken(panel: Panel, token: string | null): void {
   if (!token) {
     localStorage.removeItem(accessTokenKey(panel));
-    return;
+  } else {
+    localStorage.setItem(accessTokenKey(panel), token);
   }
-  localStorage.setItem(accessTokenKey(panel), token);
+  notifyTokenListeners(panel, token);
 }
 
 // ── Panel-scoped role ─────────────────────────────────────────────────
@@ -97,6 +151,7 @@ export function clearPanelSession(panel: Panel): void {
   localStorage.removeItem(userKey(panel));
   localStorage.removeItem('otpExpiresAt');
   localStorage.removeItem('customerOtpExpiresAt');
+  notifyTokenListeners(panel, null);
 }
 
 // ── Clear ALL panel sessions ──────────────────────────────────────────
@@ -105,6 +160,7 @@ export function clearAllSessions(): void {
   for (const p of ALL_PANELS) {
     clearPanelSession(p);
   }
+
   // Also clean up legacy keys
   localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
   localStorage.removeItem(LEGACY_ROLE_KEY);

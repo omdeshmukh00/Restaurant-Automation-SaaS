@@ -2278,6 +2278,10 @@ async function main() {
     console.log(JSON.stringify(summary, null, 2));
 
     if (postman.failures.length > 0 || smoke.failed > 0) {
+      console.log('--- SERVER STDOUT ---');
+      console.log(stdout);
+      console.log('--- SERVER STDERR ---');
+      console.log(stderr);
       process.exitCode = 1;
     }
   } catch (error) {
