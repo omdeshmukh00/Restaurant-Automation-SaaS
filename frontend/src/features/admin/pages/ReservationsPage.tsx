@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CalendarDays, Filter, Plus, ChevronDown, X, Check } from 'lucide-react';
 import { ReservationStatCards } from '../components/reservations/ReservationStatCards';
 import { ReservationCalendar } from '../components/reservations/ReservationCalendar';
@@ -8,42 +8,42 @@ import { GuestDetailsPanel } from '../components/reservations/GuestDetailsPanel'
 import { TimeSlotsOverview } from '../components/reservations/TimeSlotsOverview';
 import { ReservationAnalyticsBar } from '../components/reservations/ReservationAnalyticsBar';
 import { useReservationsStore, type ReservationStatus } from '../store/reservations.store';
-import { useEffect } from "react";
-import { reservationApi } from "../api/reservation.api";
-
-const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-pink-500',
-  'bg-orange-500', 'bg-teal-500', 'bg-indigo-500', 'bg-rose-500',
-];
+import { useTablesStore } from "../store/tables.store";
 
 const STATUS_OPTIONS: Array<'All' | ReservationStatus> = ['All', 'Confirmed', 'Pending', 'Cancelled', 'Walk-in'];
 
-const DATES = [
-  'Today, May 20',
-  'Tomorrow, May 21',
-  'May 22, 2025',
-  'May 23, 2025',
-  'May 24, 2025',
-  'May 25, 2025',
-  'May 26, 2025',
-];
+const baseDate = new Date();
+const DATES = Array.from({ length: 7 }, (_, index) => {
+  const date = new Date(baseDate);
+  date.setDate(baseDate.getDate() + index);
+  if (index === 0) return `Today, ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  if (index === 1) return `Tomorrow, ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+});
 
 export default function ReservationsPage(): JSX.Element {
-  const { selectedDate, setSelectedDate, filterStatus, setFilterStatus, filterTime, setFilterTime, addReservation } =
-    useReservationsStore();
+   const {
+    tables,
+    fetchTables,
+  } = useTablesStore();
 
-    useEffect(() => {
-  async function loadReservations() {
-    try {
-      const data = await reservationApi.getReservations();
-      console.log("Reservations API:", data);
-    } catch (error) {
-      console.error("Failed to load reservations:", error);
-    }
-  }
+  const {
+    selectedDate,
+    setSelectedDate,
+    filterStatus,
+    setFilterStatus,
+    filterTime,
+    setFilterTime,
+    addReservation,
+    fetchReservations,
+  } = useReservationsStore();
 
-  loadReservations();
-}, []);
+  useEffect(() => {
+    fetchReservations().catch((error) => {
+      console.error('Failed to load reservations:', error);
+    });
+    fetchTables();
+  }, [fetchReservations , fetchTables]);
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -56,7 +56,7 @@ export default function ReservationsPage(): JSX.Element {
     date: '',
     time: '',
     guests: 2,
-    tableId: 2,
+    tableNumber: '',
     specialRequest: '',
     occasion: '',
   });
@@ -85,13 +85,12 @@ export default function ReservationsPage(): JSX.Element {
       .toUpperCase()
       .slice(0, 2);
 
+      console.log("CREATE FORM", form);
     addReservation({
       name: form.name.trim(),
-      avatar: initials,
-      avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
       time: form.time,
       guests: form.guests,
-      tableId: form.tableId,
+      tableNumber: form.tableNumber,
       status: 'Pending',
       date: form.date,
       phone: form.phone.trim(),
@@ -104,7 +103,7 @@ export default function ReservationsPage(): JSX.Element {
     setTimeout(() => {
       setShowNewModal(false);
       setFormSuccess(false);
-      setForm({ name: '', phone: '', email: '', date: '', time: '', guests: 2, tableId: 2, specialRequest: '', occasion: '' });
+      setForm({ name: '', phone: '', email: '', date: '', time: '', guests: 2, tableNumber: '', specialRequest: '', occasion: '' });
     }, 1200);
   };
 
@@ -377,13 +376,19 @@ export default function ReservationsPage(): JSX.Element {
                     </label>
                     <select
                       id="new-res-table"
-                      value={form.tableId}
-                      onChange={(e) => handleFormChange('tableId', Number(e.target.value))}
+                      value={form.tableNumber}
+                      onChange={(e) => handleFormChange("tableNumber", e.target.value)}
                       className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 text-gray-800 dark:text-gray-100 transition-all"
                     >
-                      {[2, 4, 6, 8, 10, 11, 12].map((t) => (
-                        <option key={t} value={t}>Table {t}</option>
-                      ))}
+                      <option value="">Select Table</option>
+                      {tables.map((table) => (
+                        <option
+                            key={table.id}
+                            value={table.label}
+                        >
+                            {table.label}
+                        </option>
+                    ))}
                     </select>
                   </div>
                 </div>

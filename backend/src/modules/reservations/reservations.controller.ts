@@ -16,14 +16,30 @@ function resolveRestaurantId(req: Request, candidate?: unknown): string {
 }
 
 // Map database entity to match the frontend contract explicitly
+function formatReservationStatus(status: string) {
+  if (!status) return 'Pending';
+  return status
+    .toString()
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function mapReservationDto(reservation: any) {
   return {
     id: reservation._id?.toString() || reservation.id,
-    tableNumber: reservation.tableId?.tableNumber || '',
     guestName: reservation.customerName,
-    partySize: reservation.guests,
+    phone: reservation.mobile,
+    email: reservation.customerEmail || '',
+    guests: reservation.guests,
+    date: reservation.date,
     time: reservation.slot,
-    status: reservation.status.toLowerCase(),
+    status: formatReservationStatus(reservation.status),
+    tableNumber: reservation.tableId?.tableNumber || reservation.tableNumber || '',
+    specialRequest: reservation.notes || '',
+    occasion: reservation.occasion || '',
   };
 }
 
@@ -34,11 +50,14 @@ export async function createReservationController(req: Request, res: Response, n
     const reservation = await ReservationsService.createReservation({
       restaurantId,
       customerName: req.body.customerName,
+      customerEmail: req.body.customerEmail,
       mobile: req.body.mobile,
       guests: req.body.guests,
       date: req.body.date,
       slot: req.body.slot,
+      tableNumber: req.body.tableNumber, 
       notes: req.body.notes,
+      occasion: req.body.occasion,
     });
 
     ok(res, { reservation: mapReservationDto(reservation) }, 201);

@@ -9,6 +9,7 @@ import { ErrorCode } from '../../constants/errors';
 import { logAudit, logAuditRaw } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import * as LoyaltyService from '../loyalty/loyalty.service';
+import { AdminOrderCreateInput, AdminOrderUpdateInput } from './orders.schema';
 
 export class OrdersController {
   private static getRequiredSession(req: Request) {
@@ -99,6 +100,70 @@ export class OrdersController {
 
       const { id } = req.params;
       const order = await OrdersService.getCustomerOrderById(session.restaurantId, session._id, id);
+      ok(res, { order });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /admin/orders
+  static async getAdminOrders(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const data = await OrdersService.getAdminOrders(restaurantId, {
+        status: req.query.status as string | undefined,
+        paymentStatus: req.query.paymentStatus as string | undefined,
+        table: req.query.table as string | undefined,
+        dateRange: req.query.dateRange as string | undefined,
+        page: Number(req.query.page ?? 1),
+        limit: Number(req.query.limit ?? 100),
+      });
+
+      ok(res, { orders: data.orders, pagination: data.pagination });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /admin/orders/:id
+  static async getAdminOrderById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id } = req.params;
+      const order = await OrdersService.getAdminOrderById(restaurantId, id);
+      ok(res, { order });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /admin/orders
+  static async createAdminOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const payload = req.body as AdminOrderCreateInput;
+      const order = await OrdersService.createAdminOrder(restaurantId, payload, req.user?.id);
+
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.ORDER_PLACED,
+      });
+
+      ok(res, { order }, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /admin/orders/:id
+  static async updateAdminOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id } = req.params;
+      const payload = req.body as AdminOrderUpdateInput;
+      const order = await OrdersService.updateAdminOrder(restaurantId, id, payload, req.user?.id);
+
       ok(res, { order });
     } catch (error) {
       next(error);

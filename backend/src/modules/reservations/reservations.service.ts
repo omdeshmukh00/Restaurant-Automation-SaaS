@@ -23,7 +23,9 @@ export class ReservationsService {
     date: string;
     slot: string;
     notes?: string;
+    occasion?: string;
     status?: ReservationStatus;
+    tableNumber?: string;
     notificationPreference?: NotificationPreference;
   }) {
     await assertFeatureAccess(data.restaurantId, 'reservationAccess', 'Reservations');
@@ -42,6 +44,24 @@ export class ReservationsService {
       { upsert: true, new: true }
     );
 
+    let tableId = null;
+
+if (data.tableNumber) {
+  const table = await TableModel.findOne({
+    restaurantId: data.restaurantId,
+    tableNumber: data.tableNumber,
+  });
+
+  if (!table) {
+    throw new AppError(
+      'Table not found',
+      404,
+      ErrorCode.NOT_FOUND
+    );
+  }
+
+  tableId = table._id;
+}
     const reservation = await ReservationModel.create({
       restaurantId: data.restaurantId,
       customerProfileId: customer._id,
@@ -51,7 +71,9 @@ export class ReservationsService {
       guests: data.guests,
       date: data.date,
       slot: data.slot,
+      tableId,
       notes: data.notes,
+      occasion: data.occasion,
       status: data.status || ReservationStatus.PENDING,
       notificationPreference: data.notificationPreference || NotificationPreference.NONE,
     });
@@ -160,6 +182,7 @@ export class ReservationsService {
       status: ReservationStatus;
       tableId: string | null;
       notes: string;
+      occasion?: string;
       notificationPreference: NotificationPreference;
     }>
   ) {
@@ -169,11 +192,21 @@ export class ReservationsService {
     }
     const previousStatus = existing.status;
 
+    const updatePayload: any = { ...updates };
+    if (updates.tableNumber !== undefined) {
+      const table = await TableModel.findOne({ restaurantId, tableNumber: updates.tableNumber });
+      if (!table) {
+        throw new AppError('Table not found', 404, ErrorCode.NOT_FOUND);
+      }
+      updatePayload.tableId = table._id;
+      delete updatePayload.tableNumber;
+    }
+
     // If mobile or name is updated, we might need to sync customer profile,
     // but for simplicity we just update the reservation fields.
     const reservation = await ReservationModel.findOneAndUpdate(
       { _id: id, restaurantId },
-      { $set: updates },
+      { $set: updatePayload },
       { new: true, runValidators: true }
     ).lean();
 

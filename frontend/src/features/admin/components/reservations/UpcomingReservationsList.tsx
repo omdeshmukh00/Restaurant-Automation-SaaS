@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Users, X, Search } from 'lucide-react';
+import { useAdminSearch } from '../../context/Adminsearchcontext';
 import { useReservationsStore, type Reservation, type ReservationStatus } from '../../store/reservations.store';
 
 const statusStyle: Record<ReservationStatus, string> = {
@@ -61,23 +62,32 @@ function ReservationRow({
 export function UpcomingReservationsList(): JSX.Element {
   const { upcomingReservations, allReservations, selectedGuest, setSelectedGuest, filterStatus } =
     useReservationsStore();
+  const { searchQuery: globalSearchQuery } = useAdminSearch();
 
   const [showViewAll, setShowViewAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+
+  const activeSearch = modalSearchQuery.trim() || globalSearchQuery.trim();
+  const activeSearchLower = activeSearch.toLowerCase();
 
   const filteredUpcoming = upcomingReservations.filter((r) => {
     if (filterStatus !== 'All' && r.status !== filterStatus) return false;
-    return true;
+    if (!activeSearchLower) return true;
+    return (
+      r.name.toLowerCase().includes(activeSearchLower) ||
+      r.phone.includes(activeSearchLower) ||
+      r.email.toLowerCase().includes(activeSearchLower)
+    );
   });
 
   const filteredAll = allReservations.filter((r) => {
-    const matchesSearch =
-      !searchQuery ||
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.phone.includes(searchQuery) ||
-      r.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || r.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    if (filterStatus !== 'All' && r.status !== filterStatus) return false;
+    if (!activeSearchLower) return true;
+    return (
+      r.name.toLowerCase().includes(activeSearchLower) ||
+      r.phone.includes(activeSearchLower) ||
+      r.email.toLowerCase().includes(activeSearchLower)
+    );
   });
 
   return (
@@ -154,14 +164,14 @@ export function UpcomingReservationsList(): JSX.Element {
                 <input
                   type="text"
                   placeholder="Search by name, phone or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={modalSearchQuery}
+                  onChange={(e) => setModalSearchQuery(e.target.value)}
                   className="flex-1 text-sm bg-transparent outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
                 />
-                {searchQuery && (
+                {(modalSearchQuery || globalSearchQuery) && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => setModalSearchQuery('')}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                   >
                     <X className="w-3.5 h-3.5" />
