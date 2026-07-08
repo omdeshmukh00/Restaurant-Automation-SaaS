@@ -52,8 +52,8 @@ export const getRestaurantSettingsController = asyncHandler(async (req: Request,
   }
 
   ok(res, {
-    restaurantId: restaurant.id,
-    settings: restaurant.settings,
+    restaurantId: restaurant._id?.toString(),
+    settings: restaurant.settings ?? {},
   });
 });
 

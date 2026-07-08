@@ -74,8 +74,8 @@ export function OrderActionMenu({ order }: OrderActionMenuProps) {
               <button
                 key={label}
                 disabled={disabled}
-                onClick={() => {
-                  if (status) updateOrderStatus(order.id, status);
+                onClick={async () => {
+                  if (status) await updateOrderStatus(order.id, status);
                   setOpen(false);
                 }}
                 className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition-colors text-left ${

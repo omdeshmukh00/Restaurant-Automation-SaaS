@@ -72,6 +72,7 @@ export const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).trim().optional(),
   mobile: mobileSchema.optional(),
   avatar: z.string().optional(),
+  themeMode: z.enum(['light', 'dark', 'system']).optional(),
 });
 
 

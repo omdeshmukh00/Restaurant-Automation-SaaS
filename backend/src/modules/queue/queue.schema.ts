@@ -13,6 +13,7 @@ export const entityIdParamsSchema = z.object({
 export const publicQueueJoinBodySchema = z.object({
   restaurantId: objectIdSchema,
   customerName: z.string().trim().min(1).max(100).default('Walk-in Guest'),
+  mobile: z.string().trim().min(10).max(15),
   guests: z.coerce.number().int().min(1).max(20).default(2),
 });
 

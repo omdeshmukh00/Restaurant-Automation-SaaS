@@ -4,10 +4,10 @@ import { useOrdersStore, type OrderStatus } from '../../store/orders.store';
 import { STATUS_TABS } from './orders.constants';
 
 export function OrdersTabBar() {
-  const { orders, activeTab, searchQuery, setActiveTab, setSearchQuery } = useOrdersStore();
+  const { allOrders, activeTab, searchQuery, setActiveTab, setSearchQuery } = useOrdersStore();
 
   const tabCount = (tab: OrderStatus | 'All') =>
-    tab === 'All' ? orders.length : orders.filter((o) => o.status === tab).length;
+    tab === 'All' ? allOrders.length : allOrders.filter((o) => o.status === tab).length;
 
   return (
     <div className="border-b border-gray-100 dark:border-gray-800">

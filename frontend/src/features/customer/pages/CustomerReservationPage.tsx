@@ -100,7 +100,7 @@ export default function CustomerReservationPage() {
         phone: profile.phone,
         time,
         guests: guestCount,
-        tableId: getRandomTableId(),
+        tableNumber: `Table ${getRandomTableId()}`,
         status: 'Confirmed' as const,
         date,
         specialRequest,
