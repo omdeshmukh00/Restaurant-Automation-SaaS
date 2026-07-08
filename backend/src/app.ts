@@ -130,11 +130,11 @@ function printStack(stack: any[], prefix = '') {
     }
   }
 }
-setTimeout(() => {
-  console.log('=== EXPRESS ROUTE STACK ===');
-  printStack(app._router.stack);
-  console.log('===========================');
-}, 100);
+// setTimeout(() => {
+//   console.log('=== EXPRESS ROUTE STACK ===');
+//   printStack(app._router.stack);
+//   console.log('===========================');
+// }, 100);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
