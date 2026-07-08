@@ -37,7 +37,7 @@ export async function createCustomerPaymentController(req: Request, res: Respons
       actorRole:    'CUSTOMER',
       restaurantId: session.restaurantId.toString(),
       entityType:   AuditEntity.PAYMENT,
-      entityId: String((data.payment as any)?._id ?? data.billId),
+      entityId: data.paymentId,
       action:       AuditAction.PAYMENT_CREATED,
       metadata: {
         method,

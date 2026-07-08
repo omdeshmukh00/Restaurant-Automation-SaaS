@@ -8,6 +8,9 @@ const statusStyle: Record<ReservationStatus, string> = {
   Pending:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400',
   Cancelled: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400',
   'Walk-in': 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400',
+  Completed: "bg-green-100 text-green-700",
+  "Checked In": "bg-blue-100 text-blue-700",
+  "No Show": "bg-red-100 text-red-700",
 };
 
 const timeColor: Record<ReservationStatus, string> = {
@@ -15,6 +18,9 @@ const timeColor: Record<ReservationStatus, string> = {
   Pending:   'text-amber-500',
   Cancelled: 'text-red-500',
   'Walk-in': 'text-purple-500',
+  Completed: "text-green-700",
+  "Checked In": "text-blue-700",
+  "No Show": "text-red-700",
 };
 
 function ReservationRow({
@@ -52,7 +58,7 @@ function ReservationRow({
         <p className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{r.name}</p>
         <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
           <Users className="w-3 h-3" />
-          {r.guests} Guests • Table {r.tableId}
+          {r.guests} Guests • Table {r.tableNumber}
         </p>
       </div>
     </button>

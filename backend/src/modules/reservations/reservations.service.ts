@@ -181,6 +181,7 @@ if (data.tableNumber) {
       slot: string;
       status: ReservationStatus;
       tableId: string | null;
+      tableNumber?: string;
       notes: string;
       occasion?: string;
       notificationPreference: NotificationPreference;
