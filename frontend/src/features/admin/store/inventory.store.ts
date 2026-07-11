@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { apiClient } from '../../../shared/services/apiClient';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +73,9 @@ export interface NewItemForm {
 }
 
 interface InventoryStore {
+  loading: boolean;
+  error: string | null;
+
   stats: InventoryStats;
   items: InventoryItem[];
   stockAlerts: StockAlert[];
@@ -111,187 +114,290 @@ interface InventoryStore {
   setShowIngredientsModal:  (v: boolean) => void;
 
   // Actions
-  addItem: (form: NewItemForm) => void;
-  deleteItem: (id: string) => void;
-  importItems: (raw: string) => void;
+  fetchInventory: () => Promise<void>;
+  addItem: (form: NewItemForm) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  importItems: (raw: string) => Promise<void>;
 }
 
-// ── Seed Data ─────────────────────────────────────────────────────────────────
-
-const seedItems: InventoryItem[] = [
-  { id: 'I001', name: 'Tomatoes',           category: 'Ingredients',       unit: 'kg',  currentStock: 24.50, parLevel: 20.00, status: 'In Stock',      lastUpdated: 'May 20, 2025', imageEmoji: '🍅' },
-  { id: 'I002', name: 'Chicken Breast',     category: 'Ingredients',       unit: 'kg',  currentStock: 15.20, parLevel: 15.00, status: 'Low Stock',     lastUpdated: 'May 20, 2025', imageEmoji: '🍗' },
-  { id: 'I003', name: 'Olive Oil',          category: 'Ingredients',       unit: 'L',   currentStock:  3.00, parLevel:  5.00, status: 'Low Stock',     lastUpdated: 'May 19, 2025', imageEmoji: '🫒' },
-  { id: 'I004', name: 'Mozzarella Cheese',  category: 'Ingredients',       unit: 'kg',  currentStock:  0.00, parLevel: 10.00, status: 'Out of Stock',  lastUpdated: 'May 19, 2025', imageEmoji: '🧀' },
-  { id: 'I005', name: 'Lettuce',            category: 'Ingredients',       unit: 'kg',  currentStock:  8.50, parLevel: 10.00, status: 'Low Stock',     lastUpdated: 'May 18, 2025', imageEmoji: '🥬' },
-  { id: 'I006', name: 'Coca Cola',          category: 'Beverages',         unit: 'pcs', currentStock: 48,    parLevel: 30,    status: 'In Stock',      lastUpdated: 'May 18, 2025', imageEmoji: '🥤' },
-  { id: 'I007', name: 'Paper Cups (12oz)',  category: 'Packaging',         unit: 'pcs', currentStock: 120,   parLevel: 100,   status: 'In Stock',      lastUpdated: 'May 18, 2025', imageEmoji: '🧃' },
-  { id: 'I008', name: 'Disinfectant Spray', category: 'Cleaning Supplies', unit: 'pcs', currentStock:  2,    parLevel:  5,    status: 'Low Stock',     lastUpdated: 'May 17, 2025', imageEmoji: '🧴' },
-  { id: 'I009', name: 'Garlic',             category: 'Ingredients',       unit: 'kg',  currentStock: 12.00, parLevel:  8.00, status: 'In Stock',      lastUpdated: 'May 16, 2025', imageEmoji: '🧄' },
-  { id: 'I010', name: 'Onions',             category: 'Ingredients',       unit: 'kg',  currentStock:  9.50, parLevel: 10.00, status: 'Low Stock',     lastUpdated: 'May 16, 2025', imageEmoji: '🧅' },
-  { id: 'I011', name: 'Sparkling Water',    category: 'Beverages',         unit: 'pcs', currentStock: 60,    parLevel: 40,    status: 'In Stock',      lastUpdated: 'May 15, 2025', imageEmoji: '💧' },
-  { id: 'I012', name: 'Take-out Boxes',     category: 'Packaging',         unit: 'pcs', currentStock: 200,   parLevel: 150,   status: 'In Stock',      lastUpdated: 'May 15, 2025', imageEmoji: '📦' },
-  { id: 'I013', name: 'Floor Cleaner',      category: 'Cleaning Supplies', unit: 'L',   currentStock:  4.00, parLevel:  5.00, status: 'Low Stock',     lastUpdated: 'May 14, 2025', imageEmoji: '🧹' },
-  { id: 'I014', name: 'Bell Peppers',       category: 'Ingredients',       unit: 'kg',  currentStock:  6.00, parLevel:  6.00, status: 'Expiring Soon', lastUpdated: 'May 14, 2025', imageEmoji: '🫑' },
-  { id: 'I015', name: 'Orange Juice',       category: 'Beverages',         unit: 'L',   currentStock: 18,    parLevel: 12,    status: 'In Stock',      lastUpdated: 'May 13, 2025', imageEmoji: '🍊' },
-];
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function deriveStatus(currentStock: number, parLevel: number): ItemStatus {
   if (currentStock === 0) return 'Out of Stock';
-  if (currentStock <= parLevel * 0.5) return 'Low Stock';
   if (currentStock <= parLevel) return 'Low Stock';
   return 'In Stock';
 }
 
-function recomputeStats(items: InventoryItem[]): InventoryStats {
-  const low     = items.filter((i) => i.status === 'Low Stock').length;
-  const out     = items.filter((i) => i.status === 'Out of Stock').length;
-  const expiring = items.filter((i) => i.status === 'Expiring Soon').length;
-  return {
-    totalItems: items.length,
-    totalItemsChange: '+12.5%',
-    totalValue: `₹${(items.length * 1640).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
-    totalValueChange: '+8.3%',
-    lowStockItems: low,
-    lowStockChange: `-${low}`,
-    outOfStockItems: out,
-    outOfStockChange: `-${out}`,
-    expiringSoon: expiring,
-  };
+function normalizeCategory(cat?: string): ItemCategory {
+  const c = cat || '';
+  if (c.toLowerCase().includes('ingred')) return 'Ingredients';
+  if (c.toLowerCase().includes('bev')) return 'Beverages';
+  if (c.toLowerCase().includes('pack')) return 'Packaging';
+  if (c.toLowerCase().includes('clean')) return 'Cleaning Supplies';
+  return 'Other';
 }
+
+function getInitials(name: string): string {
+  if (!name) return 'SP';
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+const SUPPLIER_COLORS = ['bg-green-500', 'bg-blue-500', 'bg-orange-500', 'bg-purple-500', 'bg-red-500'];
+
+const STATIC_VALUE_OVER_TIME = [
+  { label: 'Apr 20', value: 18000 },
+  { label: 'Apr 27', value: 19500 },
+  { label: 'May 4',  value: 17800 },
+  { label: 'May 11', value: 21000 },
+];
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
-export const useInventoryStore = create<InventoryStore>()(
-  persist(
-    (set) => ({
-      stats: recomputeStats(seedItems),
+export const useInventoryStore = create<InventoryStore>((set, get) => ({
+  loading: false,
+  error: null,
 
-      items: seedItems,
+  stats: {
+    totalItems: 0,
+    totalItemsChange: '+0%',
+    totalValue: '₹0',
+    totalValueChange: '+0%',
+    lowStockItems: 0,
+    lowStockChange: '-0',
+    outOfStockItems: 0,
+    outOfStockChange: '-0',
+    expiringSoon: 0,
+  },
 
-      stockAlerts: [
-        { id: 'A001', name: 'Chicken Breast',     detail: '15.20 kg left',  status: 'Low Stock',    imageEmoji: '🍗' },
-        { id: 'A002', name: 'Olive Oil',          detail: '3.00 L left',    status: 'Low Stock',    imageEmoji: '🫒' },
-        { id: 'A003', name: 'Mozzarella Cheese',  detail: 'Out of stock',   status: 'Out of Stock', imageEmoji: '🧀' },
-        { id: 'A004', name: 'Disinfectant Spray', detail: '2 pcs left',     status: 'Low Stock',    imageEmoji: '🧴' },
-        { id: 'A005', name: 'Lettuce',            detail: '8.50 kg left',   status: 'Low Stock',    imageEmoji: '🥬' },
-        { id: 'A006', name: 'Onions',             detail: '9.50 kg left',   status: 'Low Stock',    imageEmoji: '🧅' },
-        { id: 'A007', name: 'Floor Cleaner',      detail: '4.00 L left',    status: 'Low Stock',    imageEmoji: '🧹' },
-      ],
+  items: [],
+  stockAlerts: [],
+  topSuppliers: [],
+  valueOverTime: STATIC_VALUE_OVER_TIME,
+  topUsedIngredients: [],
+  statusDistribution: {
+    inStock: 0, inStockPct: 0,
+    lowStock: 0, lowStockPct: 0,
+    outOfStock: 0, outOfStockPct: 0,
+    expiringSoon: 0, expiringSoonPct: 0,
+  },
 
-      topSuppliers: [
-        { id: 'S001', name: 'Fresh Farm Foods',     spent: '₹12,450.00', color: 'bg-green-500',  initials: 'FF' },
-        { id: 'S002', name: 'Global Beverages',     spent: '₹6,780.50',  color: 'bg-blue-500',   initials: 'GB' },
-        { id: 'S003', name: 'Pack & More Supplies', spent: '₹3,240.00',  color: 'bg-orange-500', initials: 'PM' },
-        { id: 'S004', name: 'CleanPro India',       spent: '₹1,890.00',  color: 'bg-purple-500', initials: 'CP' },
-        { id: 'S005', name: 'Agro Direct',          spent: '₹1,320.00',  color: 'bg-red-500',    initials: 'AD' },
-      ],
+  activeTab:      'All Items',
+  activeCategory: 'All Categories',
+  searchQuery:     '',
+  currentPage:     1,
+  perPage:         8,
 
-      valueOverTime: [
-        { label: 'Apr 20', value: 18000 },
-        { label: 'Apr 27', value: 19500 },
-        { label: 'May 4',  value: 17800 },
-        { label: 'May 11', value: 21000 },
-        { label: 'May 18', value: 24680 },
-      ],
+  // Modals
+  showAddItemModal:     false,
+  showImportModal:      false,
+  showStockAlertsModal: false,
+  showSuppliersModal:   false,
+  showValueChartModal:  false,
+  showDonutModal:       false,
+  showIngredientsModal: false,
 
-      topUsedIngredients: [
-        { label: 'Chicken Breast', value: 90 },
-        { label: 'Tomatoes',       value: 75 },
-        { label: 'Lettuce',        value: 55 },
-        { label: 'Cheese',         value: 40 },
-        { label: 'Olive Oil',      value: 30 },
-      ],
+  setActiveTab:      (t) => set({ activeTab: t,      currentPage: 1 }),
+  setActiveCategory: (c) => set({ activeCategory: c, currentPage: 1 }),
+  setSearchQuery:    (q) => set({ searchQuery: q,    currentPage: 1 }),
+  setCurrentPage:    (p) => set({ currentPage: p }),
 
-      statusDistribution: {
-        inStock: 156, inStockPct: 62.9,
-        lowStock: 18, lowStockPct: 7.3,
-        outOfStock: 6, outOfStockPct: 2.4,
-        expiringSoon: 11, expiringSoonPct: 4.4,
-      },
+  setShowAddItemModal:     (v) => set({ showAddItemModal: v }),
+  setShowImportModal:      (v) => set({ showImportModal: v }),
+  setShowStockAlertsModal: (v) => set({ showStockAlertsModal: v }),
+  setShowSuppliersModal:   (v) => set({ showSuppliersModal: v }),
+  setShowValueChartModal:  (v) => set({ showValueChartModal: v }),
+  setShowDonutModal:       (v) => set({ showDonutModal: v }),
+  setShowIngredientsModal: (v) => set({ showIngredientsModal: v }),
 
-      activeTab:      'All Items',
-      activeCategory: 'All Categories',
-      searchQuery:    '',
-      currentPage:    1,
-      perPage:        8,
+  fetchInventory: async () => {
+    set({ loading: true, error: null });
+    try {
+      const [itemsRes, statsRes, alertsRes, analyticsRes, suppliersRes] = await Promise.all([
+        apiClient.get('/admin/inventory'),
+        apiClient.get('/admin/inventory/stats'),
+        apiClient.get('/admin/inventory/alerts'),
+        apiClient.get('/admin/inventory/analytics'),
+        apiClient.get('/admin/suppliers'),
+      ]);
 
-      // Modals
-      showAddItemModal:     false,
-      showImportModal:      false,
-      showStockAlertsModal: false,
-      showSuppliersModal:   false,
-      showValueChartModal:  false,
-      showDonutModal:       false,
-      showIngredientsModal: false,
+      const backendItems = itemsRes.data?.data?.items || [];
+      const statsData = statsRes.data?.data?.stats || {};
+      const alertsData = alertsRes.data?.data?.alerts || [];
+      const analyticsData = analyticsRes.data?.data?.inventoryAnalytics || {};
+      const suppliersData = suppliersRes.data?.data?.suppliers || [];
 
-      setActiveTab:      (t) => set({ activeTab: t,      currentPage: 1 }),
-      setActiveCategory: (c) => set({ activeCategory: c, currentPage: 1 }),
-      setSearchQuery:    (q) => set({ searchQuery: q,    currentPage: 1 }),
-      setCurrentPage:    (p) => set({ currentPage: p }),
-
-      setShowAddItemModal:     (v) => set({ showAddItemModal: v }),
-      setShowImportModal:      (v) => set({ showImportModal: v }),
-      setShowStockAlertsModal: (v) => set({ showStockAlertsModal: v }),
-      setShowSuppliersModal:   (v) => set({ showSuppliersModal: v }),
-      setShowValueChartModal:  (v) => set({ showValueChartModal: v }),
-      setShowDonutModal:       (v) => set({ showDonutModal: v }),
-      setShowIngredientsModal: (v) => set({ showIngredientsModal: v }),
-
-      addItem: (form) =>
-        set((state) => {
-          const currentStock = parseFloat(form.currentStock) || 0;
-          const parLevel     = parseFloat(form.parLevel) || 0;
-          const newItem: InventoryItem = {
-            id:           `I${String(state.items.length + 1).padStart(3, '0')}`,
-            name:         form.name.trim(),
-            category:     form.category,
-            unit:         form.unit.trim() || 'pcs',
-            currentStock,
-            parLevel,
-            status:       deriveStatus(currentStock, parLevel),
-            lastUpdated:  new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-            imageEmoji:   form.imageEmoji || '📦',
-          };
-          const items = [newItem, ...state.items];
-          return {
-            items,
-            stats: recomputeStats(items),
-            showAddItemModal: false,
-          };
+      // 1. Map items
+      const mappedItems: InventoryItem[] = backendItems.map((item: any) => ({
+        id: item._id,
+        name: item.name,
+        category: normalizeCategory(item.category),
+        unit: item.unit || 'pcs',
+        currentStock: item.stock || 0,
+        parLevel: item.threshold || 0,
+        status: deriveStatus(item.stock || 0, item.threshold || 0),
+        lastUpdated: new Date(item.updatedAt || Date.now()).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
         }),
+        imageEmoji: item.imageEmoji || '📦',
+      }));
 
-      deleteItem: (id) =>
-        set((state) => {
-          const items = state.items.filter((i) => i.id !== id);
-          return { items, stats: recomputeStats(items) };
-        }),
+      // 2. Map stats
+      const totalVal = statsData.totalInventoryValue || 0;
+      const mappedStats: InventoryStats = {
+        totalItems: statsData.totalItems || 0,
+        totalItemsChange: '+0%',
+        totalValue: `₹${totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+        totalValueChange: '+0%',
+        lowStockItems: statsData.lowStockItems || 0,
+        lowStockChange: `-${statsData.lowStockItems || 0}`,
+        outOfStockItems: statsData.outOfStockItems || 0,
+        outOfStockChange: `-${statsData.outOfStockItems || 0}`,
+        expiringSoon: 0,
+      };
 
-      importItems: (raw) =>
-        set((state) => {
-          const lines = raw.trim().split('\n').filter(Boolean);
-          const newItems: InventoryItem[] = lines.map((line, idx) => {
-            const parts = line.split(',').map((s) => s.trim());
-            const currentStock = parseFloat(parts[2]) || 0;
-            const parLevel     = parseFloat(parts[3]) || 0;
-            return {
-              id:           `IMP${Date.now()}_${idx}`,
-              name:         parts[0] || `Item ${idx + 1}`,
-              category:     (parts[1] as ItemCategory) || 'Other',
-              unit:         parts[4] || 'pcs',
-              currentStock,
-              parLevel,
-              status:       deriveStatus(currentStock, parLevel),
-              lastUpdated:  new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
-              imageEmoji:   parts[5] || '📦',
-            };
-          });
-          const items = [...newItems, ...state.items];
-          return { items, stats: recomputeStats(items), showImportModal: false };
-        }),
-    }),
-    {
-      name: 'admin-inventory-store',
+      // 3. Map alerts
+      const mappedAlerts: StockAlert[] = alertsData.map((alert: any) => ({
+        id: alert._id,
+        name: alert.name,
+        detail: alert.stock > 0 ? `${alert.stock.toFixed(2)} ${alert.unit || 'pcs'} left` : 'Out of stock',
+        status: alert.stock === 0 ? 'Out of Stock' : 'Low Stock',
+        imageEmoji: alert.imageEmoji || '📦',
+      }));
+
+      // 4. Map top suppliers (dynamically compute spent based on active inventory items from this supplier)
+      const mappedSuppliers: Supplier[] = suppliersData.map((s: any, idx: number) => {
+        // Sum stock * pricePerUnit for items from this supplier
+        const supplierItems = backendItems.filter((i: any) => i.supplierId === s._id || i.supplierId?._id === s._id);
+        const totalSpent = supplierItems.reduce((acc: number, curr: any) => {
+          return acc + (curr.stock || 0) * (curr.pricePerUnit || 0);
+        }, 0);
+
+        return {
+          id: s._id,
+          name: s.name,
+          spent: `₹${totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+          color: SUPPLIER_COLORS[idx % SUPPLIER_COLORS.length],
+          initials: getInitials(s.name),
+        };
+      });
+
+      // 5. Map analytics: Top Used Ingredients
+      const topIngredients = analyticsData.topConsumedIngredients || [];
+      const mappedUsedIngredients: ChartDataPoint[] = topIngredients.map((item: any) => ({
+        label: item.name || 'Unknown',
+        value: item.totalConsumed || 0,
+      }));
+
+      // Fallback if no analytics items returned, keep some static items
+      const topUsedIngredients = mappedUsedIngredients.length > 0 ? mappedUsedIngredients : [
+        { label: 'Chicken', value: 84 },
+        { label: 'Tomatoes', value: 58 },
+        { label: 'Cheese', value: 42 },
+        { label: 'Lettuce', value: 31 },
+        { label: 'Onions', value: 19 },
+      ];
+
+      // 6. Map status distribution percentages
+      const health = statsData.stockHealth || { healthy: 0, low: 0, outOfStock: 0 };
+      const totalHealth = health.healthy + health.low + health.outOfStock;
+      const statusDistribution: StatusDistribution = {
+        inStock: health.healthy || 0,
+        inStockPct: totalHealth > 0 ? Math.round((health.healthy / totalHealth) * 100) : 0,
+        lowStock: health.low || 0,
+        lowStockPct: totalHealth > 0 ? Math.round((health.low / totalHealth) * 100) : 0,
+        outOfStock: health.outOfStock || 0,
+        outOfStockPct: totalHealth > 0 ? Math.round((health.outOfStock / totalHealth) * 100) : 0,
+        expiringSoon: 0,
+        expiringSoonPct: 0,
+      };
+
+      // 7. Map value over time trend chart
+      const valueOverTime = [
+        ...STATIC_VALUE_OVER_TIME,
+        { label: 'Today', value: totalVal },
+      ];
+
+      set({
+        items: mappedItems,
+        stats: mappedStats,
+        stockAlerts: mappedAlerts,
+        topSuppliers: mappedSuppliers,
+        topUsedIngredients,
+        statusDistribution,
+        valueOverTime,
+      });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || err.message });
+    } finally {
+      set({ loading: false });
     }
-  )
-);
+  },
+
+  addItem: async (form) => {
+    set({ loading: true, error: null });
+    try {
+      const payload = {
+        name: form.name.trim(),
+        category: form.category,
+        unit: form.unit.trim() || 'pcs',
+        stock: parseFloat(form.currentStock) || 0,
+        threshold: parseFloat(form.parLevel) || 0,
+        imageEmoji: form.imageEmoji || '📦',
+      };
+      await apiClient.post('/admin/inventory', payload);
+      await get().fetchInventory();
+      set({ showAddItemModal: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || err.message });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  deleteItem: async (id) => {
+    set({ loading: true, error: null });
+    try {
+      await apiClient.delete(`/admin/inventory/${id}`);
+      await get().fetchInventory();
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || err.message });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  importItems: async (raw) => {
+    set({ loading: true, error: null });
+    try {
+      const lines = raw.trim().split('\n').filter(Boolean);
+      const payload = lines.map((line) => {
+        const parts = line.split(',').map((s) => s.trim());
+        const currentStock = parseFloat(parts[2]) || 0;
+        const parLevel     = parseFloat(parts[3]) || 0;
+        return {
+          name:         parts[0] || 'Unnamed Item',
+          category:     parts[1] || 'Other',
+          stock:        currentStock,
+          threshold:    parLevel,
+          unit:         parts[4] || 'pcs',
+          imageEmoji:   parts[5] || '📦',
+        };
+      });
+      await apiClient.post('/admin/inventory/bulk-import', payload);
+      await get().fetchInventory();
+      set({ showImportModal: false });
+    } catch (err: any) {
+      set({ error: err.response?.data?.message || err.message });
+    } finally {
+      set({ loading: false });
+    }
+  },
+}));

@@ -14,18 +14,23 @@ export function RevenueOverview(): JSX.Element {
   const chartW = W - PAD.l - PAD.r;
   const chartH = H - PAD.t - PAD.b;
 
-  const maxVal = Math.max(...revenueTrend.map((d) => d.revenue));
-  const minVal = Math.min(...revenueTrend.map((d) => d.revenue));
+  const hasData = revenueTrend.length > 0;
+  const maxVal = hasData ? Math.max(...revenueTrend.map((d) => d.revenue)) : 0;
+  const minVal = hasData ? Math.min(...revenueTrend.map((d) => d.revenue)) : 0;
   const range  = maxVal - minVal || 1;
 
-  const pts = revenueTrend.map((d, i) => ({
-    x: PAD.l + (i / Math.max(revenueTrend.length - 1, 1)) * chartW,
-    y: PAD.t + (1 - (d.revenue - minVal) / range) * chartH,
-    ...d,
-  }));
+  const pts = hasData
+    ? revenueTrend.map((d, i) => ({
+        x: PAD.l + (i / Math.max(revenueTrend.length - 1, 1)) * chartW,
+        y: PAD.t + (1 - (d.revenue - minVal) / range) * chartH,
+        ...d,
+      }))
+    : [];
 
   const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const areaPath = `${linePath} L${pts[pts.length - 1].x},${PAD.t + chartH} L${pts[0].x},${PAD.t + chartH} Z`;
+  const areaPath = pts.length > 0
+    ? `${linePath} L${pts[pts.length - 1].x},${PAD.t + chartH} L${pts[0].x},${PAD.t + chartH} Z`
+    : '';
 
   const yLabels = [maxVal, (maxVal + minVal) / 2, minVal].map((v) =>
     v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : v >= 1000 ? `₹${Math.round(v / 1000)}K` : `₹${Math.round(v)}`
@@ -81,14 +86,22 @@ export function RevenueOverview(): JSX.Element {
             </g>
           );
         })}
-        {pts.map((p, i) => (
-          <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.date}</text>
-        ))}
-        <path d={areaPath} fill="url(#revGrad)" />
-        <path d={linePath} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {pts.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#f97316" stroke="white" strokeWidth="2" />
-        ))}
+        {!hasData ? (
+          <text x={PAD.l + chartW / 2} y={PAD.t + chartH / 2} textAnchor="middle" fontSize="10" fill="#9ca3af" className="font-semibold">
+            No revenue data for this period
+          </text>
+        ) : (
+          <>
+            {pts.map((p, i) => (
+              <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.date}</text>
+            ))}
+            <path d={areaPath} fill="url(#revGrad)" />
+            <path d={linePath} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {pts.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#f97316" stroke="white" strokeWidth="2" />
+            ))}
+          </>
+        )}
       </svg>
     </div>
   );

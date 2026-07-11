@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useInventoryStore } from '../store/inventory.store';
 import {
   InventoryHeader,
@@ -14,8 +14,21 @@ import {
 } from '../components/inventory';
 
 export function InventoryPage() {
-  const { items, activeTab, activeCategory, searchQuery, currentPage, perPage } =
+  const { items, activeTab, activeCategory, searchQuery, currentPage, perPage, fetchInventory, loading } =
     useInventoryStore();
+
+  useEffect(() => {
+    fetchInventory();
+  }, [fetchInventory]);
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mb-4" />
+        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Loading inventory data...</p>
+      </div>
+    );
+  }
 
   const filtered = items.filter((item) => {
     const matchTab      = activeTab === 'All Items' || item.category === activeTab;
@@ -28,7 +41,7 @@ export function InventoryPage() {
   const paginated = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="space-y-4 sm:space-y-5 animate-fadeIn">
 
       {/* 1. Header */}
       <InventoryHeader />

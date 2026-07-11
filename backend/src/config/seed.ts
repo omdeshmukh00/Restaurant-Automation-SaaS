@@ -38,6 +38,12 @@ import { AuditLogModel } from '../modules/auditLogs/auditLogs.model';
 import { FeatureFlagModel, PlatformPlanModel } from '../modules/superAdmin/superAdmin.model';
 import { KitchenBatchModel } from '../modules/kitchen/kitchen.model';
 import { PaymentModel } from '../modules/payments/payments.model';
+import {
+  SubscriptionModel,
+  SubscriptionStatus,
+  BillingCycle,
+  SubscriptionPaymentProvider,
+} from '../modules/subscriptions/subscriptions.model';
 
 type SeedUserInput = {
   name: string;
@@ -143,9 +149,9 @@ export async function seedDevelopmentData(): Promise<void> {
   const [adminUser, customerUser, staffUser, , , superAdminUser] = await Promise.all([
     upsertUser({
       name: 'Admin',
-      email: 'admin@ambertable.com',
+      email: 'adminpanel16@gmail.com',
       mobile: '5555555555',
-      password: 'Admin@123',
+      password: 'Happy@100',
       role: UserRole.RESTAURANT_ADMIN,
       restaurantId: amberTable._id,
     }),
@@ -159,36 +165,36 @@ export async function seedDevelopmentData(): Promise<void> {
     }),
     upsertUser({
       name: 'Riya Service',
-      email: 'staff@ambertable.com',
+      email: 'staffpanel320@gmail.com',
       mobile: '8888888888',
-      password: 'Staff@123',
+      password: 'Happy@100',
       role: UserRole.SERVICE_STAFF,
       restaurantId: amberTable._id,
       staff_role: StaffInternalRole.FLOOR_SUPERVISOR,
     }),
     upsertUser({
       name: 'Kabir Kitchen',
-      email: 'kitchen@ambertable.com',
+      email: 'kitchenpanel1@gmail.com',
       mobile: '7777777777',
-      password: 'Kitchen@123',
+      password: 'Happy@100',
       role: UserRole.KITCHEN_STAFF,
       restaurantId: amberTable._id,
       kitchen_role: KitchenRole.HEAD_CHEF,
     }),
     upsertUser({
       name: 'Meera Cleaning',
-      email: 'cleaning@ambertable.com',
+      email: 'cleaningpanel14@gmail.com',
       mobile: '6666666666',
-      password: 'Cleaning@123',
+      password: 'Happy@100',
       role: UserRole.CLEANING_STAFF,
       restaurantId: amberTable._id,
       cleaning_role: CleaningRole.CLEANING_SUPERVISOR,
     }),
     upsertUser({
       name: 'Platform Owner',
-      email: 'superadmin@graphura.com',
+      email: 'adminsuper22@gmail.com',
       mobile: '4444444444',
-      password: 'Super@123',
+      password: 'Happy@100',
       role: UserRole.SUPER_ADMIN,
     }),
   ]);
@@ -240,6 +246,52 @@ export async function seedDevelopmentData(): Promise<void> {
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
   ]);
+
+  const proPlan = await PlatformPlanModel.findOne({ name: 'PRO' });
+  const starterPlan = await PlatformPlanModel.findOne({ name: 'STARTER' });
+
+  if (proPlan) {
+    await SubscriptionModel.findOneAndUpdate(
+      { restaurantId: amberTable._id },
+      {
+        $set: {
+          restaurantId: amberTable._id,
+          plan: 'PRO',
+          planId: proPlan._id,
+          status: SubscriptionStatus.ACTIVE,
+          billingCycle: BillingCycle.MONTHLY,
+          startedAt: new Date(),
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          autoRenew: true,
+          paymentProvider: SubscriptionPaymentProvider.MOCK,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+  }
+
+  const pepperHarbor = await RestaurantModel.findOne({ slug: 'pepper-harbor' });
+  if (starterPlan && pepperHarbor) {
+    await SubscriptionModel.findOneAndUpdate(
+      { restaurantId: pepperHarbor._id },
+      {
+        $set: {
+          restaurantId: pepperHarbor._id,
+          plan: 'STARTER',
+          planId: starterPlan._id,
+          status: SubscriptionStatus.ACTIVE,
+          billingCycle: BillingCycle.MONTHLY,
+          startedAt: new Date(),
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          autoRenew: true,
+          paymentProvider: SubscriptionPaymentProvider.MOCK,
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+  }
 
   const [tableOne, tableTwo, tableThree] = await Promise.all([
     TableModel.findOneAndUpdate(
