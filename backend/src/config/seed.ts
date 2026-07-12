@@ -202,37 +202,37 @@ export async function seedDevelopmentData(): Promise<void> {
   await Promise.all([
     PlatformPlanModel.findOneAndUpdate(
       { name: 'STARTER' },
-      { $set: { name: 'STARTER', priceMonthly: 4999, tenantLimit: 1, usageLimit: 100 } },
+      { $set: { name: 'STARTER', priceMonthly: 4999, tenantLimit: 1, usageLimit: 100, yearlyDiscountPercentage: 20, features: ['Digital Menu', 'Basic Analytics', 'Order Management'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     PlatformPlanModel.findOneAndUpdate(
       { name: 'PRO' },
-      { $set: { name: 'PRO', priceMonthly: 12999, tenantLimit: 5, usageLimit: 1000 } },
+      { $set: { name: 'PRO', priceMonthly: 12999, tenantLimit: 5, usageLimit: 1000, yearlyDiscountPercentage: 25, features: ['Digital Menu', 'Advanced Analytics', 'Order Management', 'Inventory Management', 'Staff Management'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     PlatformPlanModel.findOneAndUpdate(
       { name: 'ENTERPRISE' },
-      { $set: { name: 'ENTERPRISE', priceMonthly: 24999, tenantLimit: 20, usageLimit: 10000 } },
+      { $set: { name: 'ENTERPRISE', priceMonthly: 24999, tenantLimit: 20, usageLimit: 10000, yearlyDiscountPercentage: 30, features: ['Digital Menu', 'Advanced Analytics', 'Order Management', 'Inventory Management', 'Staff Management', 'Multi-branch Support', 'Custom Branding'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     PlatformPlanModel.findOneAndUpdate(
       { name: 'Free' },
-      { $set: { name: 'Free', priceMonthly: 0, tenantLimit: 1, usageLimit: 100, staffLimit: 5 } },
+      { $set: { name: 'Free', priceMonthly: 0, tenantLimit: 1, usageLimit: 100, staffLimit: 5, yearlyDiscountPercentage: 0, features: ['Digital Menu', 'Basic Order Management'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     PlatformPlanModel.findOneAndUpdate(
       { name: 'Standard' },
-      { $set: { name: 'Standard', priceMonthly: 599, tenantLimit: 15, usageLimit: 500, staffLimit: 15 } },
+      { $set: { name: 'Standard', priceMonthly: 599, tenantLimit: 15, usageLimit: 500, staffLimit: 15, yearlyDiscountPercentage: 15, features: ['Digital Menu', 'Basic Analytics', 'Order Management', 'Staff Management'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     PlatformPlanModel.findOneAndUpdate(
       { name: 'Premium' },
-      { $set: { name: 'Premium', priceMonthly: 999, tenantLimit: 30, usageLimit: 2000, staffLimit: 30 } },
+      { $set: { name: 'Premium', priceMonthly: 999, tenantLimit: 30, usageLimit: 2000, staffLimit: 30, yearlyDiscountPercentage: 20, features: ['Digital Menu', 'Advanced Analytics', 'Order Management', 'Staff Management', 'Inventory Management'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     PlatformPlanModel.findOneAndUpdate(
       { name: 'Enterprise' },
-      { $set: { name: 'Enterprise', priceMonthly: 1999, tenantLimit: 100, usageLimit: 10000, staffLimit: null } },
+      { $set: { name: 'Enterprise', priceMonthly: 1999, tenantLimit: 100, usageLimit: 10000, staffLimit: null, yearlyDiscountPercentage: 25, features: ['Digital Menu', 'Advanced Analytics', 'Order Management', 'Staff Management', 'Inventory Management', 'Multi-branch Support'] } },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     FeatureFlagModel.findOneAndUpdate(

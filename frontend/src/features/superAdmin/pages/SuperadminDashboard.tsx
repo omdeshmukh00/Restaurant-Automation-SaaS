@@ -17,6 +17,7 @@ import {
   X,
   Compass,
   ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import { useRestaurantRequestsStore, type RestaurantRequest } from "../store/RestaurantRequests";
 import { getSocket, connectSocket } from "../../../lib/socket";
@@ -33,6 +34,7 @@ export default function SuperAdminDashboard() {
   const requestsOpen = searchParams.get("requests") === "new";
   
   const requests = useRestaurantRequestsStore((state) => state.requests);
+  const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
   const approveRequest = useRestaurantRequestsStore((state) => state.approveRequest);
   const denyRequest = useRestaurantRequestsStore((state) => state.denyRequest);
@@ -43,6 +45,9 @@ export default function SuperAdminDashboard() {
   const [customRejectionReason, setCustomRejectionReason] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [viewingRequest, setViewingRequest] = useState<RestaurantRequest | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+  const [shouldRefund, setShouldRefund] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRequests();
@@ -60,13 +65,17 @@ export default function SuperAdminDashboard() {
 
       socket.on('restaurant_request_approved', ({ id }) => {
         useRestaurantRequestsStore.setState((state) => ({
-          requests: state.requests.filter((r) => r.id !== id),
+          requests: state.requests.map((r) =>
+            r.id === id ? { ...r, status: 'APPLICATION_APPROVED' } : r
+          ),
         }));
       });
 
-      socket.on('restaurant_request_rejected', ({ id }) => {
+      socket.on('restaurant_request_rejected', ({ id, reason }) => {
         useRestaurantRequestsStore.setState((state) => ({
-          requests: state.requests.filter((r) => r.id !== id),
+          requests: state.requests.map((r) =>
+            r.id === id ? { ...r, status: 'REJECTED', rejectionReason: reason || r.rejectionReason } : r
+          ),
         }));
       });
     }
@@ -142,9 +151,9 @@ export default function SuperAdminDashboard() {
             >
               <Building2 size={13} />
               New Requests
-              {requests.length > 0 && (
+              {pendingCount > 0 && (
                 <span className="ml-1 min-w-5 h-5 px-1 rounded-full bg-orange-600 text-white text-[10px] flex items-center justify-center">
-                  {requests.length}
+                  {pendingCount}
                 </span>
               )}
             </button>
@@ -226,162 +235,230 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
+            <div className={`flex border-b px-5 ${darkMode ? "border-slate-800" : "border-slate-200"}`}>
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`py-2.5 px-4 text-xs font-bold border-b-2 transition-all ${
+                  activeTab === 'pending'
+                    ? "border-orange-500 text-orange-500"
+                    : "border-transparent text-slate-400 hover:text-slate-500"
+                }`}
+              >
+                New Requests
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`py-2.5 px-4 text-xs font-bold border-b-2 transition-all ${
+                  activeTab === 'history'
+                    ? "border-orange-500 text-orange-500"
+                    : "border-transparent text-slate-400 hover:text-slate-500"
+                }`}
+              >
+                Request History
+              </button>
+            </div>
+
             <div className="p-4 sm:p-5 overflow-y-auto max-h-[calc(86vh-88px)]">
-              {requests.length === 0 ? (
-                <div
-                  className={`rounded-xl border px-4 py-10 text-center ${
-                    darkMode
-                      ? "border-slate-800 bg-slate-900/40"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  <Building2
-                    size={28}
-                    className={`mx-auto mb-3 ${
-                      darkMode ? "text-slate-600" : "text-slate-300"
-                    }`}
-                  />
-                  <p className="text-sm font-semibold">No pending requests</p>
-                  <p
-                    className={`text-xs mt-1 ${
-                      darkMode ? "text-slate-500" : "text-slate-400"
-                    }`}
-                  >
-                    Approved restaurants are added to Restaurant Management.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {requests.map((request) => {
-                    const isProcessing = processingId === request.id;
-                    return (
-                      <div
-                        key={request.id}
-                        onClick={() => setViewingRequest(request)}
-                        className={`rounded-xl border p-4 cursor-pointer hover:border-orange-500/50 hover:shadow-md transition-all ${
-                          darkMode
-                            ? "bg-slate-900/50 border-slate-800"
-                            : "bg-slate-50 border-slate-200"
+              {(() => {
+                const filteredList = requests.filter((r) => {
+                  const isHist = r.status === 'APPLICATION_APPROVED' || r.status === 'REJECTED' || r.status === 'APPROVED';
+                  return activeTab === 'pending' ? !isHist : isHist;
+                });
+
+                if (filteredList.length === 0) {
+                  return (
+                    <div
+                      className={`rounded-xl border px-4 py-10 text-center ${
+                        darkMode
+                          ? "border-slate-800 bg-slate-900/40"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <Building2
+                        size={28}
+                        className={`mx-auto mb-3 ${
+                          darkMode ? "text-slate-600" : "text-slate-300"
+                        }`}
+                      />
+                      <p className="text-sm font-semibold">No requests found</p>
+                      <p
+                        className={`text-xs mt-1 ${
+                          darkMode ? "text-slate-500" : "text-slate-400"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold truncate">
-                              {request.name}
+                        {activeTab === 'pending'
+                          ? "New applications will appear here when submitted."
+                          : "Processed applications will show up here."}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {filteredList.map((request) => {
+                      const isProcessing = processingId === request.id;
+                      const isRejected = request.status === 'REJECTED';
+                      const isApproved = request.status === 'APPLICATION_APPROVED' || request.status === 'APPROVED';
+                      const isPendingPayment = request.status === 'PENDING_PAYMENT';
+
+                      return (
+                        <div
+                          key={request.id}
+                          onClick={() => {
+                            setActionError(null);
+                            setViewingRequest(request);
+                          }}
+                          className={`rounded-xl border p-4 cursor-pointer hover:border-orange-500/50 hover:shadow-md transition-all ${
+                            darkMode
+                              ? "bg-slate-900/50 border-slate-800"
+                              : "bg-slate-50 border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-bold truncate">
+                                  {request.name}
+                                </p>
+                                {request.paymentId && (
+                                  <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                                    request.paymentStatus === 'REFUNDED'
+                                      ? "bg-blue-500/10 text-blue-400"
+                                      : "bg-emerald-500/10 text-emerald-400"
+                                  }`}>
+                                    {request.paymentStatus === 'REFUNDED' ? 'Refunded' : 'Fee Paid'}
+                                  </span>
+                                )}
+                              </div>
+                              <p
+                                className={`text-xs mt-1 ${
+                                  darkMode ? "text-slate-400" : "text-slate-500"
+                                }`}
+                              >
+                                Owner: {request.owner}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5">
+                              {request.status && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                  isApproved
+                                    ? "bg-emerald-500/15 text-emerald-400"
+                                    : isRejected
+                                    ? "bg-red-500/15 text-red-400"
+                                    : isPendingPayment
+                                    ? "bg-amber-500/15 text-amber-400 font-extrabold"
+                                    : "bg-orange-500/10 text-orange-400"
+                                }`}>
+                                  {isPendingPayment ? 'Unpaid' : request.status.replace('_', ' ')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <p
+                            className={`mt-3 text-xs leading-relaxed ${
+                              darkMode ? "text-slate-400" : "text-slate-600"
+                            }`}
+                          >
+                            {request.message}
+                          </p>
+
+                          {isRejected && request.rejectionReason && (
+                            <div className="mt-2 p-2 rounded-lg bg-red-500/5 border border-red-500/10 text-[11px] text-red-400">
+                              <strong>Rejection Reason:</strong> {request.rejectionReason}
+                            </div>
+                          )}
+
+                          <div className="mt-4 space-y-2 text-xs">
+                            <p className="flex items-center gap-2">
+                              <Mail size={13} className="text-orange-500" />
+                              <span className="truncate">{request.email}</span>
                             </p>
-                            <p
-                              className={`text-xs mt-1 ${
-                                darkMode ? "text-slate-400" : "text-slate-500"
+                            <p className="flex items-center gap-2">
+                              <Phone size={13} className="text-orange-500" />
+                              <span>{request.phone}</span>
+                            </p>
+                            <p className="flex items-center gap-2">
+                              <MapPin size={13} className="text-orange-500" />
+                              <span className="truncate">{request.location}</span>
+                            </p>
+                            {request.latitude && request.longitude && (
+                              <p className="flex items-center gap-2">
+                                <Compass size={13} className="text-orange-500" />
+                                <a
+                                  href={request.googleMapsUrl || `https://www.google.com/maps?q=${request.latitude},${request.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-orange-400 hover:text-orange-300 hover:underline truncate font-semibold"
+                                >
+                                  {request.googleMapsUrl ? "Google Maps Link" : `Map View: ${request.latitude.toFixed(5)}, ${request.longitude.toFixed(5)}`}
+                                </a>
+                              </p>
+                            )}
+                          </div>
+
+                          {activeTab === 'pending' && !isPendingPayment && (
+                            <div
+                              className={`mt-4 pt-4 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+                                darkMode ? "border-slate-800" : "border-slate-200"
                               }`}
                             >
-                              Owner: {request.owner}
-                            </p>
-                          </div>
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${
-                              darkMode
-                                ? "bg-orange-500/10 text-orange-300"
-                               : "bg-orange-100 text-orange-700"
-                            }`}
-                          >
-                            {request.plan}
-                          </span>
-                        </div>
-
-                        <p
-                          className={`mt-3 text-xs leading-relaxed ${
-                            darkMode ? "text-slate-400" : "text-slate-600"
-                          }`}
-                        >
-                          {request.message}
-                        </p>
-
-                        <div className="mt-4 space-y-2 text-xs">
-                          <p className="flex items-center gap-2">
-                            <Mail size={13} className="text-orange-500" />
-                            <span className="truncate">{request.email}</span>
-                          </p>
-                          <p className="flex items-center gap-2">
-                            <Phone size={13} className="text-orange-500" />
-                            <span>{request.phone}</span>
-                          </p>
-                          <p className="flex items-center gap-2">
-                            <MapPin size={13} className="text-orange-500" />
-                            <span className="truncate">{request.location}</span>
-                          </p>
-                          {request.latitude && request.longitude && (
-                            <p className="flex items-center gap-2">
-                              <Compass size={13} className="text-orange-500" />
-                              <a
-                                href={request.googleMapsUrl || `https://www.google.com/maps?q=${request.latitude},${request.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-orange-400 hover:text-orange-300 hover:underline truncate font-semibold"
+                              <span
+                                className={`text-[11px] ${
+                                  darkMode ? "text-slate-500" : "text-slate-400"
+                                }`}
                               >
-                                {request.googleMapsUrl ? "Google Maps Link" : `Map View: ${request.latitude.toFixed(5)}, ${request.longitude.toFixed(5)}`}
-                              </a>
-                            </p>
+                                Requested {request.requestedAt}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  disabled={isProcessing}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRejectingRequestId(request.id);
+                                  }}
+                                  className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border ${
+                                    darkMode
+                                      ? "border-slate-700 text-slate-300 hover:bg-slate-800"
+                                      : "border-slate-200 text-slate-600 hover:bg-white"
+                                  } disabled:opacity-55`}
+                                >
+                                  <X size={13} />
+                                  Deny
+                                </button>
+                                <button
+                                  disabled={isProcessing}
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setProcessingId(request.id);
+                                    try {
+                                      await approveRequest(request.id);
+                                    } catch (err) {
+                                      console.error(err);
+                                    } finally {
+                                      setProcessingId(null);
+                                    }
+                                  }}
+                                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-55"
+                                >
+                                  {isProcessing ? (
+                                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <Check size={13} />
+                                  )}
+                                  Approve
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
-
-                        <div
-                          className={`mt-4 pt-4 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
-                            darkMode ? "border-slate-800" : "border-slate-200"
-                          }`}
-                        >
-                          <span
-                            className={`text-[11px] ${
-                              darkMode ? "text-slate-500" : "text-slate-400"
-                            }`}
-                          >
-                            Requested {request.requestedAt}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              disabled={isProcessing}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRejectingRequestId(request.id);
-                              }}
-                              className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border ${
-                                darkMode
-                                  ? "border-slate-700 text-slate-300 hover:bg-slate-800"
-                                  : "border-slate-200 text-slate-600 hover:bg-white"
-                              } disabled:opacity-55`}
-                            >
-                              <X size={13} />
-                              Deny
-                            </button>
-                            <button
-                              disabled={isProcessing}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                setProcessingId(request.id);
-                                try {
-                                  await approveRequest(request.id);
-                                } catch (err) {
-                                  console.error(err);
-                                } finally {
-                                  setProcessingId(null);
-                                }
-                              }}
-                              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-55"
-                            >
-                              {isProcessing ? (
-                                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Check size={13} />
-                              )}
-                              Approve
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -402,27 +479,53 @@ export default function SuperAdminDashboard() {
                 <select
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500/50"
+                  className={`w-full border rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-orange-500/50 ${
+                    darkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
                 >
                   <option value="Duplicate Application">Duplicate Application</option>
                   <option value="Incomplete Information">Incomplete Information</option>
                   <option value="Verification Failed">Verification Failed</option>
+                  <option value="Outside Service Area">Outside Service Area</option>
+                  <option value="Invalid Documents">Invalid Documents</option>
+                  <option value="Fraudulent Information">Fraudulent Information</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
 
               {rejectionReason === "Other" && (
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Custom Reason</label>
-                  <input
-                    type="text"
+                  <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Custom Explanation</label>
+                  <textarea
+                    rows={4}
                     value={customRejectionReason}
                     onChange={(e) => setCustomRejectionReason(e.target.value)}
-                    placeholder="Enter custom rejection reason"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500/50"
+                    placeholder="Provide a detailed explanation of the rejection..."
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500/50 resize-none ${
+                      darkMode ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                    }`}
                   />
                 </div>
               )}
+
+              {(() => {
+                const rejectingReq = requests.find(r => r.id === rejectingRequestId);
+                const hasPaidFee = rejectingReq && rejectingReq.paymentId && rejectingReq.paymentStatus === 'CAPTURED';
+                return hasPaidFee && (
+                  <div className="flex items-center gap-2 py-2">
+                    <input
+                      type="checkbox"
+                      id="shouldRefund"
+                      checked={shouldRefund}
+                      onChange={(e) => setShouldRefund(e.target.checked)}
+                      className="rounded text-orange-500 bg-slate-950 border-slate-800 focus:ring-orange-500/20"
+                    />
+                    <label htmlFor="shouldRefund" className="text-xs text-slate-300">
+                      Refund Onboarding Fee (₹{rejectingReq?.paymentAmount || 0}) via Razorpay
+                    </label>
+                  </div>
+                );
+              })()}
 
               <div className="flex gap-3 pt-2">
                 <button
@@ -430,17 +533,28 @@ export default function SuperAdminDashboard() {
                     setRejectingRequestId(null);
                     setCustomRejectionReason("");
                   }}
-                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-semibold"
+                  className={`flex-1 py-2.5 px-4 rounded-xl border text-xs font-semibold ${
+                    darkMode ? 'border-slate-850 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={async () => {
-                    const finalReason = rejectionReason === "Other" ? customRejectionReason : rejectionReason;
+                    const finalReason = rejectionReason === "Other" 
+                      ? `Other - ${customRejectionReason}` 
+                      : rejectionReason;
                     if (!finalReason.trim()) return;
-                    await denyRequest(rejectingRequestId, finalReason);
-                    setRejectingRequestId(null);
-                    setCustomRejectionReason("");
+                    const rejectingReq = requests.find(r => r.id === rejectingRequestId);
+                    const hasPaidFee = rejectingReq && rejectingReq.paymentId && rejectingReq.paymentStatus === 'CAPTURED';
+                    try {
+                      await denyRequest(rejectingRequestId, finalReason, hasPaidFee ? shouldRefund : false);
+                      setRejectingRequestId(null);
+                      setCustomRejectionReason("");
+                    } catch (err: any) {
+                      console.error(err);
+                      alert(err.response?.data?.error?.message || err.response?.data?.message || err.message || 'An error occurred during rejection.');
+                    }
                   }}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
                 >
@@ -469,7 +583,10 @@ export default function SuperAdminDashboard() {
                 <p className="text-xs text-slate-500 mt-0.5">Submitted: {new Date(viewingRequest.requestedAt).toLocaleString()}</p>
               </div>
               <button
-                onClick={() => setViewingRequest(null)}
+                onClick={() => {
+                  setViewingRequest(null);
+                  setActionError(null);
+                }}
                 className={`p-1.5 rounded-lg transition-colors ${
                   darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
                 }`}
@@ -477,6 +594,13 @@ export default function SuperAdminDashboard() {
                 <X size={16} />
               </button>
             </div>
+
+            {actionError && (
+              <div className="flex items-start gap-3 p-4 mb-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-650 animate-in fade-in duration-200">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                <span>{actionError}</span>
+              </div>
+            )}
 
             {/* Information Grid */}
             <div className="space-y-5 text-xs">
@@ -561,8 +685,8 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
-              {/* Payment Details (For Paid Plans) */}
-              {viewingRequest.plan !== 'Free' && viewingRequest.paymentId && (
+              {/* Payment Details (For Paid Onboarding Processing Fee or Legacy Paid Plans) */}
+              {viewingRequest.paymentId && (
                 <div>
                   <h4 className="font-extrabold uppercase tracking-wider text-[10px] text-orange-500 mb-2">Billing & Payment Info</h4>
                   <div className="grid grid-cols-2 gap-3 p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
@@ -595,41 +719,50 @@ export default function SuperAdminDashboard() {
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
-              <button
-                disabled={processingId === viewingRequest.id}
-                onClick={() => {
-                  setRejectingRequestId(viewingRequest.id);
-                  setViewingRequest(null);
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 text-xs font-semibold disabled:opacity-50"
-              >
-                Deny Application
-              </button>
-              <button
-                disabled={processingId === viewingRequest.id}
-                onClick={async () => {
-                  setProcessingId(viewingRequest.id);
-                  try {
-                    await approveRequest(viewingRequest.id);
-                    setViewingRequest(null);
-                  } catch (err) {
-                    console.error(err);
-                  } finally {
-                    setProcessingId(null);
-                  }
-                }}
-                className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5 disabled:opacity-55"
-              >
-                {processingId === viewingRequest.id ? (
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Check size={13} />
-                )}
-                Approve Application
-              </button>
-            </div>
+            {/* Actions (Only for pending requests) */}
+            {(() => {
+              const isHist = viewingRequest.status === 'APPLICATION_APPROVED' || viewingRequest.status === 'REJECTED' || viewingRequest.status === 'APPROVED';
+              if (isHist) return null;
+              return (
+                <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+                  <button
+                    disabled={processingId === viewingRequest.id}
+                    onClick={() => {
+                      setRejectingRequestId(viewingRequest.id);
+                      setViewingRequest(null);
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl border border-red-500/20 text-red-500 hover:bg-red-500/10 text-xs font-semibold disabled:opacity-50"
+                  >
+                    Deny Application
+                  </button>
+                  <button
+                    disabled={processingId === viewingRequest.id}
+                    onClick={async () => {
+                      setProcessingId(viewingRequest.id);
+                      setActionError(null);
+                      try {
+                        await approveRequest(viewingRequest.id);
+                        setViewingRequest(null);
+                      } catch (err: any) {
+                        console.error(err);
+                        const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'An error occurred during approval.';
+                        setActionError(msg);
+                      } finally {
+                        setProcessingId(null);
+                      }
+                    }}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5 disabled:opacity-55"
+                  >
+                    {processingId === viewingRequest.id ? (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check size={13} />
+                    )}
+                    Approve Application
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

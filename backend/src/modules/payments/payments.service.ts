@@ -683,6 +683,53 @@ export class PaymentsService {
       return { received: true, event: eventType, subscription: subscriptionId };
     }
 
+    // ---- Partner request onboarding fee path ----
+    const { RestaurantRequestModel } = await import('../superAdmin/restaurantRequest.model');
+    const partnerRequest = await RestaurantRequestModel.findOne({ orderId: rzpOrderId }).setOptions({ bypassTenant: true });
+    if (partnerRequest) {
+      if (eventType === 'payment.captured') {
+        if (partnerRequest.status === 'PENDING_PAYMENT') {
+          partnerRequest.status = 'APPLICATION_PENDING';
+          partnerRequest.paymentId = rzpPaymentId;
+          partnerRequest.paymentStatus = 'CAPTURED';
+          partnerRequest.paymentTimestamp = new Date();
+          await partnerRequest.save();
+
+          // Send submission email
+          const { sendRestaurantSubmissionEmail } = await import('../../services/mail.service');
+          void sendRestaurantSubmissionEmail(
+            partnerRequest.email,
+            partnerRequest.ownerName,
+            partnerRequest.restaurantName,
+            'Processing Fee Paid (Webhook)'
+          );
+
+          // Broadcast via Socket.IO
+          socketService.emitToSuperAdmin('restaurant_request_created', {
+            id: partnerRequest._id.toString(),
+            name: partnerRequest.restaurantName,
+            owner: partnerRequest.ownerName,
+            email: partnerRequest.email,
+            phone: partnerRequest.phone,
+            location: `${partnerRequest.city}, ${partnerRequest.state}, ${partnerRequest.country}`,
+            plan: partnerRequest.selectedPlan || 'Free Onboarding',
+            requestedAt: partnerRequest.submittedAt.toISOString(),
+            message: partnerRequest.message ?? '',
+            latitude: partnerRequest.latitude,
+            longitude: partnerRequest.longitude,
+            googleMapsUrl: partnerRequest.googleMapsUrl ?? '',
+          });
+        }
+      }
+
+      if (eventType === 'payment.failed') {
+        partnerRequest.paymentStatus = 'FAILED';
+        await partnerRequest.save();
+      }
+
+      return { received: true, event: eventType, partnerRequest: partnerRequest._id.toString() };
+    }
+
     // ---- Customer bill payment path (existing behavior) ----
     const payment = (await PaymentModel.findOne({
       $or: [

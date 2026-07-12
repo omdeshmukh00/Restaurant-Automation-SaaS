@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, Trash, Plus, Sparkles, Building2, X } from "lucide-react";
+import { BarChart3, Trash, Plus, Sparkles, Building2, X, CreditCard, RefreshCw } from "lucide-react";
 import { apiClient } from "../../../shared/services/apiClient";
 
 import type {
@@ -65,6 +65,10 @@ export default function Subscriptions() {
   });
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
   const [dbPlans, setDbPlans] = useState<any[]>([]);
+  const [isBulkOffersOpen, setIsBulkOffersOpen] = useState(false);
+  const [bulkYearlyDiscount, setBulkYearlyDiscount] = useState<number>(20);
+  const [bulkMonthlyDiscount, setBulkMonthlyDiscount] = useState<number>(0);
+  const [bulkApplying, setBulkApplying] = useState(false);
 
   // Fetch plans from backend
   const fetchPlans = async () => {
@@ -113,6 +117,7 @@ export default function Subscriptions() {
           name: editingPlan.name,
           priceMonthly: editingPlan.priceMonthly,
           originalPriceMonthly: editingPlan.originalPriceMonthly,
+          yearlyDiscountPercentage: editingPlan.yearlyDiscountPercentage,
           tenantLimit: editingPlan.tenantLimit,
           staffLimit: editingPlan.staffLimit,
           isActive: editingPlan.isActive,
@@ -123,6 +128,7 @@ export default function Subscriptions() {
           name: editingPlan.name,
           priceMonthly: editingPlan.priceMonthly,
           originalPriceMonthly: editingPlan.originalPriceMonthly,
+          yearlyDiscountPercentage: editingPlan.yearlyDiscountPercentage,
           tenantLimit: editingPlan.tenantLimit,
           staffLimit: editingPlan.staffLimit,
           isActive: editingPlan.isActive,
@@ -180,6 +186,7 @@ export default function Subscriptions() {
   const [restaurants, setRestaurants] = useState<RestaurantNode[]>(restaurantData);
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
+  const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
   const updateApprovedRestaurantStatus = useRestaurantRequestsStore(
     (state) => state.updateRestaurantStatus
   );
@@ -189,6 +196,75 @@ export default function Subscriptions() {
   const deleteApprovedRestaurant = useRestaurantRequestsStore(
     (state) => state.deleteRestaurant
   );
+  const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
+
+  // Platform Settings State
+  const [platformSettings, setPlatformSettings] = useState({
+    applicationFeeEnabled: false,
+    applicationFeeAmount: 0,
+    currency: "INR",
+    refundPolicy: "refundable",
+    enablePartnerRegistration: true,
+    maxPendingApplications: 50,
+    applicationExpiryDays: 30,
+    totalRevenue: 0,
+    history: [] as Array<{
+      id: string;
+      restaurantName: string;
+      ownerName: string;
+      amount: number;
+      currency: string;
+      paymentId: string;
+      timestamp: string;
+    }>
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  const fetchPlatformSettings = async () => {
+    try {
+      const res = await apiClient.get('/superadmin/platform-settings');
+      if (res.data?.data) {
+        setPlatformSettings(res.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch platform settings', err);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPlatformSettings();
+  }, []);
+
+  const handleSavePlatformSettings = async () => {
+    try {
+      const res = await apiClient.patch('/superadmin/platform-settings', {
+        applicationFeeEnabled: platformSettings.applicationFeeEnabled,
+        applicationFeeAmount: platformSettings.applicationFeeAmount,
+        currency: platformSettings.currency,
+        refundPolicy: platformSettings.refundPolicy,
+        enablePartnerRegistration: platformSettings.enablePartnerRegistration,
+        maxPendingApplications: platformSettings.maxPendingApplications,
+        applicationExpiryDays: platformSettings.applicationExpiryDays,
+      });
+      if (res.data?.data) {
+        setPlatformSettings(prev => ({
+          ...prev,
+          ...res.data.data
+        }));
+        setSettingsSaved(true);
+        setTimeout(() => setSettingsSaved(false), 2000);
+      }
+    } catch (err) {
+      console.error('Failed to save platform settings', err);
+    }
+  };
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -304,6 +380,7 @@ export default function Subscriptions() {
         formattedRevenue: formatCurrency(revenue),
         activeCount: matchingRestaurants.filter(r => r.status === 'Active').length,
         trialCount: matchingRestaurants.filter(r => r.status === 'Trial').length,
+        yearlyDiscountPercentage: plan.yearlyDiscountPercentage,
       };
     });
   }, [dbPlans, linkedRestaurants]);
@@ -355,6 +432,18 @@ export default function Subscriptions() {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setIsBulkOffersOpen(true)}
+            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <Sparkles size={13} className="text-orange-500" />
+            Bulk Offers
+          </button>
+
+          <button
             onClick={() => navigate('/superadmin?requests=new')}
             className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
               darkMode
@@ -364,9 +453,29 @@ export default function Subscriptions() {
           >
             <Building2 size={13} />
             New Requests
-            {requests.length > 0 && (
+            {pendingCount > 0 && (
               <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
-                {requests.length}
+                {pendingCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              const el = document.getElementById('processing-fee-settings');
+              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all flex items-center gap-1.5 ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <CreditCard size={13} />
+            Processing Fee
+            {platformSettings.applicationFeeEnabled && (
+              <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] flex items-center justify-center font-bold">
+                ₹{platformSettings.applicationFeeAmount}
               </span>
             )}
           </button>
@@ -377,6 +486,7 @@ export default function Subscriptions() {
                 name: '',
                 priceMonthly: 0,
                 originalPriceMonthly: null,
+                yearlyDiscountPercentage: 20,
                 tenantLimit: 1,
                 staffLimit: 5,
                 isActive: true,
@@ -469,6 +579,187 @@ export default function Subscriptions() {
         </span>
       </div>
 
+      {/* Platform Settings & Onboarding Processing Fee */}
+      <div id="processing-fee-settings" className={`mt-8 p-6 rounded-2xl border ${
+        darkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800 shadow-sm"
+      }`}>
+        <div className="flex items-center justify-between border-b pb-4 mb-6 border-slate-800/10">
+          <div>
+            <h2 className="text-base font-bold">Platform Settings & Onboarding Fee</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Configure global partner application fees, refund policies, and view onboarding revenue.
+            </p>
+          </div>
+          {settingsSaved && (
+            <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-pulse">
+              Settings Saved!
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Config column */}
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+              <div>
+                <p className="font-bold">Enable Application Processing Fee</p>
+                <p className="text-[10px] text-slate-500">Require paid review fee before a partner can submit their application.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={platformSettings.applicationFeeEnabled}
+                onClick={() => setPlatformSettings(prev => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                  platformSettings.applicationFeeEnabled
+                    ? 'bg-orange-500'
+                    : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    platformSettings.applicationFeeEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Fee Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={platformSettings.applicationFeeAmount}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
+                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Currency</label>
+                <select
+                  value={platformSettings.currency}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, currency: e.target.value }))}
+                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                  }`}
+                >
+                  <option value="INR">INR — Indian Rupee (₹)</option>
+                  <option value="USD">USD — US Dollar ($)</option>
+                  <option value="EUR">EUR — Euro (€)</option>
+                  <option value="GBP">GBP — British Pound (£)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Refund Policy</label>
+                <select
+                  value={platformSettings.refundPolicy}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                  }`}
+                >
+                  <option value="refundable">Refundable upon rejection</option>
+                  <option value="non-refundable">Non-Refundable</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Pending Requests</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={platformSettings.maxPendingApplications}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
+                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+              <div>
+                <p className="font-bold">Allow Partner Self-Registration</p>
+                <p className="text-[10px] text-slate-500">Enable the public registration page for new partners.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={platformSettings.enablePartnerRegistration}
+                onClick={() => setPlatformSettings(prev => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                  platformSettings.enablePartnerRegistration
+                    ? 'bg-orange-500'
+                    : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    platformSettings.enablePartnerRegistration ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <button
+              onClick={handleSavePlatformSettings}
+              className="py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all shadow-md shadow-orange-600/10"
+            >
+              Save Platform Settings
+            </button>
+          </div>
+
+          {/* Revenue & history column */}
+          <div className="space-y-4 text-xs border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-6 border-slate-800/10">
+            <div>
+              <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
+              <span className="text-xl font-extrabold text-emerald-500">
+                {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
+              {platformSettings.history && platformSettings.history.length > 0 ? (
+                <div className="max-h-52 overflow-y-auto border border-slate-800/10 rounded-xl">
+                  <table className="w-full text-left text-[11px] border-collapse">
+                    <thead>
+                      <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
+                        <th className="p-2 font-bold">Restaurant</th>
+                        <th className="p-2 font-bold">Amount</th>
+                        <th className="p-2 font-bold">Payment ID</th>
+                        <th className="p-2 font-bold">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {platformSettings.history.map(row => (
+                        <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
+                          <td className="p-2 font-semibold">{row.restaurantName}</td>
+                          <td className="p-2 text-emerald-500 font-bold">
+                            {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
+                          </td>
+                          <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
+                          <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-500 italic py-4">No processing fee payments recorded yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* View Modal */}
       {viewingNode && (
         <ViewModal
@@ -494,7 +785,7 @@ export default function Subscriptions() {
 
       {/* Edit Plan Modal */}
       {editingPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
           <div className={`w-full max-w-lg rounded-3xl p-6 border shadow-2xl flex flex-col ${
             darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
           }`}>
@@ -503,7 +794,7 @@ export default function Subscriptions() {
                 <h3 className="text-base font-bold">
                   {editingPlan.isNew ? 'Create Subscription Plan' : `Edit ${editingPlan.name} Plan`}
                 </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-[11px] text-slate-500 mt-0.5 font-semibold">
                   Configure pricing, limits, and core features for this plan tier.
                 </p>
               </div>
@@ -533,7 +824,7 @@ export default function Subscriptions() {
                   />
                 </div>
                 <div className="pt-5 shrink-0">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-500 hover:text-orange-500 transition-colors">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-550 hover:text-orange-500 transition-colors">
                     <input
                       type="checkbox"
                       checked={editingPlan.isActive !== false}
@@ -546,9 +837,9 @@ export default function Subscriptions() {
               </div>
 
               {/* Pricing Row */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Offer Price (₹)</label>
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Monthly Price (₹)</label>
                   <input
                     type="number"
                     min="0"
@@ -568,6 +859,20 @@ export default function Subscriptions() {
                     placeholder="No discount"
                     value={editingPlan.originalPriceMonthly || ''}
                     onChange={(e) => setEditingPlan({ ...editingPlan, originalPriceMonthly: e.target.value === '' ? null : (parseInt(e.target.value) || null) })}
+                    className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                      darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Yearly Discount (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="20"
+                    value={editingPlan.yearlyDiscountPercentage === null || editingPlan.yearlyDiscountPercentage === undefined ? '' : editingPlan.yearlyDiscountPercentage}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, yearlyDiscountPercentage: e.target.value === '' ? null : (parseInt(e.target.value) || 0) })}
                     className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
                       darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
                     }`}
@@ -642,6 +947,114 @@ export default function Subscriptions() {
                 className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md shadow-orange-500/10"
               >
                 Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Offers Modal */}
+      {isBulkOffersOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
+          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
+              <div>
+                <h3 className="text-base font-bold">Configure Bulk Offers</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5 font-semibold">
+                  Apply discounts globally to all active subscription plans.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsBulkOffersOpen(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Global Yearly Discount (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={bulkYearlyDiscount}
+                  onChange={(e) => setBulkYearlyDiscount(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="eg. 20"
+                />
+                <p className="text-[9px] text-slate-550 mt-1 leading-normal">
+                  Updates the yearly subscription discount percentage across all plan options.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Global Monthly Offer Discount (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={bulkMonthlyDiscount}
+                  onChange={(e) => setBulkMonthlyDiscount(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="eg. 10 (Set to 0 to restore original prices)"
+                />
+                <p className="text-[9px] text-slate-550 mt-1 leading-normal">
+                  Updates all monthly subscription rates based on their original baseline price. Set to 0 to restore original price.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+              <button
+                onClick={() => setIsBulkOffersOpen(false)}
+                disabled={bulkApplying}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border ${
+                  darkMode ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setBulkApplying(true);
+                  try {
+                    await apiClient.post('/superadmin/plans/bulk-offers', {
+                      yearlyDiscountPercentage: bulkYearlyDiscount,
+                      monthlyDiscountPercentage: bulkMonthlyDiscount,
+                    });
+                    setIsBulkOffersOpen(false);
+                    await fetchPlans();
+                  } catch (err) {
+                    console.error('Failed to apply bulk offers', err);
+                  } finally {
+                    setBulkApplying(false);
+                  }
+                }}
+                disabled={bulkApplying}
+                className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-md shadow-orange-600/10 flex items-center justify-center gap-1.5"
+              >
+                {bulkApplying ? (
+                  <>
+                    <RefreshCw size={12} className="animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  'Apply to All Plans'
+                )}
               </button>
             </div>
           </div>

@@ -5,27 +5,41 @@ import { apiClient } from '../../shared/services/apiClient';
 interface PlanSelectorProps {
   selectedPlan: string;
   onChange: (plan: string) => void;
+  plans?: any[];
+  loading?: boolean;
 }
 
-export default function PlanSelector({ selectedPlan, onChange }: PlanSelectorProps) {
+export default function PlanSelector({ selectedPlan, onChange, plans: propPlans, loading: propLoading }: PlanSelectorProps) {
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (propPlans !== undefined) {
+      setPlans(propPlans);
+      if (propLoading !== undefined) {
+        setLoading(propLoading);
+      } else {
+        setLoading(false);
+      }
+      return;
+    }
+
     apiClient.get('/public/plans')
       .then((res) => {
         const list = res.data?.data?.plans || [];
         setPlans(list);
-        
-        // Auto-select first active plan if current selection is invalid
-        if (list.length > 0 && !list.some((p: any) => p.name === selectedPlan)) {
-          const defaultPlan = list.find((p: any) => p.name.toLowerCase() === 'free' || p.name.toLowerCase() === 'basic') || list[0];
-          onChange(defaultPlan.name);
-        }
       })
       .catch((err) => console.error('Failed to load plans', err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [propPlans, propLoading]);
+
+  // Auto-select first active plan if current selection is invalid
+  useEffect(() => {
+    if (plans.length > 0 && !plans.some((p: any) => p.name === selectedPlan)) {
+      const defaultPlan = plans.find((p: any) => p.name.toLowerCase() === 'free' || p.name.toLowerCase() === 'basic') || plans[0];
+      onChange(defaultPlan.name);
+    }
+  }, [plans, selectedPlan, onChange]);
 
   const badges = [
     { text: 'Best for Starters', color: 'text-emerald-700', bg: 'bg-emerald-50' },

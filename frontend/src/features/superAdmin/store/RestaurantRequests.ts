@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import {
   placeholderRestaurantRequests,
   superAdminRestaurantRequestsApi,
@@ -32,6 +31,8 @@ export interface RestaurantRequest {
   paymentId?: string;
   paymentAmount?: number;
   paymentStatus?: string;
+  status?: string;
+  rejectionReason?: string;
 }
 
 interface RestaurantRequestsState {
@@ -39,7 +40,7 @@ interface RestaurantRequestsState {
   requests: RestaurantRequest[];
   fetchRequests: () => Promise<void>;
   approveRequest: (id: string) => Promise<void>;
-  denyRequest: (id: string, reason: string) => Promise<void>;
+  denyRequest: (id: string, reason: string, refund?: boolean) => Promise<void>;
   addRestaurant: (restaurant: RestaurantsRow) => void;
   updateRestaurantStatus: (
     id: string,
@@ -66,71 +67,79 @@ const requestToRestaurant = (request: RestaurantRequest): RestaurantsRow => ({
 });
 
 export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
-  persist(
-    (set, get) => ({
-      restaurants: restaurantData,
-      requests: [],
-      fetchRequests: async () => {
-        try {
-          const reqs = await superAdminRestaurantRequestsApi.getRequests();
-          set({ requests: reqs });
-        } catch (error) {
-          console.error("Failed to fetch requests", error);
-        }
-      },
-      approveRequest: async (id) => {
-        try {
-          const request = get().requests.find((item) => item.id === id);
-          if (!request) return;
+  (set, get) => ({
+    restaurants: restaurantData,
+    requests: [],
+    fetchRequests: async () => {
+      try {
+        const reqs = await superAdminRestaurantRequestsApi.getRequests();
+        set({ requests: reqs });
+      } catch (error) {
+        console.error("Failed to fetch requests", error);
+      }
+    },
+    approveRequest: async (id) => {
+      try {
+        const request = get().requests.find((item) => item.id === id);
+        if (!request) return;
 
-          await superAdminRestaurantRequestsApi.approveRequest(id);
+        await superAdminRestaurantRequestsApi.approveRequest(id);
 
-          const restaurant = requestToRestaurant(request);
-          const alreadyAdded = get().restaurants.some(
-            (item) => item.name === restaurant.name
-          );
+        const restaurant = requestToRestaurant(request);
+        const alreadyAdded = get().restaurants.some(
+          (item) => item.name === restaurant.name
+        );
 
-          set((state) => ({
-            restaurants: alreadyAdded
-              ? state.restaurants
-              : [restaurant, ...state.restaurants],
-            requests: state.requests.filter((item) => item.id !== id),
-          }));
-        } catch (error) {
-          console.error("Failed to approve request", error);
-          throw error;
-        }
-      },
-      denyRequest: async (id, reason) => {
-        try {
-          await superAdminRestaurantRequestsApi.denyRequest(id, reason);
-          set((state) => ({
-            requests: state.requests.filter((item) => item.id !== id),
-          }));
-        } catch (error) {
-          console.error("Failed to deny request", error);
-          throw error;
-        }
-      },
-      addRestaurant: (restaurant) =>
-        set((state) => ({ restaurants: [restaurant, ...state.restaurants] })),
-      updateRestaurantStatus: (id, status) =>
         set((state) => ({
-          restaurants: state.restaurants.map((restaurant) =>
-            restaurant.id === id ? { ...restaurant, status } : restaurant
+          restaurants: alreadyAdded
+            ? state.restaurants
+            : [restaurant, ...state.restaurants],
+          requests: state.requests.map((item) =>
+            item.id === id ? { ...item, status: 'APPLICATION_APPROVED' } : item
           ),
-        })),
-      updateRestaurantPlan: (id, plan) =>
+        }));
+      } catch (error) {
+        console.error("Failed to approve request", error);
+        throw error;
+      }
+    },
+    denyRequest: async (id, reason, refund) => {
+      try {
+        await superAdminRestaurantRequestsApi.denyRequest(id, reason, refund);
         set((state) => ({
-          restaurants: state.restaurants.map((restaurant) =>
-            restaurant.id === id ? { ...restaurant, plan: plan as any } : restaurant
+          requests: state.requests.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: 'REJECTED',
+                  rejectionReason: reason,
+                  paymentStatus: refund ? 'REFUNDED' : item.paymentStatus,
+                }
+              : item
           ),
-        })),
-      deleteRestaurant: (id) =>
-        set((state) => ({
-          restaurants: state.restaurants.filter((restaurant) => restaurant.id !== id),
-        })),
-    }),
-    { name: "superadmin-restaurant-requests" }
-  )
+        }));
+      } catch (error) {
+        console.error("Failed to deny request", error);
+        throw error;
+      }
+    },
+    addRestaurant: (restaurant) =>
+      set((state) => ({ restaurants: [restaurant, ...state.restaurants] })),
+    updateRestaurantStatus: (id, status) =>
+      set((state) => ({
+        restaurants: state.restaurants.map((restaurant) =>
+          restaurant.id === id ? { ...restaurant, status } : restaurant
+        ),
+      })),
+    updateRestaurantPlan: (id, plan) =>
+      set((state) => ({
+        restaurants: state.restaurants.map((restaurant) =>
+          restaurant.id === id ? { ...restaurant, plan: plan as any } : restaurant
+        ),
+      })),
+    deleteRestaurant: (id) =>
+      set((state) => ({
+        restaurants: state.restaurants.filter((restaurant) => restaurant.id !== id),
+      })),
+  })
 );

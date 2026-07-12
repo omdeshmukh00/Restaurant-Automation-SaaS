@@ -43,6 +43,7 @@ export default function Restaurant() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const restaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
+  const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
   const addRestaurant = useRestaurantRequestsStore((state) => state.addRestaurant);
   const updateRestaurantStatus = useRestaurantRequestsStore(
     (state) => state.updateRestaurantStatus
@@ -53,6 +54,11 @@ export default function Restaurant() {
   const deleteRestaurantById = useRestaurantRequestsStore(
     (state) => state.deleteRestaurant
   );
+  const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [viewingRestaurant, setViewingRestaurant] = useState<RestaurantsRow | null>(null);
@@ -170,9 +176,9 @@ export default function Restaurant() {
           >
             <Building2 size={13} />
             New Requests
-            {requests.length > 0 && (
+            {pendingCount > 0 && (
               <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
-                {requests.length}
+                {pendingCount}
               </span>
             )}
           </button>

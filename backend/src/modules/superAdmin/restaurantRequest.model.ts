@@ -14,15 +14,16 @@ export interface IRestaurantRequest extends Document {
   cuisine: string;
   branches: number;
   expectedMonthlyOrders: number;
-  selectedPlan: string;
+  selectedPlan?: string;
   latitude: number;
   longitude: number;
   googleMapsUrl?: string;
   message?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING_PAYMENT' | 'APPLICATION_PENDING' | 'APPLICATION_APPROVED' | 'REJECTED';
   submittedAt: Date;
   reviewedBy?: Types.ObjectId;
   reviewedAt?: Date;
+  restaurantId?: Types.ObjectId;
   rejectionReason?: string;
   
   // Payment Details
@@ -31,6 +32,9 @@ export interface IRestaurantRequest extends Document {
   paymentAmount?: number;
   paymentCurrency?: string;
   paymentStatus?: string;
+  paymentSignature?: string;
+  paymentTimestamp?: Date;
+  billingFrequency?: 'monthly' | 'yearly';
 }
 
 const restaurantRequestSchema = new Schema<IRestaurantRequest>(
@@ -48,23 +52,21 @@ const restaurantRequestSchema = new Schema<IRestaurantRequest>(
     cuisine: { type: String, required: true, trim: true },
     branches: { type: Number, required: true, default: 1 },
     expectedMonthlyOrders: { type: Number, required: true },
-    selectedPlan: {
-      type: String,
-      required: true,
-    },
+    selectedPlan: { type: String, trim: true },
     latitude: { type: Number, required: true },
     longitude: { type: Number, required: true },
     googleMapsUrl: { type: String, trim: true },
     message: { type: String, trim: true },
     status: {
       type: String,
-      enum: ['PENDING', 'APPROVED', 'REJECTED'],
-      default: 'PENDING',
+      enum: ['PENDING_PAYMENT', 'APPLICATION_PENDING', 'APPLICATION_APPROVED', 'REJECTED'],
+      default: 'APPLICATION_PENDING',
       index: true,
     },
     submittedAt: { type: Date, default: Date.now },
-    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+     reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: { type: Date },
+    restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant' },
     rejectionReason: { type: String, trim: true },
 
     paymentId: { type: String },
@@ -72,6 +74,9 @@ const restaurantRequestSchema = new Schema<IRestaurantRequest>(
     paymentAmount: { type: Number },
     paymentCurrency: { type: String },
     paymentStatus: { type: String },
+    paymentSignature: { type: String },
+    paymentTimestamp: { type: Date },
+    billingFrequency: { type: String, enum: ['monthly', 'yearly'], default: 'monthly' },
   },
   {
     timestamps: true,

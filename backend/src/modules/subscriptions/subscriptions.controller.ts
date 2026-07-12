@@ -99,3 +99,32 @@ export const createBillingOrder = asyncHandler(async (req: Request, res: Respons
   const result = await service.createBillingOrder(req.params.id, req.body);
   ok(res, result, 201);
 });
+
+export const createPurchaseOrder = asyncHandler(async (req: Request, res: Response) => {
+  const restaurantId = req.user?.restaurantId;
+  if (!restaurantId) {
+    throw new AppError('Restaurant ID not found on user session', 400, ErrorCode.INVALID_REQUEST);
+  }
+  const { plan, billingCycle } = req.body;
+  const result = await service.createPurchaseOrder(restaurantId, plan, billingCycle);
+  ok(res, result);
+});
+
+export const verifyPurchase = asyncHandler(async (req: Request, res: Response) => {
+  const restaurantId = req.user?.restaurantId;
+  const userId = req.user?.id;
+  if (!restaurantId || !userId) {
+    throw new AppError('Session context missing', 400, ErrorCode.INVALID_REQUEST);
+  }
+  const { plan, billingCycle, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+  const result = await service.verifyPurchase({
+    restaurantId,
+    userId,
+    plan,
+    billingCycle,
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature
+  });
+  ok(res, result);
+});

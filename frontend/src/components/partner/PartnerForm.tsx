@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, AlertCircle, CheckCircle, RefreshCw, ShieldAlert, Layout } from 'lucide-react';
-import PlanSelector, {  } from './PlanSelector';
+import { Building2, AlertCircle, CheckCircle, RefreshCw, ShieldAlert, Layout, CreditCard, X } from 'lucide-react';
 import LocationPicker from './LocationPicker';
 import PaymentDialog from './PaymentDialog';
 import { apiClient } from '../../shared/services/apiClient';
@@ -41,6 +40,13 @@ const initialFormData: FormData = {
   message: '',
 };
 
+interface PlatformSettings {
+  applicationFeeEnabled: boolean;
+  applicationFeeAmount: number;
+  currency: string;
+  refundPolicy: string;
+}
+
 export default function PartnerForm() {
   const [formData, setFormData] = useState<FormData>(() => {
     const saved = sessionStorage.getItem('partner_form_data');
@@ -48,9 +54,6 @@ export default function PartnerForm() {
   });
   const [phonePrefix, setPhonePrefix] = useState(() => {
     return sessionStorage.getItem('partner_phone_prefix') || '+91';
-  });
-  const [selectedPlan, setSelectedPlan] = useState<string>(() => {
-    return sessionStorage.getItem('partner_selected_plan') || 'Free';
   });
   const [latitude, setLatitude] = useState<number | null>(() => {
     const saved = sessionStorage.getItem('partner_latitude');
@@ -61,23 +64,23 @@ export default function PartnerForm() {
     return saved ? parseFloat(saved) : null;
   });
 
-  const [plans, setPlans] = useState<any[]>([]);
-  const [plansLoading, setPlansLoading] = useState(true);
+  const [settings, setSettings] = useState<PlatformSettings>({
+    applicationFeeEnabled: false,
+    applicationFeeAmount: 0,
+    currency: 'INR',
+    refundPolicy: 'refundable',
+  });
+  const [settingsLoading, setSettingsLoading] = useState(true);
 
   React.useEffect(() => {
-    apiClient.get('/public/plans')
+    apiClient.get('/public/platform-settings')
       .then((res) => {
-        const list = res.data?.data?.plans || [];
-        setPlans(list);
-        
-        // Auto-select first active plan if current selection is invalid
-        if (list.length > 0 && !list.some((p: any) => p.name === selectedPlan)) {
-          const defaultPlan = list.find((p: any) => p.name.toLowerCase() === 'free' || p.name.toLowerCase() === 'basic') || list[0];
-          setSelectedPlan(defaultPlan.name);
+        if (res.data?.data) {
+          setSettings(res.data.data);
         }
       })
-      .catch((err) => console.error('Failed to load plans', err))
-      .finally(() => setPlansLoading(false));
+      .catch((err) => console.error('Failed to load platform settings', err))
+      .finally(() => setSettingsLoading(false));
   }, []);
 
   React.useEffect(() => {
@@ -87,10 +90,6 @@ export default function PartnerForm() {
   React.useEffect(() => {
     sessionStorage.setItem('partner_phone_prefix', phonePrefix);
   }, [phonePrefix]);
-
-  React.useEffect(() => {
-    sessionStorage.setItem('partner_selected_plan', selectedPlan);
-  }, [selectedPlan]);
 
   React.useEffect(() => {
     if (latitude !== null) {
@@ -114,17 +113,23 @@ export default function PartnerForm() {
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Payment States
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentOrder, setPaymentOrder] = useState<{
+    orderId: string;
+    amount: number;
+    currency: string;
+    requestId: string;
+  } | null>(null);
+
   React.useEffect(() => {
     if (formError) {
       const timer = setTimeout(() => {
         setFormError(null);
-      }, 300000); // 5 minutes
+      }, 5000); // 5 seconds as requested
       return () => clearTimeout(timer);
     }
   }, [formError]);
-
-  // Payment Dialog State
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -234,10 +239,14 @@ export default function PartnerForm() {
       if (nextEmpty) {
         nextEmpty.focus();
       } else {
-        // All required fields are filled, submit the form!
         handleSubmit(e);
       }
     }
+  };
+
+  const showError = (msg: string) => {
+    setFormError(msg);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -246,72 +255,68 @@ export default function PartnerForm() {
 
     const isValid = validateForm();
     if (!isValid) {
-      setFormError('Please resolve all validation errors before submitting.');
+      showError('Please resolve all validation errors before submitting.');
       return;
     }
 
-    const currentPlan = plans.find((p) => p.name === selectedPlan);
-    const isFree = currentPlan ? currentPlan.priceMonthly === 0 : true;
-
-    if (isFree) {
-      // Free plan submits directly
-      await submitApplication();
-    } else {
-      // Paid plan requires checkout popup first
-      setIsPaymentOpen(true);
-    }
-  };
-
-  const submitApplication = async (paymentDetails?: {
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-  }) => {
     setSubmitting(true);
-    setFormError(null);
 
     try {
-      // Use phonePrefix combined with raw phone number for DB storage
       const fullPhoneNumber = `${phonePrefix} ${formData.phone.trim()}`;
 
-      // Use apiClient to handle correct endpoint base mapping
+      // Submit application
       const response = await apiClient.post('/public/partner-request', {
         ...formData,
         phone: fullPhoneNumber,
-        selectedPlan,
         latitude,
         longitude,
-        ...paymentDetails,
       });
 
-      setSubmitSuccess(response.data.data?.message || 'Application submitted successfully.');
-      setIsPaymentOpen(false);
-      setFormData(initialFormData);
-      setLatitude(null);
-      setLongitude(null);
-      setPhonePrefix('+91');
-      setSelectedPlan('Free');
-      sessionStorage.removeItem('partner_form_data');
-      sessionStorage.removeItem('partner_phone_prefix');
-      sessionStorage.removeItem('partner_selected_plan');
-      sessionStorage.removeItem('partner_latitude');
-      sessionStorage.removeItem('partner_longitude');
+      const data = response.data?.data;
+
+      if (data?.requiresFee) {
+        // Platform requires processing fee
+        setPaymentOrder({
+          orderId: data.orderId,
+          amount: data.amount,
+          currency: data.currency,
+          requestId: data.requestId,
+        });
+        setIsPaymentOpen(true);
+      } else {
+        // Direct submission success
+        setSubmitSuccess(data?.message || 'Application submitted successfully.');
+        clearSessionStorage();
+      }
     } catch (err: any) {
       console.error('Submission error:', err);
       const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'An error occurred during submission.';
-      setFormError(msg);
+      showError(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handlePaymentSuccess = (response: any) => {
-    submitApplication(response);
+  const clearSessionStorage = () => {
+    setFormData(initialFormData);
+    setLatitude(null);
+    setLongitude(null);
+    setPhonePrefix('+91');
+    sessionStorage.removeItem('partner_form_data');
+    sessionStorage.removeItem('partner_phone_prefix');
+    sessionStorage.removeItem('partner_latitude');
+    sessionStorage.removeItem('partner_longitude');
+  };
+
+  const handlePaymentSuccess = (verifyResponse: any) => {
+    setSubmitSuccess(verifyResponse.data?.message || 'Payment verified and application submitted successfully.');
+    setIsPaymentOpen(false);
+    clearSessionStorage();
   };
 
   const handlePaymentFailure = (errorMsg: string) => {
     setIsPaymentOpen(false);
-    setFormError(errorMsg);
+    showError(errorMsg);
   };
 
   if (submitSuccess) {
@@ -328,10 +333,10 @@ export default function PartnerForm() {
         </div>
         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 text-left space-y-3">
           <p className="text-xs text-slate-500 leading-relaxed">
-            Our super administrators will review your application details, verify the geolocation, and validate payment records. 
+            Our super administrators will review your application details and verify the details submitted.
           </p>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Upon approval, you will receive an automatic welcome email containing your **temporary admin credentials** and your secure dashboard link.
+            Upon approval, you will receive an automatic welcome email containing your <strong>temporary admin credentials</strong> and your secure dashboard link.
           </p>
         </div>
         <div>
@@ -347,35 +352,42 @@ export default function PartnerForm() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-8 items-start">
-      {/* Left Column: Form Info */}
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
-      <form
-        onSubmit={handleSubmit}
-        onKeyDown={handleKeyDown}
-        noValidate
-        className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6"
-      >
-        
-        {formError && (
-          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-600">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-            <span>{formError}</span>
+    <div className="space-y-6">
+      {formError && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white px-6 py-4 shadow-xl border-b border-red-700 flex items-center justify-between animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-3 max-w-6xl mx-auto w-full">
+            <AlertCircle className="w-5 h-5 shrink-0 text-white" />
+            <span className="text-sm font-semibold tracking-wide">{formError}</span>
           </div>
-        )}
-
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
-            <Building2 className="w-4.5 h-4.5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-extrabold text-slate-800">Restaurant & Owner Information</h3>
-            <p className="text-[11px] text-slate-500">Provide your details and select the plan that best suits your business needs.</p>
-          </div>
+          <button 
+            type="button" 
+            onClick={() => setFormError(null)}
+            className="text-white hover:text-red-200 transition-colors p-1"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_0.9fr] gap-8 items-start">
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={handleKeyDown}
+          noValidate
+          className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
+              <Building2 className="w-4.5 h-4.5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-800">Restaurant & Owner Information</h3>
+              <p className="text-[11px] text-slate-500">Provide your details to submit your partner verification application.</p>
+            </div>
+          </div>
 
         <div className="space-y-4">
-          
           {/* Row 1: Restaurant Name & Owner Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -470,7 +482,7 @@ export default function PartnerForm() {
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
               Restaurant Address <span className="text-orange-500">*</span>
-            </label>
+              </label>
             <input
               type="text"
               name="address"
@@ -679,6 +691,11 @@ export default function PartnerForm() {
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   Submitting Application...
                 </>
+              ) : settings.applicationFeeEnabled ? (
+                <>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Pay ₹{settings.applicationFeeAmount} & Submit Application
+                </>
               ) : (
                 <>
                   <Layout className="w-3.5 h-3.5" />
@@ -692,33 +709,92 @@ export default function PartnerForm() {
               <span>Your information is secure and will only be used to contact you.</span>
             </div>
           </div>
-
         </div>
       </form>
 
-      {/* Right Column: Plans */}
+      {/* Right Column: Platform Summary & Process Fee Detail */}
       <div className="space-y-6">
-        <PlanSelector selectedPlan={selectedPlan} onChange={setSelectedPlan} />
+        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
+          <div className="border-b border-slate-100 pb-4">
+            <h3 className="text-sm font-extrabold text-slate-800">Application Summary</h3>
+            <p className="text-[11px] text-slate-400">Review onboarding stages and settings</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Onboarding Process:</span>
+              <span className="font-bold text-slate-800">Two-Stage Verification</span>
+            </div>
+            
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Stage 1:</span>
+              <span className="text-slate-700 font-bold text-right">Submit details & verify location</span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Stage 2:</span>
+              <span className="text-slate-700 font-bold text-right">Super Admin review & approval</span>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 space-y-4">
+              {settingsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <RefreshCw className="w-5 h-5 text-orange-500 animate-spin" />
+                </div>
+              ) : settings.applicationFeeEnabled ? (
+                <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-orange-850 font-bold">Onboarding Fee</span>
+                    <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-md font-bold capitalize">
+                      {settings.refundPolicy}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-550 leading-relaxed">
+                    This platform requires a processing fee to verify your restaurant details and physical location coordinates.
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-extrabold text-orange-500 font-sans">₹{settings.applicationFeeAmount}</span>
+                    <span className="text-[10px] text-slate-400 font-medium">one-time payment</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 space-y-2">
+                  <span className="text-xs text-emerald-850 font-bold">Free Application Review</span>
+                  <div className="text-[11px] text-slate-550 leading-relaxed">
+                    There are no upfront charges to submit your restaurant details for review.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <div className="bg-slate-50 rounded-2xl p-4 text-[11px] text-slate-500 leading-relaxed space-y-2">
+                <p className="font-semibold text-slate-700">Please Note:</p>
+                <p>Subscription plans (Monthly/Yearly) and pricing details will be selected and purchased directly from your RestoHub Admin Panel after your account is approved.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Payment Dialog Modal */}
-      {(() => {
-        const currentPlan = plans.find((p) => p.name === selectedPlan);
-        const isFree = currentPlan ? currentPlan.priceMonthly === 0 : true;
-        return !isFree && (
-          <PaymentDialog
-            isOpen={isPaymentOpen}
-            onClose={() => setIsPaymentOpen(false)}
-            plan={selectedPlan}
-            amount={currentPlan?.priceMonthly || 0}
-            ownerName={formData.ownerName}
-            email={formData.email}
-            phone={formData.phone}
-            onPaymentSuccess={handlePaymentSuccess}
-            onPaymentFailure={handlePaymentFailure}
-          />
-        );
-      })()}
+      {paymentOrder && (
+        <PaymentDialog
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+          orderId={paymentOrder.orderId}
+          amount={paymentOrder.amount}
+          currency={paymentOrder.currency}
+          requestId={paymentOrder.requestId}
+          ownerName={formData.ownerName}
+          email={formData.email}
+          phone={`${phonePrefix} ${formData.phone.trim()}`}
+          refundPolicy={settings.refundPolicy}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentFailure={handlePaymentFailure}
+        />
+      )}
+      </div>
     </div>
   );
 }

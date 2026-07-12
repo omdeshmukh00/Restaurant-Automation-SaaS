@@ -25,6 +25,7 @@ interface TierCardProps {
   trialCount: number;
   isActive: boolean;
   isPlanActive: boolean;
+  yearlyDiscountPercentage?: number | null;
   darkMode: boolean;
   onClick: () => void;
   onEditClick: () => void;
@@ -33,7 +34,7 @@ interface TierCardProps {
 function TierCard({
   label, price, icon, accentRing, accentBg, accentText, iconBg,
   count, formattedRevenue, activeCount, trialCount,
-  isActive, isPlanActive, darkMode, onClick, onEditClick
+  isActive, isPlanActive, yearlyDiscountPercentage, darkMode, onClick, onEditClick
 }: TierCardProps) {
   return (
     <div
@@ -90,6 +91,11 @@ function TierCard({
       <div className="flex items-baseline gap-1 mt-0.5 mb-3 sm:mt-1 sm:mb-4 flex-wrap">
         <span className={`text-xl sm:text-2xl font-black ${darkMode ? "text-white" : "text-slate-900"}`}>{price}</span>
         <span className={`text-[10px] sm:text-xs ${darkMode ? "text-slate-500" : "text-slate-400"}`}>/mo</span>
+        {yearlyDiscountPercentage !== undefined && yearlyDiscountPercentage !== null && yearlyDiscountPercentage > 0 && (
+          <span className="text-[8px] font-extrabold text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-500/20 px-1.5 py-0.5 rounded-md ml-1 inline-flex items-center">
+            {yearlyDiscountPercentage}% OFF YEARLY
+          </span>
+        )}
       </div>
 
       {/* Divider */}
@@ -181,6 +187,7 @@ export default function TierCards({ plans, tierFilter, darkMode, onTierChange, o
                 trialCount={t.trialCount}
                 isActive={tierFilter === t.name}
                 isPlanActive={t.isActive !== false}
+                yearlyDiscountPercentage={t.yearlyDiscountPercentage}
                 darkMode={darkMode}
                 onClick={() => onTierChange(tierFilter === t.name ? "All" : t.name)}
                 onEditClick={() => onEditClick(t.name)}
