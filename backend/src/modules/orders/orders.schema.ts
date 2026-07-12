@@ -30,6 +30,7 @@ export interface IOrderItem {
 export interface IOrder extends Document {
   restaurantId: mongoose.Types.ObjectId;
 
+  customerName?: string;
   customerId?: mongoose.Types.ObjectId;
 
   tableId?: mongoose.Types.ObjectId;
@@ -142,6 +143,12 @@ export const orderSchema = new Schema<IOrder>(
       type: Schema.Types.ObjectId,
       ref: "Restaurant",
       required: true,
+    },
+
+    customerName: {
+      type: String,
+      trim: true,
+      default: "",
     },
 
     customerId: {
@@ -381,5 +388,39 @@ export const orderIdParamsSchema = z.object({
 export const customerOrdersQuerySchema = z.object({
   status: z.nativeEnum(OrderStatus).optional(),
   page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(1000).optional(),
+});
+
+export const adminOrdersQuerySchema = z.object({
+  status: z.nativeEnum(OrderStatus).optional(),
+  paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  dateRange: z.enum(['today', 'yesterday', 'last7', 'last30']).optional(),
+  table: z.string().optional(),
+  page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
+
+export const adminOrderUpdateSchema = z.object({
+  status: z.nativeEnum(OrderStatus).optional(),
+  table: z.string().optional(),
+  paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  specialInstructions: z.string().trim().max(500).optional(),
+});
+
+export const createAdminOrderBodySchema = z.object({
+  customerName: z.string().trim().min(1).max(100),
+  table: z.string().trim().min(1),
+  paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  items: z.array(z.object({
+    menuItemId: z.string().optional(),
+    name: z.string().trim().min(1),
+    quantity: z.coerce.number().int().positive(),
+    price: z.coerce.number().nonnegative(),
+    notes: z.string().trim().optional(),
+  })).min(1),
+  specialInstructions: z.string().trim().max(500).optional(),
+});
+
+export type AdminOrderCreateInput = z.infer<typeof createAdminOrderBodySchema>;
+export type AdminOrderUpdateInput = z.infer<typeof adminOrderUpdateSchema>;
+export type AdminOrdersQueryInput = z.infer<typeof adminOrdersQuerySchema>;

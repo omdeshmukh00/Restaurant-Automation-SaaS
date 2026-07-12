@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useReservationsStore } from '../../store/reservations.store';
+import { useReservationsStore, type ReservationStatus } from '../../store/reservations.store';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -8,21 +8,42 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const reservationDates: Record<number, 'confirmed' | 'pending' | 'cancelled' | 'walkin'> = {
-  2: 'confirmed', 3: 'walkin', 7: 'pending', 10: 'confirmed',
-  12: 'confirmed', 14: 'cancelled', 17: 'confirmed', 19: 'pending',
-  20: 'confirmed', 21: 'confirmed', 25: 'pending', 27: 'walkin', 31: 'confirmed',
+const statusPriority: Record<ReservationStatus, number> = {
+  Cancelled: 0,
+  Pending: 1,
+  'Walk-in': 2,
+  Confirmed: 3,
+  'Checked In': 4,
+  Completed: 4,
+  'No Show': 0,
 };
 
 export function ReservationCalendar(): JSX.Element {
-  const { calendarView, setCalendarView } = useReservationsStore();
-  const [month, setMonth] = useState(4);
-  const [year, setYear] = useState(2025);
-  const [selectedDay, setSelectedDay] = useState(20);
+  const { calendarView, setCalendarView, allReservations } = useReservationsStore();
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth());
+  const [year, setYear] = useState(now.getFullYear());
+  const [selectedDay, setSelectedDay] = useState(now.getDate());
 
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
+
+  const reservationDates = allReservations.reduce<Record<number, ReservationStatus>>((acc, reservation) => {
+    const parsed = new Date(reservation.date);
+    if (Number.isNaN(parsed.getTime())) return acc;
+    if (parsed.getFullYear() !== year || parsed.getMonth() !== month) return acc;
+
+    const day = parsed.getDate();
+    const currentPriority = acc[day] ? statusPriority[acc[day]] : -1;
+    const candidatePriority = statusPriority[reservation.status] ?? 1;
+
+    if (candidatePriority > currentPriority) {
+      acc[day] = reservation.status;
+    }
+
+    return acc;
+  }, {});
 
   const cells: Array<{ day: number; current: boolean }> = [];
 
@@ -36,11 +57,14 @@ export function ReservationCalendar(): JSX.Element {
     cells.push({ day: cells.length - firstDay - daysInMonth + 1, current: false });
   }
 
-  const dotColor: Record<string, string> = {
-    confirmed: 'bg-green-500',
-    pending: 'bg-amber-400',
-    cancelled: 'bg-red-400',
-    walkin: 'bg-purple-400',
+  const dotColor: Record<ReservationStatus, string> = {
+    Confirmed: 'bg-green-500',
+    Pending: 'bg-amber-400',
+    Cancelled: 'bg-red-400',
+    'Walk-in': 'bg-purple-400',
+    'Checked In': 'bg-green-500',
+    Completed: 'bg-green-500',
+    'No Show': 'bg-red-400',
   };
 
   return (
@@ -104,7 +128,7 @@ export function ReservationCalendar(): JSX.Element {
         {cells.map((cell, i) => {
           const dot = cell.current ? reservationDates[cell.day] : undefined;
           const isSelected = cell.current && cell.day === selectedDay;
-          const isToday = cell.current && cell.day === 20 && month === 4;
+          const isToday = cell.current && cell.day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
           return (
             <button
               key={i}

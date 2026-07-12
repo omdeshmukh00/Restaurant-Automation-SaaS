@@ -42,20 +42,28 @@ export function DailySummary(): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {dailySummary.map((row, i) => (
-              <tr
-                key={i}
-                className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
-              >
-                <td className="px-3 sm:px-4 py-3 text-xs text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap">{row.date}</td>
-                <td className="px-3 sm:px-4 py-3 text-xs font-bold text-gray-900 dark:text-gray-100">{row.revenue}</td>
-                <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.orders.toLocaleString()}</td>
-                <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.customers.toLocaleString()}</td>
-                <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.avgOrderValue}</td>
-                <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.repeatCustomers.toLocaleString()}</td>
-                <td className="px-3 sm:px-4 py-3 text-xs font-semibold text-green-600 dark:text-green-400">{row.netProfit}</td>
+            {dailySummary.length === 0 ? (
+              <tr>
+                <td colSpan={cols.length} className="text-center py-8 text-xs text-gray-400 dark:text-gray-500 font-medium">
+                  No summary data available for this period.
+                </td>
               </tr>
-            ))}
+            ) : (
+              dailySummary.map((row, i) => (
+                <tr
+                  key={i}
+                  className="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
+                >
+                  <td className="px-3 sm:px-4 py-3 text-xs text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap">{row.date}</td>
+                  <td className="px-3 sm:px-4 py-3 text-xs font-bold text-gray-900 dark:text-gray-100">{row.revenue}</td>
+                  <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.orders.toLocaleString()}</td>
+                  <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.customers.toLocaleString()}</td>
+                  <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.avgOrderValue}</td>
+                  <td className="px-3 sm:px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{row.repeatCustomers.toLocaleString()}</td>
+                  <td className="px-3 sm:px-4 py-3 text-xs font-semibold text-green-600 dark:text-green-400">{row.netProfit}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

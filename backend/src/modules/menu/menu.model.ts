@@ -26,7 +26,7 @@ const CategorySchema = new Schema<ICategory>(
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
-  { timestamps: true, collection: 'menuCategories' }
+  { timestamps: true, collection: 'menucategories' }
 );
 
 CategorySchema.index({ restaurantId: 1, displayOrder: 1 });

@@ -18,9 +18,17 @@ const inputClass =
   'w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-400';
 
 function AddItemModal() {
-  const { showAddItemModal, setShowAddItemModal, addItem } = useInventoryStore();
+  const { showAddItemModal, setShowAddItemModal, addItem, error, loading } = useInventoryStore();
   const [form, setForm] = useState<NewItemForm>(DEFAULT_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof NewItemForm, string>>>({});
+
+  React.useEffect(() => {
+    if (showAddItemModal) {
+      setForm(DEFAULT_FORM);
+      setErrors({});
+      useInventoryStore.setState({ error: null });
+    }
+  }, [showAddItemModal]);
 
   if (!showAddItemModal) return null;
 
@@ -34,17 +42,13 @@ function AddItemModal() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validate()) return;
-    addItem(form);
-    setForm(DEFAULT_FORM);
-    setErrors({});
+    await addItem(form);
   };
 
   const handleClose = () => {
     setShowAddItemModal(false);
-    setForm(DEFAULT_FORM);
-    setErrors({});
   };
 
   return (
@@ -169,20 +173,28 @@ function AddItemModal() {
           </div>
         </div>
 
+        {error && (
+          <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl text-xs text-red-500 font-semibold">
+            {error}
+          </div>
+        )}
+
         <div className="flex gap-2 pt-1">
           <button
             type="button"
             onClick={handleClose}
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm"
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm disabled:opacity-50"
           >
-            Add Item
+            {loading ? 'Adding...' : 'Add Item'}
           </button>
         </div>
       </div>
@@ -191,16 +203,26 @@ function AddItemModal() {
 }
 
 function ImportModal() {
-  const { showImportModal, setShowImportModal, importItems } = useInventoryStore();
+  const { showImportModal, setShowImportModal, importItems, error, loading } = useInventoryStore();
   const [csv, setCsv] = useState('');
+
+  React.useEffect(() => {
+    if (showImportModal) {
+      setCsv('');
+      useInventoryStore.setState({ error: null });
+    }
+  }, [showImportModal]);
 
   if (!showImportModal) return null;
 
-  const handleClose = () => { setShowImportModal(false); setCsv(''); };
+  const handleClose = () => { setShowImportModal(false); };
 
-  const handleImport = () => {
-    if (csv.trim()) importItems(csv);
-    else handleClose();
+  const handleImport = async () => {
+    if (csv.trim()) {
+      await importItems(csv);
+    } else {
+      handleClose();
+    }
   };
 
   return (
@@ -245,20 +267,28 @@ function ImportModal() {
           />
         </div>
 
+        {error && (
+          <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl text-xs text-red-500 font-semibold">
+            {error}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleClose}
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleImport}
-            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm"
+            disabled={loading}
+            className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm disabled:opacity-50"
           >
-            Import
+            {loading ? 'Importing...' : 'Import'}
           </button>
         </div>
       </div>

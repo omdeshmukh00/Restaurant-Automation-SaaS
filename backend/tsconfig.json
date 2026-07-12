@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "ignoreDeprecations": "5.0",
     "forceConsistentCasingInFileNames": true,
+    "types": ["node", "jest"],
 
     "resolveJsonModule": true,
 

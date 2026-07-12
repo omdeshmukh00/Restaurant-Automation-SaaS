@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { OrderModel } from './orders.model';
 import { Cart } from '../cart/cart.model';
-import { PlaceOrderInput, OrderStatus, PaymentStatus } from './orders.schema';
+import { PlaceOrderInput, AdminOrderCreateInput, AdminOrderUpdateInput, OrderStatus, PaymentStatus } from './orders.schema';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { Priority, SessionStatus, TableStatus } from '../../constants/statuses';
@@ -64,8 +64,244 @@ async function enforceOrderLimits(restaurantId: string | Types.ObjectId) {
 
   return { dailyOrderCount: dailyOrders + 1, monthlyOrderCount: monthlyOrders + 1 };
 }
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+
+function normalizeAdminOrderStatusFilter(status?: string): string | string[] | undefined {
+  if (!status) return undefined;
+  switch (status.toUpperCase()) {
+    case OrderStatus.PENDING:
+      return OrderStatus.PENDING;
+    case OrderStatus.CONFIRMED:
+      return OrderStatus.CONFIRMED;
+    case OrderStatus.PREPARING:
+      return [
+        OrderStatus.CONFIRMED,
+        OrderStatus.PREPARING,
+        OrderStatus.DELAYED,
+        OrderStatus.READY,
+      ];
+    case OrderStatus.DELAYED:
+      return OrderStatus.DELAYED;
+    case OrderStatus.READY:
+      return OrderStatus.READY;
+    case OrderStatus.PICKED:
+      return OrderStatus.PICKED;
+    case OrderStatus.SERVED:
+      return OrderStatus.SERVED;
+    case OrderStatus.BILLED:
+      return OrderStatus.BILLED;
+    case OrderStatus.PAID:
+      return OrderStatus.PAID;
+    case OrderStatus.COMPLETED:
+      return [
+        OrderStatus.BILLED,
+        OrderStatus.PAID,
+        OrderStatus.COMPLETED,
+      ];
+    case OrderStatus.CANCELLED:
+      return [OrderStatus.CANCELLED, OrderStatus.REJECTED];
+    case OrderStatus.REJECTED:
+      return OrderStatus.REJECTED;
+    default:
+      return undefined;
+  }
+}
 
 export class OrdersService {
+  static async getAdminOrders(
+    restaurantId: string | Types.ObjectId,
+    options: {
+      status?: string;
+      paymentStatus?: string;
+      table?: string;
+      dateRange?: string;
+      page?: number;
+      limit?: number;
+    } = {}
+  ) {
+    const page = Number(options.page ?? 1);
+    const limit = Number(options.limit ?? 100);
+    const skip = (page - 1) * limit;
+
+    const query: Record<string, unknown> = {
+      restaurantId,
+    };
+
+    if (options.status) {
+      const statusFilter = normalizeAdminOrderStatusFilter(options.status);
+      if (Array.isArray(statusFilter)) {
+        query.status = { $in: statusFilter };
+      } else if (statusFilter) {
+        query.status = statusFilter;
+      }
+    }
+
+    if (options.paymentStatus) {
+      query.paymentStatus = options.paymentStatus;
+    }
+
+    if (options.table) {
+      const tableRegex = new RegExp(`^${escapeRegex(options.table)}`, 'i');
+      const tableIds = await TableModel.find({
+        restaurantId,
+        tableNumber: tableRegex,
+      }).distinct('_id');
+
+      query.tableId = tableIds.length > 0 ? { $in: tableIds } : new mongoose.Types.ObjectId();
+    }
+
+    // Date range filtering (today, yesterday, last7, last30)
+    if (options.dateRange) {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let start: Date | null = null;
+      let end: Date | null = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+
+      switch ((options.dateRange || '').toLowerCase()) {
+        case 'today':
+          start = startOfToday;
+          break;
+        case 'yesterday':
+          start = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+          end = startOfToday;
+          break;
+        case 'last7':
+          start = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last30':
+          start = new Date(startOfToday.getTime() - 29 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          start = null;
+      }
+
+      if (start && end) {
+        query.createdAt = { $gte: start, $lt: end };
+      } else if (start) {
+        query.createdAt = { $gte: start };
+      }
+    }
+
+    const [orders, total] = await Promise.all([
+      OrderModel.find(query).populate('tableId', 'tableNumber').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      OrderModel.countDocuments(query),
+    ]);
+
+    return {
+      orders,
+      pagination: {
+        page,
+        limit,
+        total,
+      },
+    };
+  }
+
+  static async getAdminOrderById(
+    restaurantId: string | Types.ObjectId,
+    orderId: string | Types.ObjectId,
+  ) {
+    const order = await OrderModel.findOne({ _id: orderId, restaurantId }).populate('tableId', 'tableNumber');
+    if (!order) {
+      throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
+    }
+    return order;
+  }
+
+  static async createAdminOrder(
+    restaurantId: string | Types.ObjectId,
+    payload: AdminOrderCreateInput,
+    actorId?: string | Types.ObjectId | null,
+  ) {
+    const table = await TableModel.findOne({ restaurantId, tableNumber: payload.table });
+    if (!table) {
+      throw new AppError('Table not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    const orderItems = payload.items.map((item) => ({
+      menuItemId: item.menuItemId
+        ? new mongoose.Types.ObjectId(item.menuItemId)
+        : new mongoose.Types.ObjectId(),
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      totalPrice: item.quantity * item.price,
+      notes: item.notes || '',
+    }));
+
+    const totalAmount = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    const order = await OrderModel.create({
+      restaurantId,
+      customerName: payload.customerName,
+      tableId: table._id,
+      orderNumber,
+      items: orderItems,
+      totalAmount,
+      taxAmount: 0,
+      discountAmount: 0,
+      finalAmount: totalAmount,
+      status: OrderStatus.PENDING,
+      paymentStatus: payload.paymentStatus ?? PaymentStatus.PENDING,
+      priority: Priority.NORMAL,
+      specialInstructions: payload.specialInstructions || '',
+    });
+
+    return order;
+  }
+
+  static async updateAdminOrder(
+    restaurantId: string | Types.ObjectId,
+    orderId: string | Types.ObjectId,
+    updates: AdminOrderUpdateInput,
+    actorId?: string | Types.ObjectId | null,
+  ) {
+    const order = await OrderModel.findOne({ _id: orderId, restaurantId });
+    if (!order) {
+      throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    if (updates.table !== undefined) {
+      const table = await TableModel.findOne({ restaurantId, tableNumber: updates.table });
+      if (!table) {
+        throw new AppError('Table not found', 404, ErrorCode.NOT_FOUND);
+      }
+      order.tableId = table._id;
+    }
+
+    if (updates.paymentStatus !== undefined) {
+      order.paymentStatus = updates.paymentStatus;
+    }
+
+    if (updates.specialInstructions !== undefined) {
+      order.specialInstructions = updates.specialInstructions;
+    }
+
+    if (updates.status !== undefined) {
+      ensureOrderTransition(order.status as OrderStatus, updates.status, 'Order cannot be updated to requested status');
+      order.status = updates.status;
+
+      if (updates.status === OrderStatus.CANCELLED) {
+        order.cancelledAt = new Date();
+        if (order.stockDeducted) {
+          await InventoryService.restoreStock(restaurantId, order.items, order._id, actorId || undefined);
+          order.stockDeducted = false;
+        }
+      }
+
+      if (updates.status === OrderStatus.COMPLETED) {
+        order.completedAt = new Date();
+      }
+    }
+
+    await order.save();
+    return order;
+  }
+
   static async placeOrder(
     restaurantId: string | Types.ObjectId,
     sessionId: string | Types.ObjectId,

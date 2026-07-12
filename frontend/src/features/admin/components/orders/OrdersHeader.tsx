@@ -4,6 +4,7 @@ import { useOrdersStore, type DateFilter, type PaymentMethod } from '../../store
 import { NewOrderModal } from './NewOrderModal';
 
 const DATE_OPTIONS: { label: string; value: DateFilter }[] = [
+  { label: 'All',          value: 'all'       },
   { label: 'Today',        value: 'today'     },
   { label: 'Yesterday',    value: 'yesterday' },
   { label: 'Last 7 days',  value: 'last7'     },

@@ -12,7 +12,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { connectDB, disconnectDB } from '../config/db';
 
 // Allow enough time for first-run mongodb-memory-server binary download on fresh machines/CI.
-jest.setTimeout(300000);
+jest.setTimeout(600000);
 
 // Ensure we are in test mode and use the test database
 process.env.NODE_ENV = 'test';

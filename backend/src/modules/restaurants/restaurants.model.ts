@@ -35,6 +35,7 @@ export interface IRestaurant extends Document {
   cuisine: string;
   city: string;
   rating: number;
+  location_url?: string;
   settings: RestaurantSettings;
   ownerName: string;
   email: string;
@@ -138,6 +139,11 @@ const restaurantSchema = new Schema<IRestaurant>(
     onboardingRequestId: { type: Schema.Types.ObjectId, ref: 'RestaurantRequest' },
     adminUserId: { type: Schema.Types.ObjectId, ref: 'User' },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', default: null },
+    location_url: {
+      type: String,
+      trim: true,
+      default: null,
+    },
     settings: {
       type: restaurantSettingsSchema,
       default: () => ({

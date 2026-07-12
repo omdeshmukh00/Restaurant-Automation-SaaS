@@ -16,18 +16,23 @@ export function OrdersTrend(): JSX.Element {
   const chartW = W - PAD.l - PAD.r;
   const chartH = H - PAD.t - PAD.b;
 
-  const maxVal = Math.max(...ordersTrend.map((d) => d.orders));
-  const minVal = Math.min(...ordersTrend.map((d) => d.orders));
+  const hasData = ordersTrend.length > 0;
+  const maxVal = hasData ? Math.max(...ordersTrend.map((d) => d.orders)) : 0;
+  const minVal = hasData ? Math.min(...ordersTrend.map((d) => d.orders)) : 0;
   const range  = maxVal - minVal || 1;
 
-  const pts = ordersTrend.map((d, i) => ({
-    x: PAD.l + (i / Math.max(ordersTrend.length - 1, 1)) * chartW,
-    y: PAD.t + (1 - (d.orders - minVal) / range) * chartH,
-    ...d,
-  }));
+  const pts = hasData
+    ? ordersTrend.map((d, i) => ({
+        x: PAD.l + (i / Math.max(ordersTrend.length - 1, 1)) * chartW,
+        y: PAD.t + (1 - (d.orders - minVal) / range) * chartH,
+        ...d,
+      }))
+    : [];
 
   const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const areaPath = `${linePath} L${pts[pts.length - 1].x},${PAD.t + chartH} L${pts[0].x},${PAD.t + chartH} Z`;
+  const areaPath = pts.length > 0
+    ? `${linePath} L${pts[pts.length - 1].x},${PAD.t + chartH} L${pts[0].x},${PAD.t + chartH} Z`
+    : '';
 
   const ySteps = [maxVal, Math.round((maxVal + minVal) / 2), minVal];
 
@@ -83,14 +88,22 @@ export function OrdersTrend(): JSX.Element {
             </g>
           );
         })}
-        {pts.map((p, i) => (
-          <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.date}</text>
-        ))}
-        <path d={areaPath} fill="url(#ordGrad)" />
-        <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {pts.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#3b82f6" stroke="white" strokeWidth="2" />
-        ))}
+        {!hasData ? (
+          <text x={PAD.l + chartW / 2} y={PAD.t + chartH / 2} textAnchor="middle" fontSize="10" fill="#9ca3af" className="font-semibold">
+            No order data for this period
+          </text>
+        ) : (
+          <>
+            {pts.map((p, i) => (
+              <text key={i} x={p.x} y={H - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">{p.date}</text>
+            ))}
+            <path d={areaPath} fill="url(#ordGrad)" />
+            <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {pts.map((p, i) => (
+              <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#3b82f6" stroke="white" strokeWidth="2" />
+            ))}
+          </>
+        )}
       </svg>
     </div>
   );

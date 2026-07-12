@@ -19,6 +19,7 @@ export interface IReservation extends Document {
   status: ReservationStatus;
   tableId?: Types.ObjectId | null;
   notes?: string;
+  occasion?: string;
   notificationPreference: NotificationPreference;
   notificationSentAt?: Date | null;
   lastNotificationType?: string | null;
@@ -50,6 +51,7 @@ const reservationSchema = new Schema<IReservation>(
     },
     tableId: { type: Schema.Types.ObjectId, ref: 'Table', default: null },
     notes: { type: String, trim: true },
+    occasion: { type: String, trim: true, default: null },
     notificationPreference: {
       type: String,
       enum: Object.values(NotificationPreference),

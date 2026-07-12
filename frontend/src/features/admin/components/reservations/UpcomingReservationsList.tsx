@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowRight, Users, X, Search } from 'lucide-react';
+import { useAdminSearch } from '../../context/Adminsearchcontext';
 import { useReservationsStore, type Reservation, type ReservationStatus } from '../../store/reservations.store';
 
 const statusStyle: Record<ReservationStatus, string> = {
@@ -7,6 +8,9 @@ const statusStyle: Record<ReservationStatus, string> = {
   Pending:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400',
   Cancelled: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400',
   'Walk-in': 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400',
+  Completed: "bg-green-100 text-green-700",
+  "Checked In": "bg-blue-100 text-blue-700",
+  "No Show": "bg-red-100 text-red-700",
 };
 
 const timeColor: Record<ReservationStatus, string> = {
@@ -14,6 +18,9 @@ const timeColor: Record<ReservationStatus, string> = {
   Pending:   'text-amber-500',
   Cancelled: 'text-red-500',
   'Walk-in': 'text-purple-500',
+  Completed: "text-green-700",
+  "Checked In": "text-blue-700",
+  "No Show": "text-red-700",
 };
 
 function ReservationRow({
@@ -51,7 +58,7 @@ function ReservationRow({
         <p className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{r.name}</p>
         <p className="text-[11px] sm:text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
           <Users className="w-3 h-3" />
-          {r.guests} Guests • Table {r.tableId}
+          {r.guests} Guests • Table {r.tableNumber}
         </p>
       </div>
     </button>
@@ -61,23 +68,32 @@ function ReservationRow({
 export function UpcomingReservationsList(): JSX.Element {
   const { upcomingReservations, allReservations, selectedGuest, setSelectedGuest, filterStatus } =
     useReservationsStore();
+  const { searchQuery: globalSearchQuery } = useAdminSearch();
 
   const [showViewAll, setShowViewAll] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+
+  const activeSearch = modalSearchQuery.trim() || globalSearchQuery.trim();
+  const activeSearchLower = activeSearch.toLowerCase();
 
   const filteredUpcoming = upcomingReservations.filter((r) => {
     if (filterStatus !== 'All' && r.status !== filterStatus) return false;
-    return true;
+    if (!activeSearchLower) return true;
+    return (
+      r.name.toLowerCase().includes(activeSearchLower) ||
+      r.phone.includes(activeSearchLower) ||
+      r.email.toLowerCase().includes(activeSearchLower)
+    );
   });
 
   const filteredAll = allReservations.filter((r) => {
-    const matchesSearch =
-      !searchQuery ||
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.phone.includes(searchQuery) ||
-      r.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || r.status === filterStatus;
-    return matchesSearch && matchesStatus;
+    if (filterStatus !== 'All' && r.status !== filterStatus) return false;
+    if (!activeSearchLower) return true;
+    return (
+      r.name.toLowerCase().includes(activeSearchLower) ||
+      r.phone.includes(activeSearchLower) ||
+      r.email.toLowerCase().includes(activeSearchLower)
+    );
   });
 
   return (
@@ -154,14 +170,14 @@ export function UpcomingReservationsList(): JSX.Element {
                 <input
                   type="text"
                   placeholder="Search by name, phone or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={modalSearchQuery}
+                  onChange={(e) => setModalSearchQuery(e.target.value)}
                   className="flex-1 text-sm bg-transparent outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
                 />
-                {searchQuery && (
+                {(modalSearchQuery || globalSearchQuery) && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => setModalSearchQuery('')}
                     className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                   >
                     <X className="w-3.5 h-3.5" />

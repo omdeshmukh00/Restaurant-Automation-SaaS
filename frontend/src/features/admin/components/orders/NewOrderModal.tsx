@@ -32,7 +32,7 @@ const STAFF_OPTIONS = [
 type CartItem = { name: string; price: number; qty: number };
 
 export function NewOrderModal({ onClose }: NewOrderModalProps) {
-  const { addOrder, orders } = useOrdersStore();
+  const { createOrder, orders } = useOrdersStore();
 
   const [customerName, setCustomerName] = useState('');
   const [table,        setTable]        = useState('T-01');
@@ -66,33 +66,27 @@ export function NewOrderModal({ onClose }: NewOrderModalProps) {
     return cart.find((c) => c.name === name)?.qty ?? 0;
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!customerName.trim() || cart.length === 0) return;
     setSaving(true);
-    setTimeout(() => {
-      const initials = customerName.trim().split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
-      const newId = `#ORD-${String(Number(orders[0]?.id.replace('#ORD-', '') ?? '00124') + 1).padStart(5, '0')}`;
-      addOrder({
-        id: newId,
-        customer: customerName.trim(),
-        customerAvatar: initials,
-        items: cart.reduce((s, i) => s + i.qty, 0),
-        itemNames: cart.flatMap((c) => Array(c.qty).fill(c.name)),
+    try {
+      await createOrder({
+        customerName: customerName.trim(),
         table,
-        amount: `₹${total.toLocaleString('en-IN')}`,
-        amountRaw: total,
         payment,
-        status: 'Pending' as OrderStatus,
-        assignedStaff: staff.name,
-        staffAvatar: staff.avatar,
-        time: 'just now',
-        timeRaw: 0,
-        date: new Date().toISOString().split('T')[0],
-        notes: notes.trim() || undefined,
+        notes: notes.trim(),
+        items: cart.map((item) => ({
+          name: item.name,
+          price: item.price,
+          quantity: item.qty,
+        })),
       });
-      setSaving(false);
       onClose();
-    }, 400);
+    } catch (error) {
+      console.error('Failed to create order', error);
+    } finally {
+      setSaving(false);
+    }
   }
 
   const fieldClass = "w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 focus:border-orange-300 dark:focus:border-orange-700 text-gray-800 dark:text-gray-100 transition-all";

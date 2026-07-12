@@ -101,7 +101,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                 className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors last:border-b-0"
               >
                 <td className="px-2 sm:px-4 py-3 pl-3 sm:pl-5">
-                  <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{order.id}</span>
+                  <span className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">{order.orderNumber}</span>
                 </td>
                 <td className="px-2 sm:px-4 py-3">
                   <CustomerCell order={order} />

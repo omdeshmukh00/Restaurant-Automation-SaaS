@@ -8,28 +8,29 @@ import {
   type ReservationStatus,
   type Reservation,
 } from '../../store/reservations.store';
+import { useTablesStore } from "../../store/tables.store";
 
 const statusStyle: Record<ReservationStatus, string> = {
-  Confirmed: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400',
-  Pending:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400',
-  Cancelled: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400',
-  'Walk-in': 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400',
-};
+  Confirmed:
+    'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400',
 
-const MOCK_HISTORY: Record<
-  string,
-  Array<{ date: string; occasion?: string; guests: number; total: string; note?: string }>
-> = {
-  r1: [
-    { date: 'Apr 14, 2025', occasion: 'Anniversary Dinner', guests: 4, total: '₹3,240', note: 'Requested quiet table' },
-    { date: 'Jan 20, 2025', guests: 2, total: '₹1,580' },
-    { date: 'Dec 25, 2024', occasion: "New Year's Eve", guests: 4, total: '₹4,100', note: 'Complimentary dessert' },
-  ],
-  r2: [{ date: 'Mar 10, 2025', guests: 2, total: '₹980' }],
-  r3: [
-    { date: 'Feb 14, 2025', occasion: "Valentine's Day", guests: 6, total: '₹5,200' },
-    { date: 'Nov 12, 2024', guests: 4, total: '₹2,800' },
-  ],
+  Pending:
+    'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400',
+
+  Cancelled:
+    'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400',
+
+  'Walk-in':
+    'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400',
+
+  'Checked In':
+    'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400',
+
+  Completed:
+    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400',
+
+  'No Show':
+    'bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-400',
 };
 
 function EmptyState() {
@@ -59,28 +60,36 @@ function EditModal({ guest, onClose, onSave }: EditModalProps) {
     email: guest.email,
     time: guest.time,
     guests: guest.guests,
-    tableId: guest.tableId,
+    tableNumber: guest.tableNumber,
     specialRequest: guest.specialRequest ?? '',
     occasion: guest.occasion ?? '',
     status: guest.status,
   });
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    onSave({
-      name: form.name.trim(),
-      phone: form.phone.trim(),
-      email: form.email.trim(),
-      time: form.time,
-      guests: form.guests,
-      tableId: form.tableId,
-      specialRequest: form.specialRequest.trim() || undefined,
-      occasion: form.occasion.trim() || undefined,
-      status: form.status as ReservationStatus,
-    });
-    setSaved(true);
-    setTimeout(onClose, 1000);
-  };
+  const { tables, fetchTables } = useTablesStore();
+
+  const handleSave = async () => {
+    try {
+    console.log("EditModal Save");
+    await onSave({
+    name: form.name.trim(),
+    phone: form.phone.trim(),
+    email: form.email.trim(),
+    time: form.time,
+    guests: form.guests,
+    tableNumber: form.tableNumber,
+    specialRequest: form.specialRequest.trim() || undefined,
+    occasion: form.occasion.trim() || undefined,
+    status: form.status as ReservationStatus,
+});
+console.log("Save completed");
+setSaved(true);
+setTimeout(onClose, 800);
+ } catch (err) {
+    console.error("SAVE FAILED", err);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -174,15 +183,18 @@ function EditModal({ guest, onClose, onSave }: EditModalProps) {
                 </label>
                 <select
                   id="edit-table"
-                  value={form.tableId}
-                  onChange={(e) => setForm((p) => ({ ...p, tableId: Number(e.target.value) }))}
+                  value={form.tableNumber}
+                  onChange={(e) => setForm((p) => ({ ...p, tableNumber: e.target.value }))}
                   className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 text-gray-800 dark:text-gray-100 transition-all"
                 >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((t) => (
-                    <option key={t} value={t}>
-                      Table {t}
+                  {tables.map((table) => (
+                    <option
+                        key={table.id}
+                        value={table.label}
+                    >
+                        {table.label}
                     </option>
-                  ))}
+                ))}
                 </select>
               </div>
             </div>
@@ -256,7 +268,13 @@ interface HistoryModalProps {
 }
 
 function HistoryModal({ guest, onClose }: HistoryModalProps) {
-  const history = MOCK_HISTORY[guest.id] ?? [];
+  const history: Array<{
+  date: string;
+  occasion?: string;
+  guests: number;
+  total: string;
+  note?: string;
+}> = [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -387,11 +405,15 @@ export function GuestDetailsPanel(): JSX.Element {
   const [showEdit, setShowEdit] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const handleSaveEdits = (updates: Partial<Reservation>) => {
-    if (selectedGuest) {
-      updateReservation(selectedGuest.id, updates);
+  const handleSaveEdits = async (updates: Partial<Reservation>) => {
+    if (!selectedGuest) return;
+
+    try {
+        await updateReservation(selectedGuest.id, updates);
+    } catch (error) {
+        console.error(error);
     }
-  };
+};
 
   return (
     <>
@@ -457,7 +479,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   { icon: <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: selectedGuest.date },
                   { icon: <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: selectedGuest.time },
                   { icon: <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `${selectedGuest.guests} Guests` },
-                  { icon: <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `Table ${selectedGuest.tableId}` },
+                  { icon: <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `Table ${selectedGuest.tableNumber}` },
                 ].map(({ icon, text }, idx) => (
                   <div key={idx} className="flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                     {icon}
