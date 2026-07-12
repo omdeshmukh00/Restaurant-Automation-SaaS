@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../auth/AuthProvider';
 import { apiClient } from '../../../shared/services/apiClient';
 import { Shield, Eye, EyeOff, Check, AlertCircle, CheckCircle, Lock } from 'lucide-react';
+import { setAccessToken, setStoredRole, setStoredUser } from '../../../auth/tokenStore';
 
 export default function ResetPasswordPage() {
   const { signOutAll } = useAuth();
@@ -55,20 +56,35 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      await apiClient.post('/auth/reset-first-login-password', {
+      const response = await apiClient.post('/auth/reset-first-login-password', {
         temporaryPassword,
         newPassword,
         confirmPassword,
       });
 
-      setSuccess(true);
-      sessionStorage.removeItem('last_used_password');
-      
-      // Auto log out after 3 seconds
-      setTimeout(() => {
-        signOutAll();
-        window.location.href = '/auth/admin';
-      }, 3000);
+      const data = response.data?.data;
+      if (data?.user && data?.accessToken) {
+        const panel = data.panel || 'admin';
+        setStoredRole(panel, data.user.role);
+        setStoredUser(panel, { ...data.user, panel });
+        setAccessToken(panel, data.accessToken);
+        
+        sessionStorage.removeItem('last_used_password');
+        setSuccess(true);
+        
+        setTimeout(() => {
+          window.location.href = '/admin';
+        }, 1500);
+      } else {
+        setSuccess(true);
+        sessionStorage.removeItem('last_used_password');
+        
+        // Auto log out after 3 seconds
+        setTimeout(() => {
+          signOutAll();
+          window.location.href = '/auth/admin';
+        }, 3000);
+      }
     } catch (err: any) {
       console.error(err);
       const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Failed to reset password.';

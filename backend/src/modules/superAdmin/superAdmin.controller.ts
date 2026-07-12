@@ -58,15 +58,69 @@ export const approveRestaurantRequest = asyncHandler(async (req: Request, res: R
 
 export const rejectRestaurantRequest = asyncHandler(async (req: Request, res: Response) => {
   const reviewerId = req.user!.id;
-  const { reason } = req.body;
+  const { reason, refund } = req.body;
   if (!reason) {
     throw new AppError('Rejection reason is required', 400, ErrorCode.INVALID_REQUEST);
   }
 
-  const result = await superAdminService.rejectRestaurantRequest(req.params.id, reviewerId, reason);
+  const result = await superAdminService.rejectRestaurantRequest(
+    req.params.id,
+    reviewerId,
+    reason,
+    !!refund
+  );
   
-  socketService.emitToSuperAdmin('restaurant_request_rejected', { id: req.params.id });
+  socketService.emitToSuperAdmin('restaurant_request_rejected', { id: req.params.id, reason });
   ok(res, { success: true, request: result });
+});
+
+import { getPlatformSettings } from './platformSettings.model';
+
+export const getPlatformSettingsController = asyncHandler(async (req: Request, res: Response) => {
+  const settings = await getPlatformSettings();
+  
+  const { RestaurantRequestModel } = await import('./restaurantRequest.model');
+  const paidRequests = await RestaurantRequestModel.find({
+    paymentStatus: 'CAPTURED',
+    paymentAmount: { $gt: 0 }
+  }).setOptions({ bypassTenant: true }).lean();
+
+  const totalRevenue = paidRequests.reduce((sum: number, r: any) => sum + (r.paymentAmount || 0), 0);
+
+  const history = paidRequests.map((r: any) => ({
+    id: r._id.toString(),
+    restaurantName: r.restaurantName,
+    ownerName: r.ownerName,
+    amount: r.paymentAmount,
+    currency: r.paymentCurrency || 'INR',
+    paymentId: r.paymentId,
+    timestamp: r.paymentTimestamp || r.updatedAt
+  }));
+
+  ok(res, {
+    ...settings.toObject(),
+    totalRevenue,
+    history
+  });
+});
+
+export const updatePlatformSettingsController = asyncHandler(async (req: Request, res: Response) => {
+  const settings = await getPlatformSettings();
+  
+  const fields = [
+    'applicationFeeEnabled', 'applicationFeeAmount', 'currency', 
+    'refundPolicy', 'enablePartnerRegistration', 
+    'maxPendingApplications', 'applicationExpiryDays'
+  ];
+
+  for (const field of fields) {
+    if (req.body[field] !== undefined) {
+      (settings as any)[field] = req.body[field];
+    }
+  }
+
+  await settings.save();
+  ok(res, settings);
 });
 
 export const suspendRestaurant = asyncHandler(async (req: Request, res: Response) => {
@@ -96,6 +150,11 @@ export const listPlans = asyncHandler(async (req: Request, res: Response) => {
 export const updatePlan = asyncHandler(async (req: Request, res: Response) => {
   const plan = await superAdminService.updatePlan(req.params.id, req.body);
   ok(res, { plan });
+});
+
+export const applyBulkOffersController = asyncHandler(async (req: Request, res: Response) => {
+  const result = await superAdminService.applyBulkOffers(req.body);
+  ok(res, result);
 });
 
 // ──────────────────────────────────────────────────────────────────────

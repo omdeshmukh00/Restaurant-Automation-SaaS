@@ -118,33 +118,40 @@ export async function login(input: LoginInput, meta?: { userAgent?: string; ip?:
 }
 
 export async function refresh(oldRefreshToken: string) {
-  const users = await UserModel.find({}).select('+refreshTokens');
+  const hashedToken = await hashToken(oldRefreshToken);
 
-  let matchedUser: IUser | null = null;
+  // 1. Direct query using SHA-256 hash
+  let matchedUser = await UserModel.findOne({
+    'refreshTokens.tokenHash': hashedToken,
+  }).select('+refreshTokens');
+
   let matchedTokenIndex = -1;
 
-  for (const user of users) {
-    if (!user.refreshTokens?.length) {
-      continue;
-    }
+  if (matchedUser) {
+    matchedTokenIndex = matchedUser.refreshTokens.findIndex(
+      (refreshToken) => refreshToken.tokenHash === hashedToken
+    );
+  } else {
+    // 2. Fallback to slow search for legacy bcrypt tokens
+    const legacyUsers = await UserModel.find({
+      'refreshTokens.tokenHash': { $regex: /^\$2/ },
+    }).select('+refreshTokens');
 
-    for (let index = 0; index < user.refreshTokens.length; index += 1) {
-      const refreshToken = user.refreshTokens[index];
-
-      if (new Date() > new Date(refreshToken.expiresAt)) {
-        continue;
+    for (const user of legacyUsers) {
+      for (let index = 0; index < user.refreshTokens.length; index += 1) {
+        const refreshToken = user.refreshTokens[index];
+        if (
+          refreshToken.tokenHash.startsWith('$2') &&
+          (await compareToken(oldRefreshToken, refreshToken.tokenHash))
+        ) {
+          matchedUser = user;
+          matchedTokenIndex = index;
+          break;
+        }
       }
-
-      const isMatch = await compareToken(oldRefreshToken, refreshToken.tokenHash);
-      if (isMatch) {
-        matchedUser = user;
-        matchedTokenIndex = index;
+      if (matchedUser) {
         break;
       }
-    }
-
-    if (matchedUser) {
-      break;
     }
   }
 

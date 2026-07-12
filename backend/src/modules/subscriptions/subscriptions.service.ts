@@ -13,6 +13,7 @@ import {
 import { BillingOrderInput, CreateSubscriptionInput, UpdateSubscriptionInput } from './subscriptions.schema';
 import { PlatformPlanModel } from '../superAdmin/superAdmin.model';
 import { RestaurantModel } from '../restaurants/restaurants.model';
+import { logger } from '../../config/logger';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationCategory, NotificationPriority } from '../notifications/notifications.schema';
 import { UserRole } from '../../constants/roles';
@@ -28,6 +29,7 @@ type PlanDetails = {
   usageLimit?: number | null;
   priceMonthly: number;
   priceYearly?: number | null;
+  yearlyDiscountPercentage?: number | null;
 };
 
 async function resolvePlanDetails(plan: string): Promise<PlanDetails> {
@@ -190,9 +192,12 @@ function addDays(date: Date, days: number) {
 
 
 function getPlanAmount(plan: PlanDetails, billingCycle: BillingCycle) {
-  return billingCycle === BillingCycle.YEARLY
-    ? plan.priceYearly ?? plan.priceMonthly * 12
-    : plan.priceMonthly;
+  if (billingCycle === BillingCycle.YEARLY) {
+    if (plan.priceYearly) return plan.priceYearly;
+    const discount = plan.yearlyDiscountPercentage ?? 20;
+    return Math.round(plan.priceMonthly * 12 * (1 - discount / 100));
+  }
+  return plan.priceMonthly;
 }
 
 function validateSeatsAgainstPlanLimit(seats: number, tenantLimit: number) {
@@ -775,4 +780,183 @@ export async function incrementUsage(id: string, key: string, delta = 1) {
   }
 
   return updated;
+}
+
+export async function createPurchaseOrder(restaurantId: string, plan: string, billingCycle: string) {
+  const planDoc = await resolvePlanDetails(plan);
+  const amount = billingCycle === 'yearly'
+    ? (planDoc.priceYearly ?? Math.round(planDoc.priceMonthly * 12 * (1 - (planDoc.yearlyDiscountPercentage ?? 20) / 100)))
+    : planDoc.priceMonthly;
+
+  const restaurant = await RestaurantModel.findById(restaurantId);
+  if (!restaurant) {
+    throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  restaurant.status = 'PAYMENT_PENDING' as any;
+  await restaurant.save();
+
+  if (amount <= 0) {
+    return {
+      requiresPayment: false,
+      amount: 0,
+      currency: 'INR',
+      plan: planDoc.name,
+      billingCycle,
+    };
+  }
+
+  const receipt = `sub_purchase_${Date.now()}`;
+  const order = await createRazorpayOrder({ amount, receipt });
+
+  return {
+    requiresPayment: true,
+    orderId: order.id,
+    amount,
+    currency: 'INR',
+    plan: planDoc.name,
+    billingCycle,
+  };
+}
+
+export interface VerifyPurchaseInput {
+  restaurantId: string;
+  userId: string;
+  plan: string;
+  billingCycle: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_signature?: string;
+}
+
+export async function verifyPurchase(input: VerifyPurchaseInput) {
+  const { restaurantId, userId, plan, billingCycle, razorpay_order_id, razorpay_payment_id, razorpay_signature } = input;
+
+  const planDoc = await resolvePlanDetails(plan);
+  const planAmount = billingCycle === 'yearly'
+    ? (planDoc.priceYearly ?? Math.round(planDoc.priceMonthly * 12 * (1 - (planDoc.yearlyDiscountPercentage ?? 20) / 100)))
+    : planDoc.priceMonthly;
+
+  const restaurant = await RestaurantModel.findById(restaurantId);
+  if (!restaurant) {
+    throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  const isPaid = planAmount > 0;
+
+  if (isPaid) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      throw new AppError('Payment details are required for paid subscriptions', 400, ErrorCode.INVALID_REQUEST);
+    }
+    const { verifyRazorpaySignature } = await import('../../services/razorpay.service');
+    const isValid = verifyRazorpaySignature({
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    });
+    if (!isValid) {
+      throw new AppError('Razorpay payment signature verification failed', 400, ErrorCode.INVALID_REQUEST);
+    }
+  }
+
+  const existingSub = await SubscriptionModel.findOne({ restaurantId });
+  let subscription: any;
+
+  const days = billingCycle === 'yearly' ? 365 : 30;
+  const currentPeriodEnd = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+  if (existingSub) {
+    existingSub.plan = planDoc.name;
+    existingSub.planId = planDoc._id;
+    existingSub.status = SubscriptionStatus.ACTIVE;
+    existingSub.billingCycle = billingCycle as BillingCycle;
+    existingSub.currentPeriodStart = new Date();
+    existingSub.currentPeriodEnd = currentPeriodEnd;
+    existingSub.paymentProvider = isPaid ? SubscriptionPaymentProvider.RAZORPAY : SubscriptionPaymentProvider.MOCK;
+    existingSub.lastPaymentReference = razorpay_payment_id || 'manual';
+    await existingSub.save();
+    subscription = existingSub;
+  } else {
+    subscription = await SubscriptionModel.create({
+      restaurantId: new mongoose.Types.ObjectId(restaurantId),
+      plan: planDoc.name,
+      planId: planDoc._id,
+      status: SubscriptionStatus.ACTIVE,
+      billingCycle: billingCycle as BillingCycle,
+      seats: 1,
+      startedAt: new Date(),
+      currentPeriodStart: new Date(),
+      currentPeriodEnd: currentPeriodEnd,
+      autoRenew: true,
+      nextBillingDate: currentPeriodEnd,
+      paymentProvider: isPaid ? SubscriptionPaymentProvider.RAZORPAY : SubscriptionPaymentProvider.MOCK,
+      lastPaymentReference: razorpay_payment_id || 'manual',
+    });
+  }
+
+  const payment = await SubscriptionPaymentModel.create({
+    subscriptionId: subscription._id,
+    restaurantId: new mongoose.Types.ObjectId(restaurantId),
+    planId: planDoc._id,
+    provider: isPaid ? SubscriptionPaymentProvider.RAZORPAY : SubscriptionPaymentProvider.MOCK,
+    status: SubscriptionPaymentStatus.COMPLETED,
+    billingCycle: billingCycle as BillingCycle,
+    amount: planAmount,
+    currency: 'INR',
+    providerOrderId: razorpay_order_id || null,
+    providerPaymentId: razorpay_payment_id || null,
+    paidAt: new Date(),
+    metadata: { source: 'subscription_purchase', userId },
+  });
+
+  subscription.lastPaymentId = payment._id;
+  await subscription.save();
+
+  restaurant.status = 'ACTIVE' as any;
+  restaurant.plan = planDoc.name;
+  restaurant.billingCycle = billingCycle as any;
+  restaurant.subscriptionId = subscription._id;
+  await restaurant.save();
+
+  await appendSubscriptionHistory({
+    subscriptionId: subscription._id,
+    restaurantId: new mongoose.Types.ObjectId(restaurantId),
+    eventType: existingSub ? SubscriptionEventType.RENEWED : SubscriptionEventType.CREATED,
+    plan: planDoc.name,
+    billingCycle,
+    startDate: subscription.currentPeriodStart,
+    endDate: subscription.currentPeriodEnd,
+    paymentId: razorpay_payment_id || 'manual',
+    amount: planAmount,
+    status: 'active',
+    changedBy: userId,
+  });
+
+  logger.info(`Subscription Created: ${subscription._id} for Restaurant: ${restaurantId}`);
+  logger.info(`Subscription History Created: for Restaurant: ${restaurantId}`);
+
+  const { sendSubscriptionActivatedEmail, sendPaymentSuccessEmail } = await import('../../services/mail.service');
+  void sendSubscriptionActivatedEmail(
+    restaurant.email,
+    restaurant.ownerName,
+    planDoc.name,
+    billingCycle,
+    subscription.currentPeriodEnd
+  );
+
+  if (isPaid && razorpay_payment_id) {
+    void sendPaymentSuccessEmail(
+      restaurant.email,
+      restaurant.ownerName,
+      planAmount,
+      razorpay_order_id!,
+      razorpay_payment_id
+    );
+  }
+
+  return {
+    success: true,
+    subscription,
+    restaurant,
+  };
 }

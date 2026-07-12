@@ -4,10 +4,17 @@ import { useAuth } from "../auth/AuthProvider";
 import { useTheme } from "../app/providers/ThemeProvider";
 import Navbar from "../features/superAdmin/components/dashboard/Navbar";
 import Sidebar from "../features/superAdmin/components/Sidebar";
+import { useRestaurantRequestsStore } from "../features/superAdmin/store/RestaurantRequests";
 
 export default function SuperAdminLayout() {
   // Removed unused signOut variable
   useAuth();
+
+  const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const { theme: themePreference, setTheme: setThemePreference } = useTheme();
 

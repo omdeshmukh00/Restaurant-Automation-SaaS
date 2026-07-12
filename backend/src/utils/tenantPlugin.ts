@@ -4,7 +4,7 @@ import { tenantContext } from './tenantContext';
 export function tenantPlugin(schema: Schema) {
   // If the schema matches global collections, skip applying the plugin
   const collectionName = (schema as any).options?.collection;
-  const excludedCollections = ['plans', 'featureFlags', 'restaurant_requests'];
+  const excludedCollections = ['plans', 'featureFlags', 'restaurant_requests', 'platformSettings'];
   
   if (collectionName && excludedCollections.includes(collectionName)) {
     return;

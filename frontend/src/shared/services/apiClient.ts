@@ -11,8 +11,8 @@ function getPanelFromUrl(url: string | undefined): Panel | null {
     .replace(/^\/?api\/v\d+/, '')         // remove /api/v1 or api/v1
     .replace(/^\/?api/, '');              // remove /api or api
 
-  if (cleanPath.startsWith('/admin') || cleanPath.startsWith('admin')) return 'admin';
   if (cleanPath.startsWith('/superadmin') || cleanPath.startsWith('superadmin') || cleanPath.startsWith('/super-admin') || cleanPath.startsWith('super-admin')) return 'superadmin';
+  if (cleanPath.startsWith('/admin') || cleanPath.startsWith('admin')) return 'admin';
   if (cleanPath.startsWith('/kitchen') || cleanPath.startsWith('kitchen')) return 'kitchen';
   if (cleanPath.startsWith('/staff') || cleanPath.startsWith('staff')) return 'staff';
   if (cleanPath.startsWith('/cleaning') || cleanPath.startsWith('cleaning')) return 'cleaning';

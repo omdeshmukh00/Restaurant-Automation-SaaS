@@ -8,6 +8,7 @@ import {
   createPlanSchema,
   updatePlanSchema,
   planIdParamSchema,
+  bulkOffersSchema,
   featureFlagIdParamSchema,
   updateFeatureFlagSchema,
   analyticsQuerySchema,
@@ -23,6 +24,7 @@ import {
   createPlan,
   listPlans,
   updatePlan,
+  applyBulkOffersController,
   listFeatureFlags,
   updateFeatureFlag,
   getRevenueAnalytics,
@@ -32,9 +34,20 @@ import {
   listRestaurantRequests,
   approveRestaurantRequest,
   rejectRestaurantRequest,
+  getPlatformSettingsController,
+  updatePlatformSettingsController,
 } from './superAdmin.controller';
 
 const router = Router();
+
+/*
+|--------------------------------------------------------------------------
+| PLATFORM SETTINGS
+|--------------------------------------------------------------------------
+*/
+
+router.get('/platform-settings', getPlatformSettingsController);
+router.patch('/platform-settings', updatePlatformSettingsController);
 
 /*
 |--------------------------------------------------------------------------
@@ -111,6 +124,13 @@ router.post(
 
 // GET /super-admin/plans
 router.get('/plans', listPlans);
+
+// POST /super-admin/plans/bulk-offers
+router.post(
+  '/plans/bulk-offers',
+  validate({ body: bulkOffersSchema }),
+  applyBulkOffersController,
+);
 
 // PATCH /super-admin/plans/:id
 router.patch(

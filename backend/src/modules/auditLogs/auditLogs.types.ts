@@ -93,6 +93,18 @@ export enum AuditAction {
   UPLOAD_CREATED             = 'UPLOAD_CREATED',
   UPLOAD_UPDATED             = 'UPLOAD_UPDATED',
   UPLOAD_DELETED             = 'UPLOAD_DELETED',
+
+  // Restaurant
+  RESTAURANT_PROFILE_UPDATED = 'RESTAURANT_PROFILE_UPDATED',
+
+  // Additional Actions
+  RESTAURANT_REQUEST_SUBMITTED = 'RESTAURANT_REQUEST_SUBMITTED',
+  RESTAURANT_REJECTED          = 'RESTAURANT_REJECTED',
+  ADMIN_CREATED                = 'ADMIN_CREATED',
+  APPROVAL_EMAIL_SENT          = 'APPROVAL_EMAIL_SENT',
+  REJECTION_EMAIL_SENT          = 'REJECTION_EMAIL_SENT',
+  PASSWORD_RESET               = 'PASSWORD_RESET',
+  FIRST_LOGIN                  = 'FIRST_LOGIN',
 }
 
 // ── Payload passed to the log helper ─────────────────────────────────

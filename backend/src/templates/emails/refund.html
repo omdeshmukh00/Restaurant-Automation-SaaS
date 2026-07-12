@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { padding: 20px; }
+    .header { font-size: 22px; font-weight: bold; margin-bottom: 20px; color: #ef4444; }
+    .details { background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Refund Processed Successfully</div>
+    <p>Dear {{ownerName}},</p>
+    <p>A refund has been successfully initiated/processed for your payment.</p>
+    <div class="details">
+      <p><strong>Amount Refunded:</strong> ₹{{amount}}</p>
+      <p><strong>Original Transaction ID:</strong> {{paymentId}}</p>
+      <p><strong>Refund Source:</strong> Application Processing Fee Refund</p>
+    </div>
+    <p>The refunded amount should reflect back in your original payment source (bank account, card, or wallet) within 5-7 business days depending on your payment provider.</p>
+    <p>If you have any questions, please reply directly to this email.</p>
+    <p>Best regards,<br/>The RestoHub Team</p>
+  </div>
+</body>
+</html>

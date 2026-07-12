@@ -29,8 +29,8 @@ function panelAccessCookieName(panel: Panel): string {
 }
 
 function getPanelFromUrl(url: string): Panel | null {
-  if (url.includes('/admin')) return 'admin';
   if (url.includes('/superadmin') || url.includes('/super-admin')) return 'superadmin';
+  if (url.includes('/admin')) return 'admin';
   if (url.includes('/kitchen')) return 'kitchen';
   if (url.includes('/staff')) return 'staff';
   if (url.includes('/cleaning')) return 'cleaning';

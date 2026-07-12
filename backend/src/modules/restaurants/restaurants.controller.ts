@@ -100,3 +100,49 @@ export const updateRestaurantSettingsController = asyncHandler(async (req: Reque
     },
   });
 });
+
+export const updateRestaurantProfileController = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const restaurantId = req.user?.restaurantId;
+  const restaurant = restaurantId ? await RestaurantModel.findById(restaurantId) : null;
+
+  if (!restaurant) {
+    throw new AppError(404, 'NOT_FOUND', 'Restaurant not found');
+  }
+
+  const fields = [
+    'ownerName', 'phone', 'address', 'city', 'state', 'country', 
+    'pinCode', 'gstNumber', 'cuisine', 'branches', 
+    'expectedMonthlyOrders', 'latitude', 'longitude', 'googleMapsUrl'
+  ];
+
+  for (const field of fields) {
+    if (req.body[field] !== undefined) {
+      (restaurant as any)[field] = req.body[field];
+    }
+  }
+
+  if (
+    restaurant.status === 'APPLICATION_APPROVED' as any || 
+    restaurant.status === 'PENDING_APPROVAL' as any ||
+    restaurant.status === 'ADMIN_SETUP_PENDING' as any ||
+    restaurant.status === 'ONBOARDING' as any
+  ) {
+    restaurant.status = 'PLAN_SELECTION_PENDING' as any;
+  }
+
+  await restaurant.save();
+
+  ok(res, {
+    message: 'Profile updated successfully',
+    restaurant,
+  });
+
+  void logAudit(req, {
+    entityType: AuditEntity.RESTAURANT,
+    entityId:   restaurant.id.toString(),
+    action:     AuditAction.RESTAURANT_PROFILE_UPDATED,
+    metadata: {
+      updatedFields: Object.keys(req.body),
+    },
+  });
+});

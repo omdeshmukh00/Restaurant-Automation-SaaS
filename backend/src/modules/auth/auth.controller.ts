@@ -512,7 +512,30 @@ export const resetFirstLoginPassword = asyncHandler(async (req: Request, res: Re
   user.mustResetPassword = false;
   user.firstLogin = false;
   user.mustChangePassword = false;
-  user.refreshTokens = [];
+  
+  const panel = USER_ROLE_TO_PANEL[user.role as UserRole] ?? undefined;
+  
+  // Generate token pair and set cookies for the new session
+  const payload = {
+    _id: user._id.toString(),
+    email: user.email,
+    role: user.role,
+    panel,
+    mustChangePassword: user.mustChangePassword,
+    mustResetPassword: user.mustResetPassword,
+    firstLogin: user.firstLogin,
+    ...(user.restaurantId && { restaurantId: user.restaurantId.toString() }),
+    ...(user.tenantId && { tenantId: user.tenantId }),
+  };
+
+  const tokens = generateTokenPair(payload);
+  const tokenHash = await hashToken(tokens.refreshToken);
+
+  user.refreshTokens = [{
+    tokenHash,
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + parseExpiry(env.JWT_REFRESH_EXPIRES_IN)),
+  }];
   await user.save();
 
   void logAuditRaw({
@@ -539,11 +562,27 @@ export const resetFirstLoginPassword = asyncHandler(async (req: Request, res: Re
     userAgent: req.headers['user-agent'],
   });
 
-  const panel = USER_ROLE_TO_PANEL[user.role as UserRole] ?? undefined;
-  clearRefreshCookie(res, panel);
+  if (panel) {
+    setRefreshCookie(res, tokens.refreshToken, panel);
+    setAccessCookie(res, tokens.accessToken, panel);
+  }
+
+  const { RestaurantModel } = await import('../restaurants/restaurants.model');
+  const restaurant = user.restaurantId ? await RestaurantModel.findById(user.restaurantId).lean() : null;
 
   sendSuccess(res, {
     success: true,
-    message: 'Password changed successfully. Please log in with your new password.',
+    message: 'Password updated successfully.',
+    user: {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      restaurantId: user.restaurantId?.toString(),
+      restaurantName: restaurant ? restaurant.name : 'Restaurant',
+    },
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    panel,
   });
 });

@@ -83,3 +83,22 @@ export const restaurantSlugParamSchema = z.object({
 // ── Exported types ────────────────────────────────────────────────────
 export type UpdateRestaurantSettingsInput = z.infer<typeof updateRestaurantSettingsSchema>;
 export type RestaurantSlugParam = z.infer<typeof restaurantSlugParamSchema>;
+
+export const updateRestaurantProfileSchema = z.object({
+  ownerName: z.string().trim().min(2, 'Owner name must be at least 2 characters').optional(),
+  phone: z.string().trim().min(10, 'Phone number must be at least 10 digits').optional(),
+  address: z.string().trim().min(5, 'Address must be at least 5 characters').optional(),
+  city: z.string().trim().min(2, 'City must be at least 2 characters').optional(),
+  state: z.string().trim().min(2, 'State must be at least 2 characters').optional(),
+  country: z.string().trim().min(2, 'Country must be at least 2 characters').optional(),
+  pinCode: z.string().trim().min(6, 'Pin code must be at least 6 characters').optional(),
+  gstNumber: z.string().trim().optional(),
+  cuisine: z.string().trim().min(2, 'Cuisine must be at least 2 characters').optional(),
+  branches: z.number().int().positive().optional(),
+  expectedMonthlyOrders: z.number().int().nonnegative().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  googleMapsUrl: z.string().trim().optional(),
+});
+
+export type UpdateRestaurantProfileInput = z.infer<typeof updateRestaurantProfileSchema>;

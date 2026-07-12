@@ -46,27 +46,74 @@ function mapEventType(type: SubscriptionEventType): RestaurantSubscriptionHistor
 }
 
 export async function appendSubscriptionHistory(params: {
-  subscriptionId: string | mongoose.Types.ObjectId;
+  subscriptionId?: string | mongoose.Types.ObjectId;
   restaurantId: string | mongoose.Types.ObjectId;
-  eventType: SubscriptionEventType;
+  eventType: SubscriptionEventType | RestaurantSubscriptionHistoryEventType;
+  plan?: string;
+  billingCycle?: string;
+  startDate?: Date;
+  endDate?: Date;
+  paymentId?: string;
+  amount?: number;
+  status?: string;
+  changedBy?: string;
   metadata?: Record<string, unknown>;
   writeLegacyEvent?: boolean;
 }) {
-  const { subscriptionId, restaurantId, eventType, metadata = {}, writeLegacyEvent = true } = params;
+  const {
+    subscriptionId,
+    restaurantId,
+    eventType,
+    plan = 'Free',
+    billingCycle = 'monthly',
+    startDate = new Date(),
+    endDate = new Date(),
+    paymentId = 'manual',
+    amount = 0,
+    status = 'active',
+    changedBy = 'system',
+    metadata = {},
+    writeLegacyEvent = true,
+  } = params;
 
-  const subId = new mongoose.Types.ObjectId(subscriptionId);
+  const subId = subscriptionId ? new mongoose.Types.ObjectId(subscriptionId) : undefined;
   const restId = new mongoose.Types.ObjectId(restaurantId);
 
+  // Determine the RestaurantSubscriptionHistoryEventType
+  let mappedType: RestaurantSubscriptionHistoryEventType;
+  if (Object.values(RestaurantSubscriptionHistoryEventType).includes(eventType as any)) {
+    mappedType = eventType as RestaurantSubscriptionHistoryEventType;
+  } else {
+    mappedType = mapEventType(eventType as SubscriptionEventType);
+  }
+
   // Write to legacy subscriptionEvents as well (so we don’t break existing analytics).
-  if (writeLegacyEvent) {
-    await SubscriptionEventModel.create({ subscriptionId: subId, restaurantId: restId, type: eventType, metadata });
+  if (writeLegacyEvent && subId) {
+    const legacyType = Object.values(SubscriptionEventType).includes(eventType as any)
+      ? (eventType as SubscriptionEventType)
+      : SubscriptionEventType.UPDATED;
+
+    await SubscriptionEventModel.create({
+      subscriptionId: subId,
+      restaurantId: restId,
+      type: legacyType,
+      metadata,
+    });
   }
 
   // Write to dedicated history model.
   await RestaurantSubscriptionHistoryModel.create({
     subscriptionId: subId,
     restaurantId: restId,
-    eventType: mapEventType(eventType),
+    plan,
+    billingCycle,
+    startDate,
+    endDate,
+    paymentId,
+    amount,
+    status,
+    changedBy,
+    eventType: mappedType,
     metadata,
   });
 }

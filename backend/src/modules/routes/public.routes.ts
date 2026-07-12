@@ -109,15 +109,29 @@ publicRouter.get('/menu', async (req, res, next) => {
 import {
   createRazorpayOrderForPlan,
   submitPartnerRequest,
+  verifyPartnerRequestPayment,
+  recoverPartnerRequest,
 } from '../superAdmin/restaurantRequest.controller';
 
 publicRouter.post('/partner-request/create-order', createRazorpayOrderForPlan);
 publicRouter.post('/partner-request', submitPartnerRequest);
+publicRouter.post('/partner-request/verify-payment', verifyPartnerRequestPayment);
+publicRouter.post('/partner-request/recover', recoverPartnerRequest);
 
-import { PlatformPlanModel } from '../superAdmin/superAdmin.model';
+import { getPlatformSettings } from '../superAdmin/platformSettings.model';
+publicRouter.get('/platform-settings', async (_req, res, next) => {
+  try {
+    const settings = await getPlatformSettings();
+    ok(res, settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+import { listPlans } from '../superAdmin/superAdmin.service';
 publicRouter.get('/plans', async (_req, res, next) => {
   try {
-    const plans = await PlatformPlanModel.find({ isActive: { $ne: false } }).sort({ priceMonthly: 1 });
+    const plans = await listPlans(true);
     ok(res, { plans });
   } catch (error) {
     next(error);

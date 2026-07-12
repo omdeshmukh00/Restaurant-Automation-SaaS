@@ -53,4 +53,8 @@ router.patch('/:id/usage', superAdminOnly, validate({ params: subscriptionIdPara
 router.get('/:id/history', superAdminOnly, validate({ params: subscriptionIdParam }), controller.history);
 router.post('/:id/billing/order', restaurantAdminAndSuper, validate({ params: subscriptionIdParam, body: billingOrderSchema }), controller.createBillingOrder);
 
+// Decoupled subscription purchase routes for Restaurant Admin
+router.post('/purchase/create-order', restaurantAdminAndSuper, controller.createPurchaseOrder);
+router.post('/purchase/verify', restaurantAdminAndSuper, controller.verifyPurchase);
+
 export default router;

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { padding: 20px; }
+    .header { font-size: 22px; font-weight: bold; margin-bottom: 20px; color: #f97316; }
+    .details { background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #f97316; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Subscription Activated!</div>
+    <p>Dear {{ownerName}},</p>
+    <p>We are excited to inform you that your subscription to the plan <strong>{{planName}}</strong> ({{billingCycle}} billing) has been successfully activated.</p>
+    <div class="details">
+      <p><strong>Plan Name:</strong> {{planName}}</p>
+      <p><strong>Billing Cycle:</strong> {{billingCycle}}</p>
+      <p><strong>Current Period Ends:</strong> {{periodEnd}}</p>
+    </div>
+    <p>Thank you for choosing RestoHub! Your restaurant features are now fully enabled and you can start using all tools inside your admin panel.</p>
+    <p>Best regards,<br/>The RestoHub Team</p>
+  </div>
+</body>
+</html>

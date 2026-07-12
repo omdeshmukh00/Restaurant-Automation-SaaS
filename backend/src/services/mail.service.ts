@@ -582,3 +582,80 @@ export async function sendRestaurantSubmissionEmail(
     return false;
   }
 }
+
+export async function sendSubscriptionActivatedEmail(
+  email: string,
+  ownerName: string,
+  planName: string,
+  billingCycle: string,
+  periodEnd: Date
+): Promise<boolean> {
+  try {
+    let html = getTemplate('subscription-activated');
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{planName\}\}/g, planName);
+    html = html.replace(/\{\{billingCycle\}\}/g, billingCycle);
+    html = html.replace(/\{\{periodEnd\}\}/g, periodEnd.toLocaleDateString());
+
+    return await sendEmail({
+      to: email,
+      subject: 'RestoHub - Subscription Activated successfully',
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send subscription activated email', { error, email });
+    return false;
+  }
+}
+
+export async function sendRefundEmail(
+  email: string,
+  ownerName: string,
+  amount: number,
+  paymentId: string,
+  success: boolean
+): Promise<boolean> {
+  try {
+    let html = getTemplate('refund');
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{amount\}\}/g, String(amount));
+    html = html.replace(/\{\{paymentId\}\}/g, paymentId);
+
+    return await sendEmail({
+      to: email,
+      subject: 'RestoHub - Refund Processed successfully',
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send refund email', { error, email });
+    return false;
+  }
+}
+
+export async function sendPaymentSuccessEmail(
+  email: string,
+  ownerName: string,
+  amount: number,
+  orderId: string,
+  paymentId: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('payment-success');
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{amount\}\}/g, String(amount));
+    html = html.replace(/\{\{orderId\}\}/g, orderId);
+    html = html.replace(/\{\{paymentId\}\}/g, paymentId);
+
+    return await sendEmail({
+      to: email,
+      subject: 'RestoHub - Payment Received successfully',
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send payment success email', { error, email });
+    return false;
+  }
+}
