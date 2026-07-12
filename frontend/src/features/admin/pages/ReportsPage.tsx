@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Download, CalendarDays, ChevronDown } from 'lucide-react';
 import { useReportsStore, exportReportsAsCSV } from '../store/reports.store';
 import type { DateRange } from '../store/reports.store';
@@ -16,10 +16,30 @@ export default function ReportsPage(): JSX.Element {
     isCalendarOpen, setIsCalendarOpen,
     globalRange, setGlobalRange,
     getDateLabel,
+    fetchReportData,
+    dateRangeSelection,
+    revenueRange,
+    ordersRange,
+    peakHoursRange,
+    loading,
+    stats,
   } = useReportsStore();
+
+  useEffect(() => {
+    fetchReportData();
+  }, [fetchReportData, dateRangeSelection, revenueRange, ordersRange, peakHoursRange]);
 
   function handleExport() {
     exportReportsAsCSV(useReportsStore.getState());
+  }
+
+  if (loading && !stats) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mb-4" />
+        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">Loading reports and analytics...</p>
+      </div>
+    );
   }
 
   return (

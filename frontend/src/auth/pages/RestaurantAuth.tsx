@@ -26,7 +26,7 @@ const ROLES: RoleConfig[] = [
     iconBg: 'bg-orange-50 dark:bg-orange-950/20',
     iconColor: 'text-orange-500',
     seedEmail: 'kitchenpanel1@gmail.com',
-    seedPassword: 'Kitchen@123',
+    seedPassword: 'Happy@100',
   },
   {
     role: 'staff',
@@ -36,7 +36,7 @@ const ROLES: RoleConfig[] = [
     iconBg: 'bg-emerald-50 dark:bg-emerald-950/20',
     iconColor: 'text-emerald-500',
     seedEmail: 'staffpanel320@gmail.com',
-    seedPassword: 'Staff@123',
+    seedPassword: 'Happy@100',
   },
   {
     role: 'cleaning',
@@ -46,7 +46,7 @@ const ROLES: RoleConfig[] = [
     iconBg: 'bg-blue-50 dark:bg-blue-950/20',
     iconColor: 'text-blue-500',
     seedEmail: 'cleaningpanel14@gmail.com',
-    seedPassword: 'Cleaning@123',
+    seedPassword: 'Happy@100',
   },
   {
     role: 'admin',
@@ -56,7 +56,7 @@ const ROLES: RoleConfig[] = [
     iconBg: 'bg-amber-50 dark:bg-amber-950/20',
     iconColor: 'text-amber-500',
     seedEmail: 'adminpanel16@gmail.com',
-    seedPassword: 'Admin@123',
+    seedPassword: 'Happy@100',
   },
 ];
 

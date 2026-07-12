@@ -27,7 +27,7 @@ function StockValue({ item }: { item: InventoryItem }) {
     : isLow
     ? 'text-amber-500 dark:text-amber-400'
     : 'text-gray-800 dark:text-gray-100';
-  return <span className={`text-sm font-semibold ${color}`}>{item.currentStock.toFixed(2)}</span>;
+  return <span className={`text-sm font-semibold ${color}`}>{(Number(item.currentStock) || 0).toFixed(2)}</span>;
 }
 
 function ActionMenu({ item }: { item: InventoryItem }) {
@@ -131,7 +131,7 @@ function MobileItemCard({ item }: { item: InventoryItem }) {
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-0.5">Par Level</p>
-              <p className="text-sm text-gray-700 dark:text-gray-300">{item.parLevel.toFixed(2)}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300">{(Number(item.parLevel) || 0).toFixed(2)}</p>
             </div>
           </div>
           <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -229,7 +229,7 @@ export function InventoryTable({ items }: InventoryTableProps) {
                     <StockValue item={item} />
                   </td>
                   <td className="px-3 py-3">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{item.parLevel.toFixed(2)}</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{(Number(item.parLevel) || 0).toFixed(2)}</span>
                   </td>
                   <td className="px-3 py-3">
                     <InventoryStatusBadge status={item.status} />

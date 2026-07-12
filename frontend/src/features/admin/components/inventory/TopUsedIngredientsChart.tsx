@@ -48,7 +48,7 @@ function IngredientsModal() {
                   <div
                     className="h-full rounded-full transition-all"
                     style={{
-                      width: `${(d.value / maxVal) * 100}%`,
+                      width: `${maxVal > 0 ? (d.value / maxVal) * 100 : 0}%`,
                       backgroundColor: `rgba(249, 115, 22, ${0.9 - i * 0.1})`,
                     }}
                   />
@@ -116,7 +116,7 @@ export function TopUsedIngredientsChart() {
           })}
 
           {topUsedIngredients.map((d, i) => {
-            const barH = (d.value / maxVal) * innerH;
+            const barH = maxVal > 0 ? (d.value / maxVal) * innerH : 0;
             const x    = startX + i * (BAR_W + GAP);
             const y    = PAD_TOP + innerH - barH;
             const shortLabel = d.label.split(' ')[0];

@@ -107,7 +107,7 @@ export function PeakHours(): JSX.Element {
 export function TopSellingItems(): JSX.Element {
   const { getTopSellingItems, topItemsRange, setTopItemsRange } = useReportsStore();
   const topSellingItems = getTopSellingItems();
-  const maxOrders = Math.max(...topSellingItems.map((i) => i.orders));
+  const maxOrders = topSellingItems.length > 0 ? Math.max(...topSellingItems.map((i) => i.orders)) : 1;
 
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 min-w-0 w-full">
