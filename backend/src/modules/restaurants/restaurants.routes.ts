@@ -8,12 +8,14 @@ import { UserRole } from '../../constants/roles';
 import {
   updateRestaurantSettingsSchema,
   restaurantSlugParamSchema,
+  updateRestaurantProfileSchema,
 } from './restaurants.schema';
 import {
   getPublicRestaurantController,
   getRestaurantOverviewController,
   getRestaurantSettingsController,
   updateRestaurantSettingsController,
+  updateRestaurantProfileController,
 } from './restaurants.controller';
 
 const router = Router();
@@ -62,6 +64,15 @@ router.patch(
   roleGuard(...adminRoles),
   validate({ body: updateRestaurantSettingsSchema }),
   updateRestaurantSettingsController,
+);
+
+// PATCH /admin/restaurant/profile
+router.patch(
+  '/admin/restaurant/profile',
+  requireAuth,
+  roleGuard(...adminRoles),
+  validate({ body: updateRestaurantProfileSchema }),
+  updateRestaurantProfileController,
 );
 
 export default router;

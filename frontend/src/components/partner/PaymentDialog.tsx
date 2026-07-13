@@ -1,36 +1,39 @@
 import React, { useState } from 'react';
-import { CreditCard, AlertCircle, RefreshCw, X } from 'lucide-react';
+import { CreditCard, AlertCircle, RefreshCw, X, Check } from 'lucide-react';
 import { apiClient } from '../../shared/services/apiClient';
 
 interface PaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  plan: string;
+  orderId: string;
   amount: number;
+  currency: string;
+  requestId: string;
   ownerName: string;
   email: string;
   phone: string;
-  onPaymentSuccess: (metadata: {
-    razorpay_order_id: string;
-    razorpay_payment_id: string;
-    razorpay_signature: string;
-  }) => void;
+  refundPolicy: string;
+  onPaymentSuccess: (response: any) => void;
   onPaymentFailure: (errorMessage: string) => void;
 }
 
 export default function PaymentDialog({
   isOpen,
   onClose,
-  plan,
+  orderId,
   amount,
+  currency,
+  requestId,
   ownerName,
   email,
   phone,
+  refundPolicy,
   onPaymentSuccess,
   onPaymentFailure,
 }: PaymentDialogProps) {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   if (!isOpen) return null;
 
@@ -57,28 +60,33 @@ export default function PaymentDialog({
         throw new Error('Razorpay SDK failed to load. Please check your internet connection.');
       }
 
-      // 2. Create Order on Backend
-      const orderResponse = await apiClient.post('/public/partner-request/create-order', {
-        plan,
-      });
-
-      const { orderId, amount, currency } = orderResponse.data.data;
-
-      // 3. Configure Razorpay Options
+      // 2. Configure Razorpay Options
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
-        amount: amount,
+        amount: amount * 100, // Razorpay expects paise
         currency: currency,
-        name: 'RestoHub SaaS Partner',
-        description: `Setup & Subscription for ${plan} Plan`,
+        name: 'RestoHub Partner Onboarding',
+        description: 'Application Processing Fee',
         order_id: orderId,
-        handler: function (response: any) {
+        handler: async function (response: any) {
           setLoading(false);
-          onPaymentSuccess({
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature,
-          });
+          setVerifying(true);
+          try {
+            // Verify payment on the backend
+            const verifyRes = await apiClient.post('/public/partner-request/verify-payment', {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            onPaymentSuccess(verifyRes.data);
+          } catch (err: any) {
+            console.error('Payment verification failed:', err);
+            const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Verification failed.';
+            setErrorMessage(msg);
+            onPaymentFailure(msg);
+          } finally {
+            setVerifying(false);
+          }
         },
         prefill: {
           name: ownerName,
@@ -86,7 +94,7 @@ export default function PaymentDialog({
           contact: phone,
         },
         notes: {
-          plan,
+          requestId,
           ownerName,
         },
         theme: {
@@ -100,7 +108,7 @@ export default function PaymentDialog({
         },
       };
 
-      // 4. Open Razorpay Popup
+      // 3. Open Razorpay Popup
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (resp: any) {
         setLoading(false);
@@ -117,16 +125,16 @@ export default function PaymentDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={loading ? undefined : onClose} />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={(loading || verifying) ? undefined : onClose} />
 
-      {/* Modal Dialog (Light Mode) */}
-      <div className="relative w-full max-w-md bg-white border border-slate-100 rounded-[1.75rem] p-6 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-250 text-slate-800">
+      {/* Modal Dialog */}
+      <div className="relative w-full max-w-md bg-white border border-slate-100 rounded-3xl p-6 shadow-xl overflow-hidden text-slate-800">
         <button
           type="button"
           onClick={onClose}
-          disabled={loading}
+          disabled={loading || verifying}
           className="absolute top-5 right-5 text-slate-400 hover:text-slate-650 disabled:opacity-50 transition-colors"
         >
           <X className="w-5 h-5" />
@@ -138,29 +146,29 @@ export default function PaymentDialog({
               <CreditCard className="w-5 h-5 text-orange-500" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-850">Plan Setup Fee</h3>
-              <p className="text-xs text-slate-500">Complete payment to finalize your request</p>
+              <h3 className="text-base font-bold text-slate-850">Processing Fee Required</h3>
+              <p className="text-xs text-slate-500">Complete payment to submit your partner application</p>
             </div>
           </div>
 
           <div className="bg-slate-50 rounded-2xl p-5 border border-slate-150 space-y-4">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Plan Selected:</span>
-              <span className="font-bold text-slate-800">{plan} Subscription</span>
+              <span className="text-slate-500 font-medium">Fee Details:</span>
+              <span className="font-bold text-slate-800">Application Review & Verification</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Billing Frequency:</span>
-              <span className="text-slate-800 font-bold">Monthly</span>
+              <span className="text-slate-500 font-medium">Refund Policy:</span>
+              <span className="text-orange-600 font-bold capitalize">{refundPolicy}</span>
             </div>
             <div className="border-t border-slate-200/60 my-2" />
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-500 font-medium">Total Setup Fee:</span>
+              <span className="text-xs text-slate-500 font-medium">Processing Fee:</span>
               <span className="text-2xl font-extrabold text-orange-500 font-sans">₹{amount}</span>
             </div>
           </div>
 
           {errorMessage && (
-            <div className="flex items-start gap-2.5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+            <div className="flex items-start gap-2.5 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 animate-shake">
               <AlertCircle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
               <span>{errorMessage}</span>
             </div>
@@ -170,23 +178,33 @@ export default function PaymentDialog({
             <button
               type="button"
               onClick={onClose}
-              disabled={loading}
-              className="flex-1 py-3 px-4 rounded-full border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-xs font-semibold text-slate-600 transition-colors"
+              disabled={loading || verifying}
+              className="flex-1 py-3 px-4 rounded-full border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-xs font-semibold text-slate-650 transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handlePayment}
-              disabled={loading}
+              disabled={loading || verifying}
               className="flex-[1.5] py-3 px-4 rounded-full bg-[#FF6B1A] hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-orange-500/10 transition-all duration-200"
             >
-              {loading ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              {verifying ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Verifying...
+                </>
+              ) : loading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  Checkout...
+                </>
               ) : (
-                <CreditCard className="w-3.5 h-3.5" />
+                <>
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Pay & Submit
+                </>
               )}
-              {loading ? 'Processing...' : `Pay ₹${amount} & Submit`}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ export interface IPlatformPlan extends Document {
   name: string;
   priceMonthly: number;
   priceYearly?: number | null;
+  yearlyDiscountPercentage?: number | null;
   description?: string | null;
   tenantLimit: number;
   usageLimit?: number;
@@ -31,6 +32,7 @@ const platformPlanSchema = new Schema<IPlatformPlan>(
     name: { type: String, required: true, trim: true, unique: true },
     priceMonthly: { type: Number, required: true, min: 0 },
     priceYearly: { type: Number, min: 0, default: null },
+    yearlyDiscountPercentage: { type: Number, min: 0, max: 100, default: 20 },
     description: { type: String, trim: true, default: null },
     tenantLimit: { type: Number, required: true, min: 1 },
     usageLimit: { type: Number, min: 0, default: null },

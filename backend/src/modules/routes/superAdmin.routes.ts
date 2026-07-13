@@ -16,7 +16,7 @@ superAdminRouter.get('/platform/overview', async (_req, res, next) => {
     const activeRestaurants = restaurants.filter((restaurant) => restaurant.status === RestaurantStatus.ACTIVE);
     const planPriceMap = new Map(plans.map((plan) => [plan.name, plan.priceMonthly]));
     const monthlyRecurringRevenue = activeRestaurants.reduce(
-      (sum, restaurant) => sum + (planPriceMap.get(restaurant.plan) ?? 0),
+      (sum, restaurant) => sum + (planPriceMap.get(restaurant.plan || '') ?? 0),
       0,
     );
 
@@ -98,9 +98,11 @@ superAdminRouter.delete('/restaurants/:id', async (req, res, next) => {
   }
 });
 
+import { createPlan, listPlans, updatePlan, deletePlan } from '../superAdmin/superAdmin.service';
+
 superAdminRouter.post('/plans', async (req, res, next) => {
   try {
-    const plan = await PlatformPlanModel.create({
+    const plan = await createPlan({
       name: req.body?.name,
       priceMonthly: Number(req.body?.priceMonthly ?? 0),
       originalPriceMonthly: req.body?.originalPriceMonthly ? Number(req.body.originalPriceMonthly) : null,
@@ -108,10 +110,10 @@ superAdminRouter.post('/plans', async (req, res, next) => {
       description: req.body?.description || '',
       features: Array.isArray(req.body?.features) ? req.body.features : [],
       isActive: req.body?.isActive !== false,
-      tableLimit: req.body?.tableLimit ? Number(req.body.tableLimit) : null,
-      monthlyOrderLimit: req.body?.monthlyOrderLimit ? Number(req.body.monthlyOrderLimit) : null,
-      staffLimit: req.body?.staffLimit ? Number(req.body.staffLimit) : null,
-      inventoryLimit: req.body?.inventoryLimit ? Number(req.body.inventoryLimit) : null,
+      tableLimit: req.body?.tableLimit ? Number(req.body.tableLimit) : undefined,
+      monthlyOrderLimit: req.body?.monthlyOrderLimit ? Number(req.body.monthlyOrderLimit) : undefined,
+      staffLimit: req.body?.staffLimit ? Number(req.body.staffLimit) : undefined,
+      inventoryLimit: req.body?.inventoryLimit ? Number(req.body.inventoryLimit) : undefined,
       reservationAccess: req.body?.reservationAccess !== false,
       queueAccess: req.body?.queueAccess !== false,
       advancedAnalytics: req.body?.advancedAnalytics === true,
@@ -127,7 +129,7 @@ superAdminRouter.post('/plans', async (req, res, next) => {
 
 superAdminRouter.get('/plans', async (_req, res, next) => {
   try {
-    const plans = await PlatformPlanModel.find().sort({ priceMonthly: 1 });
+    const plans = await listPlans();
     ok(res, { plans });
   } catch (error) {
     next(error);
@@ -136,7 +138,7 @@ superAdminRouter.get('/plans', async (_req, res, next) => {
 
 superAdminRouter.patch('/plans/:id', async (req, res, next) => {
   try {
-    const plan = await PlatformPlanModel.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const plan = await updatePlan(req.params.id, req.body);
     ok(res, { plan });
   } catch (error) {
     next(error);
@@ -145,7 +147,7 @@ superAdminRouter.patch('/plans/:id', async (req, res, next) => {
 
 superAdminRouter.delete('/plans/:id', async (req, res, next) => {
   try {
-    await PlatformPlanModel.findByIdAndDelete(req.params.id);
+    await deletePlan(req.params.id);
     ok(res, { deletedPlanId: req.params.id });
   } catch (error) {
     next(error);
@@ -157,7 +159,7 @@ superAdminRouter.get('/analytics/revenue', async (_req, res, next) => {
     const activeRestaurants = await RestaurantModel.find({ status: RestaurantStatus.ACTIVE }).lean();
     const plans = await PlatformPlanModel.find().lean();
     const planPriceMap = new Map(plans.map((plan) => [plan.name, plan.priceMonthly]));
-    const currentMrr = activeRestaurants.reduce((sum, restaurant) => sum + (planPriceMap.get(restaurant.plan) ?? 0), 0);
+    const currentMrr = activeRestaurants.reduce((sum, restaurant) => sum + (planPriceMap.get(restaurant.plan || '') ?? 0), 0);
 
     ok(res, {
       revenue: [

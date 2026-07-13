@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { TrendingUp, ShoppingBag, Users, Clock } from 'lucide-react';
 import { StatCard } from '../components/dashboard/StatCard';
 import { RecentOrdersTable } from '../components/dashboard/RecentOrdersTable';
@@ -10,15 +11,70 @@ import { connectSocket, getSocket } from '../../../lib/socket';
 import { useTablesStore } from '../store/tables.store';
 
 const AdminDashboard = () => {
+<<<<<<< Updated upstream
+  const { restaurant, fetchOverview } = useOutletContext<{ restaurant: any; fetchOverview: () => Promise<void> }>();
+
+  useEffect(() => {
+    // Only connect socket and setup listeners if restaurant is active
+    if (restaurant && restaurant.status === 'ACTIVE') {
+      connectSocket();
+      useTablesStore.getState().fetchTables();
+
+      const interval = setInterval(() => {
+        const socket = getSocket();
+        if (!socket || !socket.connected) {
+          useTablesStore.getState().fetchTables();
+        }
+      }, 15000);
+
+      const socket = getSocket();
+      if (socket) {
+        const handleSync = () => {
+          useTablesStore.getState().fetchTables();
+        };
+
+        socket.on('table.status.changed', handleSync);
+        socket.on('table.session.created', handleSync);
+        socket.on('table.session.closed', handleSync);
+        socket.on('table.session.expired', handleSync);
+        socket.on('order.created', handleSync);
+        socket.on('order.updated', handleSync);
+        socket.on('order.ready', handleSync);
+        socket.on('bill.requested', handleSync);
+        socket.on('bill.paid', handleSync);
+        socket.on('cleaning.started', handleSync);
+        socket.on('cleaning.completed', handleSync);
+        socket.on('staff:request-new', handleSync);
+
+        return () => {
+          clearInterval(interval);
+          socket.off('table.status.changed', handleSync);
+          socket.off('table.session.created', handleSync);
+          socket.off('table.session.closed', handleSync);
+          socket.off('table.session.expired', handleSync);
+          socket.off('order.created', handleSync);
+          socket.off('order.updated', handleSync);
+          socket.off('order.ready', handleSync);
+          socket.off('bill.requested', handleSync);
+          socket.off('bill.paid', handleSync);
+          socket.off('cleaning.started', handleSync);
+          socket.off('cleaning.completed', handleSync);
+          socket.off('staff:request-new', handleSync);
+        };
+      }
+
+      return () => clearInterval(interval);
+    }
+  }, [restaurant]);
+
+  // We don't render OnboardingWizard inline anymore as it is managed as a full-screen overlay in AdminLayout.tsx
+=======
   React.useEffect(() => {
     connectSocket();
     useTablesStore.getState().fetchTables();
 
     const interval = setInterval(() => {
-      const socket = getSocket();
-      if (!socket || !socket.connected) {
-        useTablesStore.getState().fetchTables();
-      }
+      useTablesStore.getState().fetchTables();
     }, 15000);
 
     const socket = getSocket();
@@ -59,12 +115,13 @@ const AdminDashboard = () => {
 
     return () => clearInterval(interval);
   }, []);
+>>>>>>> Stashed changes
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{"Welcome back, Debesh! Here's what's happening today."}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{`Welcome back, ${restaurant?.ownerName || 'Admin'}! Here's what's happening today.`}</p>
       </div>
 
       {/* Stat cards — 2 cols on mobile, 4 on lg */}

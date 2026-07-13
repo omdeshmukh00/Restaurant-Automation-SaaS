@@ -195,6 +195,7 @@ export default function Navbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [systemMute, setSystemMute] = useState(false);
   const requests = useRestaurantRequestsStore((state) => state.requests);
+  const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -252,7 +253,7 @@ export default function Navbar({
     [requests]
   );
 
-  const unresolvedCount = requests.length + 1;
+  const unresolvedCount = pendingCount + 1;
 
   return (
     <>
@@ -378,9 +379,9 @@ export default function Navbar({
                 >
                   <Bell size={16} />
                   <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                  {requests.length > 0 && (
+                  {pendingCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] font-bold flex items-center justify-center">
-                      {requests.length}
+                      {pendingCount}
                     </span>
                   )}
                 </button>

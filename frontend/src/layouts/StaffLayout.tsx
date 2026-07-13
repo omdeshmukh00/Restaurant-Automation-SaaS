@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+<<<<<<< Updated upstream
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 
 import { StaffSearchProvider } from '../features/staff/components/dashboard/StaffSearchContext';
@@ -7,6 +8,12 @@ import StaffTopBar from '../features/staff/components/dashboard/StaffTopBar';
 import { NotificationWindow } from '../features/staff/components/NotificationWindow';
 import { useStaffProfile } from '../features/staff/hooks/useStaffProfile';
 import { getRolePermissions } from '../features/staff/utils/roleAccess';
+=======
+import { Outlet } from 'react-router-dom';
+import { StaffSearchProvider } from '../features/staff/components/dashboard/StaffSearchContext';
+import StaffSidebar from '../features/staff/components/dashboard/StaffSidebar';
+import StaffTopBar from '../features/staff/components/dashboard/StaffTopBar';
+>>>>>>> Stashed changes
 import { connectSocket, getSocket } from '../lib/socket';
 import { staffStore } from '../features/staff/store/staff.store';
 import { requestsAPI, ordersAPI } from '../features/staff/api/staff.api';
@@ -28,8 +35,11 @@ export default function StaffLayout(): JSX.Element {
     return true;
   });
 
+<<<<<<< Updated upstream
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
+=======
+>>>>>>> Stashed changes
   useEffect(() => {
     // 1. Establish Socket Connection
     connectSocket();
@@ -97,12 +107,17 @@ export default function StaffLayout(): JSX.Element {
           staffStore.setReadyItems(mapped);
         }
       } catch (err) {
+<<<<<<< Updated upstream
         console.error('Failed to fetch initial staff layout data', err);
+=======
+        console.error('Failed to fetch staff data', err);
+>>>>>>> Stashed changes
       }
     };
 
     const playNotificationSound = () => {
       try {
+<<<<<<< Updated upstream
         const audioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (!audioCtx) return;
         const audioContext = new audioCtx();
@@ -117,13 +132,31 @@ export default function StaffLayout(): JSX.Element {
         gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
         oscillator.start();
         oscillator.stop(audioContext.currentTime + 0.15);
+=======
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(587.33, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+        
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.12);
+>>>>>>> Stashed changes
 
         setTimeout(() => {
           const oscillator2 = audioContext.createOscillator();
           const gainNode2 = audioContext.createGain();
           oscillator2.connect(gainNode2);
           gainNode2.connect(audioContext.destination);
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
           oscillator2.type = 'sine';
           oscillator2.frequency.setValueAtTime(880, audioContext.currentTime);
           gainNode2.gain.setValueAtTime(0.08, audioContext.currentTime);
@@ -138,6 +171,7 @@ export default function StaffLayout(): JSX.Element {
     // Load initial data
     fetchAllStaffData();
 
+<<<<<<< Updated upstream
     // Set polling fallback (only if socket is not connected)
     const interval = setInterval(() => {
       const socket = getSocket();
@@ -145,6 +179,10 @@ export default function StaffLayout(): JSX.Element {
         fetchAllStaffData();
       }
     }, 15000);
+=======
+    // Set polling fallback
+    const interval = setInterval(fetchAllStaffData, 15000);
+>>>>>>> Stashed changes
 
     // Set up Socket listeners
     const socket = getSocket();
@@ -182,10 +220,13 @@ export default function StaffLayout(): JSX.Element {
     };
   }, []);
 
+<<<<<<< Updated upstream
   if (!isAllowed && allowedPaths.length > 0) {
     return <Navigate to={allowedPaths[0]} replace />;
   }
 
+=======
+>>>>>>> Stashed changes
   return (
     <StaffSearchProvider>
       <div className="flex min-h-screen bg-sd-surface text-sd-on-surface font-sans staff-panel">

@@ -31,12 +31,29 @@ export interface IRestaurant extends Document {
   slug: string;
   name: string;
   status: RestaurantStatus;
-  plan: string;
+  plan?: string;
   cuisine: string;
   city: string;
   rating: number;
   location_url?: string;
   settings: RestaurantSettings;
+  ownerName: string;
+  email: string;
+  phone: string;
+  address: any;
+  state: string;
+  country: string;
+  pinCode: string;
+  gstNumber?: string;
+  branches: number;
+  expectedMonthlyOrders: number;
+  latitude: number;
+  longitude: number;
+  googleMapsUrl?: string;
+  billingCycle?: 'monthly' | 'yearly';
+  onboardingRequestId?: mongoose.Types.ObjectId;
+  adminUserId?: mongoose.Types.ObjectId;
+  subscriptionId?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,12 +116,29 @@ const restaurantSchema = new Schema<IRestaurant>(
     status: {
       type: String,
       enum: Object.values(RestaurantStatus),
-      default: RestaurantStatus.ACTIVE,
+      default: RestaurantStatus.PENDING_APPROVAL,
     },
-    plan: { type: String, required: true, trim: true },
+    plan: { type: String, trim: true },
     cuisine: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
     rating: { type: Number, default: 4.5, min: 0, max: 5 },
+    ownerName: { type: String, trim: true },
+    email: { type: String, trim: true, lowercase: true },
+    phone: { type: String, trim: true },
+    address: { type: Schema.Types.Mixed },
+    state: { type: String, trim: true },
+    country: { type: String, trim: true },
+    pinCode: { type: String, trim: true },
+    gstNumber: { type: String, trim: true },
+    branches: { type: Number, required: true, default: 1 },
+    expectedMonthlyOrders: { type: Number, required: true, default: 0 },
+    latitude: { type: Number, required: true, default: 0 },
+    longitude: { type: Number, required: true, default: 0 },
+    googleMapsUrl: { type: String, trim: true },
+    billingCycle: { type: String, enum: ['monthly', 'yearly'] },
+    onboardingRequestId: { type: Schema.Types.ObjectId, ref: 'RestaurantRequest' },
+    adminUserId: { type: Schema.Types.ObjectId, ref: 'User' },
+    subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', default: null },
     location_url: {
       type: String,
       trim: true,

@@ -4,7 +4,8 @@ export const ROLE_ACCESS: Record<string, string[]> = {
   'Waiter': [
     '/staff/menu',
     '/staff/food-ready',
-    '/staff/profile'
+    '/staff/profile',
+    '/staff/settings'
   ],
   'Floor Staff': [
     '/staff/tables',
@@ -13,7 +14,8 @@ export const ROLE_ACCESS: Record<string, string[]> = {
     '/staff/table-turnover',
     '/staff/menu',
     '/staff/alerts',
-    '/staff/profile'
+    '/staff/profile',
+    '/staff/settings'
   ],
   'Floor Supervisor': [
     '/staff',

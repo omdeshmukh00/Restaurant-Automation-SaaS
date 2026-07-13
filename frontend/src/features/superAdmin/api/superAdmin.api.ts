@@ -65,11 +65,11 @@ export const superAdminRestaurantRequestsApi = {
     await apiClient.post(superAdminRestaurantRequestEndpoints.approve(id));
   },
 
-  async denyRequest(id: string, reason: string): Promise<void> {
+  async denyRequest(id: string, reason: string, refund?: boolean): Promise<void> {
     if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
       return Promise.resolve();
     }
 
-    await apiClient.post(superAdminRestaurantRequestEndpoints.deny(id), { reason });
+    await apiClient.post(superAdminRestaurantRequestEndpoints.deny(id), { reason, refund });
   },
 };

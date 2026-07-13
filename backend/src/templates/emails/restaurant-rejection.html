@@ -1,9 +1,156 @@
-<div style="font-family: Arial, sans-serif; padding: 20px;">
-  <h2>Application Status - RestoHub</h2>
-  <p>Hello {{ownerName}},</p>
-  <p>Thank you for your interest in partnering with RestoHub.</p>
-  <p>After reviewing your application for <strong>{{restaurantName}}</strong>, we regret to inform you that we are unable to approve it at this time.</p>
-  <p><strong>Reason for Rejection:</strong> {{rejectionReason}}</p>
-  <p>If you believe this was an error or wish to submit another application with corrected details, you are welcome to apply again via our website.</p>
-  <p style="color: #666; margin-top: 20px;">Best regards,<br/>The RestoHub Team</p>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application Status</title>
+</head>
+
+<body style="margin:0;padding:0;background:#f5f7fb;font-family:Segoe UI,Arial,sans-serif;">
+
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fb;padding:40px 15px;">
+<tr>
+<td align="center">
+
+<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.08);">
+
+<!-- Header -->
+<tr>
+<td align="center" style="background:linear-gradient(135deg,#ff6b35,#ff8f5a);padding:35px;">
+
+<div style="width:70px;height:70px;border-radius:50%;background:white;line-height:70px;font-size:34px;">
+🍽️
 </div>
+
+<h1 style="margin:18px 0 5px;color:white;font-size:28px;">
+RestoHub
+</h1>
+
+<p style="margin:0;color:#ffe9df;font-size:15px;">
+Restaurant Partner Platform
+</p>
+
+</td>
+</tr>
+
+<!-- Body -->
+<tr>
+<td style="padding:40px;">
+
+<div style="
+display:inline-block;
+background:#ffe7e7;
+color:#c62828;
+padding:8px 16px;
+border-radius:30px;
+font-size:13px;
+font-weight:600;
+margin-bottom:25px;
+">
+Application Not Approved
+</div>
+
+<h2 style="margin:0;color:#222;font-size:24px;">
+Hello {{ownerName}},
+</h2>
+
+<p style="color:#555;font-size:16px;line-height:1.7;margin-top:20px;">
+Thank you for your interest in becoming a
+<strong>RestoHub Partner.</strong>
+</p>
+
+<p style="color:#555;font-size:16px;line-height:1.7;">
+After carefully reviewing your application for
+<strong>{{restaurantName}}</strong>,
+we're unable to approve it at this time.
+</p>
+
+<!-- Reason Box -->
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="
+margin:30px 0;
+background:#fff7f7;
+border-left:5px solid #ef4444;
+border-radius:10px;
+">
+
+<tr>
+
+<td style="padding:22px;">
+
+<div style="font-size:15px;font-weight:700;color:#c62828;margin-bottom:10px;">
+Reason for Rejection
+</div>
+
+<div style="font-size:15px;color:#555;line-height:1.6;">
+{{rejectionReason}}
+</div>
+
+</td>
+
+</tr>
+
+</table>
+
+<p style="color:#555;font-size:16px;line-height:1.7;">
+Many applications are approved after corrections. Once you've updated the required information, you're welcome to submit a new application.
+</p>
+
+<table cellpadding="0" cellspacing="0" style="margin:35px auto;">
+<tr>
+<td bgcolor="#ff6b35" style="border-radius:8px;">
+<a href="{{websiteUrl}}"
+style="
+display:inline-block;
+padding:15px 32px;
+font-size:16px;
+font-weight:600;
+color:white;
+text-decoration:none;
+">
+Apply Again
+</a>
+</td>
+</tr>
+</table>
+
+<p style="color:#888;font-size:14px;text-align:center;">
+Need help? Contact our support team anytime.
+</p>
+
+</td>
+</tr>
+
+<!-- Footer -->
+
+<tr>
+
+<td style="
+background:#fafafa;
+padding:25px;
+text-align:center;
+font-size:13px;
+color:#999;
+">
+
+<strong style="color:#555;">RestoHub</strong><br>
+
+Empowering Restaurants Through Technology
+
+<br><br>
+
+© {{year}} RestoHub. All rights reserved.
+
+</td>
+
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

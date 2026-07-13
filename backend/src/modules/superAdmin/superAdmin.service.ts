@@ -160,6 +160,15 @@ export async function deleteRestaurant(id: string) {
 // PLANS
 // ──────────────────────────────────────────────────────────────────────
 
+let cachedPlans: any[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 120_000; // 120 seconds (2 minutes)
+
+export function clearPlansCache() {
+  cachedPlans = null;
+  cacheTimestamp = 0;
+}
+
 export async function createPlan(input: CreatePlanInput) {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -172,6 +181,7 @@ export async function createPlan(input: CreatePlanInput) {
 
     const created = await PlatformPlanModel.create([input], { session });
     await session.commitTransaction();
+    clearPlansCache();
     return created[0];
   } catch (error) {
     await session.abortTransaction();
@@ -185,8 +195,17 @@ export async function createPlan(input: CreatePlanInput) {
   }
 }
 
-export async function listPlans() {
-  return PlatformPlanModel.find().sort({ priceMonthly: 1 }).lean();
+export async function listPlans(activeOnly = false) {
+  const now = Date.now();
+  if (!cachedPlans || now - cacheTimestamp > CACHE_TTL_MS) {
+    cachedPlans = await PlatformPlanModel.find().sort({ priceMonthly: 1 }).lean();
+    cacheTimestamp = now;
+  }
+
+  if (activeOnly) {
+    return cachedPlans.filter((plan: any) => plan.isActive !== false);
+  }
+  return cachedPlans;
 }
 
 export async function updatePlan(id: string, input: UpdatePlanInput) {
@@ -205,7 +224,61 @@ export async function updatePlan(id: string, input: UpdatePlanInput) {
     }
 
     await session.commitTransaction();
+    clearPlansCache();
     return plan;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+export async function deletePlan(id: string) {
+  const plan = await PlatformPlanModel.findByIdAndDelete(id).lean();
+  if (!plan) {
+    throw new AppError('Plan not found', 404, ErrorCode.NOT_FOUND);
+  }
+  clearPlansCache();
+  return plan;
+}
+
+export async function applyBulkOffers(input: { yearlyDiscountPercentage?: number | null; monthlyDiscountPercentage?: number | null }) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const plans = await PlatformPlanModel.find().session(session);
+
+    for (const plan of plans) {
+      // 1. Update yearlyDiscountPercentage if passed
+      if (input.yearlyDiscountPercentage !== undefined && input.yearlyDiscountPercentage !== null) {
+        plan.yearlyDiscountPercentage = input.yearlyDiscountPercentage;
+      }
+
+      // 2. Update monthlyDiscountPercentage if passed
+      if (input.monthlyDiscountPercentage !== undefined && input.monthlyDiscountPercentage !== null) {
+        const discPct = input.monthlyDiscountPercentage;
+        if (discPct === 0) {
+          if (plan.originalPriceMonthly) {
+            plan.priceMonthly = plan.originalPriceMonthly;
+          }
+          plan.originalPriceMonthly = null;
+        } else {
+          if (plan.name.toLowerCase() !== 'free' && plan.priceMonthly > 0) {
+            const orig = plan.originalPriceMonthly || plan.priceMonthly;
+            plan.originalPriceMonthly = orig;
+            plan.priceMonthly = Math.round(orig * (1 - discPct / 100));
+          }
+        }
+      }
+
+      await plan.save({ session });
+    }
+
+    await session.commitTransaction();
+    clearPlansCache();
+    return { success: true };
   } catch (error) {
     await session.abortTransaction();
     throw error;
@@ -384,7 +457,7 @@ export async function getPlatformAuditLogs(filters: SuperAdminAuditLogQuery) {
 // ── Partner Onboarding Request Services ──────────────────────────────────
 import { RestaurantRequestModel } from './restaurantRequest.model';
 import { logAuditRaw } from '../auditLogs/auditLogs.helper';
-import {AuditEntity } from '../auditLogs/auditLogs.types';
+import {AuditEntity, AuditAction } from '../auditLogs/auditLogs.types';
 import crypto from 'crypto';
 import { slugify, uniqueSlug } from '../../utils/slugify';
 import { hashPassword } from '../../utils/crypto';
@@ -393,7 +466,9 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 
 export async function listRestaurantRequests() {
-  const requests = await RestaurantRequestModel.find({ status: 'PENDING' })
+  const requests = await RestaurantRequestModel.find({
+    status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED', 'REJECTED', 'PENDING_PAYMENT'] }
+  })
     .sort({ submittedAt: -1 })
     .setOptions({ bypassTenant: true })
     .lean();
@@ -405,8 +480,8 @@ export async function listRestaurantRequests() {
     email: req.email,
     phone: req.phone,
     location: `${req.city}, ${req.state}, ${req.country}`,
-    plan: req.selectedPlan,
-    requestedAt: req.submittedAt.toISOString(),
+    plan: req.selectedPlan || (req.paymentId ? 'Paid Onboarding' : 'Free Onboarding'),
+    requestedAt: req.submittedAt ? req.submittedAt.toISOString() : new Date().toISOString(),
     message: req.message ?? '',
     latitude: req.latitude,
     longitude: req.longitude,
@@ -423,6 +498,11 @@ export async function listRestaurantRequests() {
     paymentId: req.paymentId ?? '',
     paymentAmount: req.paymentAmount ?? 0,
     paymentStatus: req.paymentStatus ?? '',
+    paymentSignature: req.paymentSignature ?? '',
+    paymentTimestamp: req.paymentTimestamp ? req.paymentTimestamp.toISOString() : undefined,
+    billingFrequency: req.billingFrequency ?? 'monthly',
+    status: req.status,
+    rejectionReason: req.rejectionReason ?? '',
   }));
 }
 
@@ -431,8 +511,19 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
   if (!request) {
     throw new AppError('Restaurant request not found', 404, ErrorCode.NOT_FOUND);
   }
-  if (request.status !== 'PENDING') {
-    throw new AppError('Request is already processed', 400, ErrorCode.INVALID_REQUEST);
+  if (request.status !== 'APPLICATION_PENDING') {
+    throw new AppError('Request is already processed or not fully submitted', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  // Check if admin user already exists with this email or mobile
+  const existingUserByEmail = await UserModel.findOne({ email: request.email }).setOptions({ bypassTenant: true });
+  if (existingUserByEmail) {
+    throw new AppError(`An administrator account with email '${request.email}' already exists. Please reject this request or ask them to use a different email.`, 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const existingUserByPhone = await UserModel.findOne({ mobile: request.phone }).setOptions({ bypassTenant: true });
+  if (existingUserByPhone) {
+    throw new AppError(`An administrator account with mobile number '${request.phone}' already exists. Please reject this request or ask them to use a different mobile number.`, 400, ErrorCode.INVALID_REQUEST);
   }
 
   const session = await mongoose.startSession();
@@ -440,6 +531,7 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
 
   try {
     const restaurantId = new mongoose.Types.ObjectId();
+    const adminUserId = new mongoose.Types.ObjectId();
     const tenantId = `tenant_${crypto.randomBytes(6).toString('hex')}`;
     
     // Generate unique slug
@@ -449,17 +541,33 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
       slug = uniqueSlug(request.restaurantName);
     }
 
-    // Step 1: Create Restaurant
+    // Step 1: Create Restaurant with status ONBOARDING
+    // Preserve ALL onboarding details from request.
     const [restaurant] = await RestaurantModel.create([{
       _id: restaurantId,
       slug,
       name: request.restaurantName,
-      status: 'ACTIVE',
-      plan: request.selectedPlan,
+      status: 'ONBOARDING' as any,
       cuisine: request.cuisine,
       city: request.city,
       rating: 4.5,
       tenantId: tenantId,
+      ownerName: request.ownerName,
+      email: request.email,
+      phone: request.phone,
+      address: request.address,
+      state: request.state,
+      country: request.country,
+      pinCode: request.pinCode,
+      gstNumber: request.gstNumber,
+      branches: request.branches,
+      expectedMonthlyOrders: request.expectedMonthlyOrders,
+      latitude: request.latitude,
+      longitude: request.longitude,
+      googleMapsUrl: request.googleMapsUrl,
+      onboardingRequestId: request._id,
+      adminUserId: adminUserId,
+      subscriptionId: null,
     }], { session });
 
     // Step 2: Generate temporary password
@@ -483,8 +591,9 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
 
     const hashedPassword = await hashPassword(tempPassword);
 
-    // Step 3: Create Restaurant Admin User
+    // Step 3: Create Restaurant Admin User (temporary password welcome credentials)
     const [adminUser] = await UserModel.create([{
+      _id: adminUserId,
       name: request.ownerName,
       email: request.email,
       mobile: request.phone,
@@ -501,13 +610,17 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
     }], { session });
 
     // Step 4: Update RestaurantRequest status
-    request.status = 'APPROVED';
+    request.status = 'APPLICATION_APPROVED';
     request.reviewedBy = new mongoose.Types.ObjectId(reviewerId);
     request.reviewedAt = new Date();
+    request.restaurantId = restaurantId;
     await request.save({ session });
 
     await session.commitTransaction();
     session.endSession();
+
+    logger.info(`Partner Request Approved: ${requestId} -> Restaurant: ${restaurantId}`);
+    logger.info(`Restaurant Created: ${restaurantId}`);
 
     // Log Audits
     void logAuditRaw({
@@ -515,7 +628,7 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
       actorRole: 'super-admin',
       entityType: AuditEntity.RESTAURANT,
       entityId: restaurantId.toString(),
-      action: 'SUPER_RESTAURANT_APPROVED' as any,
+      action: AuditAction.SUPER_RESTAURANT_APPROVED,
       metadata: { requestId, tenantId, slug },
     });
 
@@ -525,7 +638,7 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
       restaurantId: restaurantId.toString(),
       entityType: AuditEntity.USER,
       entityId: adminUser._id.toString(),
-      action: 'ADMIN_CREATED' as any,
+      action: AuditAction.ADMIN_CREATED,
       metadata: { source: 'onboarding_approval' },
     });
 
@@ -544,7 +657,7 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
           actorRole: 'super-admin',
           entityType: AuditEntity.USER,
           entityId: request.email,
-          action: 'APPROVAL_EMAIL_SENT' as any,
+          action: AuditAction.APPROVAL_EMAIL_SENT,
           metadata: { recipient: request.email },
         });
       }
@@ -560,20 +673,79 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
   }
 }
 
-export async function rejectRestaurantRequest(requestId: string, reviewerId: string, rejectionReason: string) {
+export async function rejectRestaurantRequest(
+  requestId: string,
+  reviewerId: string,
+  rejectionReason: string,
+  refund = false
+) {
   const request = await RestaurantRequestModel.findById(requestId).setOptions({ bypassTenant: true });
   if (!request) {
     throw new AppError('Restaurant request not found', 404, ErrorCode.NOT_FOUND);
   }
-  if (request.status !== 'PENDING') {
-    throw new AppError('Request is already processed', 400, ErrorCode.INVALID_REQUEST);
+  if (request.status !== 'APPLICATION_PENDING') {
+    throw new AppError('Request is already processed or not fully submitted', 400, ErrorCode.INVALID_REQUEST);
   }
 
   request.status = 'REJECTED';
   request.rejectionReason = rejectionReason;
   request.reviewedBy = new mongoose.Types.ObjectId(reviewerId);
   request.reviewedAt = new Date();
+
+  let refundDetails: any = {};
+  if (refund && request.paymentId && request.paymentAmount && request.paymentAmount > 0) {
+    try {
+      const { createRazorpayRefund } = await import('../../services/razorpay.service');
+      const refundResult = await createRazorpayRefund(request.paymentId, request.paymentAmount, {
+        requestId,
+        restaurantName: request.restaurantName,
+        reason: rejectionReason,
+      });
+
+      request.paymentStatus = 'REFUNDED';
+      refundDetails = {
+        refundId: refundResult.id,
+        refundStatus: refundResult.status,
+      };
+
+      // Log the refunded event in history collection
+      const { RestaurantSubscriptionHistoryModel, RestaurantSubscriptionHistoryEventType } = await import('../subscriptions/restaurantSubscriptionHistory.model');
+      await RestaurantSubscriptionHistoryModel.create({
+        restaurantId: request._id, // request level reference since restaurant was never created
+        plan: request.selectedPlan || 'Free Onboarding',
+        billingCycle: request.billingFrequency || 'monthly',
+        startDate: request.submittedAt || new Date(),
+        endDate: new Date(),
+        paymentId: request.paymentId,
+        amount: request.paymentAmount,
+        status: 'REFUNDED',
+        changedBy: reviewerId,
+        eventType: RestaurantSubscriptionHistoryEventType.REFUNDED,
+        metadata: {
+          requestId,
+          refundId: refundResult.id,
+          rejectionReason,
+        },
+      });
+
+      // Send Refund Email
+      const { sendRefundEmail } = await import('../../services/mail.service');
+      void sendRefundEmail(
+        request.email,
+        request.ownerName,
+        request.paymentAmount,
+        request.paymentId,
+        true
+      );
+    } catch (err: any) {
+      logger.error('Failed to trigger Razorpay refund for partner request rejection:', err);
+      request.paymentStatus = 'REFUND_FAILED';
+    }
+  }
+
   await request.save();
+
+  logger.info(`Partner Request Rejected: ${requestId}, Reason: ${rejectionReason}`);
 
   // Log Audit
   void logAuditRaw({
@@ -581,11 +753,11 @@ export async function rejectRestaurantRequest(requestId: string, reviewerId: str
     actorRole: 'super-admin',
     entityType: AuditEntity.RESTAURANT,
     entityId: requestId,
-    action: 'RESTAURANT_REJECTED' as any,
-    metadata: { reason: rejectionReason },
+    action: AuditAction.RESTAURANT_REJECTED,
+    metadata: { reason: rejectionReason, refundInitiated: refund, ...refundDetails },
   });
 
-  // Send Rejection Email in background to avoid blocking request rejection
+  // Send Rejection Email
   void sendRestaurantRejectionEmail(
     request.email,
     request.ownerName,
@@ -598,7 +770,7 @@ export async function rejectRestaurantRequest(requestId: string, reviewerId: str
         actorRole: 'super-admin',
         entityType: AuditEntity.USER,
         entityId: request.email,
-        action: 'REJECTION_EMAIL_SENT' as any,
+        action: AuditAction.REJECTION_EMAIL_SENT,
         metadata: { recipient: request.email, reason: rejectionReason },
       });
     }

@@ -36,6 +36,8 @@ export const createPlanSchema = z.object({
   name:          z.string().trim().min(1, 'Plan name is required'),
   priceMonthly:  z.number().min(0, 'Price cannot be negative'),
   priceYearly:   z.number().min(0, 'Yearly price cannot be negative').optional().nullable(),
+  yearlyDiscountPercentage: z.number().min(0).max(100).optional().nullable(),
+  originalPriceMonthly: z.number().min(0).optional().nullable(),
   description:   z.string().trim().max(1000).optional().nullable(),
   tenantLimit:   z.number().int().min(1, 'Tenant limit must be at least 1'),
   usageLimit:    z.number().int().min(0, 'Usage limit must be 0 or greater').optional(),
@@ -50,12 +52,15 @@ export const createPlanSchema = z.object({
   staffLimit:     z.number().int().min(0, 'Staff limit must be 0 or greater').optional(),
   inventoryLimit: z.number().int().min(0, 'Inventory limit must be 0 or greater').optional(),
   features:       z.array(z.string().trim().min(1)).optional(),
+  isActive:       z.boolean().optional(),
 });
 
 export const updatePlanSchema = z.object({
   name:          z.string().trim().min(1).optional(),
   priceMonthly:  z.number().min(0).optional(),
   priceYearly:   z.number().min(0).optional().nullable(),
+  yearlyDiscountPercentage: z.number().min(0).max(100).optional().nullable(),
+  originalPriceMonthly: z.number().min(0).optional().nullable(),
   description:   z.string().trim().max(1000).optional().nullable(),
   tenantLimit:   z.number().int().min(1).optional(),
   usageLimit:    z.number().int().min(0).optional(),
@@ -70,10 +75,16 @@ export const updatePlanSchema = z.object({
   staffLimit:     z.number().int().min(0).optional(),
   inventoryLimit: z.number().int().min(0).optional(),
   features:       z.array(z.string().trim().min(1)).optional(),
+  isActive:       z.boolean().optional(),
 });
 
 export const planIdParamSchema = z.object({
   id: objectIdSchema,
+});
+
+export const bulkOffersSchema = z.object({
+  yearlyDiscountPercentage: z.number().min(0).max(100).optional().nullable(),
+  monthlyDiscountPercentage: z.number().min(0).max(100).optional().nullable(),
 });
 
 // ── Feature flags ─────────────────────────────────────────────────────
