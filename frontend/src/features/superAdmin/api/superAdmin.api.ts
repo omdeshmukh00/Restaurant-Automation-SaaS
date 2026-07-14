@@ -72,4 +72,61 @@ export const superAdminRestaurantRequestsApi = {
 
     await apiClient.post(superAdminRestaurantRequestEndpoints.deny(id), { reason, refund });
   },
+
+  async getRestaurants(): Promise<any[]> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve([]);
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: { restaurants: any[] } }>(
+      "/superadmin/restaurants"
+    );
+    return response.data.data.restaurants;
+  },
+
+  async getRestaurantById(id: string): Promise<any> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve(null);
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: { restaurant: any } }>(
+      `/superadmin/restaurants/${id}`
+    );
+    return response.data.data.restaurant;
+  },
+
+  async getPlans(): Promise<any[]> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve([]);
+    }
+
+    const response = await apiClient.get<{ success: boolean; data: { plans: any[] } }>(
+      "/superadmin/plans"
+    );
+    return response.data.data.plans;
+  },
+
+  async updateRestaurantStatus(id: string, status: "Active" | "Trial" | "Inactive", blockReason?: string): Promise<void> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve();
+    }
+
+    await apiClient.patch(`/superadmin/restaurants/${id}/status`, { status, blockReason });
+  },
+
+  async updateRestaurantPlan(id: string, plan: string): Promise<void> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve();
+    }
+
+    await apiClient.patch(`/superadmin/restaurants/${id}/plan`, { plan });
+  },
+
+  async deleteRestaurant(id: string): Promise<void> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve();
+    }
+
+    await apiClient.delete(`/superadmin/restaurants/${id}`);
+  },
 };

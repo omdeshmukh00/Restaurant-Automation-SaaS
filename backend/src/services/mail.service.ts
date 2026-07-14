@@ -22,6 +22,9 @@ export const EMAIL_SUBJECTS = {
   RESTAURANT_APPROVAL: 'Welcome to RestoHub - Your Restaurant Has Been Approved',
   RESTAURANT_REJECTION: 'Your RestoHub Partner Application Status',
   RESTAURANT_SUBMISSION: 'Your RestoHub Partner Application Received',
+  RESTAURANT_PLAN_UPDATED: 'RestoHub - Your Subscription Plan Has Been Updated',
+  RESTAURANT_SUSPENDED: 'RestoHub - Notice of Account Suspension',
+  RESTAURANT_ACTIVATED: 'RestoHub - Your Restaurant Has Been Activated',
 };
 
 let transporter: nodemailer.Transporter | null = null;
@@ -614,7 +617,7 @@ export async function sendRefundEmail(
   ownerName: string,
   amount: number,
   paymentId: string,
-  success: boolean
+  _success: boolean
 ): Promise<boolean> {
   try {
     let html = getTemplate('refund');
@@ -656,6 +659,110 @@ export async function sendPaymentSuccessEmail(
     });
   } catch (error) {
     logger.error('Failed to send payment success email', { error, email });
+    return false;
+  }
+}
+
+export async function sendRestaurantPlanUpdatedEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  oldPlan: string,
+  newPlan: string,
+  isUpgrade: boolean
+): Promise<boolean> {
+  try {
+    const actionText = isUpgrade ? 'upgraded' : 'downgraded';
+    const congratsText = isUpgrade 
+      ? 'Congratulations! Your account has been upgraded, and you can now enjoy all the premium features and services included in your new plan.'
+      : 'This is a notification that your plan has been demoted as requested or processed.';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-top: 4px solid #F97316; border-radius: 8px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <h2 style="color: #F97316; margin-top: 0;">Subscription Plan Updated</h2>
+        <p>Dear ${escapeHtml(ownerName)},</p>
+        <p>We are writing to inform you that your restaurant <strong>${escapeHtml(restaurantName)}</strong> has been ${actionText} from the <strong>${escapeHtml(oldPlan)}</strong> plan to the <strong>${escapeHtml(newPlan)}</strong> plan.</p>
+        <p>${congratsText}</p>
+        <div style="background-color: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 16px; margin: 20px 0;">
+          <p style="margin: 0;"><strong>Previous Plan:</strong> ${escapeHtml(oldPlan)}</p>
+          <p style="margin: 8px 0 0 0;"><strong>New Active Plan:</strong> ${escapeHtml(newPlan)}</p>
+        </div>
+        <p>If you have any questions or believe this update was made in error, please reach out to our support team.</p>
+        <p style="margin-top: 30px; font-size: 12px; color: #888;">Sincerely,<br/>The RestoHub Team</p>
+      </div>
+    `;
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.RESTAURANT_PLAN_UPDATED,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send plan update email', { error, email });
+    return false;
+  }
+}
+
+export async function sendRestaurantSuspendedEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  reason: string
+): Promise<boolean> {
+  try {
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-top: 4px solid #EF4444; border-radius: 8px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <h2 style="color: #EF4444; margin-top: 0;">Restaurant Account Suspended</h2>
+        <p>Dear ${escapeHtml(ownerName)},</p>
+        <p>We regret to inform you that your restaurant account <strong>${escapeHtml(restaurantName)}</strong> has been suspended or inactivated by RestoHub.</p>
+        <div style="background-color: #FEF2F2; border: 1px solid #FEE2E2; border-radius: 6px; padding: 16px; margin: 20px 0; color: #991B1B;">
+          <p style="margin: 0; font-weight: bold;">Reason for Suspension:</p>
+          <p style="margin: 8px 0 0 0;">${escapeHtml(reason)}</p>
+        </div>
+        <p>While suspended, you and your staff will not be able to access the admin panel or utilize the platform services.</p>
+        <p>To resolve this issue or appeal the suspension, please contact RestoHub support at <span style="color: #F97316; font-weight: bold;">support@restohub.com</span>.</p>
+        <p style="margin-top: 30px; font-size: 12px; color: #888;">Sincerely,<br/>The RestoHub Team</p>
+      </div>
+    `;
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.RESTAURANT_SUSPENDED,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send account suspension email', { error, email });
+    return false;
+  }
+}
+
+export async function sendRestaurantActivatedEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string
+): Promise<boolean> {
+  try {
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-top: 4px solid #10B981; border-radius: 8px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <h2 style="color: #10B981; margin-top: 0;">Restaurant Account Activated</h2>
+        <p>Dear ${escapeHtml(ownerName)},</p>
+        <p>We are pleased to inform you that your restaurant account <strong>${escapeHtml(restaurantName)}</strong> has been successfully activated and is now in good standing.</p>
+        <p>You and your staff can now log back into the admin panel and resume operations immediately.</p>
+        <p>Thank you for choosing RestoHub!</p>
+        <p style="margin-top: 30px; font-size: 12px; color: #888;">Sincerely,<br/>The RestoHub Team</p>
+      </div>
+    `;
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.RESTAURANT_ACTIVATED,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send account activation email', { error, email });
     return false;
   }
 }

@@ -13,6 +13,7 @@ export interface RestaurantsRow {
   status: "Active" | "Trial" | "Inactive";
   revenue: string;
   branches: number;
+  cooldownRemaining?: number;
 }
 
 export interface NewRestaurantForm {

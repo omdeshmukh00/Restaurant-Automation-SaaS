@@ -116,20 +116,20 @@ app.use(`${env.API_PREFIX}/notifications`, notificationsRoutes);
 app.use(`${env.API_PREFIX}`, billingRoutes);
 app.use(env.API_PREFIX, apiRouter);
 
-// Express route stack printer utility for debugging
-function printStack(stack: any[], prefix = '') {
-  for (const layer of stack) {
-    if (layer.route) {
-      console.log(`[Route Stack] ${prefix}${layer.route.path} (${Object.keys(layer.route.methods).join(',')})`);
-    } else if (layer.name === 'router') {
-      const match = layer.regexp.toString().match(/^\/\^\\(.*?)\\\//);
-      const subPrefix = match ? match[1].replace(/\\\//g, '/').replace(/\?/g, '') : '';
-      printStack(layer.handle.stack, `${prefix}${subPrefix}`);
-    } else {
-      console.log(`[Middleware Stack] ${prefix} -> ${layer.name || 'anonymous'}`);
-    }
-  }
-}
+// // Express route stack printer utility for debugging
+// function printStack(stack: any[], prefix = '') {
+//   for (const layer of stack) {
+//     if (layer.route) {
+//       console.log(`[Route Stack] ${prefix}${layer.route.path} (${Object.keys(layer.route.methods).join(',')})`);
+//     } else if (layer.name === 'router') {
+//       const match = layer.regexp.toString().match(/^\/\^\\(.*?)\\\//);
+//       const subPrefix = match ? match[1].replace(/\\\//g, '/').replace(/\?/g, '') : '';
+//       printStack(layer.handle.stack, `${prefix}${subPrefix}`);
+//     } else {
+//       console.log(`[Middleware Stack] ${prefix} -> ${layer.name || 'anonymous'}`);
+//     }
+//   }
+// }
 // setTimeout(() => {
 //   console.log('=== EXPRESS ROUTE STACK ===');
 //   printStack(app._router.stack);

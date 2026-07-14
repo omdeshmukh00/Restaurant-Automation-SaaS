@@ -17,14 +17,14 @@ import type {
   NewRestaurantForm,
 } from "../components/Subscriptions/Subcriptiontypes";
 
-import { restaurantData } from "../store/Subscriptions";
 import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
+import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
 import { computeTierMetrics, exportToCSV, parseRevenue, generateId, formatCurrency } from "../utils/Subscriptionutils";
 
 import TierCards from "../components/Subscriptions/Tiercards";
 import SubscriptionControls from "../components/Subscriptions/Subscriptioncontrols";
 import SubscriptionTable from "../components/Subscriptions/Subcriptiontable";
-import ViewModal from "../components/Subscriptions/Viewmodal";
+import ViewModal from "../components/Restaurants/Viewmodal";
 import AddRestaurantModal from "../components/Subscriptions/Addrestaurantmodal";
 
 const EMPTY_FORM: NewRestaurantForm = {
@@ -156,9 +156,20 @@ export default function Subscriptions() {
   };
 
   // ── Modal state ───────────────────────────────────────────────────────────
-  const [viewingNode, setViewingNode] = useState<RestaurantNode | null>(null);
+  const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [formData, setFormData] = useState<NewRestaurantForm>(EMPTY_FORM);
+
+  const handleViewRestaurant = async (row: RestaurantNode) => {
+    try {
+      const fullDetails = await superAdminRestaurantRequestsApi.getRestaurantById(row.id);
+      setViewingNode(fullDetails || row);
+    } catch (err) {
+      console.error("Failed to load restaurant details", err);
+      setViewingNode(row);
+    }
+  };
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -175,6 +186,7 @@ export default function Subscriptions() {
       if (e.key === "Escape") { 
         setViewingNode(null); 
         setIsAddModalOpen(false); 
+        setIsSettingsModalOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -183,7 +195,7 @@ export default function Subscriptions() {
 
   // ── Data state ────────────────────────────────────────────────────────────
   const navigate = useNavigate();
-  const [restaurants, setRestaurants] = useState<RestaurantNode[]>(restaurantData);
+  const [restaurants, setRestaurants] = useState<RestaurantNode[]>([]);
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
   const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
@@ -281,14 +293,14 @@ export default function Subscriptions() {
   };
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
-  const updateStatus = (id: string, status: StatusType) => {
-    updateApprovedRestaurantStatus(id, status);
+  const updateStatus = (id: string, status: StatusType, blockReason?: string) => {
+    updateApprovedRestaurantStatus(id, status as any, blockReason);
     setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
   };
 
-  const updatePlan = (id: string, plan: PlanType) => {
-    if (plan !== "Enterprise") updateApprovedRestaurantPlan(id, plan);
-    setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, plan } : r)));
+  const updatePlan = (id: string, plan: string) => {
+    updateApprovedRestaurantPlan(id, plan);
+    setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, plan: plan as any } : r)));
   };
 
   const deleteNode = (id: string) => {
@@ -357,7 +369,8 @@ export default function Subscriptions() {
         branches: restaurant.branches,
         joinedDate: new Date().toISOString().slice(0, 10),
         lastActive: new Date().toISOString().slice(0, 10),
-        tags: ["New Request", "Placeholder"],
+        tags: [],
+        cooldownRemaining: restaurant.cooldownRemaining,
       }));
 
     return [...approvedSubscriptionRows, ...restaurants];
@@ -461,10 +474,7 @@ export default function Subscriptions() {
           </button>
 
           <button
-            onClick={() => {
-              const el = document.getElementById('processing-fee-settings');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
+            onClick={() => setIsSettingsModalOpen(true)}
             className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all flex items-center gap-1.5 ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
@@ -550,10 +560,11 @@ export default function Subscriptions() {
         searchQuery={searchQuery}
         statusFilter={statusFilter}
         tierFilter={tierFilter}
-        onView={setViewingNode}
+        onView={handleViewRestaurant}
         onUpdateStatus={updateStatus}
         onUpdatePlan={updatePlan}
         onDelete={deleteNode}
+        plans={dbPlans}
         onResetFilters={handleResetAll}
       />
 
@@ -579,186 +590,209 @@ export default function Subscriptions() {
         </span>
       </div>
 
-      {/* Platform Settings & Onboarding Processing Fee */}
-      <div id="processing-fee-settings" className={`mt-8 p-6 rounded-2xl border ${
-        darkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800 shadow-sm"
-      }`}>
-        <div className="flex items-center justify-between border-b pb-4 mb-6 border-slate-800/10">
-          <div>
-            <h2 className="text-base font-bold">Platform Settings & Onboarding Fee</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Configure global partner application fees, refund policies, and view onboarding revenue.
-            </p>
-          </div>
-          {settingsSaved && (
-            <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-pulse">
-              Settings Saved!
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Config column */}
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+      {/* Platform Settings Modal */}
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          {/* Backdrop */}
+          <button 
+            type="button" 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-0" 
+            onClick={() => setIsSettingsModalOpen(false)} 
+            aria-label="Close modal"
+          />
+          
+          {/* Modal Container */}
+          <div className={`w-full max-w-4xl rounded-2xl border p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto ${
+            darkMode ? "bg-slate-950 border-slate-800 text-white shadow-black/85" : "bg-white border-slate-200 text-slate-800 shadow-slate-300/40"
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-6 border-slate-800/10 dark:border-slate-800">
               <div>
-                <p className="font-bold">Enable Application Processing Fee</p>
-                <p className="text-[10px] text-slate-500">Require paid review fee before a partner can submit their application.</p>
+                <h2 className="text-base font-bold">Platform Settings & Onboarding Fee</h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Configure global partner application fees, refund policies, and view onboarding revenue.
+                </p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={platformSettings.applicationFeeEnabled}
-                onClick={() => setPlatformSettings(prev => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
-                  platformSettings.applicationFeeEnabled
-                    ? 'bg-orange-500'
-                    : darkMode ? 'bg-slate-700' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    platformSettings.applicationFeeEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Fee Amount</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={platformSettings.applicationFeeAmount}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Currency</label>
-                <select
-                  value={platformSettings.currency}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, currency: e.target.value }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+              <div className="flex items-center gap-2">
+                {settingsSaved && (
+                  <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-pulse">
+                    Settings Saved!
+                  </span>
+                )}
+                <button
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className={`p-1.5 rounded-lg border hover:bg-slate-500/5 transition-all ${
+                    darkMode ? "border-slate-800 text-slate-400 hover:text-slate-200" : "border-slate-200 text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <option value="INR">INR — Indian Rupee (₹)</option>
-                  <option value="USD">USD — US Dollar ($)</option>
-                  <option value="EUR">EUR — Euro (€)</option>
-                  <option value="GBP">GBP — British Pound (£)</option>
-                </select>
+                  <X size={15} />
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Refund Policy</label>
-                <select
-                  value={platformSettings.refundPolicy}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, refundPolicy: e.target.value }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
-                  }`}
-                >
-                  <option value="refundable">Refundable upon rejection</option>
-                  <option value="non-refundable">Non-Refundable</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Pending Requests</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={platformSettings.maxPendingApplications}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
-              <div>
-                <p className="font-bold">Allow Partner Self-Registration</p>
-                <p className="text-[10px] text-slate-500">Enable the public registration page for new partners.</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={platformSettings.enablePartnerRegistration}
-                onClick={() => setPlatformSettings(prev => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
-                  platformSettings.enablePartnerRegistration
-                    ? 'bg-orange-500'
-                    : darkMode ? 'bg-slate-700' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    platformSettings.enablePartnerRegistration ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <button
-              onClick={handleSavePlatformSettings}
-              className="py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all shadow-md shadow-orange-600/10"
-            >
-              Save Platform Settings
-            </button>
-          </div>
-
-          {/* Revenue & history column */}
-          <div className="space-y-4 text-xs border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-6 border-slate-800/10">
-            <div>
-              <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
-              <span className="text-xl font-extrabold text-emerald-500">
-                {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
-              {platformSettings.history && platformSettings.history.length > 0 ? (
-                <div className="max-h-52 overflow-y-auto border border-slate-800/10 rounded-xl">
-                  <table className="w-full text-left text-[11px] border-collapse">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
-                        <th className="p-2 font-bold">Restaurant</th>
-                        <th className="p-2 font-bold">Amount</th>
-                        <th className="p-2 font-bold">Payment ID</th>
-                        <th className="p-2 font-bold">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {platformSettings.history.map(row => (
-                        <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
-                          <td className="p-2 font-semibold">{row.restaurantName}</td>
-                          <td className="p-2 text-emerald-500 font-bold">
-                            {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
-                          </td>
-                          <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
-                          <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Config column */}
+              <div className="space-y-4 text-xs">
+                <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+                  <div>
+                    <p className="font-bold">Enable Application Processing Fee</p>
+                    <p className="text-[10px] text-slate-500">Require paid review fee before a partner can submit their application.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={platformSettings.applicationFeeEnabled}
+                    onClick={() => setPlatformSettings(prev => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                      platformSettings.applicationFeeEnabled
+                        ? 'bg-orange-500'
+                        : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        platformSettings.applicationFeeEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
-              ) : (
-                <p className="text-[10px] text-slate-500 italic py-4">No processing fee payments recorded yet.</p>
-              )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Fee Amount</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={platformSettings.applicationFeeAmount}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Currency</label>
+                    <select
+                      value={platformSettings.currency}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, currency: e.target.value }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    >
+                      <option value="INR">INR — Indian Rupee (₹)</option>
+                      <option value="USD">USD — US Dollar ($)</option>
+                      <option value="EUR">EUR — Euro (€)</option>
+                      <option value="GBP">GBP — British Pound (£)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Refund Policy</label>
+                    <select
+                      value={platformSettings.refundPolicy}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    >
+                      <option value="refundable">Refundable upon rejection</option>
+                      <option value="non-refundable">Non-Refundable</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Pending Requests</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={platformSettings.maxPendingApplications}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+                  <div>
+                    <p className="font-bold">Allow Partner Self-Registration</p>
+                    <p className="text-[10px] text-slate-500">Enable the public registration page for new partners.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={platformSettings.enablePartnerRegistration}
+                    onClick={() => setPlatformSettings(prev => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                      platformSettings.enablePartnerRegistration
+                        ? 'bg-orange-500'
+                        : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        platformSettings.enablePartnerRegistration ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleSavePlatformSettings}
+                  className="py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all shadow-md shadow-orange-600/10"
+                >
+                  Save Platform Settings
+                </button>
+              </div>
+
+              {/* Revenue & history column */}
+              <div className="space-y-4 text-xs border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-6 border-slate-800/10 dark:border-slate-800">
+                <div>
+                  <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
+                  <span className="text-xl font-extrabold text-emerald-500">
+                    {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
+                  {platformSettings.history && platformSettings.history.length > 0 ? (
+                    <div className="max-h-52 overflow-y-auto border border-slate-800/10 dark:border-slate-850 rounded-xl">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                          <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
+                            <th className="p-2 font-bold">Restaurant</th>
+                            <th className="p-2 font-bold">Amount</th>
+                            <th className="p-2 font-bold">Payment ID</th>
+                            <th className="p-2 font-bold">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {platformSettings.history.map(row => (
+                            <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
+                              <td className="p-2 font-semibold">{row.restaurantName}</td>
+                              <td className="p-2 text-emerald-500 font-bold">
+                                {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
+                              </td>
+                              <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
+                              <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 italic py-4">No processing fee payments recorded yet.</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* View Modal */}
       {viewingNode && (
@@ -766,9 +800,6 @@ export default function Subscriptions() {
           restaurant={viewingNode}
           darkMode={darkMode}
           onClose={() => setViewingNode(null)}
-          onEditClick={() => {
-            setViewingNode(null);
-          }}
         />
       )}
 

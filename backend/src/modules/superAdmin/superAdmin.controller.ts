@@ -201,3 +201,23 @@ export const getPlatformAuditLogs = asyncHandler(async (req: Request, res: Respo
   const result = await superAdminService.getPlatformAuditLogs(query);
   ok(res, result);
 });
+
+export const updateRestaurantStatusController = asyncHandler(async (req: Request, res: Response) => {
+  const { status, blockReason } = req.body;
+  if (!status || !['Active', 'Trial', 'Inactive'].includes(status)) {
+    throw new AppError('Invalid status value. Must be Active, Trial, or Inactive', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const restaurant = await superAdminService.updateRestaurantStatus(req.params.id, status, blockReason);
+  ok(res, { restaurant });
+});
+
+export const updateRestaurantPlanController = asyncHandler(async (req: Request, res: Response) => {
+  const { plan } = req.body;
+  if (!plan) {
+    throw new AppError('Plan name is required', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const restaurant = await superAdminService.updateRestaurantPlan(req.params.id, plan);
+  ok(res, { restaurant });
+});

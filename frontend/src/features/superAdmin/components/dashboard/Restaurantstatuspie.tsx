@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { pieData } from "../../store/Superadmindashboard";
+import { useMemo } from "react";
+import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
 
 interface PieDataItem {
   name: string;
@@ -39,13 +40,38 @@ const CustomTooltip = ({
       </div>
       <p className={`mt-1 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
         Share:{" "}
-        <span className="font-semibold text-white">{item.value}%</span>
+        <span className="font-semibold">{item.value}%</span>
       </p>
     </div>
   );
 };
 
 export default function RestaurantStatusPie({ darkMode }: RestaurantStatusPieProps) {
+  const restaurants = useRestaurantRequestsStore((state) => state.restaurants);
+
+  const pieData = useMemo<PieDataItem[]>(() => {
+    const total = restaurants.length;
+    if (total === 0) {
+      return [
+        { name: "Active", value: 0, color: "#10B981" },
+        { name: "Trial", value: 0, color: "#F97316" },
+        { name: "Inactive", value: 0, color: "#64748B" },
+      ];
+    }
+
+    const activeCount = restaurants.filter(r => r.status === "Active").length;
+    const trialCount = restaurants.filter(r => r.status === "Trial").length;
+    const inactiveCount = restaurants.filter(r => r.status === "Inactive").length;
+
+    return [
+      { name: "Active", value: Math.round((activeCount / total) * 100), color: "#10B981" },
+      { name: "Trial", value: Math.round((trialCount / total) * 100), color: "#F97316" },
+      { name: "Inactive", value: Math.round((inactiveCount / total) * 100), color: "#64748B" },
+    ];
+  }, [restaurants]);
+
+  const totalVenues = restaurants.length;
+
   return (
     <div
       className={`rounded-xl p-4 sm:p-5 border ${
@@ -73,7 +99,7 @@ export default function RestaurantStatusPie({ darkMode }: RestaurantStatusPiePro
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={pieData as PieDataItem[]}
+              data={pieData}
               innerRadius="58%"
               outerRadius="80%"
               paddingAngle={4}
@@ -82,7 +108,7 @@ export default function RestaurantStatusPie({ darkMode }: RestaurantStatusPiePro
               startAngle={90}
               endAngle={-270}
             >
-              {(pieData as PieDataItem[]).map((entry, index) => (
+              {pieData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color}
@@ -98,7 +124,7 @@ export default function RestaurantStatusPie({ darkMode }: RestaurantStatusPiePro
         {/* Center label */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-2xl sm:text-3xl font-bold tracking-tight">
-            216
+            {totalVenues}
           </span>
           <span
             className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${
@@ -112,7 +138,7 @@ export default function RestaurantStatusPie({ darkMode }: RestaurantStatusPiePro
 
       {/* Legend grid — 2-col on all sizes */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-3">
-        {(pieData as PieDataItem[]).map((item) => (
+        {pieData.map((item) => (
           <div key={item.name} className="flex items-center gap-2">
             <span
               className="w-2 h-2 rounded-full shrink-0"

@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2 } from "lucide-react";
 import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
+import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
 import type {
   RestaurantsRow,
   StatusFilter,
@@ -43,6 +44,7 @@ export default function Restaurant() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const restaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
+  const [plans, setPlans] = useState<any[]>([]);
   const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
   const addRestaurant = useRestaurantRequestsStore((state) => state.addRestaurant);
   const updateRestaurantStatus = useRestaurantRequestsStore(
@@ -56,13 +58,33 @@ export default function Restaurant() {
   );
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
 
+  const fetchPlans = async () => {
+    try {
+      const list = await superAdminRestaurantRequestsApi.getPlans();
+      setPlans(list || []);
+    } catch (err) {
+      console.error("Failed to fetch plans", err);
+    }
+  };
+
   useEffect(() => {
     fetchRequests();
+    fetchPlans();
   }, [fetchRequests]);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [viewingRestaurant, setViewingRestaurant] = useState<RestaurantsRow | null>(null);
+  const [viewingRestaurant, setViewingRestaurant] = useState<any | null>(null);
   const [newRestaurant, setNewRestaurant] = useState<NewRestaurantForm>(DEFAULT_FORM);
+
+  const handleViewRestaurant = async (row: RestaurantsRow) => {
+    try {
+      const fullDetails = await superAdminRestaurantRequestsApi.getRestaurantById(row.id);
+      setViewingRestaurant(fullDetails || row);
+    } catch (err) {
+      console.error("Failed to load restaurant details", err);
+      setViewingRestaurant(row);
+    }
+  };
 
   // Sync dark mode from parent layout
   useEffect(() => {
@@ -109,11 +131,11 @@ export default function Restaurant() {
   }, [restaurants, searchQuery, statusFilter]);
 
   // Update restaurant status
-  const updateStatus = (id: string, status: "Active" | "Trial" | "Inactive") =>
-    updateRestaurantStatus(id, status);
+  const updateStatus = (id: string, status: "Active" | "Trial" | "Inactive", blockReason?: string) =>
+    updateRestaurantStatus(id, status, blockReason);
 
   // Update restaurant plan
-  const updatePlan = (id: string, plan: "Premium" | "Standard" | "Basic") =>
+  const updatePlan = (id: string, plan: string) =>
     updateRestaurantPlan(id, plan);
 
   // Delete restaurant
@@ -209,10 +231,11 @@ export default function Restaurant() {
         darkMode={darkMode}
         searchQuery={searchQuery}
         statusFilter={statusFilter}
-        onView={setViewingRestaurant}
+        onView={handleViewRestaurant}
         onUpdateStatus={updateStatus}
         onUpdatePlan={updatePlan}
         onDelete={deleteRestaurant}
+        plans={plans}
         onResetFilters={() => {
           setSearchQuery("");
           setStatusFilter("All");

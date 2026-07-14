@@ -86,6 +86,18 @@ export async function login(input: LoginInput, meta?: { userAgent?: string; ip?:
     throw new AppError('Account is not active', 403, ErrorCode.FORBIDDEN);
   }
 
+  // Enforce restaurant suspension check (for non-superadmins)
+  if (user.role !== UserRole.SUPER_ADMIN && user.restaurantId) {
+    const { RestaurantModel } = await import('../restaurants/restaurants.model');
+    const restaurant = await RestaurantModel.findById(user.restaurantId);
+    if (restaurant && restaurant.status === 'SUSPENDED') {
+      const reasonMsg = restaurant.blockReason
+        ? `Your restaurant has been inactivated/blocked by Restohub. Reason: ${restaurant.blockReason}`
+        : 'Your restaurant has been inactivated/blocked by Restohub.';
+      throw new AppError(reasonMsg, 403, ErrorCode.FORBIDDEN);
+    }
+  }
+
   const isValid = await comparePassword(input.password, user.password);
 
   if (!isValid) {

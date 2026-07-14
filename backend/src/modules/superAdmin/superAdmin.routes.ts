@@ -36,6 +36,8 @@ import {
   rejectRestaurantRequest,
   getPlatformSettingsController,
   updatePlatformSettingsController,
+  updateRestaurantStatusController,
+  updateRestaurantPlanController,
 } from './superAdmin.controller';
 
 const router = Router();
@@ -100,6 +102,20 @@ router.patch(
   '/restaurants/:id/suspend',
   validate({ params: restaurantIdParamSchema }),
   suspendRestaurant,
+);
+
+// PATCH /super-admin/restaurants/:id/status
+router.patch(
+  '/restaurants/:id/status',
+  validate({ params: restaurantIdParamSchema }),
+  updateRestaurantStatusController,
+);
+
+// PATCH /super-admin/restaurants/:id/plan
+router.patch(
+  '/restaurants/:id/plan',
+  validate({ params: restaurantIdParamSchema }),
+  updateRestaurantPlanController,
 );
 
 // DELETE /super-admin/restaurants/:id

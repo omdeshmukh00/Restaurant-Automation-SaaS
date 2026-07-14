@@ -51,9 +51,12 @@ export default function SuperAdminLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("superadmin-sidebar-collapsed");
-      return saved !== null ? saved === "true" : true;
+      if (saved !== null) {
+        return saved === "true";
+      }
+      return window.innerWidth < 1024;
     }
-    return true;
+    return false;
   });
 
   const handleToggleSidebar = () => {

@@ -21,6 +21,7 @@ export interface RestaurantNode {
   joinedDate: string; // "2024-03-15"
   lastActive: string; // "2026-05-18"
   tags?: string[];
+  cooldownRemaining?: number;
 }
 
 export interface NewRestaurantForm {

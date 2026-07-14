@@ -4,7 +4,7 @@
 import { useState } from "react";
 import {
   Mail, Phone, MapPin, Edit2, MoreVertical, Eye, Trash2,
-  CheckCircle2, AlertCircle, X
+  CheckCircle2, AlertCircle, X, Clock
 } from "lucide-react";
 import type { RestaurantsRow } from "./Restauranttypes";
 
@@ -12,9 +12,11 @@ interface RestaurantCardProps {
   restaurant: RestaurantsRow;
   darkMode: boolean;
   onView: (restaurant: RestaurantsRow) => void;
-  onUpdateStatus: (id: string, status: "Active" | "Trial" | "Inactive") => void;
-  onUpdatePlan: (id: string, plan: "Premium" | "Standard" | "Basic") => void;
+  onUpdateStatus: (id: string, status: "Active" | "Trial" | "Inactive", blockReason?: string) => void;
+  onUpdatePlan: (id: string, plan: string) => void;
   onDelete: (id: string) => void;
+  plans: any[];
+  cooldown: number;
 }
 
 export default function RestaurantCard({
@@ -24,18 +26,28 @@ export default function RestaurantCard({
   onUpdateStatus,
   onUpdatePlan,
   onDelete,
+  plans,
+  cooldown,
 }: RestaurantCardProps) {
   const [showActions, setShowActions] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [showPlanMenu, setShowPlanMenu] = useState(false);
 
   const handleStatusChange = (status: "Active" | "Trial" | "Inactive") => {
-    onUpdateStatus(restaurant.id, status);
+    if (status === "Inactive") {
+      const blockReason = window.prompt("Type the reason for inactivating/blocking this restaurant account:");
+      if (blockReason === null) {
+        return; // cancelled
+      }
+      onUpdateStatus(restaurant.id, status, blockReason);
+    } else {
+      onUpdateStatus(restaurant.id, status);
+    }
     setShowStatusMenu(false);
     setShowActions(false);
   };
 
-  const handlePlanChange = (plan: "Premium" | "Standard" | "Basic") => {
+  const handlePlanChange = (plan: string) => {
     onUpdatePlan(restaurant.id, plan);
     setShowPlanMenu(false);
     setShowActions(false);
@@ -100,7 +112,13 @@ export default function RestaurantCard({
             ID: {restaurant.id}
           </p>
         </div>
-        <div className="relative ml-2">
+        <div className="relative ml-2 flex items-center gap-1.5">
+          {cooldown > 0 && (
+            <span className="text-[10px] font-bold text-red-500 px-1.5 py-0.5 rounded bg-red-500/10 animate-pulse flex items-center gap-0.5">
+              <Clock size={9} />
+              {cooldown}s
+            </span>
+          )}
           <button
             onClick={() => setShowActions(!showActions)}
             className={`p-2 rounded-lg transition-all ${
@@ -120,12 +138,19 @@ export default function RestaurantCard({
                 onClick={() => setShowActions(false)}
               />
               <div
-                className={`absolute right-0 top-full mt-1 w-48 rounded-lg border shadow-lg z-20 ${
+                className={`absolute right-0 top-full mt-1 w-48 rounded-lg border shadow-lg z-20 p-1.5 ${
                   darkMode
                     ? "bg-slate-950 border-slate-800 shadow-black/40"
                     : "bg-white border-slate-200 shadow-slate-200"
                 }`}
               >
+                {cooldown > 0 && (
+                  <div className="mb-2 p-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-bold text-center flex items-center justify-center gap-1 animate-pulse mx-1">
+                    <Clock size={11} />
+                    Cooldown: {cooldown}s
+                  </div>
+                )}
+
                 <button
                   onClick={() => {
                     onView(restaurant);
@@ -143,11 +168,12 @@ export default function RestaurantCard({
                 {/* Status submenu */}
                 <div>
                   <button
+                    disabled={cooldown > 0}
                     onClick={() => setShowStatusMenu(!showStatusMenu)}
-                    className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg hover:bg-slate-500/5 flex items-center gap-2 transition-colors border-b border-inherit ${
-                      darkMode
-                        ? "text-slate-300 hover:text-white"
-                        : "text-slate-700 hover:text-slate-900"
+                    className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg flex items-center gap-2 transition-colors border-b border-inherit ${
+                      cooldown > 0
+                        ? "opacity-40 cursor-not-allowed text-slate-500"
+                        : `hover:bg-slate-500/5 ${darkMode ? "text-slate-300 hover:text-white" : "text-slate-700 hover:text-slate-900"}`
                     }`}
                   >
                     <Edit2 size={13} /> Change Status
@@ -195,11 +221,12 @@ export default function RestaurantCard({
                 {/* Plan submenu */}
                 <div>
                   <button
+                    disabled={cooldown > 0}
                     onClick={() => setShowPlanMenu(!showPlanMenu)}
-                    className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg hover:bg-slate-500/5 flex items-center gap-2 transition-colors border-b border-inherit ${
-                      darkMode
-                        ? "text-slate-300 hover:text-white"
-                        : "text-slate-700 hover:text-slate-900"
+                    className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg flex items-center gap-2 transition-colors border-b border-inherit ${
+                      cooldown > 0
+                        ? "opacity-40 cursor-not-allowed text-slate-500"
+                        : `hover:bg-slate-500/5 ${darkMode ? "text-slate-300 hover:text-white" : "text-slate-700 hover:text-slate-900"}`
                     }`}
                   >
                     <Edit2 size={13} /> Change Plan
@@ -210,36 +237,46 @@ export default function RestaurantCard({
                         darkMode ? "border-slate-800" : "border-slate-200"
                       }`}
                     >
-                      <button
-                        onClick={() => handlePlanChange("Premium")}
-                        className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-orange-500 flex items-center gap-2 transition-colors ${
-                          restaurant.plan === "Premium"
-                            ? "bg-orange-500/10"
-                            : ""
-                        }`}
-                      >
-                        ⭐ Premium
-                      </button>
-                      <button
-                        onClick={() => handlePlanChange("Standard")}
-                        className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-amber-500 flex items-center gap-2 transition-colors ${
-                          restaurant.plan === "Standard"
-                            ? "bg-amber-500/10"
-                            : ""
-                        }`}
-                      >
-                        ⭐⭐ Standard
-                      </button>
-                      <button
-                        onClick={() => handlePlanChange("Basic")}
-                        className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-blue-500 flex items-center gap-2 transition-colors ${
-                          restaurant.plan === "Basic"
-                            ? "bg-blue-500/10"
-                            : ""
-                        }`}
-                      >
-                        ⭐ Basic
-                      </button>
+                      {plans && plans.length > 0 ? (
+                        plans.map((p) => (
+                          <button
+                            key={p._id || p.id}
+                            onClick={() => handlePlanChange(p.name)}
+                            className={`w-full text-left px-4 py-1.5 text-xs font-semibold hover:bg-slate-500/5 text-slate-700 dark:text-slate-300 flex items-center gap-2 transition-colors ${
+                              restaurant.plan === p.name ? "bg-slate-500/10 font-bold" : ""
+                            }`}
+                          >
+                            ⚡ {p.name}
+                          </button>
+                        ))
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handlePlanChange("Premium")}
+                            className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-orange-500 flex items-center gap-2 transition-colors ${
+                              restaurant.plan === "Premium" ? "bg-orange-500/10" : ""
+                            }`}
+                          >
+                            ⭐ Premium
+                          </button>
+                          <button
+                            onClick={() => handlePlanChange("Standard")}
+                            className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-amber-500 flex items-center gap-2 transition-colors ${
+                              restaurant.plan === "Standard" ? "bg-amber-500/10" : ""
+                            }`}
+                          >
+                            ⭐⭐ Standard
+                          </button>
+                          <button
+                            onClick={() => handlePlanChange("Basic")}
+                            className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-blue-500 flex items-center gap-2 transition-colors ${
+                              restaurant.plan === "Basic" ? "bg-blue-500/10" : ""
+                            }`}
+                          >
+                            ⭐ Basic
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

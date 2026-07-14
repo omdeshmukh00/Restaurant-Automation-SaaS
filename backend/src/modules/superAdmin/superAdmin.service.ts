@@ -6,6 +6,7 @@ import mongoose, { FilterQuery } from 'mongoose';
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { UserModel } from '../users/users.model';
 import { PlatformPlanModel, FeatureFlagModel } from './superAdmin.model';
+import { EmailLogModel } from '../notifications/emailLog.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
 import { AppError } from '../../utils/AppError';
@@ -97,8 +98,35 @@ export async function listRestaurants(filters: RestaurantListQuery) {
     RestaurantModel.countDocuments(query),
   ]);
 
+  // Calculate remaining cooldown in seconds for each restaurant
+  const recipientEmails = restaurants.map((r: any) => r.email).filter(Boolean);
+  const oneMinuteAgo = new Date(Date.now() - 60000);
+  const recentLogs = await EmailLogModel.find({
+    recipient: { $in: recipientEmails },
+    status: 'SENT',
+    sentAt: { $gte: oneMinuteAgo }
+  }).lean();
+
+  const cooldownMap: Record<string, number> = {};
+  recentLogs.forEach((log: any) => {
+    const elapsedSeconds = Math.floor((Date.now() - log.sentAt.getTime()) / 1000);
+    const remaining = 60 - elapsedSeconds;
+    if (remaining > 0) {
+      cooldownMap[log.recipient] = Math.max(cooldownMap[log.recipient] || 0, remaining);
+    }
+  });
+
+  const enrichedRestaurants = restaurants.map((r: any) => {
+    const email = r.email;
+    const cooldown = email ? (cooldownMap[email] || 0) : 0;
+    return {
+      ...r,
+      cooldownRemaining: cooldown,
+    };
+  });
+
   return {
-    restaurants,
+    restaurants: enrichedRestaurants,
     pagination: {
       total,
       page,
@@ -109,13 +137,31 @@ export async function listRestaurants(filters: RestaurantListQuery) {
 }
 
 export async function getRestaurantById(id: string) {
-  const restaurant = await RestaurantModel.findById(id).lean();
+  const restaurant = await RestaurantModel.findById(id)
+    .populate('onboardingRequestId')
+    .lean();
 
   if (!restaurant) {
     throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
   }
 
-  return restaurant;
+  let cooldown = 0;
+  if (restaurant.email) {
+    const oneMinuteAgo = new Date(Date.now() - 60000);
+    const recentEmail = await EmailLogModel.findOne({
+      recipient: restaurant.email,
+      status: 'SENT',
+      sentAt: { $gte: oneMinuteAgo }
+    }).sort({ sentAt: -1 }).lean();
+    if (recentEmail) {
+      cooldown = Math.max(0, 60 - Math.floor((Date.now() - recentEmail.sentAt.getTime()) / 1000));
+    }
+  }
+
+  return {
+    ...restaurant,
+    cooldownRemaining: cooldown,
+  };
 }
 
 export async function approveRestaurant(id: string) {
@@ -461,9 +507,19 @@ import {AuditEntity, AuditAction } from '../auditLogs/auditLogs.types';
 import crypto from 'crypto';
 import { slugify, uniqueSlug } from '../../utils/slugify';
 import { hashPassword } from '../../utils/crypto';
-import { sendRestaurantApprovalEmail, sendRestaurantRejectionEmail } from '../../services/mail.service';
+import { sendRestaurantApprovalEmail, sendRestaurantRejectionEmail, sendRestaurantPlanUpdatedEmail, sendRestaurantSuspendedEmail, sendRestaurantActivatedEmail } from '../../services/mail.service';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+
+async function isEmailOnCooldown(recipient: string): Promise<boolean> {
+  const oneMinuteAgo = new Date(Date.now() - 60000);
+  const recentEmail = await EmailLogModel.findOne({
+    recipient,
+    status: 'SENT',
+    sentAt: { $gte: oneMinuteAgo }
+  });
+  return !!recentEmail;
+}
 
 export async function listRestaurantRequests() {
   const requests = await RestaurantRequestModel.find({
@@ -779,4 +835,127 @@ export async function rejectRestaurantRequest(
   });
 
   return request;
+}
+
+export async function updateRestaurantStatus(id: string, statusStr: 'Active' | 'Trial' | 'Inactive', blockReason?: string) {
+  let status: RestaurantStatus;
+  if (statusStr === 'Active') {
+    status = RestaurantStatus.ACTIVE;
+  } else if (statusStr === 'Trial') {
+    status = RestaurantStatus.ONBOARDING;
+  } else {
+    status = RestaurantStatus.SUSPENDED;
+  }
+
+  const oldRestaurant = await RestaurantModel.findById(id).lean();
+  if (!oldRestaurant) {
+    throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  if (oldRestaurant.status === status) {
+    return oldRestaurant;
+  }
+
+  if (oldRestaurant.email) {
+    const onCooldown = await isEmailOnCooldown(oldRestaurant.email);
+    if (onCooldown) {
+      throw new AppError('This restaurant is on email cooldown. Please wait 60s before updating again.', 429, ErrorCode.RATE_LIMIT_EXCEEDED);
+    }
+  }
+
+  const updateFields: any = { status };
+  if (status === RestaurantStatus.SUSPENDED) {
+    updateFields.blockReason = blockReason || 'No reason specified';
+  } else {
+    updateFields.blockReason = null;
+  }
+
+  const restaurant = await RestaurantModel.findByIdAndUpdate(
+    id,
+    updateFields,
+    { new: true }
+  ).lean();
+
+  if (!restaurant) {
+    throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  // Trigger emails asynchronously with a 60s cooldown check
+  if (restaurant.email) {
+    const onCooldown = await isEmailOnCooldown(restaurant.email);
+    if (!onCooldown) {
+      if (status === RestaurantStatus.SUSPENDED) {
+        void sendRestaurantSuspendedEmail(
+          restaurant.email,
+          restaurant.ownerName || 'Owner',
+          restaurant.name,
+          updateFields.blockReason
+        );
+      } else if (oldRestaurant.status === RestaurantStatus.SUSPENDED && status === RestaurantStatus.ACTIVE) {
+        void sendRestaurantActivatedEmail(
+          restaurant.email,
+          restaurant.ownerName || 'Owner',
+          restaurant.name
+        );
+      }
+    } else {
+      logger.info(`Throttling status change email to ${restaurant.email} due to 60s cooldown`);
+    }
+  }
+
+  return restaurant;
+}
+
+export async function updateRestaurantPlan(id: string, planName: string) {
+  const restaurant = await RestaurantModel.findById(id);
+  if (!restaurant) {
+    throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  const oldPlan = restaurant.plan || 'Basic';
+  if (oldPlan.toLowerCase() === planName.toLowerCase()) {
+    return restaurant.toObject();
+  }
+
+  if (restaurant.email) {
+    const onCooldown = await isEmailOnCooldown(restaurant.email);
+    if (onCooldown) {
+      throw new AppError('This restaurant is on email cooldown. Please wait 60s before updating again.', 429, ErrorCode.RATE_LIMIT_EXCEEDED);
+    }
+  }
+
+  restaurant.plan = planName;
+  await restaurant.save();
+
+  // Determine upgrade vs demotion based on plan pricing
+  let isUpgrade = true;
+  try {
+    const [oldPlanDoc, newPlanDoc] = await Promise.all([
+      PlatformPlanModel.findOne({ name: oldPlan }),
+      PlatformPlanModel.findOne({ name: planName }),
+    ]);
+    if (oldPlanDoc && newPlanDoc) {
+      isUpgrade = newPlanDoc.priceMonthly >= oldPlanDoc.priceMonthly;
+    }
+  } catch (err) {
+    logger.error('Failed to compare plan prices', err);
+  }
+
+  if (restaurant.email) {
+    const onCooldown = await isEmailOnCooldown(restaurant.email);
+    if (!onCooldown) {
+      void sendRestaurantPlanUpdatedEmail(
+        restaurant.email,
+        restaurant.ownerName || 'Owner',
+        restaurant.name,
+        oldPlan,
+        planName,
+        isUpgrade
+      );
+    } else {
+      logger.info(`Throttling plan update email to ${restaurant.email} due to 60s cooldown`);
+    }
+  }
+
+  return restaurant.toObject();
 }

@@ -19,8 +19,6 @@ import { ErrorCode } from '../../constants/errors';
 import { z } from 'zod';
 
 import { attachUser } from '../../middleware/requireAuth';
-import { restaurantSlugParamSchema } from '../restaurants/restaurants.schema';
-import { QueueService } from '../queue/queue.service';
 
 export const publicRouter = Router();
 
