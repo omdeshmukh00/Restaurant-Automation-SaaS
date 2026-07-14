@@ -13,6 +13,7 @@ import {
   updateFeatureFlagSchema,
   analyticsQuerySchema,
   superAdminAuditLogQuerySchema,
+  registerRestaurantSchema,
 } from './superAdmin.schema';
 import {
   getPlatformOverview,
@@ -38,6 +39,8 @@ import {
   updatePlatformSettingsController,
   updateRestaurantStatusController,
   updateRestaurantPlanController,
+  registerRestaurantController,
+  getReservationQueueAnalyticsController,
 } from './superAdmin.controller';
 
 const router = Router();
@@ -81,6 +84,13 @@ router.get(
   '/restaurants',
   validate({ query: restaurantListQuerySchema }),
   listRestaurants,
+);
+
+// POST /super-admin/restaurants
+router.post(
+  '/restaurants',
+  validate({ body: registerRestaurantSchema }),
+  registerRestaurantController,
 );
 
 // GET /super-admin/restaurants/:id
@@ -199,6 +209,9 @@ router.get(
 
 // GET /super-admin/system/monitoring
 router.get('/system/monitoring', getSystemMonitoring);
+
+// GET /super-admin/analytics/reservation-queue
+router.get('/analytics/reservation-queue', getReservationQueueAnalyticsController);
 
 /*
 |--------------------------------------------------------------------------

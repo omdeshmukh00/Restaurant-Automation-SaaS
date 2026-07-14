@@ -1,4 +1,6 @@
-import { X, Mail, Phone, MapPin, CreditCard, Building2, Calendar, ShieldAlert } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Mail, Phone, MapPin, CreditCard, Building2, Calendar, ShieldAlert, SlidersHorizontal } from "lucide-react";
+import { apiClient } from "../../../../shared/services/apiClient";
 
 interface ViewModalProps {
   restaurant: any;
@@ -47,6 +49,31 @@ export default function ViewModal({ restaurant, darkMode, onClose }: ViewModalPr
       })
     : "N/A";
 
+  const [usageDashboard, setUsageDashboard] = useState<any>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
+
+  useEffect(() => {
+    const restaurantId = restaurant._id || restaurant.id;
+    if (restaurantId) {
+      setLoadingUsage(true);
+      apiClient.get(`/subscriptions/usage-dashboard?restaurantId=${restaurantId}`)
+        .then(res => {
+          if (res.data) {
+            setUsageDashboard(res.data);
+          }
+        })
+        .catch(err => console.error("Failed to fetch subscription usage dashboard", err))
+        .finally(() => setLoadingUsage(false));
+    }
+  }, [restaurant]);
+
+  const getProgressBarColor = (percent: number) => {
+    if (percent >= 100) return "bg-red-500";
+    if (percent >= 80) return "bg-orange-500";
+    if (percent >= 50) return "bg-amber-500";
+    return "bg-emerald-500";
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-950/40 animate-fade-in overflow-y-auto">
       {/* Backdrop listener to close when clicking outside */}
@@ -75,7 +102,7 @@ export default function ViewModal({ restaurant, darkMode, onClose }: ViewModalPr
         {/* Modal Header */}
         <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-905 border-slate-100/10">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-orange-500/10 text-orange-500 uppercase">
-            Paid Onboarding Plan
+            {usageDashboard?.planName ? `${usageDashboard.planName} Plan` : "Paid Onboarding Plan"}
           </span>
           <h2 className="text-2xl font-bold tracking-tight mt-2 text-slate-900 dark:text-white">
             {restaurant.name || "Restaurant Details"}
@@ -88,6 +115,45 @@ export default function ViewModal({ restaurant, darkMode, onClose }: ViewModalPr
 
         {/* Modal Body */}
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          
+          {/* USAGE TELEMETRY METERS */}
+          <div className={`rounded-2xl border p-4 space-y-3.5 ${
+            darkMode ? "bg-slate-900/30 border-slate-900" : "bg-slate-50/50 border-slate-100"
+          }`}>
+            <h3 className="text-[10px] font-bold text-orange-500 uppercase tracking-widest flex items-center gap-1.5">
+              <SlidersHorizontal size={12} />
+              Plan Limits & Current Usage
+            </h3>
+            {loadingUsage && (
+              <div className="text-xs text-slate-400 animate-pulse py-2 flex items-center gap-2">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-orange-500" />
+                Loading usage telemetry meters...
+              </div>
+            )}
+            {!loadingUsage && usageDashboard && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {usageDashboard.quotas.map((quota: any) => {
+                  const hasLimit = quota.limit !== null;
+                  return (
+                    <div key={quota.key} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-600 dark:text-slate-350">{quota.label}</span>
+                        <span className="text-slate-500 dark:text-slate-400 font-mono">
+                          {quota.used} / {hasLimit ? quota.limit : "∞"}
+                        </span>
+                      </div>
+                      <div className={`h-2 rounded-full overflow-hidden ${darkMode ? "bg-slate-800" : "bg-slate-200"}`}>
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(quota.percent)}`}
+                          style={{ width: `${hasLimit ? quota.percent : 100}%`, opacity: hasLimit ? 1 : 0.4 }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           
           {/* BUSINESS INFORMATION CARD */}
           <div className={`rounded-2xl border p-4 space-y-3.5 ${

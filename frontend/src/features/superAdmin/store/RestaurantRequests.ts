@@ -4,7 +4,7 @@ import {
   superAdminRestaurantRequestsApi,
 } from "../api/superAdmin.api";
 import { restaurantData } from "./Restaurants";
-import type { RestaurantsRow } from "../components/Restaurants/Restauranttypes";
+import type { RestaurantsRow, NewRestaurantForm } from "../components/Restaurants/Restauranttypes";
 
 export interface RestaurantRequest {
   id: string;
@@ -42,7 +42,7 @@ interface RestaurantRequestsState {
   fetchRequests: () => Promise<void>;
   approveRequest: (id: string) => Promise<void>;
   denyRequest: (id: string, reason: string, refund?: boolean) => Promise<void>;
-  addRestaurant: (restaurant: RestaurantsRow) => void;
+  addRestaurant: (restaurant: NewRestaurantForm) => Promise<void>;
   updateRestaurantStatus: (
     id: string,
     status: "Active" | "Trial" | "Inactive",
@@ -127,8 +127,16 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
         throw error;
       }
     },
-    addRestaurant: (restaurant) =>
-      set((state) => ({ restaurants: [restaurant, ...state.restaurants] })),
+    addRestaurant: async (formData) => {
+      try {
+        await superAdminRestaurantRequestsApi.registerRestaurant(formData);
+        const dbRestaurants = await superAdminRestaurantRequestsApi.getRestaurants();
+        set({ restaurants: dbRestaurants.map(mapDbRestaurantToRow) });
+      } catch (error: any) {
+        console.error("Failed to add restaurant", error);
+        throw error;
+      }
+    },
     updateRestaurantStatus: async (id, status, blockReason) => {
       try {
         await superAdminRestaurantRequestsApi.updateRestaurantStatus(id, status, blockReason);

@@ -20,6 +20,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useRestaurantRequestsStore, type RestaurantRequest } from "../store/RestaurantRequests";
+import { useSuperAdminDashboardStore } from "../store/Superadmindashboard";
 import { getSocket, connectSocket } from "../../../lib/socket";
 
 interface OutletContext {
@@ -49,8 +50,11 @@ export default function SuperAdminDashboard() {
   const [shouldRefund, setShouldRefund] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const fetchOverview = useSuperAdminDashboardStore((state) => state.fetchOverview);
+  
   useEffect(() => {
     fetchRequests();
+    fetchOverview();
 
     connectSocket();
     const socket = getSocket();
@@ -88,7 +92,7 @@ export default function SuperAdminDashboard() {
         socket.off('restaurant_request_rejected');
       }
     };
-  }, [fetchRequests]);
+  }, [fetchRequests, fetchOverview]);
 
   const closeRequests = () => {
     setSearchParams({});
@@ -159,7 +163,10 @@ export default function SuperAdminDashboard() {
             </button>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                fetchRequests();
+                fetchOverview();
+              }}
               className={`self-start sm:self-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
                 darkMode
                   ? "border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-800/40"

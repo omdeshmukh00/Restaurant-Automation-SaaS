@@ -1,6 +1,6 @@
 // types/SubscriptionTypes.ts
 
-export type PlanType = "Basic" | "Standard" | "Premium" | "Enterprise";
+export type PlanType = string;
 export type StatusType = "Active" | "Trial" | "Inactive";
 export type TierFilter = "All" | PlanType;
 export type StatusFilter = "All" | StatusType;

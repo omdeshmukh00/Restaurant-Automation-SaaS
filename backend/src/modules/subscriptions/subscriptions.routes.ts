@@ -14,6 +14,7 @@ const restaurantAdminAndSuper = roleGuard(UserRole.RESTAURANT_ADMIN, UserRole.SU
 router.post('/', superAdminOnly, validate({ body: createSubscriptionSchema }), controller.create);
 router.get('/', superAdminOnly, controller.list);
 router.get('/current', restaurantAdminAndSuper, controller.getCurrent);
+router.get('/usage-dashboard', restaurantAdminAndSuper, controller.getUsageDashboard);
 router.get('/:id', superAdminOnly, validate({ params: subscriptionIdParam }), controller.getOne);
 router.patch('/:id', superAdminOnly, validate({ params: subscriptionIdParam, body: updateSubscriptionSchema }), controller.patch);
 router.post(

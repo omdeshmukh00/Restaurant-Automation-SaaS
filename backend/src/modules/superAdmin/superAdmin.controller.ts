@@ -8,6 +8,7 @@ import type {
   RestaurantListQuery,
   AnalyticsQuery,
   SuperAdminAuditLogQuery,
+  RegisterRestaurantInput,
 } from './superAdmin.schema';
 
 // ──────────────────────────────────────────────────────────────────────
@@ -110,7 +111,8 @@ export const updatePlatformSettingsController = asyncHandler(async (req: Request
   const fields = [
     'applicationFeeEnabled', 'applicationFeeAmount', 'currency', 
     'refundPolicy', 'enablePartnerRegistration', 
-    'maxPendingApplications', 'applicationExpiryDays'
+    'maxPendingApplications', 'applicationExpiryDays',
+    'platformCommissionRate'
   ];
 
   for (const field of fields) {
@@ -220,4 +222,16 @@ export const updateRestaurantPlanController = asyncHandler(async (req: Request, 
 
   const restaurant = await superAdminService.updateRestaurantPlan(req.params.id, plan);
   ok(res, { restaurant });
+});
+
+export const registerRestaurantController = asyncHandler(async (req: Request, res: Response) => {
+  const reviewerId = req.user!.id;
+  const input = req.body as RegisterRestaurantInput;
+  const result = await superAdminService.registerRestaurantDirectly(input, reviewerId);
+  ok(res, { success: true, ...result }, 201);
+});
+
+export const getReservationQueueAnalyticsController = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await superAdminService.getReservationQueueAnalytics();
+  ok(res, result);
 });

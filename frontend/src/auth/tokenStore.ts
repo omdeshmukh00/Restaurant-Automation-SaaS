@@ -116,6 +116,7 @@ export type StoredAuthUser = {
   restaurantName?: string;
   email?: string;
   mobile?: string;
+  themeMode?: 'light' | 'dark' | 'system';
 };
 
 export function getStoredUser(panel: Panel): StoredAuthUser | null {

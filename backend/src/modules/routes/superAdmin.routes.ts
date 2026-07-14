@@ -5,33 +5,15 @@ import { ok } from '../../utils/responses';
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
 import { FeatureFlagModel, PlatformPlanModel } from '../superAdmin/superAdmin.model';
+import { RestaurantRequestModel } from '../superAdmin/restaurantRequest.model';
+import { SubscriptionPaymentModel } from '../subscriptions/subscriptions.model';
+import { PaymentModel } from '../payments/payments.model';
+import { OrderModel } from '../orders/orders.model';
+import { getPlatformSettings } from '../superAdmin/platformSettings.model';
 
 import { RestaurantStatus } from '../../constants/statuses';
 
 export const superAdminRouter = Router();
-
-superAdminRouter.get('/platform/overview', async (_req, res, next) => {
-  try {
-    const [restaurants, plans] = await Promise.all([RestaurantModel.find().lean(), PlatformPlanModel.find().lean()]);
-    const activeRestaurants = restaurants.filter((restaurant) => restaurant.status === RestaurantStatus.ACTIVE);
-    const planPriceMap = new Map(plans.map((plan) => [plan.name, plan.priceMonthly]));
-    const monthlyRecurringRevenue = activeRestaurants.reduce(
-      (sum, restaurant) => sum + (planPriceMap.get(restaurant.plan || '') ?? 0),
-      0,
-    );
-
-    ok(res, {
-      overview: {
-        totalRestaurants: restaurants.length,
-        activeRestaurants: activeRestaurants.length,
-        monthlyRecurringRevenue,
-        uptimePercent: mongoose.connection.readyState === 1 ? 99.98 : 0,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
 
 superAdminRouter.get('/restaurants', async (req, res, next) => {
   try {
@@ -250,6 +232,197 @@ superAdminRouter.patch('/feature-flags/:id', async (req, res, next) => {
     );
 
     ok(res, { featureFlag });
+  } catch (error) {
+    next(error);
+  }
+});
+
+function formatTimestamp(date?: Date | null): string {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+superAdminRouter.get('/transactions', async (_req, res, next) => {
+  try {
+    const [onboardingRequests, subscriptionPayments, orderPayments, settings] = await Promise.all([
+      RestaurantRequestModel.find({
+        paymentStatus: 'CAPTURED',
+        paymentAmount: { $gt: 0 }
+      }).setOptions({ bypassTenant: true }).lean(),
+      
+      SubscriptionPaymentModel.find()
+        .populate('restaurantId')
+        .setOptions({ bypassTenant: true })
+        .lean(),
+      
+      PaymentModel.find()
+        .populate('restaurantId')
+        .setOptions({ bypassTenant: true })
+        .lean(),
+
+      getPlatformSettings()
+    ]);
+
+    const commissionRate = settings.platformCommissionRate ?? 10;
+    const transactions: any[] = [];
+
+    // 1. Map onboarding fee payments
+    onboardingRequests.forEach((r: any) => {
+      transactions.push({
+        id: r.paymentId || `ONB-${r._id}`,
+        restaurant: r.restaurantName,
+        restaurantId: r.restaurantId ? r.restaurantId.toString() : r._id.toString(),
+        amount: r.paymentAmount || 0,
+        commission: r.paymentAmount || 0,
+        commissionRate: 100,
+        paymentMethod: 'UPI / Wallet',
+        status: 'Completed',
+        timestamp: formatTimestamp(r.paymentTimestamp || r.updatedAt),
+        city: r.city || 'Onboarding',
+        ordersCount: 0,
+        note: 'Onboarding Fee'
+      });
+    });
+
+    // 2. Map subscription plan payments
+    subscriptionPayments.forEach((sp: any) => {
+      const restName = sp.restaurantId?.name || 'Unknown Restaurant';
+      const restCity = sp.restaurantId?.city || 'Platform';
+      transactions.push({
+        id: sp.providerPaymentId || `SUB-${sp._id}`,
+        restaurant: restName,
+        restaurantId: sp.restaurantId?._id?.toString() || sp.restaurantId?.toString() || '',
+        amount: sp.amount || 0,
+        commission: sp.amount || 0,
+        commissionRate: 100,
+        paymentMethod: sp.provider === 'razorpay' ? 'UPI / Wallet' : 'Credit Card',
+        status: sp.status === 'completed' ? 'Completed' : sp.status === 'failed' ? 'Failed' : 'Pending',
+        timestamp: formatTimestamp(sp.paidAt || sp.createdAt),
+        city: restCity,
+        ordersCount: 0,
+        note: 'Subscription renewal'
+      });
+    });
+
+    // 3. Map dining order payments
+    orderPayments.forEach((op: any) => {
+      const restName = op.restaurantId?.name || 'Unknown Restaurant';
+      const restCity = op.restaurantId?.city || 'Unknown';
+      let method: any = 'UPI / Wallet';
+      if (op.method === 'CASH') method = 'Cash';
+      else if (op.method === 'CREDIT_CARD') method = 'Credit Card';
+      else if (op.method === 'NET_BANKING') method = 'Net Banking';
+      else if (op.method === 'CRYPTO') method = 'Crypto';
+
+      const storedCommissionRate = op.commissionRate !== undefined && op.commissionRate !== null ? op.commissionRate : commissionRate;
+      const storedCommission = op.commission !== undefined && op.commission !== null ? op.commission : Math.round((op.amount || 0) * (storedCommissionRate / 100) * 100) / 100;
+
+      transactions.push({
+        id: op.providerPaymentId || op.razorpayPaymentId || `ORD-${op._id}`,
+        restaurant: restName,
+        restaurantId: op.restaurantId?._id?.toString() || op.restaurantId?.toString() || '',
+        amount: op.amount || 0,
+        commission: storedCommission,
+        commissionRate: storedCommissionRate,
+        paymentMethod: method,
+        status: op.status === 'COMPLETED' ? 'Completed' : op.status === 'FAILED' ? 'Failed' : 'Pending',
+        timestamp: formatTimestamp(op.verifiedAt || op.createdAt),
+        city: restCity,
+        ordersCount: 1,
+        note: 'Dining Order Payment'
+      });
+    });
+
+    // Sort descending by timestamp
+    transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    ok(res, { transactions });
+  } catch (error) {
+    next(error);
+  }
+});
+
+superAdminRouter.get('/analytics/orders', async (_req, res, next) => {
+  try {
+    const [orders, settings] = await Promise.all([
+      OrderModel.find()
+        .populate('restaurantId')
+        .setOptions({ bypassTenant: true })
+        .sort({ createdAt: -1 })
+        .lean(),
+      getPlatformSettings()
+    ]);
+
+    const commissionRate = settings.platformCommissionRate ?? 10;
+
+    // Fetch matching payments to retrieve stored commission values
+    const orderIds = orders.map((o: any) => o._id);
+    const payments = await PaymentModel.find({ orderId: { $in: orderIds } })
+      .setOptions({ bypassTenant: true })
+      .lean();
+
+    const paymentMap = new Map<string, any>();
+    payments.forEach((p: any) => {
+      paymentMap.set(p.orderId.toString(), p);
+    });
+
+    const mappedOrders = orders.map((o: any) => {
+      const restName = o.restaurantId?.name || 'Unknown Restaurant';
+      let status: any = 'Processing';
+      if (o.paymentStatus === 'PAID' || o.status === 'SERVED' || o.status === 'COMPLETED') {
+        status = 'Settled';
+      } else if (o.status === 'CANCELLED' || o.status === 'REJECTED') {
+        status = 'Disputed';
+      }
+
+      // Format date for visual representation on dashboard
+      const date = new Date(o.createdAt);
+      let timeStr = 'Awaiting backend sync';
+      if (!isNaN(date.getTime())) {
+        const today = new Date();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
+        
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const formattedTime = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        
+        if (date.toDateString() === today.toDateString()) {
+          timeStr = `Today, ${formattedTime}`;
+        } else if (date.toDateString() === yesterday.toDateString()) {
+          timeStr = `Yesterday, ${formattedTime}`;
+        } else {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          timeStr = `${months[date.getMonth()]} ${date.getDate()}, ${formattedTime}`;
+        }
+      }
+
+      const grossAmount = o.finalAmount || o.totalAmount || 0;
+      const associatedPayment = paymentMap.get(o._id.toString());
+      
+      const storedCommissionRate = associatedPayment?.commissionRate !== undefined && associatedPayment?.commissionRate !== null
+        ? associatedPayment.commissionRate
+        : commissionRate;
+
+      const storedCommission = associatedPayment?.commission !== undefined && associatedPayment?.commission !== null
+        ? associatedPayment.commission
+        : Math.round(grossAmount * (storedCommissionRate / 100) * 100) / 100; // fallback calculation
+
+      return {
+        id: o.orderNumber || o._id.toString(),
+        restaurant: restName,
+        type: 'Dine-In',
+        grossAmount,
+        commission: storedCommission,
+        commissionRate: storedCommissionRate,
+        status,
+        timestamp: timeStr
+      };
+    });
+
+    ok(res, { orders: mappedOrders, commissionRate });
   } catch (error) {
     next(error);
   }

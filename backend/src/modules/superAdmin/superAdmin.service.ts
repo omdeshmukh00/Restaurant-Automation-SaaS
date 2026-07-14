@@ -360,24 +360,325 @@ export async function updateFeatureFlag(id: string, input: UpdateFeatureFlagInpu
 // ──────────────────────────────────────────────────────────────────────
 
 export async function getPlatformOverview() {
+  const { OrderModel } = await import('../orders/orders.model');
+  const { PaymentModel } = await import('../payments/payments.model');
+  const { RestaurantRequestModel } = await import('./restaurantRequest.model');
+  const { SubscriptionPaymentModel } = await import('../subscriptions/subscriptions.model');
+
+  const now = new Date();
+  
+  // Start of this month
+  const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Start of last month
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  // End of last month
+  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+  // 6 months ago (for trend chart)
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
   const [
     totalRestaurants,
-    activeRestaurants,
-    totalUsers,
-    activeSessions,
+    restaurantsBeforeThisMonth,
+    statusCounts,
+    monthlyOrderStats,
+    lastMonthOrderStats,
+    monthlyOrderPaymentsCommission,
+    lastMonthOrderPaymentsCommission,
+    monthlyOnboardingPayments,
+    lastMonthOnboardingPayments,
+    monthlySubscriptionPayments,
+    lastMonthSubscriptionPayments,
+    trendStats,
+    topRestaurantsStats,
   ] = await Promise.all([
+    // 1. Total Restaurants
     RestaurantModel.countDocuments(),
-    RestaurantModel.countDocuments({ status: RestaurantStatus.ACTIVE }),
-    UserModel.countDocuments(),
-    TableSessionModel.countDocuments({ status: 'ACTIVE' }),
+    // Restaurants before this month (for growth)
+    RestaurantModel.countDocuments({ createdAt: { $lt: startOfThisMonth } }),
+
+    // 2. Status counts
+    RestaurantModel.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]),
+
+    // 3. Monthly Order Stats (total amount for orders this month)
+    OrderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfThisMonth },
+          status: { $in: ['COMPLETED', 'SERVED'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          revenue: { $sum: '$finalAmount' },
+          orders: { $sum: 1 }
+        }
+      }
+    ]),
+
+    // 4. Last Month Order Stats
+    OrderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+          status: { $in: ['COMPLETED', 'SERVED'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          revenue: { $sum: '$finalAmount' },
+          orders: { $sum: 1 }
+        }
+      }
+    ]),
+
+    // 5. Monthly Order Payments Commission
+    PaymentModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfThisMonth },
+          status: 'COMPLETED'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          commission: { $sum: '$commission' }
+        }
+      }
+    ]),
+
+    // 6. Last Month Order Payments Commission
+    PaymentModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+          status: 'COMPLETED'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          commission: { $sum: '$commission' }
+        }
+      }
+    ]),
+
+    // 7. Monthly Onboarding Payments
+    RestaurantRequestModel.aggregate([
+      {
+        $match: {
+          paymentStatus: 'CAPTURED',
+          paymentTimestamp: { $gte: startOfThisMonth }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          amount: { $sum: '$paymentAmount' }
+        }
+      }
+    ]),
+
+    // 8. Last Month Onboarding Payments
+    RestaurantRequestModel.aggregate([
+      {
+        $match: {
+          paymentStatus: 'CAPTURED',
+          paymentTimestamp: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          amount: { $sum: '$paymentAmount' }
+        }
+      }
+    ]),
+
+    // 9. Monthly Subscription Payments
+    SubscriptionPaymentModel.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          paidAt: { $gte: startOfThisMonth }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          amount: { $sum: '$amount' }
+        }
+      }
+    ]),
+
+    // 10. Last Month Subscription Payments
+    SubscriptionPaymentModel.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          paidAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          amount: { $sum: '$amount' }
+        }
+      }
+    ]),
+
+    // 11. Trend Stats (over last 6 months)
+    OrderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: sixMonthsAgo },
+          status: { $in: ['COMPLETED', 'SERVED'] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          revenue: { $sum: '$finalAmount' },
+          orders: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]),
+
+    // 12. Top Restaurants Stats
+    OrderModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfThisMonth },
+          status: { $in: ['COMPLETED', 'SERVED'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$restaurantId',
+          orders: { $sum: 1 },
+          revenue: { $sum: '$finalAmount' }
+        }
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 5 }
+    ])
   ]);
 
+  // Populate names for top restaurants
+  const topRestaurants = [];
+  if (topRestaurantsStats.length > 0) {
+    const restaurantIds = topRestaurantsStats.map((item: any) => item._id);
+    const restaurantDocs = await RestaurantModel.find({ _id: { $in: restaurantIds } }).lean();
+    const restNameMap = new Map();
+    restaurantDocs.forEach((r: any) => {
+      restNameMap.set(r._id.toString(), r.name);
+    });
+
+    for (const item of topRestaurantsStats) {
+      const name = restNameMap.get(item._id.toString()) || 'Unknown Restaurant';
+      topRestaurants.push({
+        name,
+        orders: item.orders,
+        revenue: `₹${item.revenue.toLocaleString()}`,
+        growth: '+10%'
+      });
+    }
+  }
+
+  // Parse status counts
+  let activeCount = 0;
+  let trialCount = 0;
+  let inactiveCount = 0;
+  let blockedCount = 0;
+
+  statusCounts.forEach((sc: any) => {
+    const status = sc._id;
+    if (status === 'ACTIVE') {
+      activeCount += sc.count;
+    } else if (['ONBOARDING', 'PENDING_APPROVAL', 'APPLICATION_APPROVED', 'ADMIN_SETUP_PENDING', 'PLAN_SELECTION_PENDING', 'PAYMENT_PENDING'].includes(status)) {
+      trialCount += sc.count;
+    } else if (status === 'SUSPENDED') {
+      blockedCount += sc.count;
+    } else {
+      inactiveCount += sc.count;
+    }
+  });
+
+  const pieData = [
+    { name: 'Active', value: activeCount, color: '#10B981' },
+    { name: 'Trial', value: trialCount, color: '#F97316' },
+    { name: 'Inactive', value: inactiveCount, color: '#64748B' },
+    { name: 'Blocked', value: blockedCount, color: '#EF4444' },
+  ];
+
+  // Calculate Monthly Revenue and growth
+  const thisMonthRevenue = monthlyOrderStats[0]?.revenue || 0;
+  const lastMonthRevenue = lastMonthOrderStats[0]?.revenue || 0;
+  const revenueGrowthVal = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+  const revenueGrowth = (revenueGrowthVal >= 0 ? '+' : '') + Math.round(revenueGrowthVal * 10) / 10 + '%';
+
+  // Calculate Total Orders and growth
+  const thisMonthOrders = monthlyOrderStats[0]?.orders || 0;
+  const lastMonthOrders = lastMonthOrderStats[0]?.orders || 0;
+  const ordersGrowthVal = lastMonthOrders > 0 ? ((thisMonthOrders - lastMonthOrders) / lastMonthOrders) * 100 : 0;
+  const ordersGrowth = (ordersGrowthVal >= 0 ? '+' : '') + Math.round(ordersGrowthVal * 10) / 10 + '%';
+
+  // Calculate Commission Earned (dining commission + onboarding requests + subscriptions)
+  const thisMonthCommission = (monthlyOrderPaymentsCommission[0]?.commission || 0) + (monthlyOnboardingPayments[0]?.amount || 0) + (monthlySubscriptionPayments[0]?.amount || 0);
+  const lastMonthCommission = (lastMonthOrderPaymentsCommission[0]?.commission || 0) + (lastMonthOnboardingPayments[0]?.amount || 0) + (lastMonthSubscriptionPayments[0]?.amount || 0);
+  const commissionGrowthVal = lastMonthCommission > 0 ? ((thisMonthCommission - lastMonthCommission) / lastMonthCommission) * 100 : 0;
+  const commissionGrowth = (commissionGrowthVal >= 0 ? '+' : '') + Math.round(commissionGrowthVal * 10) / 10 + '%';
+
+  // Restaurant growth
+  const restaurantGrowthVal = restaurantsBeforeThisMonth > 0 ? ((totalRestaurants - restaurantsBeforeThisMonth) / restaurantsBeforeThisMonth) * 100 : 0;
+  const restaurantGrowth = (restaurantGrowthVal >= 0 ? '+' : '') + Math.round(restaurantGrowthVal * 10) / 10 + '%';
+
+  // Format 6-month trend data
+  const monthsAbbr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const formattedTrend = [];
+  
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const monthLabel = monthsAbbr[d.getMonth()];
+    
+    const matched = trendStats.find((item: any) => item._id.year === year && item._id.month === month);
+    formattedTrend.push({
+      month: monthLabel,
+      revenue: matched?.revenue || 0,
+      orders: matched?.orders || 0
+    });
+  }
+
   return {
-    totalRestaurants,
-    activeRestaurants,
-    suspendedRestaurants: totalRestaurants - activeRestaurants,
-    totalUsers,
-    activeSessions,
+    stats: {
+      totalRestaurants,
+      restaurantGrowth,
+      monthlyRevenue: thisMonthRevenue,
+      revenueGrowth,
+      totalOrders: thisMonthOrders,
+      ordersGrowth,
+      commissionEarned: thisMonthCommission,
+      commissionGrowth,
+    },
+    pieData,
+    revenueData: formattedTrend,
+    topRestaurants,
   };
 }
 
@@ -507,7 +808,7 @@ import {AuditEntity, AuditAction } from '../auditLogs/auditLogs.types';
 import crypto from 'crypto';
 import { slugify, uniqueSlug } from '../../utils/slugify';
 import { hashPassword } from '../../utils/crypto';
-import { sendRestaurantApprovalEmail, sendRestaurantRejectionEmail, sendRestaurantPlanUpdatedEmail, sendRestaurantSuspendedEmail, sendRestaurantActivatedEmail } from '../../services/mail.service';
+import { sendRestaurantApprovalEmail, sendRestaurantRejectionEmail, sendRestaurantPlanUpdatedEmail, sendRestaurantSuspendedEmail, sendRestaurantActivatedEmail, sendRestaurantDirectOnboardingEmail } from '../../services/mail.service';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 
@@ -719,6 +1020,165 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
       }
     }).catch((err) => {
       logger.error('Failed to send restaurant approval email:', { error: err, email: request.email });
+    });
+
+    return { restaurant, adminUser };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+}
+
+export async function registerRestaurantDirectly(input: any, reviewerId: string) {
+  // Check if admin user already exists with this email or mobile
+  const existingUserByEmail = await UserModel.findOne({ email: input.email }).setOptions({ bypassTenant: true });
+  if (existingUserByEmail) {
+    throw new AppError(`An administrator account with email '${input.email}' already exists. Please use a different email.`, 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const existingUserByPhone = await UserModel.findOne({ mobile: input.phone }).setOptions({ bypassTenant: true });
+  if (existingUserByPhone) {
+    throw new AppError(`An administrator account with mobile number '${input.phone}' already exists. Please use a different mobile number.`, 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const restaurantId = new mongoose.Types.ObjectId();
+    const adminUserId = new mongoose.Types.ObjectId();
+    const tenantId = `tenant_${crypto.randomBytes(6).toString('hex')}`;
+    
+    // Generate unique slug
+    let slug = slugify(input.restaurantName);
+    const existingRest = await RestaurantModel.findOne({ slug }).setOptions({ bypassTenant: true });
+    if (existingRest) {
+      slug = uniqueSlug(input.restaurantName);
+    }
+
+    // Map status: Trial -> ONBOARDING, Active -> ACTIVE, Inactive -> CLOSED
+    let statusVal = RestaurantStatus.ONBOARDING;
+    if (input.status === 'Active') {
+      statusVal = RestaurantStatus.ACTIVE;
+    } else if (input.status === 'Inactive') {
+      statusVal = RestaurantStatus.CLOSED;
+    }
+
+    // Step 1: Create Restaurant
+    const [restaurant] = await RestaurantModel.create([{
+      _id: restaurantId,
+      slug,
+      name: input.restaurantName,
+      status: statusVal,
+      plan: input.plan,
+      cuisine: input.cuisine,
+      city: input.city,
+      rating: 4.5,
+      tenantId: tenantId,
+      ownerName: input.ownerName,
+      email: input.email,
+      phone: input.phone,
+      address: input.address,
+      state: input.state,
+      country: input.country,
+      pinCode: input.pinCode,
+      gstNumber: input.gstNumber || undefined,
+      branches: input.branches || 1,
+      expectedMonthlyOrders: input.expectedMonthlyOrders || 0,
+      latitude: input.latitude || 0,
+      longitude: input.longitude || 0,
+      googleMapsUrl: input.googleMapsUrl || undefined,
+      adminUserId: adminUserId,
+      subscriptionId: null,
+    }], { session });
+
+    // Step 2: Generate temporary password
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^*()_+-=';
+    const allChars = lowercase + uppercase + numbers + symbols;
+
+    let tempPassword = '';
+    tempPassword += lowercase[crypto.randomInt(lowercase.length)];
+    tempPassword += uppercase[crypto.randomInt(uppercase.length)];
+    tempPassword += numbers[crypto.randomInt(numbers.length)];
+    tempPassword += symbols[crypto.randomInt(symbols.length)];
+
+    for (let i = 4; i < 18; i++) {
+      tempPassword += allChars[crypto.randomInt(allChars.length)];
+    }
+    // Shuffle temp password
+    tempPassword = tempPassword.split('').sort(() => crypto.randomInt(3) - 1).join('');
+
+    const hashedPassword = await hashPassword(tempPassword);
+
+    // Step 3: Create Restaurant Admin User
+    const [adminUser] = await UserModel.create([{
+      _id: adminUserId,
+      name: input.ownerName,
+      email: input.email,
+      mobile: input.phone,
+      password: hashedPassword,
+      role: 'restaurant-admin',
+      status: 'ACTIVE',
+      restaurantId: restaurantId,
+      tenantId: tenantId,
+      isEmailVerified: true,
+      isMobileVerified: true,
+      mustResetPassword: true,
+      firstLogin: true,
+      mustChangePassword: true,
+    }], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    logger.info(`Restaurant Created Directly by Super Admin: ${restaurantId}`);
+
+    // Log Audits
+    void logAuditRaw({
+      actorId: reviewerId,
+      actorRole: 'super-admin',
+      entityType: AuditEntity.RESTAURANT,
+      entityId: restaurantId.toString(),
+      action: AuditAction.SUPER_RESTAURANT_APPROVED,
+      metadata: { tenantId, slug, source: 'direct_registration' },
+    });
+
+    void logAuditRaw({
+      actorId: adminUser._id.toString(),
+      actorRole: 'restaurant-admin',
+      restaurantId: restaurantId.toString(),
+      entityType: AuditEntity.USER,
+      entityId: adminUser._id.toString(),
+      action: AuditAction.ADMIN_CREATED,
+      metadata: { source: 'direct_registration' },
+    });
+
+    // Send welcome email in background
+    const loginUrl = `${env.CLIENT_URL}/auth/admin`;
+    void sendRestaurantDirectOnboardingEmail(
+      input.email,
+      input.ownerName,
+      input.restaurantName,
+      input.plan,
+      tempPassword,
+      loginUrl
+    ).then((emailSent) => {
+      if (emailSent) {
+        void logAuditRaw({
+          actorId: reviewerId,
+          actorRole: 'super-admin',
+          entityType: AuditEntity.USER,
+          entityId: input.email,
+          action: AuditAction.APPROVAL_EMAIL_SENT,
+          metadata: { recipient: input.email },
+        });
+      }
+    }).catch((err) => {
+      logger.error('Failed to send restaurant welcome email:', { error: err, email: input.email });
     });
 
     return { restaurant, adminUser };
@@ -958,4 +1418,232 @@ export async function updateRestaurantPlan(id: string, planName: string) {
   }
 
   return restaurant.toObject();
+}
+
+// ── Reservation & Queue Analytics ──────────────────────────────────────────
+import { ReservationModel } from '../reservations/reservations.model';
+import { QueueEntryModel } from '../queue/queue.model';
+import { ReservationStatus, QueueStatus } from '../../constants/statuses';
+
+export async function getReservationQueueAnalytics() {
+  // ── Summary counts ──────────────────────────────────────────────────────
+  const [
+    totalReservations,
+    confirmedReservations,
+    cancelledReservations,
+    noShows,
+    completedReservations,
+    totalQueueEntries,
+    seatedFromQueue,
+    cancelledQueue,
+    expiredQueue,
+  ] = await Promise.all([
+    ReservationModel.countDocuments().setOptions({ bypassTenant: true }),
+    ReservationModel.countDocuments({ status: ReservationStatus.CONFIRMED }).setOptions({ bypassTenant: true }),
+    ReservationModel.countDocuments({ status: ReservationStatus.CANCELLED }).setOptions({ bypassTenant: true }),
+    ReservationModel.countDocuments({ status: ReservationStatus.NO_SHOW }).setOptions({ bypassTenant: true }),
+    ReservationModel.countDocuments({ status: ReservationStatus.COMPLETED }).setOptions({ bypassTenant: true }),
+    QueueEntryModel.countDocuments().setOptions({ bypassTenant: true }),
+    QueueEntryModel.countDocuments({ status: QueueStatus.SEATED }).setOptions({ bypassTenant: true }),
+    QueueEntryModel.countDocuments({ status: QueueStatus.CANCELLED }).setOptions({ bypassTenant: true }),
+    QueueEntryModel.countDocuments({ status: QueueStatus.EXPIRED }).setOptions({ bypassTenant: true }),
+  ]);
+
+  // Average wait time from queue entries (etaMinutes)
+  const avgWaitAgg = await QueueEntryModel.aggregate([
+    { $group: { _id: null, avgWait: { $avg: '$etaMinutes' } } },
+  ]).option({ bypassTenant: true });
+  const avgWaitMinutes = avgWaitAgg.length > 0 ? Math.round((avgWaitAgg[0].avgWait || 0) * 10) / 10 : 0;
+
+  const reservationSuccessRate = totalReservations > 0
+    ? Math.round((completedReservations / totalReservations) * 1000) / 10
+    : 0;
+
+  const queueConversionRate = totalQueueEntries > 0
+    ? Math.round((seatedFromQueue / totalQueueEntries) * 1000) / 10
+    : 0;
+
+  // ── Daily trends (last 7 days) ──────────────────────────────────────────
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  const reservationTrends = await ReservationModel.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]).option({ bypassTenant: true });
+
+  const queueTrends = await QueueEntryModel.aggregate([
+    { $match: { createdAt: { $gte: sevenDaysAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]).option({ bypassTenant: true });
+
+  // Merge trends into unified array
+  const trendMap: Record<string, { reservations: number; queueEntries: number }> = {};
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sevenDaysAgo);
+    d.setDate(d.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    trendMap[key] = { reservations: 0, queueEntries: 0 };
+  }
+  for (const r of reservationTrends) {
+    if (trendMap[r._id]) trendMap[r._id].reservations = r.count;
+  }
+  for (const q of queueTrends) {
+    if (trendMap[q._id]) trendMap[q._id].queueEntries = q.count;
+  }
+  const trends = Object.entries(trendMap).map(([date, vals]) => ({ date, ...vals }));
+
+  // ── Peak hours (all-time, hourly distribution) ──────────────────────────
+  const reservationPeakHours = await ReservationModel.aggregate([
+    {
+      $group: {
+        _id: { $hour: '$createdAt' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]).option({ bypassTenant: true });
+
+  const queuePeakHours = await QueueEntryModel.aggregate([
+    {
+      $group: {
+        _id: { $hour: '$createdAt' },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]).option({ bypassTenant: true });
+
+  const peakHoursMap: Record<number, { reservations: number; queueEntries: number }> = {};
+  for (let h = 0; h < 24; h++) {
+    peakHoursMap[h] = { reservations: 0, queueEntries: 0 };
+  }
+  for (const r of reservationPeakHours) {
+    peakHoursMap[r._id].reservations = r.count;
+  }
+  for (const q of queuePeakHours) {
+    peakHoursMap[q._id].queueEntries = q.count;
+  }
+  const peakHours = Object.entries(peakHoursMap).map(([hour, vals]) => ({
+    hour: Number(hour),
+    ...vals,
+  }));
+
+  // ── Restaurant leaderboard ──────────────────────────────────────────────
+  const reservationsByRestaurant = await ReservationModel.aggregate([
+    {
+      $group: {
+        _id: '$restaurantId',
+        total: { $sum: 1 },
+        completed: {
+          $sum: { $cond: [{ $eq: ['$status', ReservationStatus.COMPLETED] }, 1, 0] },
+        },
+      },
+    },
+  ]).option({ bypassTenant: true });
+
+  const queueByRestaurant = await QueueEntryModel.aggregate([
+    {
+      $group: {
+        _id: '$restaurantId',
+        total: { $sum: 1 },
+        seated: {
+          $sum: { $cond: [{ $eq: ['$status', QueueStatus.SEATED] }, 1, 0] },
+        },
+        avgWait: { $avg: '$etaMinutes' },
+      },
+    },
+  ]).option({ bypassTenant: true });
+
+  // Get restaurant names
+  const restaurantIds = [
+    ...new Set([
+      ...reservationsByRestaurant.map((r: any) => r._id?.toString()),
+      ...queueByRestaurant.map((q: any) => q._id?.toString()),
+    ]),
+  ].filter(Boolean);
+
+  const restaurants = await RestaurantModel.find({
+    _id: { $in: restaurantIds },
+  })
+    .select('name')
+    .setOptions({ bypassTenant: true })
+    .lean();
+
+  const restaurantNameMap: Record<string, string> = {};
+  for (const r of restaurants) {
+    restaurantNameMap[r._id.toString()] = r.name;
+  }
+
+  // Merge leaderboard data
+  const leaderboardMap: Record<string, any> = {};
+  for (const r of reservationsByRestaurant) {
+    const id = r._id?.toString();
+    if (!id) continue;
+    leaderboardMap[id] = {
+      restaurantId: id,
+      restaurantName: restaurantNameMap[id] || 'Unknown',
+      totalReservations: r.total,
+      successRate: r.total > 0 ? Math.round((r.completed / r.total) * 1000) / 10 : 0,
+      avgWaitMinutes: 0,
+      totalQueueEntries: 0,
+      queueConversionRate: 0,
+    };
+  }
+  for (const q of queueByRestaurant) {
+    const id = q._id?.toString();
+    if (!id) continue;
+    if (!leaderboardMap[id]) {
+      leaderboardMap[id] = {
+        restaurantId: id,
+        restaurantName: restaurantNameMap[id] || 'Unknown',
+        totalReservations: 0,
+        successRate: 0,
+        avgWaitMinutes: 0,
+        totalQueueEntries: 0,
+        queueConversionRate: 0,
+      };
+    }
+    leaderboardMap[id].totalQueueEntries = q.total;
+    leaderboardMap[id].avgWaitMinutes = Math.round((q.avgWait || 0) * 10) / 10;
+    leaderboardMap[id].queueConversionRate = q.total > 0
+      ? Math.round((q.seated / q.total) * 1000) / 10
+      : 0;
+  }
+
+  const restaurantLeaderboard = Object.values(leaderboardMap)
+    .sort((a: any, b: any) => b.totalReservations - a.totalReservations);
+
+  return {
+    summary: {
+      totalReservations,
+      confirmedReservations,
+      cancelledReservations,
+      noShows,
+      completedReservations,
+      totalQueueEntries,
+      seatedFromQueue,
+      cancelledQueue,
+      expiredQueue,
+      avgWaitMinutes,
+      reservationSuccessRate,
+      queueConversionRate,
+    },
+    trends,
+    peakHours,
+    restaurantLeaderboard,
+  };
 }

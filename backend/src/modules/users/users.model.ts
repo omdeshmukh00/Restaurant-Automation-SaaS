@@ -176,7 +176,7 @@ const userSchema = new Schema<IUser>(
     themeMode: {
       type: String,
       enum: ['light', 'dark', 'system'],
-      default: 'system',
+      default: 'light',
     },
 
     isDeleted: {

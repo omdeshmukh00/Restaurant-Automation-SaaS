@@ -28,6 +28,18 @@ const DEFAULT_FORM: NewRestaurantForm = {
   status: "Trial",
   revenue: "₹0",
   branches: 1,
+  address: "",
+  city: "",
+  state: "",
+  country: "India",
+  pinCode: "",
+  gstNumber: "",
+  cuisine: "",
+  expectedMonthlyOrders: 500,
+  latitude: null,
+  longitude: null,
+  googleMapsUrl: "",
+  message: "",
 };
 
 export default function Restaurant() {
@@ -57,11 +69,26 @@ export default function Restaurant() {
     (state) => state.deleteRestaurant
   );
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [viewingRestaurant, setViewingRestaurant] = useState<any | null>(null);
+  const [newRestaurant, setNewRestaurant] = useState<NewRestaurantForm>(() => {
+    try {
+      const saved = sessionStorage.getItem("ra/add-restaurant-draft");
+      return saved ? JSON.parse(saved) : DEFAULT_FORM;
+    } catch {
+      return DEFAULT_FORM;
+    }
+  });
 
   const fetchPlans = async () => {
     try {
       const list = await superAdminRestaurantRequestsApi.getPlans();
       setPlans(list || []);
+      if (list && list.length > 0) {
+        const activePlans = list.filter((p: any) => p.isActive !== false);
+        const defaultPlan = activePlans.length > 0 ? activePlans[0].name : list[0].name;
+        setNewRestaurant(prev => ({ ...prev, plan: prev.plan || defaultPlan }));
+      }
     } catch (err) {
       console.error("Failed to fetch plans", err);
     }
@@ -72,9 +99,11 @@ export default function Restaurant() {
     fetchPlans();
   }, [fetchRequests]);
 
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [viewingRestaurant, setViewingRestaurant] = useState<any | null>(null);
-  const [newRestaurant, setNewRestaurant] = useState<NewRestaurantForm>(DEFAULT_FORM);
+
+
+  useEffect(() => {
+    sessionStorage.setItem("ra/add-restaurant-draft", JSON.stringify(newRestaurant));
+  }, [newRestaurant]);
 
   const handleViewRestaurant = async (row: RestaurantsRow) => {
     try {
@@ -143,28 +172,37 @@ export default function Restaurant() {
     deleteRestaurantById(id);
 
   // Handle form submission for new restaurant
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRestaurant.name || !newRestaurant.owner) return;
-
-    const row: RestaurantsRow = {
-      id: `RST-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: newRestaurant.name,
-      owner: newRestaurant.owner,
-      email: newRestaurant.email || "info@restaurant.com",
-      phone: newRestaurant.phone || "+1 (555) 000-0000",
-      location: newRestaurant.location || "Remote Deployment Location",
-      plan: newRestaurant.plan,
-      status: newRestaurant.status,
-      revenue: newRestaurant.revenue.startsWith("₹")
-        ? newRestaurant.revenue
-        : `₹${newRestaurant.revenue}`,
-      branches: Number(newRestaurant.branches) || 1,
-    };
-
-    addRestaurant(row);
-    setIsModalOpen(false);
-    setNewRestaurant(DEFAULT_FORM);
+    if (!newRestaurant.name || !newRestaurant.owner || !newRestaurant.email || !newRestaurant.phone) {
+      window.alert("Please fill out all required fields.");
+      return;
+    }
+    if (!newRestaurant.googleMapsUrl) {
+      window.alert("Google Maps URL is required to extract coordinates.");
+      return;
+    }
+    try {
+      await addRestaurant({
+        ...newRestaurant,
+        // sync the display 'location' string using city, state, country
+        location: `${newRestaurant.city || ""}, ${newRestaurant.state || ""}, ${newRestaurant.country || ""}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim()
+      });
+      setIsModalOpen(false);
+      setNewRestaurant(DEFAULT_FORM);
+      sessionStorage.removeItem("ra/add-restaurant-draft");
+    } catch (err: any) {
+      console.error(err);
+      let msg = err.response?.data?.error?.message || err.message || "Failed to register new restaurant.";
+      const fields = err.response?.data?.error?.fields;
+      if (fields) {
+        const details = Object.entries(fields)
+          .map(([field, msgs]: any) => `${field}: ${msgs.join(", ")}`)
+          .join("\n");
+        msg = `${msg}\n\n${details}`;
+      }
+      window.alert(msg);
+    }
   };
 
   return (
@@ -256,9 +294,14 @@ export default function Restaurant() {
         <AddRestaurantModal
           darkMode={darkMode}
           formData={newRestaurant}
+          plans={plans}
           onChange={(data) => setNewRestaurant((prev) => ({ ...prev, ...data }))}
           onSubmit={handleSubmit}
           onClose={() => setIsModalOpen(false)}
+          onClear={() => {
+            setNewRestaurant(DEFAULT_FORM);
+            sessionStorage.removeItem("ra/add-restaurant-draft");
+          }}
         />
       )}
     </div>

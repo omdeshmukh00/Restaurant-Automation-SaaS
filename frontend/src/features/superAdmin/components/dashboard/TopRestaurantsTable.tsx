@@ -1,7 +1,5 @@
 import { TrendingUp, Star } from "lucide-react";
-import { useMemo } from "react";
-import { restaurants } from "../../store/Superadmindashboard";
-import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
+import { useSuperAdminDashboardStore } from "../../store/Superadmindashboard";
 
 interface Restaurant {
   name: string;
@@ -15,17 +13,8 @@ interface TopRestaurantsTableProps {
 }
 
 export default function TopRestaurantsTable({ darkMode }: TopRestaurantsTableProps) {
-  const restaurantRows = useRestaurantRequestsStore((state) => state.restaurants);
-  const topRestaurants = useMemo<Restaurant[]>(() => {
-    return restaurantRows
-      .map((restaurant) => ({
-        name: restaurant.name,
-        orders: 0,
-        revenue: restaurant.revenue || "₹0",
-        growth: restaurant.status === "Active" ? "Active" : restaurant.status,
-      }))
-      .slice(0, 5);
-  }, [restaurantRows]);
+  const { data } = useSuperAdminDashboardStore();
+  const topRestaurants = data?.topRestaurants || [];
 
   return (
     <div

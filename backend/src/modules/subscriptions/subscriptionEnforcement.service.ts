@@ -206,6 +206,41 @@ export async function assertPlanLimit(
       `Your ${plan.name} plan allows ${limit} ${label}. Upgrade to continue.`,
       'SUBSCRIPTION_LIMIT_EXCEEDED',
     );
+
+    // Send email alert (rate limited to 1 per 24 hours per recipient)
+    try {
+      const { EmailLogModel } = await import('../notifications/emailLog.model');
+      const { sendUsageExceededEmail } = await import('../../services/mail.service');
+      const { RestaurantModel } = await import('../restaurants/restaurants.model');
+      const { env } = await import('../../config/env');
+
+      const restaurant = await RestaurantModel.findById(restaurantId).lean();
+      if (restaurant?.email) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const recentExceededEmail = await EmailLogModel.findOne({
+          recipient: restaurant.email,
+          subject: /Plan Limit Exceeded/i,
+          sentAt: { $gte: oneDayAgo },
+        }).lean();
+
+        if (!recentExceededEmail) {
+          const billingUrl = `${env.CLIENT_URL}/admin/settings?tab=subscription`;
+          void sendUsageExceededEmail(
+            restaurant.email,
+            restaurant.ownerName || 'Owner',
+            restaurant.name,
+            label,
+            plan.name,
+            nextUsage,
+            limit,
+            billingUrl
+          );
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+
     throw new AppError(`${label} limit (${limit}) exceeded for current subscription plan`, 400, ErrorCode.USAGE_LIMIT_EXCEEDED);
   }
 
@@ -226,6 +261,30 @@ export async function assertPlanLimit(
       'SUBSCRIPTION_USAGE_80_PERCENT',
       NotificationPriority.NORMAL,
     );
+
+    // Send email alert
+    try {
+      const { sendUsageWarningEmail } = await import('../../services/mail.service');
+      const { RestaurantModel } = await import('../restaurants/restaurants.model');
+      const { env } = await import('../../config/env');
+
+      const restaurant = await RestaurantModel.findById(restaurantId).lean();
+      if (restaurant?.email) {
+        const billingUrl = `${env.CLIENT_URL}/admin/settings?tab=subscription`;
+        void sendUsageWarningEmail(
+          restaurant.email,
+          restaurant.ownerName || 'Owner',
+          restaurant.name,
+          label,
+          plan.name,
+          nextUsage,
+          limit,
+          billingUrl
+        );
+      }
+    } catch (e) {
+      // Ignore
+    }
   }
 }
 

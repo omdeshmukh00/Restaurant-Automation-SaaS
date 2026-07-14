@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { StatusFilter, SortField, SortOrder, DateRange } from "../components/Transactions/Transactiontypes";
+import { StatusFilter, SortField, SortOrder, DateRange, Transaction } from "../components/Transactions/Transactiontypes";
 import { filterByDateRange, computeMetrics, exportToCSV } from "../utils/transactionUtils";
 import TransactionMetrics from "../components/Transactions/Transactionmetrics";
 import TransactionControls from "../components/Transactions/Transactioncontrols";
 import TransactionTable from "../components/Transactions/Transactiontable";
 import TransactionSummaryBar from "../components/Transactions/Transactionsummarybar";
-import { transactionData } from "../store/Transactions";
-import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
+import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
 
 interface LayoutContextType {
   darkMode: boolean;
@@ -15,7 +14,8 @@ interface LayoutContextType {
 
 export default function Transactions() {
   const { darkMode } = useOutletContext<LayoutContextType>();
-  const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const handleThemeSync = (e: Event) => {
@@ -29,6 +29,19 @@ export default function Transactions() {
       }
     };
     window.addEventListener("sync-app-theme", handleThemeSync);
+
+    const fetchTransactions = async () => {
+      try {
+        const txs = await superAdminRestaurantRequestsApi.getTransactions();
+        setTransactions(txs);
+      } catch (error) {
+        console.error("Failed to fetch transactions", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTransactions();
+
     return () => window.removeEventListener("sync-app-theme", handleThemeSync);
   }, []);
 
@@ -55,36 +68,9 @@ export default function Transactions() {
     setDateRange("all");
   };
 
-  const linkedTransactions = useMemo(() => {
-    const existingRestaurantNames = new Set(
-      transactionData.map((transaction) => transaction.restaurant.toLowerCase())
-    );
-
-    const placeholderTransactions = approvedRestaurants
-      .filter(
-        (restaurant) => !existingRestaurantNames.has(restaurant.name.toLowerCase())
-      )
-      .map((restaurant, index) => ({
-        id: `ONB-${restaurant.id}`,
-        restaurant: restaurant.name,
-        restaurantId: restaurant.id,
-        amount: 0,
-        commission: 0,
-        commissionRate: 0,
-        paymentMethod: "UPI / Wallet" as const,
-        status: "Pending" as const,
-        timestamp: `2026-05-19 18:${String(30 + index).padStart(2, "0")}:00`,
-        city: restaurant.location.split(",")[0] || "Onboarding",
-        ordersCount: 0,
-        note: "Placeholder onboarding transaction until backend order data is connected",
-      }));
-
-    return [...placeholderTransactions, ...transactionData];
-  }, [approvedRestaurants]);
-
   const dateFiltered = useMemo(
-    () => filterByDateRange(linkedTransactions, dateRange),
-    [linkedTransactions, dateRange]
+    () => filterByDateRange(transactions, dateRange),
+    [transactions, dateRange]
   );
 
   const filteredTransactions = useMemo(() => {
@@ -134,7 +120,7 @@ export default function Transactions() {
         paymentFilter={paymentFilter}
         dateRange={dateRange}
         darkMode={darkMode}
-        totalCount={linkedTransactions.length}
+        totalCount={transactions.length}
         filteredCount={filteredTransactions.length}
         onSearchChange={setSearchTerm}
         onStatusChange={setStatusFilter}

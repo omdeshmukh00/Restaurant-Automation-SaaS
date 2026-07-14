@@ -19,6 +19,7 @@ interface AnalyticsOrdersTableProps {
   statusTab: string;
   onSearchChange: (v: string) => void;
   onTabChange: (tab: string) => void;
+  commissionRate?: number;
 }
 
 const statusConfig: Record<
@@ -152,6 +153,7 @@ export default function AnalyticsOrdersTable({
   statusTab,
   onSearchChange,
   onTabChange,
+  commissionRate = 10,
 }: AnalyticsOrdersTableProps) {
   const inputCls = [
     "pl-9 pr-9 py-2 text-xs rounded-lg outline-none border transition-all w-full sm:min-w-[220px]",
@@ -166,7 +168,7 @@ export default function AnalyticsOrdersTable({
     { key: "restaurant",  label: "Restaurant",           align: "left" },
     { key: "type",        label: "Channel",              align: "left" },
     { key: "grossAmount", label: "Gross Vol",            align: "right" },
-    { key: "commission",  label: "10% Platform Cut",     align: "right" },
+    { key: "commission",  label: `${commissionRate}% Platform Cut`,     align: "right" },
     { key: "status",      label: "Cluster Health",       align: "left" },
     { key: "timestamp",   label: "Activity Log",         align: "right" },
   ];

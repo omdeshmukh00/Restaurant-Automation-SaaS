@@ -25,6 +25,9 @@ export const EMAIL_SUBJECTS = {
   RESTAURANT_PLAN_UPDATED: 'RestoHub - Your Subscription Plan Has Been Updated',
   RESTAURANT_SUSPENDED: 'RestoHub - Notice of Account Suspension',
   RESTAURANT_ACTIVATED: 'RestoHub - Your Restaurant Has Been Activated',
+  USAGE_WARNING: 'RestoHub - Plan Limit Warning',
+  USAGE_EXCEEDED: 'RestoHub - Plan Limit Exceeded',
+  SUBSCRIPTION_EXPIRED: 'RestoHub - Subscription Expired',
 };
 
 let transporter: nodemailer.Transporter | null = null;
@@ -530,6 +533,36 @@ export async function sendRestaurantApprovalEmail(
   }
 }
 
+export async function sendRestaurantDirectOnboardingEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  planName: string,
+  temporaryPassword: string,
+  loginUrl: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('onboarding-mail');
+
+    html = html.replace(/\{\{ownerName\}\}/g, escapeHtml(ownerName));
+    html = html.replace(/\{\{restaurantName\}\}/g, escapeHtml(restaurantName));
+    html = html.replace(/\{\{planName\}\}/g, escapeHtml(planName));
+    html = html.replace(/\{\{loginEmail\}\}/g, escapeHtml(email));
+    html = html.replace(/\{\{temporaryPassword\}\}/g, escapeHtml(temporaryPassword));
+    html = html.replace(/\{\{loginUrl\}\}/g, escapeHtml(loginUrl));
+
+    return await sendEmail({
+      to: email,
+      subject: `Welcome to RestoHub - Your Onboarding Credentials for ${restaurantName}`,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send restaurant direct onboarding email', { error, email });
+    return false;
+  }
+}
+
 /**
  * Send Restaurant Rejection Email
  */
@@ -763,6 +796,100 @@ export async function sendRestaurantActivatedEmail(
     });
   } catch (error) {
     logger.error('Failed to send account activation email', { error, email });
+    return false;
+  }
+}
+
+export async function sendUsageWarningEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  label: string,
+  planName: string,
+  used: number,
+  limit: number,
+  billingUrl: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('usage-warning');
+
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{restaurantName\}\}/g, restaurantName);
+    html = html.replace(/\{\{label\}\}/g, label);
+    html = html.replace(/\{\{planName\}\}/g, planName);
+    html = html.replace(/\{\{used\}\}/g, used.toString());
+    html = html.replace(/\{\{limit\}\}/g, limit.toString());
+    html = html.replace(/\{\{percent\}\}/g, Math.round((used / limit) * 100).toString());
+    html = html.replace(/\{\{billingUrl\}\}/g, billingUrl);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.USAGE_WARNING,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send usage warning email', { error, email });
+    return false;
+  }
+}
+
+export async function sendUsageExceededEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  label: string,
+  planName: string,
+  used: number,
+  limit: number,
+  billingUrl: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('usage-exceeded');
+
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{restaurantName\}\}/g, restaurantName);
+    html = html.replace(/\{\{label\}\}/g, label);
+    html = html.replace(/\{\{planName\}\}/g, planName);
+    html = html.replace(/\{\{used\}\}/g, used.toString());
+    html = html.replace(/\{\{limit\}\}/g, limit.toString());
+    html = html.replace(/\{\{billingUrl\}\}/g, billingUrl);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.USAGE_EXCEEDED,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send usage exceeded email', { error, email });
+    return false;
+  }
+}
+
+export async function sendSubscriptionExpiredEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  planName: string,
+  billingUrl: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('subscription-expired');
+
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{restaurantName\}\}/g, restaurantName);
+    html = html.replace(/\{\{planName\}\}/g, planName);
+    html = html.replace(/\{\{billingUrl\}\}/g, billingUrl);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.SUBSCRIPTION_EXPIRED,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send subscription expired email', { error, email });
     return false;
   }
 }

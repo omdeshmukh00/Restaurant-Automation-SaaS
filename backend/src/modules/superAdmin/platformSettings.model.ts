@@ -8,6 +8,7 @@ export interface IPlatformSettings extends Document {
   enablePartnerRegistration: boolean;
   maxPendingApplications: number;
   applicationExpiryDays: number;
+  platformCommissionRate?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +22,7 @@ const platformSettingsSchema = new Schema<IPlatformSettings>(
     enablePartnerRegistration: { type: Boolean, default: true },
     maxPendingApplications: { type: Number, default: 50, min: 1 },
     applicationExpiryDays: { type: Number, default: 30, min: 1 },
+    platformCommissionRate: { type: Number, default: 10, min: 0, max: 100 },
   },
   {
     timestamps: true,
@@ -48,6 +50,7 @@ export async function getPlatformSettings(): Promise<IPlatformSettings> {
       enablePartnerRegistration: true,
       maxPendingApplications: 50,
       applicationExpiryDays: 30,
+      platformCommissionRate: 10,
     });
     return settings;
   }
