@@ -16,16 +16,63 @@ const CUISINES = [
   { name: 'Healthy', emoji: '🥗' },
 ];
 
-export default function CuisineExplorer() {
-  const [active, setActive] = useState('All');
+const CUISINE_EMOJIS: Record<string, string> = {
+  All: '🍽️',
+  Pizza: '🍕',
+  'North Indian': '🍛',
+  'South Indian': '🍛',
+  'Modern Indian': '🍛',
+  Indian: '🍛',
+  Chinese: '🍜',
+  Italian: '🍝',
+  Cafe: '☕',
+  Desserts: '🧁',
+  Bakery: '🧁',
+  'Fine Dining': '🥂',
+  Buffet: '🍱',
+  Seafood: '🦐',
+  'Street Food': '🌮',
+  Mexican: '🌮',
+  Healthy: '🥗',
+  Salad: '🥗',
+  Vegan: '🥗',
+  Burger: '🍔',
+  American: '🍔',
+  Beverage: '🍹',
+  Drinks: '🍹',
+  Asian: '🥢',
+  'Fast Food': '🍟',
+  Sushi: '🍣',
+  Japanese: '🍣',
+  Continental: '🍽️',
+};
+
+const getCuisineEmoji = (name: string): string => {
+  const match = Object.keys(CUISINE_EMOJIS).find(
+    (k) => name.toLowerCase().includes(k.toLowerCase())
+  );
+  return match ? CUISINE_EMOJIS[match] : '🍽️';
+};
+
+interface CuisineExplorerProps {
+  cuisines?: string[];
+  activeCuisine: string;
+  onCuisineSelect: (cuisine: string) => void;
+}
+
+export default function CuisineExplorer({ cuisines, activeCuisine, onCuisineSelect }: CuisineExplorerProps) {
   const [vibratingId, setVibratingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleSelect = (name: string) => {
-    setActive(name);
+    onCuisineSelect(name);
     setVibratingId(name);
     setTimeout(() => setVibratingId(null), 300);
   };
+
+  const displayCuisines = cuisines && cuisines.length > 0
+    ? [{ name: 'All', emoji: '🍽️' }, ...cuisines.map((c) => ({ name: c, emoji: getCuisineEmoji(c) }))]
+    : CUISINES;
 
 
   const scroll = (direction: 'left' | 'right') => {
@@ -74,8 +121,8 @@ export default function CuisineExplorer() {
             ref={scrollRef}
             className="flex gap-3 overflow-x-auto landing-hide-scrollbar py-2 px-1"
           >
-            {CUISINES.map((cuisine) => {
-              const isActive = active === cuisine.name;
+            {displayCuisines.map((cuisine) => {
+              const isActive = activeCuisine === cuisine.name;
               return (
                 <button
                   key={cuisine.name}

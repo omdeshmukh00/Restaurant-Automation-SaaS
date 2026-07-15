@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Star, Clock, MapPin, ChevronDown, Search, Filter, Flame, Crown, TrendingUp, Utensils } from 'lucide-react';
 import '../components/landing/landing.css';
+import { apiClient } from '../../../shared/services/apiClient';
 import LandingFooter from '../components/landing/LandingFooter';
 
 const AREAS = ['All Areas', 'Bandra', 'Andheri', 'Colaba', 'Lower Parel', 'Juhu', 'Powai', 'Dadar'];
@@ -38,15 +39,71 @@ const RESTAURANTS: RestaurantData[] = [
 ];
 
 export default function RestaurantsPage() {
+  const [searchParams] = useSearchParams();
+  const cuisineParam = searchParams.get('cuisine') || 'All';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArea, setSelectedArea] = useState('All Areas');
-  const [selectedCuisine, setSelectedCuisine] = useState('All');
+  const [selectedCuisine, setSelectedCuisine] = useState(cuisineParam);
   const [sortBy, setSortBy] = useState('Relevance');
   const [vegOnly, setVegOnly] = useState(false);
+  const [backendRestaurants, setBackendRestaurants] = useState<any[]>([]);
 
   const navigate = useNavigate();
 
-  const filtered = RESTAURANTS.filter((r) => {
+  useEffect(() => {
+    if (cuisineParam) {
+      setSelectedCuisine(cuisineParam);
+    }
+  }, [cuisineParam]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchRestaurants = async () => {
+      try {
+        const response = await apiClient.get('/public/landing/data');
+        if (active && response.data?.status === 'success' && response.data?.data?.restaurants) {
+          setBackendRestaurants(response.data.data.restaurants);
+        }
+      } catch (err) {
+        console.error('Failed to fetch restaurants list', err);
+      }
+    };
+    fetchRestaurants();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const mapBackendRestaurants = (items: any[]): RestaurantData[] => {
+    return items.map((r, idx) => {
+      const imgIndex = (idx % 4) + 1;
+      return {
+        id: r._id || r.id,
+        name: r.name,
+        cuisine: r.cuisine || 'Multi-Cuisine',
+        rating: r.rating || 4.5,
+        reviews: Math.floor(100 + (r.name.length * 15)),
+        area: r.city || 'Mumbai',
+        distance: `${(0.5 + (idx * 0.7)).toFixed(1)} km`,
+        time: `${10 + (idx * 5)} mins`,
+        priceRange: r.plan === 'STARTER' ? '₹200-400' : r.plan === 'PRO' ? '₹400-800' : '₹800-1500',
+        tables: 10,
+        offer: r.currentOffer || undefined,
+        image: `/images/landing/restaurant-${imgIndex}.png`,
+        veg: idx % 2 === 0,
+        tags: r.plan === 'PRO' ? ['Trending', 'Date Night'] : ['Popular', 'Family']
+      };
+    });
+  };
+
+  const displayRestaurants = backendRestaurants.length > 0
+    ? mapBackendRestaurants(backendRestaurants)
+    : RESTAURANTS;
+
+  const dynamicCuisines = ['All', ...Array.from(new Set(displayRestaurants.map(r => r.cuisine).flatMap(c => c.split(',').map(s => s.trim()))))];
+
+  const filtered = displayRestaurants.filter((r) => {
     if (searchQuery && !r.name.toLowerCase().includes(searchQuery.toLowerCase()) && !r.cuisine.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (selectedArea !== 'All Areas' && r.area !== selectedArea) return false;
     if (selectedCuisine !== 'All' && !r.cuisine.toLowerCase().includes(selectedCuisine.toLowerCase())) return false;
@@ -132,7 +189,7 @@ export default function RestaurantsPage() {
           {/* Stats row */}
           <div className="flex items-center justify-center gap-6 sm:gap-10 mt-8">
             {[
-              { value: `${RESTAURANTS.length * 12}+`, label: 'Restaurants' },
+              { value: `${displayRestaurants.length * 12}+`, label: 'Restaurants' },
               { value: '4.5+', label: 'Avg Rating' },
               { value: 'Live', label: 'Availability' },
             ].map((stat) => (
@@ -171,7 +228,7 @@ export default function RestaurantsPage() {
           <div className="flex items-center gap-1.5 px-3 h-[40px] shrink-0" style={{ borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)' }}>
             <Utensils className="w-[14px] h-[14px]" style={{ color: '#FF6B1A' }} />
             <select value={selectedCuisine} onChange={(e) => setSelectedCuisine(e.target.value)} className="bg-transparent outline-none text-[13px] text-white cursor-pointer appearance-none pr-4">
-              {CUISINES.map((c) => <option key={c} value={c} style={{ background: '#1A1A1A' }}>{c}</option>)}
+              {dynamicCuisines.map((c) => <option key={c} value={c} style={{ background: '#1A1A1A' }}>{c}</option>)}
             </select>
             <ChevronDown className="w-[13px] h-[13px] -ml-3" style={{ color: 'rgba(255,255,255,0.4)' }} />
           </div>

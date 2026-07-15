@@ -42,9 +42,29 @@ function useCountUp(target: number, duration: number, trigger: boolean) {
   return count;
 }
 
-export default function LiveAvailabilityStrip() {
+interface LiveAvailabilityStripProps {
+  stats?: {
+    tablesAvailable: number;
+    restaurantsOpen: number;
+    reservationsToday: number;
+    offersRunning: number;
+    averageWaitTime: number;
+    averageRating: number;
+  };
+}
+
+export default function LiveAvailabilityStrip({ stats }: LiveAvailabilityStripProps) {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const displayStats = [
+    { value: stats?.tablesAvailable ?? 120, suffix: '+', label: 'Tables Available Now', isLive: true, emoji: '🪑', accent: '#4CAF50' },
+    { value: stats?.restaurantsOpen ?? 85, suffix: '', label: 'Restaurants Open', isLive: true, emoji: '🍽️', accent: '#FF6B1A' },
+    { value: stats?.averageWaitTime ?? 15, suffix: ' min', prefix: '~', label: 'Average Wait Time', emoji: '⏱️', accent: '#2196F3' },
+    { value: stats?.reservationsToday ?? 340, suffix: '+', label: 'Reservations Today', emoji: '📋', accent: '#9C27B0' },
+    { value: stats?.offersRunning ?? 50, suffix: '+', label: 'Offers Running', isLive: true, emoji: '🎁', accent: '#E91E63' },
+    { value: stats?.averageRating ?? 4.8, suffix: '★', label: 'Average Rating', emoji: '⭐', accent: '#FF9800' },
+  ];
 
   useEffect(() => {
     const el = ref.current;
@@ -63,7 +83,7 @@ export default function LiveAvailabilityStrip() {
   }, []);
 
   // Duplicate stats for seamless marquee
-  const allStats = [...STATS, ...STATS];
+  const allStats = [...displayStats, ...displayStats];
 
   return (
     <section
@@ -77,7 +97,7 @@ export default function LiveAvailabilityStrip() {
     >
       <div className="landing-marquee-content">
         {allStats.map((stat, idx) => (
-          <StampCard key={`${stat.label}-${idx}`} stat={stat} isVisible={isVisible} delay={idx % STATS.length} />
+          <StampCard key={`${stat.label}-${idx}`} stat={stat} isVisible={isVisible} delay={idx % displayStats.length} />
         ))}
       </div>
     </section>

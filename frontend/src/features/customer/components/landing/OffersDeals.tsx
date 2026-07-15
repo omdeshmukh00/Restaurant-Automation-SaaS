@@ -50,8 +50,37 @@ const OFFERS: Offer[] = [
   },
 ];
 
-export default function OffersDeals() {
+interface OffersDealsProps {
+  offers?: any[];
+}
+
+export default function OffersDeals({ offers }: OffersDealsProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const mapBackendOffers = (items: any[]): Offer[] => {
+    const gradients = [
+      'linear-gradient(135deg, #1A1008 0%, #2D1F10 50%, #1A1008 100%)',
+      'linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 50%, #0F0F0F 100%)',
+      'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)',
+    ];
+    return items.map((o, idx) => {
+      const grad = gradients[idx % gradients.length];
+      const fallbackImage = `https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop`;
+      return {
+        id: o._id || o.id,
+        discount: `FLAT ${o.discountPercent}% OFF`,
+        condition: o.name || 'Special discount offer',
+        code: o.code || 'SPECIAL',
+        validity: 'Valid for a limited time',
+        gradient: grad,
+        image: fallbackImage
+      };
+    });
+  };
+
+  const displayOffers = offers && offers.length > 0
+    ? mapBackendOffers(offers)
+    : OFFERS;
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -160,7 +189,7 @@ export default function OffersDeals() {
           ref={scrollRef}
           className="flex gap-5 overflow-x-auto landing-hide-scrollbar pb-2"
         >
-          {OFFERS.map((offer) => (
+          {displayOffers.map((offer) => (
             <OfferCard key={offer.id} offer={offer} />
           ))}
         </div>
