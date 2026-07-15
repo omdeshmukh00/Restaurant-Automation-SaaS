@@ -13,6 +13,9 @@ export interface RestaurantsRow {
   status: "Active" | "Trial" | "Inactive";
   revenue: string;
   branches: number;
+  joinedDate?: string;
+  lastActive?: string;
+  tags?: string[];
   cooldownRemaining?: number;
 }
 

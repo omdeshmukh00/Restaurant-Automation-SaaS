@@ -41,6 +41,10 @@ import {
   updateRestaurantPlanController,
   registerRestaurantController,
   getReservationQueueAnalyticsController,
+  getAnalyticsChartsController,
+  getPlatformAlertsController,
+  updatePlatformAlertController,
+  deletePlatformAlertController,
 } from './superAdmin.controller';
 
 const router = Router();
@@ -213,6 +217,9 @@ router.get('/system/monitoring', getSystemMonitoring);
 // GET /super-admin/analytics/reservation-queue
 router.get('/analytics/reservation-queue', getReservationQueueAnalyticsController);
 
+// GET /super-admin/analytics/charts
+router.get('/analytics/charts', getAnalyticsChartsController);
+
 /*
 |--------------------------------------------------------------------------
 | AUDIT LOGS (platform-wide)
@@ -225,5 +232,20 @@ router.get(
   validate({ query: superAdminAuditLogQuerySchema }),
   getPlatformAuditLogs,
 );
+
+/*
+|--------------------------------------------------------------------------
+| PLATFORM SYSTEM ALERTS
+|--------------------------------------------------------------------------
+*/
+
+// GET /super-admin/alerts
+router.get('/alerts', getPlatformAlertsController);
+
+// PATCH /super-admin/alerts/:id
+router.patch('/alerts/:id', updatePlatformAlertController);
+
+// DELETE /super-admin/alerts/:id
+router.delete('/alerts/:id', deletePlatformAlertController);
 
 export default router;

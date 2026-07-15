@@ -64,8 +64,11 @@ const mapDbRestaurantToRow = (r: any): RestaurantsRow => ({
   location: r.city ? `${r.city}, ${r.state || ""}, ${r.country || ""}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim() : "Unknown",
   plan: (r.plan || "Basic") as any,
   status: r.status === "ACTIVE" ? "Active" : r.status === "ONBOARDING" || r.status === "PENDING_APPROVAL" ? "Trial" : "Inactive",
-  revenue: "₹0",
+  revenue: typeof r.revenue === 'number' ? `₹${r.revenue.toLocaleString('en-IN')}` : r.revenue || "₹0",
   branches: r.branches || 1,
+  joinedDate: r.joinedDate ? new Date(r.joinedDate).toISOString().slice(0, 10) : r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  lastActive: r.lastActive ? new Date(r.lastActive).toISOString().slice(0, 10) : r.updatedAt ? new Date(r.updatedAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  tags: r.tags || [],
   cooldownRemaining: r.cooldownRemaining || 0,
 });
 

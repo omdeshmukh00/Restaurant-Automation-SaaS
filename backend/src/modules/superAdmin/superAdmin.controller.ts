@@ -235,3 +235,35 @@ export const getReservationQueueAnalyticsController = asyncHandler(async (_req: 
   const result = await superAdminService.getReservationQueueAnalytics();
   ok(res, result);
 });
+
+export const getAnalyticsChartsController = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await superAdminService.getAnalyticsCharts();
+  ok(res, result);
+});
+
+export const getPlatformAlertsController = asyncHandler(async (req: Request, res: Response) => {
+  const { status, type } = req.query;
+  const filter: any = {};
+  if (status) filter.status = status;
+  if (type) filter.type = type;
+
+  const result = await superAdminService.getPlatformAlerts(filter);
+  ok(res, result);
+});
+
+export const updatePlatformAlertController = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!status || !['new', 'acknowledged', 'resolved'].includes(status)) {
+    throw new AppError('Invalid alert status', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const result = await superAdminService.updatePlatformAlert(id, status);
+  ok(res, result);
+});
+
+export const deletePlatformAlertController = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  await superAdminService.deletePlatformAlert(id);
+  ok(res, { success: true });
+});

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Eye, Edit2, MoreVertical, Mail, Phone, MapPin,
   CheckCircle2, AlertCircle, X, Trash2, SlidersHorizontal,
-  Crown, Zap, Package, Building2, GitBranch, ChevronDown, Clock
+  Crown, Zap, Package, Building2, GitBranch, ChevronDown, Clock, Activity
 } from "lucide-react";
 import type { RestaurantNode, PlanType, StatusType } from "./Subcriptiontypes";
 import { PLAN_COLORS } from "../../store/Subscriptions";
@@ -14,6 +14,7 @@ interface SubscriptionTableProps {
   statusFilter: string;
   tierFilter: string;
   onView: (row: RestaurantNode) => void;
+  onLiveActivity: (row: RestaurantNode) => void;
   onUpdateStatus: (id: string, status: StatusType, blockReason?: string) => void;
   onUpdatePlan: (id: string, plan: string) => void;
   onDelete: (id: string) => void;
@@ -140,10 +141,11 @@ function EditDropdownContent({
 }
 
 function MobileRestaurantCard({
-  row, darkMode, onView, onUpdateStatus, onUpdatePlan, onDelete, plans, cooldown,
+  row, darkMode, onView, onLiveActivity, onUpdateStatus, onUpdatePlan, onDelete, plans, cooldown,
 }: {
   row: RestaurantNode; darkMode: boolean;
   onView: (r: RestaurantNode) => void;
+  onLiveActivity: (r: RestaurantNode) => void;
   onUpdateStatus: (id: string, s: StatusType, blockReason?: string) => void;
   onUpdatePlan: (id: string, p: string) => void;
   onDelete: (id: string) => void;
@@ -250,6 +252,17 @@ function MobileRestaurantCard({
         </button>
 
         <div className="flex items-center gap-1">
+          {/* Live Activity */}
+          <button
+            onClick={() => onLiveActivity(row)}
+            className={`p-1.5 rounded-lg transition-all hover:text-orange-500 hover:bg-orange-500/5 ${
+              darkMode ? "text-slate-500" : "text-slate-400"
+            }`}
+            title="Live Activity"
+          >
+            <Activity size={14} />
+          </button>
+
           {/* View */}
           <button
             onClick={() => onView(row)}
@@ -362,7 +375,7 @@ function EmptyState({ darkMode, label, onResetFilters }: { darkMode: boolean; la
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SubscriptionTable({
   restaurants, darkMode, searchQuery, statusFilter, tierFilter,
-  onView, onUpdateStatus, onUpdatePlan, onDelete, plans, onResetFilters,
+  onView, onLiveActivity, onUpdateStatus, onUpdatePlan, onDelete, plans, onResetFilters,
 }: SubscriptionTableProps) {
   const [editDropdownId, setEditDropdownId] = useState<string | null>(null);
   const [moreDropdownId, setMoreDropdownId] = useState<string | null>(null);
@@ -422,6 +435,7 @@ export default function SubscriptionTable({
             row={row}
             darkMode={darkMode}
             onView={onView}
+            onLiveActivity={onLiveActivity}
             onUpdateStatus={onUpdateStatus}
             onUpdatePlan={onUpdatePlan}
             onDelete={onDelete}
@@ -540,6 +554,15 @@ export default function SubscriptionTable({
                     {/* Actions */}
                     <td className="py-4 px-5 whitespace-nowrap text-center relative overflow-visible">
                       <div className="flex items-center justify-center gap-1.5">
+
+                        {/* Live Activity */}
+                        <button
+                          onClick={() => onLiveActivity(row)}
+                          title="Live Activity"
+                          className={`p-1.5 rounded-lg transition-all hover:text-orange-500 hover:bg-orange-500/5 ${darkMode ? "text-slate-500" : "text-slate-400"}`}
+                        >
+                          <Activity size={14} />
+                        </button>
 
                         <button
                           onClick={() => { closeAll(); onView(row); }}

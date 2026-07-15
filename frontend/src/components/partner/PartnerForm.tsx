@@ -592,22 +592,15 @@ export default function PartnerForm() {
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
                 Cuisine / Cuisine Type <span className="text-orange-500">*</span>
               </label>
-              <select
+              <input
+                type="text"
                 name="cuisine"
                 value={formData.cuisine}
                 onChange={handleInputChange}
                 required
-                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-orange-500"
-              >
-                <option value="">Select cuisine type</option>
-                <option value="Fast Food">Fast Food</option>
-                <option value="Fine Dining">Fine Dining</option>
-                <option value="Cafe & Bakery">Cafe & Bakery</option>
-                <option value="Casual Dining">Casual Dining</option>
-                <option value="Multi-Cuisine">Multi-Cuisine</option>
-                <option value="Pizzeria">Pizzeria</option>
-                <option value="Other">Other</option>
-              </select>
+                placeholder="e.g. Multi-Cuisine, Italian, Cafe"
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-500 transition-colors"
+              />
               {errors.cuisine && <p className="text-[10px] text-red-500 mt-1">{errors.cuisine}</p>}
             </div>
 

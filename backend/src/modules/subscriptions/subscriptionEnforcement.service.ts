@@ -207,6 +207,24 @@ export async function assertPlanLimit(
       'SUBSCRIPTION_LIMIT_EXCEEDED',
     );
 
+    // Create platform system alert for Super Admin
+    try {
+      const { createSystemAlert } = await import('../superAdmin/superAdmin.service');
+      const { RestaurantModel } = await import('../restaurants/restaurants.model');
+      const restaurant = await RestaurantModel.findById(restaurantId).lean();
+      
+      await createSystemAlert({
+        title: `Plan Limit Exceeded: ${restaurant?.name || 'Restaurant'}`,
+        description: `${label} limit exceeded (${nextUsage}/${limit}) under ${plan.name} plan.`,
+        type: 'critical',
+        entityType: 'restaurant',
+        entityId: toMongoId(restaurantId),
+        tags: ['limit_exceeded', field],
+      });
+    } catch (e) {
+      // Ignore
+    }
+
     // Send email alert (rate limited to 1 per 24 hours per recipient)
     try {
       const { EmailLogModel } = await import('../notifications/emailLog.model');

@@ -11,12 +11,15 @@ import {
 import { exportOrdersAsCSV } from "../utils/Analyticsutils";
 import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
 import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
+import { useSuperAdminDashboardStore } from "../store/Superadmindashboard";
 
 import AnalyticsHeader     from "../components/Analytics/Analyticsheader";
 import AnalyticsKPICards   from "../components/Analytics/Analyticskpicards";
 import AnalyticsBarChart   from "../components/Analytics/Analyticsbarchart";
 import AnalyticsPieChart   from "../components/Analytics/Analyticspiechart";
 import AnalyticsOrdersTable from "../components/Analytics/Analyticsorderstable";
+import RevenueChart        from "../components/dashboard/RevenueChart";
+import RestaurantStatusPie from "../components/dashboard/Restaurantstatuspie";
 
 import AnalyticsTabBar, { type AnalyticsTab } from "../components/Analytics/AnalyticsTabBar";
 import ReservationQueueKPI from "../components/Analytics/ReservationQueueKPI";
@@ -32,6 +35,7 @@ export default function Analytics() {
   const { darkMode } = useOutletContext<LayoutContextType>();
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+  const fetchOverview = useSuperAdminDashboardStore((state) => state.fetchOverview);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<AnalyticsTab>("revenue");
@@ -51,6 +55,17 @@ export default function Analytics() {
   // Reservation & Queue analytics state
   const [rqData, setRqData] = useState<any>(null);
   const [rqLoading, setRqLoading] = useState(false);
+
+  // Dynamic charts and feature adoption state
+  const [dynamicBarSeries, setDynamicBarSeries] = useState<any[]>(barSeries);
+  const [dynamicDistributionSeries, setDynamicDistributionSeries] = useState<any[]>(distributionSeries);
+  const [featureAdoption, setFeatureAdoption] = useState<any>({
+    reservations: 65,
+    queues: 48,
+    discounts: 52,
+    analytics: 35,
+    automation: 22,
+  });
 
   const fetchOrders = async () => {
     try {
@@ -76,9 +91,30 @@ export default function Analytics() {
     }
   };
 
+  const fetchChartsData = async () => {
+    try {
+      const result = await superAdminRestaurantRequestsApi.getAnalyticsCharts();
+      if (result) {
+        if (result.barSeries && result.barSeries.length > 0) {
+          setDynamicBarSeries(result.barSeries);
+        }
+        if (result.distributionSeries && result.distributionSeries.length > 0) {
+          setDynamicDistributionSeries(result.distributionSeries);
+        }
+        if (result.featureAdoption) {
+          setFeatureAdoption(result.featureAdoption);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch analytics charts data", error);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchRequests();
+    fetchChartsData();
+    fetchOverview();
   }, [fetchRequests]);
 
   // Fetch reservation/queue data when tab is activated
@@ -146,6 +182,8 @@ export default function Analytics() {
     try {
       await fetchOrders();
       await fetchRequests();
+      await fetchChartsData();
+      await fetchOverview();
       if (activeTab === "reservations") {
         await fetchReservationQueueData();
       }
@@ -199,21 +237,79 @@ export default function Analytics() {
               averageOrderValue={averageOrderValue}
             />
 
+            {/* Feature Adoption Card */}
+            <div
+              className={`rounded-2xl p-6 border transition-all duration-300 ${
+                darkMode
+                  ? "bg-slate-900/40 border-slate-800/80 text-slate-100 shadow-xl shadow-black/20"
+                  : "bg-white border-slate-200/80 text-slate-800 shadow-sm"
+              }`}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                    darkMode ? "bg-orange-500/10 text-orange-400" : "bg-orange-50 text-orange-600"
+                  }`}
+                >
+                  <span className="text-sm font-bold">⚡</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight">Feature Adoption Analytics</h3>
+                  <p className={`text-[10px] font-semibold mt-0.5 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
+                    Active onboarded tenants utilizing core premium capabilities
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-6 mt-6">
+                {[
+                  { label: "Reservations Engine", value: featureAdoption.reservations, color: "bg-gradient-to-r from-blue-600 to-blue-400", shadow: "shadow-blue-500/10" },
+                  { label: "Waitlist & Queue", value: featureAdoption.queues, color: "bg-gradient-to-r from-orange-600 to-orange-400", shadow: "shadow-orange-500/10" },
+                  { label: "Dynamic Discount Engine", value: featureAdoption.discounts, color: "bg-gradient-to-r from-purple-600 to-purple-400", shadow: "shadow-purple-500/10" },
+                  { label: "Advanced Analytics Suite", value: featureAdoption.analytics, color: "bg-gradient-to-r from-emerald-600 to-emerald-400", shadow: "shadow-emerald-500/10" },
+                  { label: "Smart Automation Rules", value: featureAdoption.automation, color: "bg-gradient-to-r from-pink-600 to-pink-400", shadow: "shadow-pink-500/10" },
+                ].map((item, idx) => (
+                  <div key={idx} className="space-y-2">
+                    <div className="flex justify-between text-[11px] font-bold">
+                      <span className={darkMode ? "text-slate-400" : "text-slate-500"}>{item.label}</span>
+                      <span className={darkMode ? "text-slate-300" : "text-slate-700"}>{item.value}%</span>
+                    </div>
+                    <div className={`h-2.5 rounded-full w-full overflow-hidden ${darkMode ? "bg-slate-800" : "bg-slate-100"}`}>
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${item.color} ${item.shadow}`}
+                        style={{ width: `${item.value}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Charts row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="md:col-span-2">
-                <AnalyticsBarChart darkMode={darkMode} data={barSeries} />
+                <AnalyticsBarChart darkMode={darkMode} data={dynamicBarSeries} />
               </div>
               <div className="md:col-span-1">
                 <AnalyticsPieChart
                   darkMode={darkMode}
-                  data={distributionSeries}
+                  data={dynamicDistributionSeries}
                 />
               </div>
             </div>
 
-            {/* Orders table */}
-            <AnalyticsOrdersTable
+        {/* Dashboard Trend Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2">
+            <RevenueChart darkMode={darkMode} />
+          </div>
+          <div className="lg:col-span-1">
+            <RestaurantStatusPie darkMode={darkMode} />
+          </div>
+        </div>
+
+        {/* Orders table */}
+        <AnalyticsOrdersTable
               darkMode={darkMode}
               orders={filteredOrders}
               searchQuery={searchQuery}

@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
+import { useAlertsStore } from "../../store/AlertsStore";
 
 interface NavbarProps {
   darkMode: boolean;
@@ -195,9 +196,59 @@ export default function Navbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [systemMute, setSystemMute] = useState(false);
   const requests = useRestaurantRequestsStore((state) => state.requests);
-  const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
+  const alerts = useAlertsStore((state) => state.alerts);
+  const fetchAlerts = useAlertsStore((state) => state.fetchAlerts);
+  const setupSocketListener = useAlertsStore((state) => state.setupSocketListener);
+  const acknowledgeAlert = useAlertsStore((state) => state.acknowledgeAlert);
+  const dismissAlert = useAlertsStore((state) => state.dismissAlert);
+
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("superadmin_dismissed_notifications");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("superadmin_dismissed_notifications", JSON.stringify(dismissedIds));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [dismissedIds]);
+
+  const handleMarkAllRead = async () => {
+    const toAcknowledge = alerts.filter(a => a.status === 'new');
+    for (const a of toAcknowledge) {
+      await acknowledgeAlert(a.id);
+    }
+  };
+
+  const handleDismissAll = async () => {
+    const toDismiss = alerts.filter(a => !a.id.startsWith('request-'));
+    for (const a of toDismiss) {
+      await dismissAlert(a.id);
+    }
+    const reqIds = requests.map(r => `req-${r.id}`);
+    setDismissedIds(prev => [...prev, ...reqIds]);
+  };
+
+  const handleDismissItem = async (item: any) => {
+    setDismissedIds(prev => [...prev, item.id]);
+    if (item.alert) {
+      const alertId = item.id.replace('alert-', '');
+      await dismissAlert(alertId);
+    }
+  };
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchAlerts();
+    setupSocketListener();
+  }, [fetchAlerts, setupSocketListener]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -222,38 +273,36 @@ export default function Navbar({
     );
   };
 
-  const notifications = useMemo(
-    () => [
-      ...requests.map((request) => ({
-        id: request.id,
+  const notifications = useMemo(() => {
+    const activeRequests = requests
+      .filter((r) => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT')
+      .map((request) => ({
+        id: `req-${request.id}`,
         title: "New Restaurant Request",
         description: `${request.name} requested ${request.plan} onboarding.`,
-        time: request.requestedAt,
+        time: request.requestedAt ? new Date(request.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
         type: "info",
         unread: true,
         request: true,
-      })),
-    {
-      id: 2,
-      title: "Gateway Timeout Alert",
-      description: "Payment API experienced a 1.2s latent spike.",
-      time: "14 mins ago",
-      type: "warning",
-      unread: true,
-    },
-    {
-      id: 3,
-      title: "Payout Disbursed Successfully",
-      description: "Batch #4029 wired to 14 standard merchants.",
-      time: "2 hours ago",
-      type: "success",
-      unread: false,
-    },
-    ],
-    [requests]
-  );
+      }));
 
-  const unresolvedCount = pendingCount + 1;
+    const activeAlerts = alerts
+      .filter((alert) => alert.status === 'new')
+      .map((alert) => ({
+        id: `alert-${alert.id}`,
+        title: alert.title,
+        description: alert.description,
+        time: alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+        type: alert.type === 'critical' ? 'warning' : 'info',
+        unread: true,
+        alert: true,
+      }));
+
+    return [...activeRequests, ...activeAlerts].filter(item => !dismissedIds.includes(item.id));
+  }, [requests, alerts, dismissedIds]);
+
+  const pendingCount = notifications.length;
+  const unresolvedCount = pendingCount;
 
   return (
     <>
@@ -403,49 +452,95 @@ export default function Navbar({
                           {unresolvedCount} Action items unresolved
                         </p>
                       </div>
+
+                      <div className="flex items-center gap-3 select-none">
+                        {alerts.filter(a => !a.id.startsWith('request-')).length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDismissAll();
+                            }}
+                            className="text-[9px] font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-wider bg-transparent border-none p-0 cursor-pointer"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                        {pendingCount > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkAllRead();
+                            }}
+                            className="text-[9px] font-bold text-orange-500 hover:text-orange-600 transition-colors uppercase tracking-wider bg-transparent border-none p-0 cursor-pointer"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="max-h-64 overflow-y-auto divide-y dark:divide-slate-900">
-                      {notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            if ("request" in item && item.request) {
+                      {notifications.length > 0 ? (
+                        notifications.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
                               setNotificationsOpen(false);
-                              navigate("/superadmin?requests=new");
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
                               if ("request" in item && item.request) {
-                                setNotificationsOpen(false);
                                 navigate("/superadmin?requests=new");
+                              } else if ("alert" in item && item.alert) {
+                                navigate("/superadmin/alerts");
                               }
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          className={`p-3.5 flex gap-3 cursor-pointer group relative ${
-                            item.unread
-                              ? darkMode
-                                ? "bg-slate-900/30"
-                                : "bg-orange-50/20"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-xs truncate">
-                              {item.title}
-                            </p>
-                            <p className="text-[11px] mt-0.5 text-slate-400">
-                              {item.description}
-                            </p>
-                            <p className="text-[10px] mt-1 text-slate-500">
-                              {item.time}
-                            </p>
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setNotificationsOpen(false);
+                                if ("request" in item && item.request) {
+                                  navigate("/superadmin?requests=new");
+                                } else if ("alert" in item && item.alert) {
+                                  navigate("/superadmin/alerts");
+                                }
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            className={`p-3.5 flex gap-3 cursor-pointer group relative ${
+                              item.unread
+                                ? darkMode
+                                  ? "bg-slate-900/30"
+                                  : "bg-orange-50/20"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0 pr-6">
+                              <p className="font-semibold text-xs truncate">
+                                {item.title}
+                              </p>
+                              <p className="text-[11px] mt-0.5 text-slate-400">
+                                {item.description}
+                              </p>
+                              <p className="text-[10px] mt-1 text-slate-500">
+                                {item.time}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDismissItem(item);
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-all z-10"
+                              title="Dismiss notification"
+                            >
+                              <X size={12} />
+                            </button>
                           </div>
+                        ))
+                      ) : (
+                        <div className="py-8 text-center text-xs text-slate-500">
+                          No active notifications
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 )}

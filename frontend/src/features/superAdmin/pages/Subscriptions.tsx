@@ -26,6 +26,7 @@ import SubscriptionControls from "../components/Subscriptions/Subscriptioncontro
 import SubscriptionTable from "../components/Subscriptions/Subcriptiontable";
 import ViewModal from "../components/Restaurants/Viewmodal";
 import AddRestaurantModal from "../components/Restaurants/AddRestaurantModal";
+import LiveActivityModal from "../components/Subscriptions/LiveActivityModal";
 
 const EMPTY_FORM: NewRestaurantForm = {
   name: "",
@@ -175,6 +176,7 @@ export default function Subscriptions() {
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [viewingNode, setViewingNode] = useState<any | null>(null);
+  const [liveActivityRestaurant, setLiveActivityRestaurant] = useState<RestaurantNode | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isCommissionOpen, setIsCommissionOpen] = useState(false);
@@ -199,6 +201,10 @@ export default function Subscriptions() {
       console.error("Failed to load restaurant details", err);
       setViewingNode(row);
     }
+  };
+
+  const handleLiveActivity = (row: RestaurantNode) => {
+    setLiveActivityRestaurant(row);
   };
 
   useEffect(() => {
@@ -407,9 +413,9 @@ export default function Subscriptions() {
         status: restaurant.status,
         revenue: restaurant.revenue,
         branches: restaurant.branches,
-        joinedDate: new Date().toISOString().slice(0, 10),
-        lastActive: new Date().toISOString().slice(0, 10),
-        tags: [],
+        joinedDate: restaurant.joinedDate || new Date().toISOString().slice(0, 10),
+        lastActive: restaurant.lastActive || new Date().toISOString().slice(0, 10),
+        tags: restaurant.tags || [],
         cooldownRemaining: restaurant.cooldownRemaining,
       }));
 
@@ -618,6 +624,7 @@ export default function Subscriptions() {
         statusFilter={statusFilter}
         tierFilter={tierFilter}
         onView={handleViewRestaurant}
+        onLiveActivity={handleLiveActivity}
         onUpdateStatus={updateStatus}
         onUpdatePlan={updatePlan}
         onDelete={deleteNode}
@@ -857,6 +864,16 @@ export default function Subscriptions() {
           restaurant={viewingNode}
           darkMode={darkMode}
           onClose={() => setViewingNode(null)}
+        />
+      )}
+
+      {/* Live Activity Modal */}
+      {liveActivityRestaurant && (
+        <LiveActivityModal
+          restaurantId={liveActivityRestaurant.id}
+          restaurantName={liveActivityRestaurant.name}
+          darkMode={darkMode}
+          onClose={() => setLiveActivityRestaurant(null)}
         />
       )}
 

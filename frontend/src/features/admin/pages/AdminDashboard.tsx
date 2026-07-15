@@ -21,7 +21,7 @@ const AdminDashboard = () => {
     try {
       const res = await apiClient.get('/subscriptions/usage-dashboard');
       if (res.data) {
-        setUsageData(res.data);
+        setUsageData(res.data.data || res.data);
       }
     } catch (error) {
       console.error('Failed to fetch usage data', error);

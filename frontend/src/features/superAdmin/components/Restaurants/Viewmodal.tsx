@@ -58,8 +58,8 @@ export default function ViewModal({ restaurant, darkMode, onClose }: ViewModalPr
       setLoadingUsage(true);
       apiClient.get(`/subscriptions/usage-dashboard?restaurantId=${restaurantId}`)
         .then(res => {
-          if (res.data) {
-            setUsageDashboard(res.data);
+          if (res.data && res.data.data) {
+            setUsageDashboard(res.data.data);
           }
         })
         .catch(err => console.error("Failed to fetch subscription usage dashboard", err))

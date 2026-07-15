@@ -168,4 +168,25 @@ export const superAdminRestaurantRequestsApi = {
     );
     return response.data.data;
   },
+
+  async getAnalyticsCharts(): Promise<any> {
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      "/superadmin/analytics/charts"
+    );
+    return response.data.data;
+  },
+
+  async getAlerts(): Promise<any[]> {
+    const response = await apiClient.get<{ success: boolean; data: any[] }>("/superadmin/alerts");
+    return response.data.data;
+  },
+
+  async updateAlertStatus(id: string, status: string): Promise<any> {
+    const response = await apiClient.patch<{ success: boolean; data: any }>(`/superadmin/alerts/${id}`, { status });
+    return response.data.data;
+  },
+
+  async deleteAlert(id: string): Promise<void> {
+    await apiClient.delete(`/superadmin/alerts/${id}`);
+  },
 };

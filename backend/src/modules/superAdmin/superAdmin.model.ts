@@ -80,3 +80,36 @@ const featureFlagSchema = new Schema<IFeatureFlag>(
 
 export const PlatformPlanModel = mongoose.model<IPlatformPlan>('PlatformPlan', platformPlanSchema);
 export const FeatureFlagModel = mongoose.model<IFeatureFlag>('FeatureFlag', featureFlagSchema);
+
+export interface ISystemAlert extends Document {
+  title: string;
+  description: string;
+  type: 'critical' | 'warning' | 'info';
+  status: 'new' | 'acknowledged' | 'resolved';
+  entityType: 'restaurant' | 'payment' | 'system' | 'user';
+  entityId?: mongoose.Types.ObjectId | null;
+  tags?: string[];
+  timestamp: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const systemAlertSchema = new Schema<ISystemAlert>(
+  {
+    title: { type: String, required: true },
+    description: { type: String, required: true },
+    type: { type: String, enum: ['critical', 'warning', 'info'], default: 'warning' },
+    status: { type: String, enum: ['new', 'acknowledged', 'resolved'], default: 'new' },
+    entityType: { type: String, enum: ['restaurant', 'payment', 'system', 'user'], required: true },
+    entityId: { type: Schema.Types.ObjectId, default: null },
+    tags: [{ type: String, trim: true }],
+    timestamp: { type: Date, default: Date.now },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+    collection: 'systemAlerts',
+  }
+);
+
+export const SystemAlertModel = mongoose.model<ISystemAlert>('SystemAlert', systemAlertSchema);

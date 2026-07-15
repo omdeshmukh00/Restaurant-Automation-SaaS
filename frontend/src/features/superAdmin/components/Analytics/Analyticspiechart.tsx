@@ -81,14 +81,14 @@ export default function AnalyticsPieChart({
           >
             <PieIcon size={14} />
           </span>
-          Deployment Architecture
+          Tenant Plan Distribution
         </h3>
         <p
           className={`text-[12px] mt-0.5 ${
             darkMode ? "text-slate-500" : "text-slate-400"
           }`}
         >
-          Core allocation mapping by channel
+          Active subscription segments by tier
         </p>
       </div>
 
@@ -125,7 +125,7 @@ export default function AnalyticsPieChart({
               darkMode ? "text-slate-500" : "text-slate-400"
             }`}
           >
-            Configured
+            Tiers
           </span>
         </div>
       </div>

@@ -31,6 +31,7 @@ export default function AdminLayout(): JSX.Element {
     }
   };
 
+
   useEffect(() => {
     fetchOverview();
   }, []);
@@ -84,6 +85,7 @@ export default function AdminLayout(): JSX.Element {
               sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
             }`}
           >
+
             <AdminTopbar onMenuToggle={handleToggleSidebar} />
 
             <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">

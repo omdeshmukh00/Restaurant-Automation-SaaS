@@ -55,6 +55,10 @@ export interface IRestaurant extends Document {
   adminUserId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId | null;
   blockReason?: string;
+  revenue?: number;
+  lastActive?: Date;
+  tags?: string[];
+  joinedDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -141,6 +145,10 @@ const restaurantSchema = new Schema<IRestaurant>(
     adminUserId: { type: Schema.Types.ObjectId, ref: 'User' },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', default: null },
     blockReason: { type: String, default: null },
+    revenue: { type: Number, default: 0 },
+    lastActive: { type: Date, default: Date.now },
+    tags: { type: [String], default: [] },
+    joinedDate: { type: Date, default: Date.now },
     location_url: {
       type: String,
       trim: true,

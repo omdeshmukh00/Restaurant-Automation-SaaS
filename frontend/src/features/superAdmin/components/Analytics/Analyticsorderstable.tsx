@@ -112,7 +112,14 @@ function MobileOrderCard({
           >
             Commission
           </p>
-          <p className="font-bold text-orange-500">+₹{order.commission}</p>
+          <p className="font-bold text-orange-500">
+            +₹{order.commission.toLocaleString()}
+            {order.commissionRate !== undefined && (
+              <span className={`text-[10px] ml-1 font-semibold ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
+                ({order.commissionRate}%)
+              </span>
+            )}
+          </p>
         </div>
         <div>
           <p
@@ -168,7 +175,7 @@ export default function AnalyticsOrdersTable({
     { key: "restaurant",  label: "Restaurant",           align: "left" },
     { key: "type",        label: "Channel",              align: "left" },
     { key: "grossAmount", label: "Gross Vol",            align: "right" },
-    { key: "commission",  label: `${commissionRate}% Platform Cut`,     align: "right" },
+    { key: "commission",  label: "Platform Cut",         align: "right" },
     { key: "status",      label: "Cluster Health",       align: "left" },
     { key: "timestamp",   label: "Activity Log",         align: "right" },
   ];
@@ -362,8 +369,13 @@ export default function AnalyticsOrdersTable({
                   </td>
 
                   {/* Commission */}
-                  <td className="py-3.5 px-4 font-bold text-right text-orange-500 whitespace-nowrap tabular-nums">
-                    +₹{order.commission}
+                  <td className="py-3.5 px-4 text-right whitespace-nowrap tabular-nums">
+                    <span className="font-bold text-orange-500">+₹{order.commission.toLocaleString()}</span>
+                    {order.commissionRate !== undefined && (
+                      <span className={`text-[10px] ml-1.5 font-semibold ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
+                        {order.commissionRate}%
+                      </span>
+                    )}
                   </td>
 
                   {/* Status */}

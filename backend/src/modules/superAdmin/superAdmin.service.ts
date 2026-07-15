@@ -5,7 +5,7 @@
 import mongoose, { FilterQuery } from 'mongoose';
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { UserModel } from '../users/users.model';
-import { PlatformPlanModel, FeatureFlagModel } from './superAdmin.model';
+import { PlatformPlanModel, FeatureFlagModel, SystemAlertModel } from './superAdmin.model';
 import { EmailLogModel } from '../notifications/emailLog.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
@@ -925,6 +925,10 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
       onboardingRequestId: request._id,
       adminUserId: adminUserId,
       subscriptionId: null,
+      revenue: 0,
+      lastActive: new Date(),
+      joinedDate: new Date(),
+      tags: ['New'],
     }], { session });
 
     // Step 2: Generate temporary password
@@ -1091,6 +1095,10 @@ export async function registerRestaurantDirectly(input: any, reviewerId: string)
       googleMapsUrl: input.googleMapsUrl || undefined,
       adminUserId: adminUserId,
       subscriptionId: null,
+      revenue: 0,
+      lastActive: new Date(),
+      joinedDate: new Date(),
+      tags: ['New'],
     }], { session });
 
     // Step 2: Generate temporary password
@@ -1646,4 +1654,183 @@ export async function getReservationQueueAnalytics() {
     peakHours,
     restaurantLeaderboard,
   };
+}
+
+export async function getAnalyticsCharts() {
+  const { OrderModel } = await import('../orders/orders.model');
+  const { RestaurantModel } = await import('../restaurants/restaurants.model');
+
+  // 1. Daily Orders Trend (Last 7 Days) for Bar Chart
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  const dailyOrdersAgg = await OrderModel.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: sevenDaysAgo },
+        status: { $in: ['COMPLETED', 'SERVED'] },
+      },
+    },
+    {
+      $group: {
+        _id: { $dayOfWeek: '$createdAt' },
+        count: { $sum: 1 },
+      },
+    },
+  ]).option({ bypassTenant: true });
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dailyOrdersMap: Record<string, number> = {};
+  
+  // Initialize map with days in order of the past 7 days
+  const chartDays: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const name = dayNames[d.getDay()];
+    chartDays.push(name);
+    dailyOrdersMap[name] = 0;
+  }
+
+  dailyOrdersAgg.forEach((item) => {
+    const dayName = dayNames[item._id - 1];
+    if (dayName && dailyOrdersMap[dayName] !== undefined) {
+      dailyOrdersMap[dayName] = item.count;
+    }
+  });
+
+  const maxOrders = Math.max(...Object.values(dailyOrdersMap));
+  const targetCapacity = Math.max(50, Math.round(maxOrders * 1.5));
+
+  const barSeries = chartDays.map((day) => ({
+    period: day,
+    load: dailyOrdersMap[day],
+    capacity: targetCapacity,
+  }));
+
+  // 2. Subscription Plan Distribution for Pie Chart
+  const planCounts = await RestaurantModel.aggregate([
+    {
+      $group: {
+        _id: '$plan',
+        count: { $sum: 1 },
+      },
+    },
+  ]).option({ bypassTenant: true });
+
+  const totalRestaurants = await RestaurantModel.countDocuments().setOptions({ bypassTenant: true });
+
+  const planColors: Record<string, string> = {
+    'Basic': '#3b82f6',
+    'Standard': '#8b5cf6',
+    'Premium': '#f97316',
+    'Enterprise': '#10b981',
+  };
+
+  const planMap: Record<string, number> = {
+    'Basic': 0,
+    'Standard': 0,
+    'Premium': 0,
+    'Enterprise': 0,
+  };
+
+  planCounts.forEach((item) => {
+    const name = item._id || 'Basic';
+    planMap[name] = (planMap[name] || 0) + item.count;
+  });
+
+  const distributionSeries = Object.entries(planMap).map(([planName, count]) => {
+    const percentage = totalRestaurants > 0 ? Math.round((count / totalRestaurants) * 100) : 0;
+    return {
+      division: planName,
+      allocation: percentage,
+      Hex: planColors[planName] || '#64748b',
+    };
+  });
+
+  // 3. Feature Adoption Analytics
+  const plans = await PlatformPlanModel.find().lean();
+  const activeRestaurants = await RestaurantModel.find({ status: 'ACTIVE' }).lean();
+
+  const featureAdoption = {
+    reservations: 0,
+    queues: 0,
+    discounts: 0,
+    analytics: 0,
+    automation: 0,
+  };
+
+  if (activeRestaurants.length > 0) {
+    let resCount = 0;
+    let qCount = 0;
+    let discCount = 0;
+    let anaCount = 0;
+    let autoCount = 0;
+
+    activeRestaurants.forEach((r: any) => {
+      const planDoc = plans.find((p: any) => p.name === r.plan || p._id.toString() === r.planId?.toString());
+      if (planDoc) {
+        if (planDoc.reservationAccess) resCount++;
+        if (planDoc.queueAccess) qCount++;
+        if (planDoc.dynamicDiscountEngine) discCount++;
+        if (planDoc.advancedAnalytics) anaCount++;
+        if (planDoc.smartAutomation) autoCount++;
+      }
+    });
+
+    const totalActive = activeRestaurants.length;
+    featureAdoption.reservations = Math.round((resCount / totalActive) * 100);
+    featureAdoption.queues = Math.round((qCount / totalActive) * 100);
+    featureAdoption.discounts = Math.round((discCount / totalActive) * 100);
+    featureAdoption.analytics = Math.round((anaCount / totalActive) * 100);
+    featureAdoption.automation = Math.round((autoCount / totalActive) * 100);
+  }
+
+  return {
+    barSeries,
+    distributionSeries,
+    featureAdoption,
+  };
+}
+
+export async function createSystemAlert(alertData: any) {
+  const alert = await SystemAlertModel.create({
+    ...alertData,
+    timestamp: alertData.timestamp || new Date(),
+    status: 'new',
+  });
+  
+  try {
+    const { socketService } = await import('../../sockets/socket.service');
+    socketService.emitToSuperAdmin('system_alert_created', alert.toJSON());
+  } catch (err) {
+    // Ignore socket error if it fails
+  }
+  
+  return alert;
+}
+
+export async function getPlatformAlerts(filter: any) {
+  return SystemAlertModel.find(filter).sort({ timestamp: -1 }).lean();
+}
+
+export async function updatePlatformAlert(id: string, status: string) {
+  const alert = await SystemAlertModel.findByIdAndUpdate(
+    id,
+    { $set: { status } },
+    { new: true }
+  ).lean();
+  if (!alert) {
+    throw new AppError('Alert not found', 404, ErrorCode.NOT_FOUND);
+  }
+  return alert;
+}
+
+export async function deletePlatformAlert(id: string) {
+  const alert = await SystemAlertModel.findByIdAndDelete(id).lean();
+  if (!alert) {
+    throw new AppError('Alert not found', 404, ErrorCode.NOT_FOUND);
+  }
+  return alert;
 }

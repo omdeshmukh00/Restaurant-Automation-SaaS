@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { Router } from 'express';
 import { ok } from '../../utils/responses';
+import { AppError } from '../../utils/AppError';
+import { ErrorCode } from '../../constants/errors';
 
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
@@ -10,8 +12,12 @@ import { SubscriptionPaymentModel } from '../subscriptions/subscriptions.model';
 import { PaymentModel } from '../payments/payments.model';
 import { OrderModel } from '../orders/orders.model';
 import { getPlatformSettings } from '../superAdmin/platformSettings.model';
+import { TableModel } from '../tables/tables.model';
+import { TableSessionModel } from '../tableSessions/tableSessions.model';
+import { QueueEntryModel } from '../queue/queue.model';
+import { ReservationModel } from '../reservations/reservations.model';
 
-import { RestaurantStatus } from '../../constants/statuses';
+import { RestaurantStatus, SessionStatus, OrderStatus, QueueStatus, ReservationStatus } from '../../constants/statuses';
 
 export const superAdminRouter = Router();
 
@@ -423,6 +429,129 @@ superAdminRouter.get('/analytics/orders', async (_req, res, next) => {
     });
 
     ok(res, { orders: mappedOrders, commissionRate });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /super-admin/restaurants/:id/live-activity
+superAdminRouter.get('/restaurants/:id/live-activity', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new AppError('Invalid restaurant ID', 400, ErrorCode.VALIDATION_ERROR);
+    }
+
+    const restaurant = await RestaurantModel.findById(id).lean();
+    if (!restaurant) {
+      throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    const restaurantId = new mongoose.Types.ObjectId(id);
+
+    // Today's date boundaries (UTC)
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setUTCHours(23, 59, 59, 999);
+
+    const [
+      tableStatusAgg,
+      activeSessions,
+      todayOrdersAgg,
+      activeOrderCount,
+      recentOrders,
+      queueWaiting,
+      todayReservations,
+    ] = await Promise.all([
+      // 1. Table breakdown by status
+      TableModel.aggregate([
+        { $match: { restaurantId } },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+
+      // 2. Active sessions
+      TableSessionModel.countDocuments({ restaurantId, status: SessionStatus.ACTIVE }),
+
+      // 3. Today's orders — count + revenue
+      OrderModel.aggregate([
+        { $match: { restaurantId, createdAt: { $gte: todayStart, $lte: todayEnd } } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$finalAmount' } } },
+      ]),
+
+      // 4. Active orders (in-progress)
+      OrderModel.countDocuments({
+        restaurantId,
+        status: { $in: [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY] },
+      }),
+
+      // 5. Recent 5 orders
+      OrderModel.find({ restaurantId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('orderNumber status finalAmount tableId createdAt customerName')
+        .lean(),
+
+      // 6. Queue waiting
+      QueueEntryModel.countDocuments({ restaurantId, status: QueueStatus.WAITING }),
+
+      // 7. Today's reservations
+      ReservationModel.countDocuments({
+        restaurantId,
+        status: { $in: [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN] },
+        date: { $gte: todayStart, $lte: todayEnd },
+      }),
+    ]);
+
+    // Build table breakdown map
+    const tables: Record<string, number> = {};
+    let totalTables = 0;
+    for (const row of tableStatusAgg) {
+      tables[row._id] = row.count;
+      totalTables += row.count;
+    }
+
+    const todayData = todayOrdersAgg[0] || { count: 0, revenue: 0 };
+
+    ok(res, {
+      restaurant: {
+        id: restaurant._id,
+        name: restaurant.name,
+        ownerName: restaurant.ownerName,
+        status: restaurant.status,
+        plan: restaurant.plan || 'Basic',
+      },
+      tables: {
+        total: totalTables,
+        breakdown: tables,
+        occupied: (tables['OCCUPIED'] || 0) + (tables['ORDERING'] || 0) + (tables['BILL_PENDING'] || 0) + (tables['PAYMENT_PENDING'] || 0),
+        available: tables['AVAILABLE'] || 0,
+        cleaning: (tables['NEEDS_CLEANING'] || 0) + (tables['CLEANING_IN_PROGRESS'] || 0),
+        maintenance: tables['MAINTENANCE'] || 0,
+      },
+      sessions: {
+        active: activeSessions,
+      },
+      orders: {
+        todayCount: todayData.count,
+        todayRevenue: todayData.revenue,
+        activeCount: activeOrderCount,
+        recent: recentOrders.map((o: any) => ({
+          id: o._id,
+          orderNumber: o.orderNumber,
+          status: o.status,
+          amount: o.finalAmount,
+          customerName: o.customerName || 'Walk-in',
+          createdAt: o.createdAt,
+        })),
+      },
+      queue: {
+        waiting: queueWaiting,
+      },
+      reservations: {
+        todayCount: todayReservations,
+      },
+    });
   } catch (error) {
     next(error);
   }

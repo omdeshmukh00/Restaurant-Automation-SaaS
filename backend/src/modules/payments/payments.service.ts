@@ -775,6 +775,21 @@ export class PaymentsService {
       payment.status = PaymentStatus.FAILED as any;
       payment.failureReason = entity.error_description ?? 'Payment failed';
       await payment.save();
+
+      // Create platform system alert for Super Admin
+      try {
+        const { createSystemAlert } = await import('../superAdmin/superAdmin.service');
+        await createSystemAlert({
+          title: `Payment Failed: ${entity.id || 'Transaction'}`,
+          description: `Gateway transaction failed. Reason: ${payment.failureReason}`,
+          type: 'critical',
+          entityType: 'payment',
+          entityId: payment._id,
+          tags: ['payment_failed', 'razorpay'],
+        });
+      } catch (e) {
+        // Ignore
+      }
     }
 
     return { received: true, event: eventType };
