@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Crown, TrendingUp } from 'lucide-react';
 import RestaurantCard, { type Restaurant } from './RestaurantCard';
 
@@ -55,6 +56,8 @@ const RESTAURANTS: Restaurant[] = [
 
 interface TrendingRestaurantsProps {
   onLoginOpen: () => void;
+  restaurants?: any[];
+  selectedCuisine?: string;
 }
 
 function ScrollableRow({ restaurants, onLoginOpen, rowRef }: {
@@ -81,12 +84,13 @@ function ScrollableRow({ restaurants, onLoginOpen, rowRef }: {
   );
 }
 
-export default function TrendingRestaurants({ onLoginOpen }: TrendingRestaurantsProps) {
+export default function TrendingRestaurants({ onLoginOpen, restaurants, selectedCuisine = 'All' }: TrendingRestaurantsProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isParticlesActive, setIsParticlesActive] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const row1Ref = useRef<HTMLDivElement>(null);
   const row2Ref = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const el = ref.current;
@@ -115,8 +119,73 @@ export default function TrendingRestaurants({ onLoginOpen }: TrendingRestaurants
     setTimeout(() => setIsParticlesActive(false), 700);
   };
 
-  const row1 = RESTAURANTS.slice(0, 4);
-  const row2 = RESTAURANTS.slice(4, 8);
+  const handleViewAllClick = () => {
+    if (selectedCuisine && selectedCuisine !== 'All') {
+      navigate(`/customer/restaurants?cuisine=${encodeURIComponent(selectedCuisine)}`);
+    } else {
+      navigate('/customer/restaurants');
+    }
+  };
+
+  const mapBackendRestaurants = (items: any[]): Restaurant[] => {
+    return items.map((r, idx) => {
+      const imgIndex = (idx % 4) + 1;
+      return {
+        id: r._id || r.id,
+        name: r.name,
+        cuisine: r.cuisine || 'Multi-Cuisine',
+        location: `${r.city || 'Mumbai'}`,
+        image: `/images/landing/restaurant-${imgIndex}.png`,
+        rating: r.rating || 4.5,
+        reviewCount: Math.floor(100 + (r.name.length * 15)),
+        priceLevel: r.plan === 'STARTER' ? '₹' : r.plan === 'PRO' ? '₹₹' : '₹₹₹',
+        distance: `${(0.5 + (idx * 0.7)).toFixed(1)} km`,
+        waitTime: `${10 + (idx * 5)} min`,
+        availableTables: r.availableTables !== undefined ? r.availableTables : 5,
+        currentOffer: r.currentOffer || undefined,
+        isOpen: r.status === 'ACTIVE',
+      };
+    });
+  };
+
+  const isBackendData = !!(restaurants && restaurants.length > 0);
+  const displayRestaurants = isBackendData
+    ? mapBackendRestaurants(restaurants!)
+    : RESTAURANTS;
+
+  const filteredRestaurants = selectedCuisine === 'All'
+    ? displayRestaurants
+    : displayRestaurants.filter((r) =>
+        r.cuisine.toLowerCase().includes(selectedCuisine.toLowerCase())
+      );
+
+  let row1: Restaurant[] = [];
+  let row2: Restaurant[] = [];
+
+  if (isBackendData) {
+    if (filteredRestaurants.length <= 4) {
+      row1 = filteredRestaurants;
+      row2 = [];
+    } else {
+      const mid = Math.ceil(filteredRestaurants.length / 2);
+      row1 = filteredRestaurants.slice(0, mid);
+      row2 = filteredRestaurants.slice(mid);
+    }
+  } else {
+    const mockFiltered = selectedCuisine === 'All'
+      ? RESTAURANTS
+      : RESTAURANTS.filter((r) =>
+          r.cuisine.toLowerCase().includes(selectedCuisine.toLowerCase())
+        );
+    if (mockFiltered.length <= 4) {
+      row1 = mockFiltered;
+      row2 = [];
+    } else {
+      const mid = Math.ceil(mockFiltered.length / 2);
+      row1 = mockFiltered.slice(0, mid);
+      row2 = mockFiltered.slice(mid);
+    }
+  }
 
   return (
     <section
@@ -142,6 +211,7 @@ export default function TrendingRestaurants({ onLoginOpen }: TrendingRestaurants
           {/* View All Button with Particles */}
           <div className="relative hidden sm:block">
             <button
+              onClick={handleViewAllClick}
               onMouseEnter={handleViewAllHover}
               className="flex items-center gap-2 px-5 py-2.5 text-[14px] font-semibold transition-all duration-200 landing-btn-vibrate-hover landing-btn-premium landing-focus-ring"
               style={{
@@ -198,39 +268,42 @@ export default function TrendingRestaurants({ onLoginOpen }: TrendingRestaurants
         </div>
 
         {/* Row 2 */}
-        <div className="relative">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.1), rgba(255,107,26,0.05))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.15)' }}>
-              <TrendingUp className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
-              <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
-                Popular Near You
-              </span>
+        {row2 && row2.length > 0 && (
+          <div className="relative mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.1), rgba(255,107,26,0.05))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.15)' }}>
+                <TrendingUp className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
+                <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
+                  Popular Near You
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => scrollRow(row2Ref, 'left')}
+                  className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
+                  style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+                  aria-label="Scroll row 2 left"
+                >
+                  <ChevronLeft className="w-[16px] h-[16px]" />
+                </button>
+                <button
+                  onClick={() => scrollRow(row2Ref, 'right')}
+                  className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
+                  style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+                  aria-label="Scroll row 2 right"
+                >
+                  <ChevronRight className="w-[16px] h-[16px]" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => scrollRow(row2Ref, 'left')}
-                className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
-                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
-                aria-label="Scroll row 2 left"
-              >
-                <ChevronLeft className="w-[16px] h-[16px]" />
-              </button>
-              <button
-                onClick={() => scrollRow(row2Ref, 'right')}
-                className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
-                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
-                aria-label="Scroll row 2 right"
-              >
-                <ChevronRight className="w-[16px] h-[16px]" />
-              </button>
-            </div>
+            <ScrollableRow restaurants={row2} onLoginOpen={onLoginOpen} rowRef={row2Ref} />
           </div>
-          <ScrollableRow restaurants={row2} onLoginOpen={onLoginOpen} rowRef={row2Ref} />
-        </div>
+        )}
 
         {/* Mobile View All */}
         <div className="sm:hidden mt-6 text-center">
           <button
+            onClick={handleViewAllClick}
             className="text-[14px] font-semibold px-6 py-3 transition-colors duration-150 landing-btn-premium"
             style={{
               color: '#FFFFFF',

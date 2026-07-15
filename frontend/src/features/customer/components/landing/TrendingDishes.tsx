@@ -23,6 +23,7 @@ const MARQUEE_TEXT = '✦ POPULAR  ✦ TRENDING  ✦ BEST SELLER  ✦ CHEF SPECI
 
 interface TrendingDishesProps {
   onLoginOpen: () => void;
+  dishes?: any[];
 }
 
 function MarqueeStrip({ reverse = false }: { reverse?: boolean }) {
@@ -54,7 +55,25 @@ function MarqueeStrip({ reverse = false }: { reverse?: boolean }) {
   );
 }
 
-export default function TrendingDishes({ onLoginOpen }: TrendingDishesProps) {
+export default function TrendingDishes({ onLoginOpen, dishes }: TrendingDishesProps) {
+  const mapBackendDishes = (items: any[]): Dish[] => {
+    return items.map((d, idx) => {
+      const fallbackImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format';
+      return {
+        id: d._id || d.id,
+        name: d.name,
+        price: d.price,
+        rating: d.rating || parseFloat((4.2 + (d.price % 8) / 10).toFixed(1)),
+        prepTime: d.preparationTime ? `${d.preparationTime} min` : '15 min',
+        image: d.image || fallbackImage
+      };
+    });
+  };
+
+  const displayDishes = dishes && dishes.length > 0
+    ? mapBackendDishes(dishes)
+    : DISHES;
+
   return (
     <section className="py-0">
       {/* Top Marquee Strip */}
@@ -102,6 +121,7 @@ export default function TrendingDishes({ onLoginOpen }: TrendingDishesProps) {
               </p>
             </div>
             <button
+              onClick={onLoginOpen}
               className="hidden sm:flex items-center gap-1 text-[14px] font-semibold transition-colors duration-150 landing-btn-premium px-4 py-2"
               style={{ color: '#FF6B1A', borderRadius: '10px' }}
             >
@@ -111,7 +131,7 @@ export default function TrendingDishes({ onLoginOpen }: TrendingDishesProps) {
 
           {/* Dishes Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
-            {DISHES.map((dish) => (
+            {displayDishes.map((dish) => (
               <DishCard key={dish.id} dish={dish} onLoginOpen={onLoginOpen} />
             ))}
           </div>

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QrCode } from 'lucide-react';
+import { apiClient } from '../../../shared/services/apiClient';
 import {
   LandingNavbar,
   HeroSection,
@@ -19,10 +20,36 @@ import '../components/landing/landing.css';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [landingData, setLandingData] = useState<{
+    restaurants?: any[];
+    dishes?: any[];
+    offers?: any[];
+    stats?: any;
+    cuisines?: string[];
+  }>({});
+  const [selectedCuisine, setSelectedCuisine] = useState<string>('All');
 
   const openLogin = () => {
     navigate('/auth/customer');
   };
+
+  useEffect(() => {
+    let active = true;
+    const fetchData = async () => {
+      try {
+        const response = await apiClient.get('/public/landing/data');
+        if (active && response.data?.status === 'success' && response.data?.data) {
+          setLandingData(response.data.data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch landing page data', err);
+      }
+    };
+    fetchData();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="landing-page-container min-h-screen bg-neutral-50 font-sans relative overflow-hidden">
@@ -30,21 +57,29 @@ export default function LandingPage() {
       
       <HeroSection onLoginOpen={openLogin} />
       
-      <LiveAvailabilityStrip />
+      <LiveAvailabilityStrip stats={landingData.stats} />
       
       <div style={{ backgroundColor: '#FFFFFF' }}>
-        <CuisineExplorer />
+        <CuisineExplorer
+          cuisines={landingData.cuisines}
+          activeCuisine={selectedCuisine}
+          onCuisineSelect={setSelectedCuisine}
+        />
       </div>
 
       <div style={{ backgroundColor: '#FFFFFF' }}>
-        <TrendingRestaurants onLoginOpen={openLogin} />
+        <TrendingRestaurants
+          onLoginOpen={openLogin}
+          restaurants={landingData.restaurants}
+          selectedCuisine={selectedCuisine}
+        />
       </div>
 
-      <TrendingDishes onLoginOpen={openLogin} />
+      <TrendingDishes onLoginOpen={openLogin} dishes={landingData.dishes} />
       
 
       
-      <OffersDeals />
+      <OffersDeals offers={landingData.offers} />
       
       <div style={{ backgroundColor: '#FFFFFF' }}>
         <DigitalDiningJourney />
