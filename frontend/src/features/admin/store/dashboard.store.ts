@@ -74,11 +74,11 @@ const seedRevenue: RevenuePoint[] = [
 
 const seedNow = Date.now();
 const seedRecentOrders: RecentOrderRow[] = [
-  { id: '#ORD-00124', table: 'Table 7',  items: 'Pasta, Wine, Tiramisu',  total: '₹1,240', status: 'Served',    time: '2 min ago',  timeRaw: seedNow - 2 * 60000,     statusColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
-  { id: '#ORD-00123', table: 'Table 12', items: 'Burger, Fries, Coke',     total: '₹680',   status: 'Preparing', time: '8 min ago',  timeRaw: seedNow - 8 * 60000,     statusColor: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400' },
-  { id: '#ORD-00122', table: 'Table 3',  items: 'Sushi Platter, Sake',     total: '₹2,100', status: 'Pending',   time: '12 min ago', timeRaw: seedNow - 12 * 60000,    statusColor: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' },
-  { id: '#ORD-00121', table: 'Table 5',  items: 'Steak, Salad, Juice',     total: '₹1,850', status: 'Served',    time: '18 min ago', timeRaw: seedNow - 18 * 60000,    statusColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
-  { id: '#ORD-00120', table: 'Table 9',  items: 'Pizza, Garlic Bread',     total: '₹920',   status: 'Cancelled', time: '25 min ago', timeRaw: seedNow - 25 * 60000,    statusColor: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' },
+  { id: '#ORD-00124', table: 'Table 7',  items: ['Pasta, Wine, Tiramisu'],  total: '₹1,240', status: 'Served',    time: '2 min ago',  timeRaw: seedNow - 2 * 60000,     statusColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
+  { id: '#ORD-00123', table: 'Table 12', items: ['Burger, Fries, Coke'],     total: '₹680',   status: 'Preparing', time: '8 min ago',  timeRaw: seedNow - 8 * 60000,     statusColor: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400' },
+  { id: '#ORD-00122', table: 'Table 3',  items: ['Sushi Platter, Sake'],     total: '₹2,100', status: 'Pending',   time: '12 min ago', timeRaw: seedNow - 12 * 60000,    statusColor: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' },
+  { id: '#ORD-00121', table: 'Table 5',  items: ['Steak, Salad, Juice'],     total: '₹1,850', status: 'Served',    time: '18 min ago', timeRaw: seedNow - 18 * 60000,    statusColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-40０' },
+  { id: '#ORD-00120', table: 'Table 9',  items: ['Pizza, Garlic Bread'],     total: '₹920',   status: 'Cancelled', time: '25 min ago', timeRaw: seedNow - 25 * 60000,    statusColor: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' },
 ];
 
 const seedTopItems: TopItem[] = [
@@ -171,7 +171,7 @@ function buildRecentOrders(orders: Order[]): RecentOrderRow[] {
     .map((o) => ({
       id: o.orderNumber,
       table: o.table,
-      items: o.itemNames.join(', '),
+      items: o.itemNames,
       total: o.amount,
       status: o.status,
       time: o.time,

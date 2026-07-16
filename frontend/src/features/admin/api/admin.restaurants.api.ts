@@ -26,6 +26,7 @@ export interface RestaurantSettings {
   timezone: string;
   dateFormat: string;
   timeFormat: string;
+  integrations?: Record<string, { connected: boolean }>;
   floors: { id: string; label: string; tables: number }[];
   sections: { id: string; label: string; tables: number }[];
 }

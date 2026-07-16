@@ -37,7 +37,7 @@ export function IntegrationsCard(): JSX.Element {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{item.name}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.desc}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.description}</p>
               </div>
               <span
                 className={`text-xs font-semibold mr-1 ${

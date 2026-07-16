@@ -43,8 +43,6 @@ export interface IRestaurant extends Document {
   settings: RestaurantSettings;
   ownerName: string;
   email: string;
-  phone: string;
-  address: any;
   state: string;
   country: string;
   pinCode: string;
@@ -141,8 +139,6 @@ const restaurantSchema = new Schema<IRestaurant>(
     rating: { type: Number, default: 4.5, min: 0, max: 5 },
     ownerName: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
-    phone: { type: String, trim: true },
-    address: { type: Schema.Types.Mixed },
     state: { type: String, trim: true },
     country: { type: String, trim: true },
     pinCode: { type: String, trim: true },
