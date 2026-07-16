@@ -142,7 +142,6 @@ async function buildBillingSummary(
 
 export const updateRestaurantSettingsController = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const restaurant = await findRestaurantForRequest(req);
-  const restaurantId = restaurant.id;
 
   // ── Top-level restaurant fields (distinct from the `settings` sub-object) ──
   const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan'] as const;

@@ -283,11 +283,9 @@ export async function listStaffController(req: Request, res: Response, next: Nex
     const effQ = (staffQuery as any).getQuery ? (staffQuery as any).getQuery() : filter;
     const effLine = `[EFFQ] ${JSON.stringify(effQ)} | coll=${(UserModel as any).collection?.collectionName}`;
     console.error(effLine);
-    try { require('fs').appendFileSync('staff_debug.log', effLine + '\n'); } catch {}
     const staff = await staffQuery.lean();
     const cntLine = `[CNT] ${staff.length} ${staff.map((s: any) => `${s.name}[${s.role}]`).join(',')}`;
     console.error(cntLine);
-    try { require('fs').appendFileSync('staff_debug.log', cntLine + '\n'); } catch {}
     const shiftMap = await getActiveShiftMap(
       restaurantId,
       staff.map((member) => String(member._id)),

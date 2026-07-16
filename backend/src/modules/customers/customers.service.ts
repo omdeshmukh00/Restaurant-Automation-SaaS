@@ -304,7 +304,7 @@ export const CustomersService = {
     // Mirror into the analytics profile (no auth) so this customer shows spend/visits
     // consistently alongside OTP/reservation-created customers. Never overwrite an
     // existing profile's accumulated analytics.
-    let profile = await CustomerProfileModel.findOne({ mobile }).lean().exec();
+    const profile = await CustomerProfileModel.findOne({ mobile }).lean().exec();
     if (!profile) {
       try {
         await CustomerProfileModel.create({
