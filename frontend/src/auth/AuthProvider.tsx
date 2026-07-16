@@ -30,6 +30,7 @@ export type AuthUser = {
   mustResetPassword?: boolean;
   firstLogin?: boolean;
   themeMode?: 'light' | 'dark' | 'system';
+  avatar?: string;
 };
 
 type AuthContextValue = {
@@ -158,6 +159,7 @@ function toAuthUser(user: StoredAuthUser, panelOverride?: Panel): AuthUser {
     mustResetPassword: (user as any).mustResetPassword,
     firstLogin: (user as any).firstLogin,
     themeMode: user.themeMode,
+    avatar: user.avatar,
   };
 }
 

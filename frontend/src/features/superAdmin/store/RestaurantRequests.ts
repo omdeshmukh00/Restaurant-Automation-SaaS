@@ -52,7 +52,7 @@ interface RestaurantRequestsState {
     id: string,
     plan: string
   ) => Promise<void>;
-  deleteRestaurant: (id: string) => Promise<void>;
+  deleteRestaurant: (id: string, reason?: string) => Promise<void>;
 }
 
 const mapDbRestaurantToRow = (r: any): RestaurantsRow => ({
@@ -162,9 +162,9 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
         window.alert(errMsg);
       }
     },
-    deleteRestaurant: async (id) => {
+    deleteRestaurant: async (id, reason) => {
       try {
-        await superAdminRestaurantRequestsApi.deleteRestaurant(id);
+        await superAdminRestaurantRequestsApi.deleteRestaurant(id, reason);
         const dbRestaurants = await superAdminRestaurantRequestsApi.getRestaurants();
         set({ restaurants: dbRestaurants.map(mapDbRestaurantToRow) });
       } catch (error) {

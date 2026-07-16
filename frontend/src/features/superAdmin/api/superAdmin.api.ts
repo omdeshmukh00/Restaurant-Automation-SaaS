@@ -124,12 +124,12 @@ export const superAdminRestaurantRequestsApi = {
     await apiClient.patch(`/superadmin/restaurants/${id}/plan`, { plan });
   },
 
-  async deleteRestaurant(id: string): Promise<void> {
+  async deleteRestaurant(id: string, reason?: string): Promise<void> {
     if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
       return Promise.resolve();
     }
 
-    await apiClient.delete(`/superadmin/restaurants/${id}`);
+    await apiClient.delete(`/superadmin/restaurants/${id}?reason=${encodeURIComponent(reason || '')}`);
   },
 
   async registerRestaurant(data: any): Promise<any> {

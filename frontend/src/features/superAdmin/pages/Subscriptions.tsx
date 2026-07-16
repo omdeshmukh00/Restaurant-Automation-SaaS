@@ -271,6 +271,16 @@ export default function Subscriptions() {
       currency: string;
       paymentId: string;
       timestamp: string;
+    }>,
+    totalSubscriptionRevenue: 0,
+    subscriptionHistory: [] as Array<{
+      id: string;
+      restaurantName: string;
+      ownerName: string;
+      amount: number;
+      currency: string;
+      paymentId: string;
+      timestamp: string;
     }>
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
@@ -343,8 +353,24 @@ export default function Subscriptions() {
     setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, plan: plan as any } : r)));
   };
 
-  const deleteNode = (id: string) => {
-    deleteApprovedRestaurant(id);
+  const deleteNode = async (id: string) => {
+    const restaurantObj = linkedRestaurants.find(r => r.id === id);
+    const name = restaurantObj ? restaurantObj.name : "this restaurant";
+
+    let reason = "";
+    let isConfirmed = false;
+    while (!isConfirmed) {
+      const input = window.prompt(`Are you sure you want to permanently delete "${name}"? Enter the reason to confirm (this will be sent to the owner):`);
+      if (input === null) return; // Cancelled
+      if (input.trim().length > 0) {
+        reason = input.trim();
+        isConfirmed = true;
+      } else {
+        window.alert("A reason is required to delete the restaurant.");
+      }
+    }
+
+    await deleteApprovedRestaurant(id, reason);
     setRestaurants((prev) => prev.filter((r) => r.id !== id));
   };
 
@@ -388,6 +414,7 @@ export default function Subscriptions() {
   };
 
   // ── Derived data ──────────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const linkedRestaurants = useMemo<RestaurantNode[]>(() => {
     const existingKeys = new Set(
       restaurants.flatMap((restaurant) => [
@@ -814,43 +841,89 @@ export default function Subscriptions() {
 
               {/* Revenue & history column */}
               <div className="space-y-4 text-xs border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-6 border-slate-800/10 dark:border-slate-800">
-                <div>
-                  <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
-                  <span className="text-xl font-extrabold text-emerald-500">
-                    {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
-                  </span>
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
+                    <span className="text-xl font-extrabold text-emerald-500">
+                      {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
+                    {platformSettings.history && platformSettings.history.length > 0 ? (
+                      <div className="max-h-40 overflow-y-auto border border-slate-800/10 dark:border-slate-850 rounded-xl">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
+                              <th className="p-2 font-bold">Restaurant</th>
+                              <th className="p-2 font-bold">Amount</th>
+                              <th className="p-2 font-bold">Payment ID</th>
+                              <th className="p-2 font-bold">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {platformSettings.history.map(row => (
+                              <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
+                                <td className="p-2 font-semibold">{row.restaurantName}</td>
+                                <td className="p-2 text-emerald-500 font-bold">
+                                  {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
+                                </td>
+                                <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
+                                <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 italic py-2">No processing fee payments recorded yet.</p>
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
-                  {platformSettings.history && platformSettings.history.length > 0 ? (
-                    <div className="max-h-52 overflow-y-auto border border-slate-800/10 dark:border-slate-850 rounded-xl">
-                      <table className="w-full text-left text-[11px] border-collapse">
-                        <thead>
-                          <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
-                            <th className="p-2 font-bold">Restaurant</th>
-                            <th className="p-2 font-bold">Amount</th>
-                            <th className="p-2 font-bold">Payment ID</th>
-                            <th className="p-2 font-bold">Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {platformSettings.history.map(row => (
-                            <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
-                              <td className="p-2 font-semibold">{row.restaurantName}</td>
-                              <td className="p-2 text-emerald-500 font-bold">
-                                {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
-                              </td>
-                              <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
-                              <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
+                <div className="pt-4 border-t border-slate-800/10 dark:border-slate-800 space-y-4">
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Subscription Revenue</span>
+                    <span className="text-xl font-extrabold text-indigo-500">
+                      {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalSubscriptionRevenue?.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Subscription Charges</span>
+                    {platformSettings.subscriptionHistory && platformSettings.subscriptionHistory.length > 0 ? (
+                      <div className="max-h-40 overflow-y-auto border border-slate-800/10 dark:border-slate-850 rounded-xl">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
+                              <th className="p-2 font-bold">Restaurant</th>
+                              <th className="p-2 font-bold">Amount</th>
+                              <th className="p-2 font-bold">Payment ID</th>
+                              <th className="p-2 font-bold">Date</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-slate-500 italic py-4">No processing fee payments recorded yet.</p>
-                  )}
+                          </thead>
+                          <tbody>
+                            {platformSettings.subscriptionHistory.map(row => (
+                              <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
+                                <td className="p-2 font-semibold">{row.restaurantName}</td>
+                                <td className="p-2 text-indigo-500 font-bold">
+                                  {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
+                                </td>
+                                <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
+                                <td className="p-2 text-slate-500">
+                                  {new Date(row.timestamp).toLocaleDateString()}{" "}
+                                  {new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 italic py-2">No subscription payments recorded yet.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

@@ -79,7 +79,7 @@ function getGroupByFormat(groupBy: string) {
 export async function listRestaurants(filters: RestaurantListQuery) {
   const { status, plan, search, page = 1, limit = 20 } = filters;
 
-  const query: FilterQuery<typeof RestaurantModel> = {};
+  const query: FilterQuery<typeof RestaurantModel> = { isDeleted: { $ne: true } };
 
   if (status) query.status = status;
   if (plan)   query.plan   = plan;
@@ -193,11 +193,23 @@ export async function suspendRestaurant(id: string) {
 }
 
 export async function deleteRestaurant(id: string) {
-  const restaurant = await RestaurantModel.findByIdAndDelete(id).lean();
+  const { RestaurantStatus } = await import('../../constants/statuses');
+  const restaurant = await RestaurantModel.findByIdAndUpdate(
+    id,
+    { 
+      isDeleted: true,
+      status: RestaurantStatus.SUSPENDED
+    },
+    { new: true }
+  ).lean();
 
   if (!restaurant) {
     throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
   }
+
+  // Deactivate all users of this restaurant so they cannot log in
+  const { UserModel } = await import('../users/users.model');
+  await UserModel.updateMany({ restaurantId: id }, { status: 'INACTIVE' });
 
   return restaurant;
 }
@@ -378,205 +390,282 @@ export async function getPlatformOverview() {
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
   const [
-    totalRestaurants,
-    restaurantsBeforeThisMonth,
-    statusCounts,
-    monthlyOrderStats,
-    lastMonthOrderStats,
-    monthlyOrderPaymentsCommission,
-    lastMonthOrderPaymentsCommission,
-    monthlyOnboardingPayments,
-    lastMonthOnboardingPayments,
-    monthlySubscriptionPayments,
-    lastMonthSubscriptionPayments,
-    trendStats,
-    topRestaurantsStats,
+    restaurantResult,
+    orderResult,
+    paymentResult,
+    onboardingResult,
+    subscriptionResult,
   ] = await Promise.all([
-    // 1. Total Restaurants
-    RestaurantModel.countDocuments(),
-    // Restaurants before this month (for growth)
-    RestaurantModel.countDocuments({ createdAt: { $lt: startOfThisMonth } }),
-
-    // 2. Status counts
+    // 1. Restaurant Stats & status counts
     RestaurantModel.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
       {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
+        $facet: {
+          total: [{ $count: 'count' }],
+          beforeThisMonth: [
+            { $match: { createdAt: { $lt: startOfThisMonth } } },
+            { $count: 'count' }
+          ],
+          statusCounts: [
+            { $group: { _id: '$status', count: { $sum: 1 } } }
+          ]
         }
       }
     ]),
 
-    // 3. Monthly Order Stats (total amount for orders this month)
+    // 2. Order Stats
     OrderModel.aggregate([
       {
-        $match: {
-          createdAt: { $gte: startOfThisMonth },
-          status: { $in: ['COMPLETED', 'SERVED'] }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          revenue: { $sum: '$finalAmount' },
-          orders: { $sum: 1 }
+        $facet: {
+          thisMonth: [
+            {
+              $match: {
+                createdAt: { $gte: startOfThisMonth },
+                status: { $in: ['COMPLETED', 'SERVED'] }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                revenue: { $sum: '$finalAmount' },
+                orders: { $sum: 1 }
+              }
+            }
+          ],
+          lastMonth: [
+            {
+              $match: {
+                createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+                status: { $in: ['COMPLETED', 'SERVED'] }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                revenue: { $sum: '$finalAmount' },
+                orders: { $sum: 1 }
+              }
+            }
+          ],
+          trend: [
+            {
+              $match: {
+                createdAt: { $gte: sixMonthsAgo },
+                status: { $in: ['COMPLETED', 'SERVED'] }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  year: { $year: '$createdAt' },
+                  month: { $month: '$createdAt' }
+                },
+                orders: { $sum: 1 }
+              }
+            }
+          ],
+          topRestaurants: [
+            {
+              $match: {
+                createdAt: { $gte: startOfThisMonth },
+                status: { $in: ['COMPLETED', 'SERVED'] }
+              }
+            },
+            {
+              $group: {
+                _id: '$restaurantId',
+                orders: { $sum: 1 },
+                revenue: { $sum: '$finalAmount' }
+              }
+            },
+            { $sort: { revenue: -1 } },
+            { $limit: 5 }
+          ]
         }
       }
     ]),
 
-    // 4. Last Month Order Stats
-    OrderModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
-          status: { $in: ['COMPLETED', 'SERVED'] }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          revenue: { $sum: '$finalAmount' },
-          orders: { $sum: 1 }
-        }
-      }
-    ]),
-
-    // 5. Monthly Order Payments Commission
+    // 3. Payment Stats (Commissions)
     PaymentModel.aggregate([
       {
-        $match: {
-          createdAt: { $gte: startOfThisMonth },
-          status: 'COMPLETED'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          commission: { $sum: '$commission' }
+        $facet: {
+          thisMonth: [
+            {
+              $match: {
+                createdAt: { $gte: startOfThisMonth },
+                status: 'COMPLETED'
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                commission: { $sum: '$commission' }
+              }
+            }
+          ],
+          lastMonth: [
+            {
+              $match: {
+                createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+                status: 'COMPLETED'
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                commission: { $sum: '$commission' }
+              }
+            }
+          ],
+          trend: [
+            {
+              $match: {
+                createdAt: { $gte: sixMonthsAgo },
+                status: 'COMPLETED'
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  year: { $year: '$createdAt' },
+                  month: { $month: '$createdAt' }
+                },
+                commission: { $sum: '$commission' }
+              }
+            }
+          ]
         }
       }
     ]),
 
-    // 6. Last Month Order Payments Commission
-    PaymentModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
-          status: 'COMPLETED'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          commission: { $sum: '$commission' }
-        }
-      }
-    ]),
-
-    // 7. Monthly Onboarding Payments
+    // 4. Onboarding Stats (Restaurant Request payments)
     RestaurantRequestModel.aggregate([
       {
-        $match: {
-          paymentStatus: 'CAPTURED',
-          paymentTimestamp: { $gte: startOfThisMonth }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$paymentAmount' }
+        $facet: {
+          thisMonth: [
+            {
+              $match: {
+                paymentStatus: 'CAPTURED',
+                paymentTimestamp: { $gte: startOfThisMonth }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                amount: { $sum: '$paymentAmount' }
+              }
+            }
+          ],
+          lastMonth: [
+            {
+              $match: {
+                paymentStatus: 'CAPTURED',
+                paymentTimestamp: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                amount: { $sum: '$paymentAmount' }
+              }
+            }
+          ],
+          trend: [
+            {
+              $match: {
+                paymentStatus: 'CAPTURED',
+                paymentTimestamp: { $gte: sixMonthsAgo }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  year: { $year: '$paymentTimestamp' },
+                  month: { $month: '$paymentTimestamp' }
+                },
+                amount: { $sum: '$paymentAmount' }
+              }
+            }
+          ]
         }
       }
     ]),
 
-    // 8. Last Month Onboarding Payments
-    RestaurantRequestModel.aggregate([
-      {
-        $match: {
-          paymentStatus: 'CAPTURED',
-          paymentTimestamp: { $gte: startOfLastMonth, $lte: endOfLastMonth }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$paymentAmount' }
-        }
-      }
-    ]),
-
-    // 9. Monthly Subscription Payments
+    // 5. Subscription Stats
     SubscriptionPaymentModel.aggregate([
       {
-        $match: {
-          status: 'completed',
-          paidAt: { $gte: startOfThisMonth }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$amount' }
+        $facet: {
+          thisMonth: [
+            {
+              $match: {
+                status: 'completed',
+                paidAt: { $gte: startOfThisMonth }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                amount: { $sum: '$amount' }
+              }
+            }
+          ],
+          lastMonth: [
+            {
+              $match: {
+                status: 'completed',
+                paidAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                amount: { $sum: '$amount' }
+              }
+            }
+          ],
+          trend: [
+            {
+              $match: {
+                status: 'completed',
+                paidAt: { $gte: sixMonthsAgo }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  year: { $year: '$paidAt' },
+                  month: { $month: '$paidAt' }
+                },
+                amount: { $sum: '$amount' }
+              }
+            }
+          ]
         }
       }
     ]),
-
-    // 10. Last Month Subscription Payments
-    SubscriptionPaymentModel.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          paidAt: { $gte: startOfLastMonth, $lte: endOfLastMonth }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$amount' }
-        }
-      }
-    ]),
-
-    // 11. Trend Stats (over last 6 months)
-    OrderModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: sixMonthsAgo },
-          status: { $in: ['COMPLETED', 'SERVED'] }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
-          },
-          revenue: { $sum: '$finalAmount' },
-          orders: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
-    ]),
-
-    // 12. Top Restaurants Stats
-    OrderModel.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startOfThisMonth },
-          status: { $in: ['COMPLETED', 'SERVED'] }
-        }
-      },
-      {
-        $group: {
-          _id: '$restaurantId',
-          orders: { $sum: 1 },
-          revenue: { $sum: '$finalAmount' }
-        }
-      },
-      { $sort: { revenue: -1 } },
-      { $limit: 5 }
-    ])
   ]);
+
+  // Extract from facets
+  const totalRestaurants = restaurantResult[0]?.total[0]?.count || 0;
+  const restaurantsBeforeThisMonth = restaurantResult[0]?.beforeThisMonth[0]?.count || 0;
+  const statusCounts = restaurantResult[0]?.statusCounts || [];
+
+  const monthlyOrderStats = orderResult[0]?.thisMonth || [];
+  const lastMonthOrderStats = orderResult[0]?.lastMonth || [];
+  const ordersCountTrend = orderResult[0]?.trend || [];
+  const topRestaurantsStats = orderResult[0]?.topRestaurants || [];
+
+  const monthlyOrderPaymentsCommission = paymentResult[0]?.thisMonth || [];
+  const lastMonthOrderPaymentsCommission = paymentResult[0]?.lastMonth || [];
+  const diningCommissionsTrend = paymentResult[0]?.trend || [];
+
+  const monthlyOnboardingPayments = onboardingResult[0]?.thisMonth || [];
+  const lastMonthOnboardingPayments = onboardingResult[0]?.lastMonth || [];
+  const onboardingFeesTrend = onboardingResult[0]?.trend || [];
+
+  const monthlySubscriptionPayments = subscriptionResult[0]?.thisMonth || [];
+  const lastMonthSubscriptionPayments = subscriptionResult[0]?.lastMonth || [];
+  const subscriptionFeesTrend = subscriptionResult[0]?.trend || [];
 
   // Populate names for top restaurants
   const topRestaurants = [];
@@ -625,10 +714,10 @@ export async function getPlatformOverview() {
     { name: 'Blocked', value: blockedCount, color: '#EF4444' },
   ];
 
-  // Calculate Monthly Revenue and growth
-  const thisMonthRevenue = monthlyOrderStats[0]?.revenue || 0;
-  const lastMonthRevenue = lastMonthOrderStats[0]?.revenue || 0;
-  const revenueGrowthVal = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
+  // Calculate Superadmin Monthly Revenue and growth (Commissions + Onboarding + Subscriptions)
+  const monthlyRevenue = (monthlyOrderPaymentsCommission[0]?.commission || 0) + (monthlyOnboardingPayments[0]?.amount || 0) + (monthlySubscriptionPayments[0]?.amount || 0);
+  const lastMonthSuperadminRevenue = (lastMonthOrderPaymentsCommission[0]?.commission || 0) + (lastMonthOnboardingPayments[0]?.amount || 0) + (lastMonthSubscriptionPayments[0]?.amount || 0);
+  const revenueGrowthVal = lastMonthSuperadminRevenue > 0 ? ((monthlyRevenue - lastMonthSuperadminRevenue) / lastMonthSuperadminRevenue) * 100 : 0;
   const revenueGrowth = (revenueGrowthVal >= 0 ? '+' : '') + Math.round(revenueGrowthVal * 10) / 10 + '%';
 
   // Calculate Total Orders and growth
@@ -637,17 +726,17 @@ export async function getPlatformOverview() {
   const ordersGrowthVal = lastMonthOrders > 0 ? ((thisMonthOrders - lastMonthOrders) / lastMonthOrders) * 100 : 0;
   const ordersGrowth = (ordersGrowthVal >= 0 ? '+' : '') + Math.round(ordersGrowthVal * 10) / 10 + '%';
 
-  // Calculate Commission Earned (dining commission + onboarding requests + subscriptions)
-  const thisMonthCommission = (monthlyOrderPaymentsCommission[0]?.commission || 0) + (monthlyOnboardingPayments[0]?.amount || 0) + (monthlySubscriptionPayments[0]?.amount || 0);
-  const lastMonthCommission = (lastMonthOrderPaymentsCommission[0]?.commission || 0) + (lastMonthOnboardingPayments[0]?.amount || 0) + (lastMonthSubscriptionPayments[0]?.amount || 0);
-  const commissionGrowthVal = lastMonthCommission > 0 ? ((thisMonthCommission - lastMonthCommission) / lastMonthCommission) * 100 : 0;
+  // Calculate Dining Commission Earned specifically
+  const commissionEarned = monthlyOrderPaymentsCommission[0]?.commission || 0;
+  const lastMonthDiningCommission = lastMonthOrderPaymentsCommission[0]?.commission || 0;
+  const commissionGrowthVal = lastMonthDiningCommission > 0 ? ((commissionEarned - lastMonthDiningCommission) / lastMonthDiningCommission) * 100 : 0;
   const commissionGrowth = (commissionGrowthVal >= 0 ? '+' : '') + Math.round(commissionGrowthVal * 10) / 10 + '%';
 
   // Restaurant growth
   const restaurantGrowthVal = restaurantsBeforeThisMonth > 0 ? ((totalRestaurants - restaurantsBeforeThisMonth) / restaurantsBeforeThisMonth) * 100 : 0;
   const restaurantGrowth = (restaurantGrowthVal >= 0 ? '+' : '') + Math.round(restaurantGrowthVal * 10) / 10 + '%';
 
-  // Format 6-month trend data
+  // Format 6-month trend data based on superadmin monthly revenue
   const monthsAbbr = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const formattedTrend = [];
   
@@ -657,11 +746,20 @@ export async function getPlatformOverview() {
     const month = d.getMonth() + 1;
     const monthLabel = monthsAbbr[d.getMonth()];
     
-    const matched = trendStats.find((item: any) => item._id.year === year && item._id.month === month);
+    const matchedCommission = diningCommissionsTrend.find((item: any) => item._id.year === year && item._id.month === month);
+    const matchedOnboarding = onboardingFeesTrend.find((item: any) => item._id.year === year && item._id.month === month);
+    const matchedSubscription = subscriptionFeesTrend.find((item: any) => item._id.year === year && item._id.month === month);
+    const matchedOrders = ordersCountTrend.find((item: any) => item._id.year === year && item._id.month === month);
+
+    const totalRevenue = 
+      (matchedCommission?.commission || 0) + 
+      (matchedOnboarding?.amount || 0) + 
+      (matchedSubscription?.amount || 0);
+
     formattedTrend.push({
       month: monthLabel,
-      revenue: matched?.revenue || 0,
-      orders: matched?.orders || 0
+      revenue: totalRevenue,
+      orders: matchedOrders?.orders || 0
     });
   }
 
@@ -669,11 +767,11 @@ export async function getPlatformOverview() {
     stats: {
       totalRestaurants,
       restaurantGrowth,
-      monthlyRevenue: thisMonthRevenue,
+      monthlyRevenue,
       revenueGrowth,
       totalOrders: thisMonthOrders,
       ordersGrowth,
-      commissionEarned: thisMonthCommission,
+      commissionEarned,
       commissionGrowth,
     },
     pieData,
@@ -687,31 +785,128 @@ export async function getRevenueAnalytics(query: AnalyticsQuery) {
   const { start, end } = getDateRange(groupBy, from, to);
   const groupFormat = getGroupByFormat(groupBy);
 
-  // Import OrderModel here to avoid circular deps
-  const { OrderModel } = await import('../orders/orders.model');
+  const { PaymentModel } = await import('../payments/payments.model');
+  const { RestaurantRequestModel } = await import('./restaurantRequest.model');
+  const { SubscriptionPaymentModel } = await import('../subscriptions/subscriptions.model');
 
-  const revenue = await OrderModel.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: start, $lte: end },
-        status: { $in: ['COMPLETED', 'SERVED'] },
+  // We want to fetch all three types of platform earnings in the date range
+  const [commissions, onboarding, subscriptions] = await Promise.all([
+    // Dining commissions
+    PaymentModel.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: start, $lte: end },
+          status: 'COMPLETED',
+        },
       },
-    },
-    {
-      $group: {
-        _id:          groupFormat,
-        totalRevenue: { $sum: '$totalAmount' },
-        totalOrders:  { $sum: 1 },
+      {
+        $group: {
+          _id:          groupFormat,
+          totalRevenue: { $sum: '$commission' },
+          totalOrders:  { $sum: 1 },
+        },
       },
-    },
-    { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } },
+    ]),
+
+    // Onboarding fees
+    RestaurantRequestModel.aggregate([
+      {
+        $match: {
+          paymentStatus: 'CAPTURED',
+          paymentTimestamp: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $group: {
+          _id:          {
+            year: { $year: '$paymentTimestamp' },
+            month: { $month: '$paymentTimestamp' },
+            day: { $dayOfMonth: '$paymentTimestamp' }
+          },
+          totalRevenue: { $sum: '$paymentAmount' },
+          totalOrders:  { $sum: 0 },
+        },
+      },
+    ]),
+
+    // Subscription charges
+    SubscriptionPaymentModel.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          paidAt: { $gte: start, $lte: end },
+        },
+      },
+      {
+        $group: {
+          _id:          {
+            year: { $year: '$paidAt' },
+            month: { $month: '$paidAt' },
+            day: { $dayOfMonth: '$paidAt' }
+          },
+          totalRevenue: { $sum: '$amount' },
+          totalOrders:  { $sum: 0 },
+        },
+      },
+    ]),
   ]);
+
+  // Combine them in memory
+  const mergedMap = new Map<string, { year: number, month: number, day?: number, totalRevenue: number, totalOrders: number }>();
+
+  const getMapKey = (id: any) => {
+    if (!id) return '';
+    return `${id.year}-${id.month}-${id.day || 1}`;
+  };
+
+  const addItems = (list: any[]) => {
+    for (const item of list) {
+      const key = getMapKey(item._id);
+      if (!key) continue;
+      const existing = mergedMap.get(key);
+      if (existing) {
+        existing.totalRevenue += (item.totalRevenue || 0);
+        existing.totalOrders += (item.totalOrders || 0);
+      } else {
+        mergedMap.set(key, {
+          year: item._id.year,
+          month: item._id.month,
+          day: item._id.day,
+          totalRevenue: item.totalRevenue || 0,
+          totalOrders: item.totalOrders || 0,
+        });
+      }
+    }
+  };
+
+  addItems(commissions);
+  addItems(onboarding);
+  addItems(subscriptions);
+
+  const data = Array.from(mergedMap.values()).map(item => {
+    const _id: any = { year: item.year, month: item.month };
+    if (item.day !== undefined) {
+      _id.day = item.day;
+    }
+    return {
+      _id,
+      totalRevenue: item.totalRevenue,
+      totalOrders: item.totalOrders,
+    };
+  });
+
+  // Sort chronologically
+  data.sort((a: any, b: any) => {
+    if (a._id.year !== b._id.year) return a._id.year - b._id.year;
+    if (a._id.month !== b._id.month) return a._id.month - b._id.month;
+    return (a._id.day || 0) - (b._id.day || 0);
+  });
 
   return {
     groupBy,
     from: start.toISOString(),
     to:   end.toISOString(),
-    data: revenue,
+    data,
   };
 }
 
@@ -750,7 +945,7 @@ export async function getSystemMonitoring() {
     activeSessions,
     totalAuditLogs,
   ] = await Promise.all([
-    RestaurantModel.countDocuments(),
+    RestaurantModel.countDocuments({ isDeleted: { $ne: true } }),
     UserModel.countDocuments(),
     TableSessionModel.countDocuments({ status: 'ACTIVE' }),
     AuditLogModel.countDocuments(),
@@ -1712,6 +1907,9 @@ export async function getAnalyticsCharts() {
   // 2. Subscription Plan Distribution for Pie Chart
   const planCounts = await RestaurantModel.aggregate([
     {
+      $match: { isDeleted: { $ne: true } }
+    },
+    {
       $group: {
         _id: '$plan',
         count: { $sum: 1 },
@@ -1719,7 +1917,7 @@ export async function getAnalyticsCharts() {
     },
   ]).option({ bypassTenant: true });
 
-  const totalRestaurants = await RestaurantModel.countDocuments().setOptions({ bypassTenant: true });
+  const totalRestaurants = await RestaurantModel.countDocuments({ isDeleted: { $ne: true } }).setOptions({ bypassTenant: true });
 
   const planColors: Record<string, string> = {
     'Basic': '#3b82f6',

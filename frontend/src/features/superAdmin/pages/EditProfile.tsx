@@ -1,4 +1,3 @@
-// src/features/superAdmin/pages/EditProfile.tsx
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import {
@@ -16,6 +15,9 @@ import {
   Check,
   AlertCircle,
 } from "lucide-react";
+import ImageCropperModal from "../../customer/components/dashboard/ImageCropperModal";
+import { useAuth } from "../../../auth/AuthProvider";
+import { setStoredUser } from "../../../auth/tokenStore";
 
 interface OutletContext {
   darkMode: boolean;
@@ -75,16 +77,17 @@ export default function EditProfile() {
   const { darkMode } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { user, setUser } = useAuth();
 
-  const [form, setForm] = useState({
-    firstName: "Souvik",
-    lastName: "Dey",
-    displayName: "Mr. Souvik",
-    email: "souvik@hq.io",
-    phone: "+91 98765 43210",
+  const [form, setForm] = useState(() => ({
+    firstName: user?.name?.split(" ")[0] || "Souvik",
+    lastName: user?.name?.split(" ").slice(1).join(" ") || "Dey",
+    displayName: user?.name || "Mr. Souvik",
+    email: user?.email || "souvik@hq.io",
+    phone: user?.mobile || "+91 98765 43210",
     location: "Kolkata, WB",
     bio: "Super Administrator managing the HQ Terminal platform.",
-  });
+  }));
 
   const [passwords, setPasswords] = useState({
     current: "",
@@ -99,8 +102,11 @@ export default function EditProfile() {
   });
 
   const [avatarUrl, setAvatarUrl] = useState(
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80"
+    () => user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80"
   );
+
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState("");
 
   const [saved, setSaved] = useState(false);
   const [pwError, setPwError] = useState("");
@@ -116,12 +122,24 @@ export default function EditProfile() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (avatarUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(avatarUrl);
-      }
-      const url = URL.createObjectURL(file);
-      setAvatarUrl(url);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Url = reader.result as string;
+        setTempImageSrc(base64Url);
+        setCropperOpen(true);
+        e.target.value = "";
+      };
+      reader.readAsDataURL(file);
     }
+  };
+
+  const handleCropConfirm = (croppedBase64: string) => {
+    if (avatarUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarUrl);
+    }
+    setAvatarUrl(croppedBase64);
+    setCropperOpen(false);
+    setTempImageSrc("");
   };
 
   const handleSave = (e?: React.FormEvent) => {
@@ -140,6 +158,31 @@ export default function EditProfile() {
         setPwError("Passwords don't match.");
         return;
       }
+    }
+
+    // Save updated user to localStorage and update global auth state
+    const updatedStoredUser = {
+      id: user?.id || "demo-super-admin",
+      name: form.displayName,
+      role: user?.role || "super-admin",
+      panel: "superadmin" as const,
+      email: form.email,
+      mobile: form.phone,
+      avatar: avatarUrl,
+    };
+    setStoredUser("superadmin", updatedStoredUser);
+
+    if (setUser) {
+      setUser({
+        id: user?.id || "demo-super-admin",
+        name: form.displayName,
+        role: user?.role || "super-admin",
+        panel: "superadmin" as const,
+        email: form.email,
+        mobile: form.phone,
+        avatar: avatarUrl,
+        restaurantName: user?.restaurantName || "Graphura Cloud",
+      });
     }
 
     setSaved(true);
@@ -195,15 +238,17 @@ export default function EditProfile() {
           <p className={sectionTitle}>Profile Photo</p>
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <div className="relative shrink-0">
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="w-24 h-24 rounded-2xl object-cover ring-4 ring-orange-500/20"
-              />
+              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-orange-500/20">
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-md transition-colors"
+                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-md transition-colors border-2 border-white dark:border-slate-950"
                 aria-label="Change photo"
               >
                 <Camera size={14} />
@@ -524,6 +569,15 @@ export default function EditProfile() {
           </button>
         </div>
       </form>
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={tempImageSrc}
+        onClose={() => {
+          setCropperOpen(false);
+          setTempImageSrc("");
+        }}
+        onConfirm={handleCropConfirm}
+      />
     </div>
   );
 }

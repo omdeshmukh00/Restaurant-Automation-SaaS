@@ -158,6 +158,7 @@ async function seedAnalyticsRuntimeData(db) {
 
   await db.collection('restaurants').insertOne({
     _id: restaurantId,
+    tenantId: restaurantId.toString(),
     slug: 'analytics-verification-hub',
     name: 'Analytics Verification Hub',
     status: 'ACTIVE',
@@ -502,6 +503,7 @@ async function seedAnalyticsRuntimeData(db) {
   await db.collection('customerprofiles').insertMany([
     {
       _id: new mongoose.Types.ObjectId(),
+      tenantId: restaurantId.toString(),
       mobile: '9999900001',
       name: 'Aarav',
       totalVisits: 5,
@@ -515,6 +517,7 @@ async function seedAnalyticsRuntimeData(db) {
     },
     {
       _id: new mongoose.Types.ObjectId(),
+      tenantId: restaurantId.toString(),
       mobile: '9999900002',
       name: 'Mira',
       totalVisits: 1,
@@ -528,6 +531,7 @@ async function seedAnalyticsRuntimeData(db) {
     },
     {
       _id: new mongoose.Types.ObjectId(),
+      tenantId: restaurantId.toString(),
       mobile: '9999900003',
       name: 'Kabir',
       totalVisits: 3,
@@ -541,6 +545,7 @@ async function seedAnalyticsRuntimeData(db) {
     },
     {
       _id: new mongoose.Types.ObjectId(),
+      tenantId: restaurantId.toString(),
       mobile: '9999900004',
       name: 'Sia',
       totalVisits: 2,

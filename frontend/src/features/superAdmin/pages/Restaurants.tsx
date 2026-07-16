@@ -17,6 +17,7 @@ import FilterBar from "../components/Restaurants/Filterbar";
 import RestaurantTable from "../components/Restaurants/RestaurantTable";
 import ViewModal from "../components/Restaurants/Viewmodal";
 import AddRestaurantModal from "../components/Restaurants/AddRestaurantModal";
+import LiveActivityModal from "../components/Subscriptions/LiveActivityModal";
 
 const DEFAULT_FORM: NewRestaurantForm = {
   name: "",
@@ -71,6 +72,7 @@ export default function Restaurant() {
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [viewingRestaurant, setViewingRestaurant] = useState<any | null>(null);
+  const [liveActivityRestaurant, setLiveActivityRestaurant] = useState<RestaurantsRow | null>(null);
   const [newRestaurant, setNewRestaurant] = useState<NewRestaurantForm>(() => {
     try {
       const saved = sessionStorage.getItem("ra/add-restaurant-draft");
@@ -131,6 +133,7 @@ export default function Restaurant() {
       if (e.key === "Escape") {
         setIsModalOpen(false);
         setViewingRestaurant(null);
+        setLiveActivityRestaurant(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -168,8 +171,25 @@ export default function Restaurant() {
     updateRestaurantPlan(id, plan);
 
   // Delete restaurant
-  const deleteRestaurant = (id: string) =>
-    deleteRestaurantById(id);
+  const deleteRestaurant = async (id: string) => {
+    const restaurantObj = filteredRestaurants.find(r => r.id === id);
+    const name = restaurantObj ? restaurantObj.name : "this restaurant";
+
+    let reason = "";
+    let isConfirmed = false;
+    while (!isConfirmed) {
+      const input = window.prompt(`Are you sure you want to permanently delete "${name}"? Enter the reason to confirm (this will be sent to the owner):`);
+      if (input === null) return; // Cancelled
+      if (input.trim().length > 0) {
+        reason = input.trim();
+        isConfirmed = true;
+      } else {
+        window.alert("A reason is required to delete the restaurant.");
+      }
+    }
+
+    await deleteRestaurantById(id, reason);
+  };
 
   // Handle form submission for new restaurant
   const handleSubmit = async (e: React.FormEvent) => {
@@ -270,6 +290,7 @@ export default function Restaurant() {
         searchQuery={searchQuery}
         statusFilter={statusFilter}
         onView={handleViewRestaurant}
+        onLiveActivity={setLiveActivityRestaurant}
         onUpdateStatus={updateStatus}
         onUpdatePlan={updatePlan}
         onDelete={deleteRestaurant}
@@ -286,6 +307,16 @@ export default function Restaurant() {
           restaurant={viewingRestaurant}
           darkMode={darkMode}
           onClose={() => setViewingRestaurant(null)}
+        />
+      )}
+
+      {/* Live Activity Modal */}
+      {liveActivityRestaurant && (
+        <LiveActivityModal
+          restaurantId={liveActivityRestaurant.id}
+          restaurantName={liveActivityRestaurant.name}
+          darkMode={darkMode}
+          onClose={() => setLiveActivityRestaurant(null)}
         />
       )}
 

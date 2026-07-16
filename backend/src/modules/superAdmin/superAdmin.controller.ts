@@ -98,10 +98,32 @@ export const getPlatformSettingsController = asyncHandler(async (req: Request, r
     timestamp: r.paymentTimestamp || r.updatedAt
   }));
 
+  const { SubscriptionPaymentModel } = await import('../subscriptions/subscriptions.model');
+  const paidSubscriptions = await SubscriptionPaymentModel.find({
+    status: 'completed'
+  })
+    .populate('restaurantId')
+    .setOptions({ bypassTenant: true })
+    .lean();
+
+  const totalSubscriptionRevenue = paidSubscriptions.reduce((sum: number, sp: any) => sum + (sp.amount || 0), 0);
+
+  const subscriptionHistory = paidSubscriptions.map((sp: any) => ({
+    id: sp._id.toString(),
+    restaurantName: sp.restaurantId?.name || 'Unknown Restaurant',
+    ownerName: sp.restaurantId?.ownerName || 'Unknown Owner',
+    amount: sp.amount,
+    currency: sp.currency || 'INR',
+    paymentId: sp.providerPaymentId || sp.providerOrderId || sp._id.toString(),
+    timestamp: sp.paidAt || sp.createdAt
+  }));
+
   ok(res, {
     ...settings.toObject(),
     totalRevenue,
-    history
+    history,
+    totalSubscriptionRevenue,
+    subscriptionHistory
   });
 });
 

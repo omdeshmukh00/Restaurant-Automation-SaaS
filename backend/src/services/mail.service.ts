@@ -893,3 +893,28 @@ export async function sendSubscriptionExpiredEmail(
     return false;
   }
 }
+
+export async function sendRestaurantDeletedEmail(
+  email: string,
+  ownerName: string,
+  restaurantName: string,
+  reason: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('restaurant-deleted');
+
+    html = html.replace(/\{\{ownerName\}\}/g, ownerName);
+    html = html.replace(/\{\{restaurantName\}\}/g, restaurantName);
+    html = html.replace(/\{\{reason\}\}/g, reason);
+
+    return await sendEmail({
+      to: email,
+      subject: 'RestoHub - Notice of Account Deletion',
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send account deletion email', { error, email });
+    return false;
+  }
+}

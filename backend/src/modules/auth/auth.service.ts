@@ -90,7 +90,10 @@ export async function login(input: LoginInput, meta?: { userAgent?: string; ip?:
   if (user.role !== UserRole.SUPER_ADMIN && user.restaurantId) {
     const { RestaurantModel } = await import('../restaurants/restaurants.model');
     const restaurant = await RestaurantModel.findById(user.restaurantId);
-    if (restaurant && restaurant.status === 'SUSPENDED') {
+    if (!restaurant || restaurant.isDeleted) {
+      throw new AppError('Your restaurant account has been deleted by Team Restohub.', 403, ErrorCode.FORBIDDEN);
+    }
+    if (restaurant.status === 'SUSPENDED') {
       const reasonMsg = restaurant.blockReason
         ? `Your restaurant has been inactivated/blocked by Restohub. Reason: ${restaurant.blockReason}`
         : 'Your restaurant has been inactivated/blocked by Restohub.';

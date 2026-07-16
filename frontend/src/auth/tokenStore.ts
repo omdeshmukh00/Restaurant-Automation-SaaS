@@ -12,6 +12,7 @@ export function getPanelFromPath(pathname: string): Panel {
   if (pathname.startsWith('/cleaning')) return 'cleaning';
   if (pathname.startsWith('/admin')) return 'admin';
   if (pathname.startsWith('/superadmin')) return 'superadmin';
+  if (pathname.startsWith('/super-admin')) return 'superadmin';
   
   if (pathname.startsWith('/auth/customer')) return 'customer';
   if (pathname.startsWith('/auth/kitchen')) return 'kitchen';
@@ -117,6 +118,7 @@ export type StoredAuthUser = {
   email?: string;
   mobile?: string;
   themeMode?: 'light' | 'dark' | 'system';
+  avatar?: string;
 };
 
 export function getStoredUser(panel: Panel): StoredAuthUser | null {

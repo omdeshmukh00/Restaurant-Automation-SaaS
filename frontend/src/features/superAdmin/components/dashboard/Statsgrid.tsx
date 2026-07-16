@@ -18,8 +18,8 @@ export default function StatsGrid({ darkMode }: StatsGridProps) {
               darkMode ? "bg-slate-900/40 border-slate-800/80" : "bg-white border-slate-200/60"
             }`}
           >
-            <div className="h-4 bg-slate-300 dark:bg-slate-705 w-24 rounded mb-2" />
-            <div className="h-6 bg-slate-300 dark:bg-slate-705 w-16 rounded" />
+            <div className="h-4 bg-slate-300 dark:bg-slate-800 w-24 rounded mb-2" />
+            <div className="h-6 bg-slate-300 dark:bg-slate-800 w-16 rounded" />
           </div>
         ))}
       </div>

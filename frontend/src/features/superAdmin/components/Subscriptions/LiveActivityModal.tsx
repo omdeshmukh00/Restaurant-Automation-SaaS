@@ -96,7 +96,7 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
   const fetchData = useCallback(async (isManual = false) => {
     try {
       if (isManual) setRefreshing(true);
-      const res = await apiClient.get(`/super-admin/restaurants/${restaurantId}/live-activity`);
+      const res = await apiClient.get(`/superadmin/restaurants/${restaurantId}/live-activity`);
       setData(res.data.data);
       setError(null);
       setLastRefreshed(new Date());

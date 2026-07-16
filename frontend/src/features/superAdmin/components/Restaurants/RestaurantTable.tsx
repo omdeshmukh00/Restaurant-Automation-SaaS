@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import {
   Eye, Edit2, MoreVertical, Mail, Phone, MapPin,
-  Search, CheckCircle2, AlertCircle, X, Trash2, Clock
+  Search, CheckCircle2, AlertCircle, X, Trash2, Clock, Activity
 } from "lucide-react";
 import type { RestaurantsRow } from "./Restauranttypes";
 import RestaurantCard from "./RestaurantCard";
@@ -15,6 +15,7 @@ interface RestaurantTableProps {
   searchQuery: string;
   statusFilter: string;
   onView: (row: RestaurantsRow) => void;
+  onLiveActivity: (row: RestaurantsRow) => void;
   onUpdateStatus: (id: string, status: "Active" | "Trial" | "Inactive", blockReason?: string) => void;
   onUpdatePlan: (id: string, plan: string) => void;
   onDelete: (id: string) => void;
@@ -58,6 +59,7 @@ export default function RestaurantTable({
   searchQuery,
   statusFilter,
   onView,
+  onLiveActivity,
   onUpdateStatus,
   onUpdatePlan,
   onDelete,
@@ -150,6 +152,7 @@ export default function RestaurantTable({
                 restaurant={restaurant}
                 darkMode={darkMode}
                 onView={onView}
+                onLiveActivity={onLiveActivity}
                 onUpdateStatus={handleUpdateStatus}
                 onUpdatePlan={handleUpdatePlan}
                 onDelete={handleDelete}
@@ -272,6 +275,15 @@ export default function RestaurantTable({
                   {/* Actions */}
                   <td className="py-4 px-6 whitespace-nowrap text-center">
                     <div className={`flex items-center justify-center gap-3 ${darkMode ? "text-slate-500 hover:text-slate-400" : "text-slate-400 hover:text-slate-505"}`}>
+                      {/* Live Activity */}
+                      <button
+                        onClick={() => onLiveActivity(row)}
+                        className="p-1 hover:text-orange-500 rounded-md hover:bg-slate-500/5 transition-all"
+                        title="Live Activity"
+                      >
+                        <Activity size={15} />
+                      </button>
+
                       {/* View */}
                       <button
                         onClick={() => onView(row)}

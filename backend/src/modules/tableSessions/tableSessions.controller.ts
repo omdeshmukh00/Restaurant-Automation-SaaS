@@ -59,7 +59,7 @@ export async function startSession(req: Request, res: Response, next: NextFuncti
 
 export async function validateTableSessionController(req: Request, res: Response, next: NextFunction) {
   try {
-    const session = await sessionService.validateSession(req.body.token);
+    const session = await sessionService.validateSession(req.body.token, true);
     ok(res, { session });
   } catch (error) {
     next(error);

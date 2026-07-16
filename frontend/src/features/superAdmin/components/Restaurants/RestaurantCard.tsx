@@ -4,7 +4,7 @@
 import { useState } from "react";
 import {
   Mail, Phone, MapPin, Edit2, MoreVertical, Eye, Trash2,
-  CheckCircle2, AlertCircle, X, Clock
+  CheckCircle2, AlertCircle, X, Clock, Activity
 } from "lucide-react";
 import type { RestaurantsRow } from "./Restauranttypes";
 
@@ -12,6 +12,7 @@ interface RestaurantCardProps {
   restaurant: RestaurantsRow;
   darkMode: boolean;
   onView: (restaurant: RestaurantsRow) => void;
+  onLiveActivity: (restaurant: RestaurantsRow) => void;
   onUpdateStatus: (id: string, status: "Active" | "Trial" | "Inactive", blockReason?: string) => void;
   onUpdatePlan: (id: string, plan: string) => void;
   onDelete: (id: string) => void;
@@ -23,6 +24,7 @@ export default function RestaurantCard({
   restaurant,
   darkMode,
   onView,
+  onLiveActivity,
   onUpdateStatus,
   onUpdatePlan,
   onDelete,
@@ -54,10 +56,8 @@ export default function RestaurantCard({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Delete restaurant "${restaurant.name}"?`)) {
-      onDelete(restaurant.id);
-      setShowActions(false);
-    }
+    onDelete(restaurant.id);
+    setShowActions(false);
   };
 
   const getStatusColor = (status: string) => {
@@ -98,7 +98,7 @@ export default function RestaurantCard({
       <div className="flex items-start justify-between mb-4 pb-3 border-b border-inherit">
         <div className="flex-1">
           <h3
-            className={`font-bold text-sm leading-tight ${
+             className={`font-bold text-sm leading-tight ${
               darkMode ? "text-slate-100" : "text-slate-900"
             }`}
           >
@@ -150,6 +150,20 @@ export default function RestaurantCard({
                     Cooldown: {cooldown}s
                   </div>
                 )}
+
+                <button
+                  onClick={() => {
+                    onLiveActivity(restaurant);
+                    setShowActions(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg hover:bg-slate-500/5 flex items-center gap-2 transition-colors border-b border-inherit ${
+                    darkMode
+                      ? "text-slate-300 hover:text-white"
+                      : "text-slate-700 hover:text-slate-900"
+                  }`}
+                >
+                  <Activity size={13} /> Live Activity
+                </button>
 
                 <button
                   onClick={() => {

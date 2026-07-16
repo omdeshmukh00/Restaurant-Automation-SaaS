@@ -16,6 +16,8 @@ import { TableModel } from '../tables/tables.model';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
 import { QueueEntryModel } from '../queue/queue.model';
 import { ReservationModel } from '../reservations/reservations.model';
+import { UserModel } from '../users/users.model';
+import { sendRestaurantDeletedEmail } from '../../services/mail.service';
 
 import { RestaurantStatus, SessionStatus, OrderStatus, QueueStatus, ReservationStatus } from '../../constants/statuses';
 
@@ -79,7 +81,28 @@ superAdminRouter.patch('/restaurants/:id/suspend', async (req, res, next) => {
 
 superAdminRouter.delete('/restaurants/:id', async (req, res, next) => {
   try {
+    const restaurant = await RestaurantModel.findById(req.params.id);
+    if (!restaurant) {
+      throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+    }
+    const reason = String(req.query.reason || 'No reason provided');
+
+    // 1. Delete all users associated with this restaurant
+    await UserModel.deleteMany({ restaurantId: req.params.id });
+
+    // 2. Delete the restaurant itself
     await RestaurantModel.findByIdAndDelete(req.params.id);
+
+    // 3. Send deletion email to the owner
+    if (restaurant.email) {
+      await sendRestaurantDeletedEmail(
+        restaurant.email,
+        restaurant.ownerName || restaurant.email,
+        restaurant.name,
+        reason
+      );
+    }
+
     ok(res, { deletedRestaurantId: req.params.id });
   } catch (error) {
     next(error);

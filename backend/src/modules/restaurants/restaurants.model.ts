@@ -59,6 +59,7 @@ export interface IRestaurant extends Document {
   lastActive?: Date;
   tags?: string[];
   joinedDate?: Date;
+  isDeleted?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -149,6 +150,7 @@ const restaurantSchema = new Schema<IRestaurant>(
     lastActive: { type: Date, default: Date.now },
     tags: { type: [String], default: [] },
     joinedDate: { type: Date, default: Date.now },
+    isDeleted: { type: Boolean, default: false, index: true },
     location_url: {
       type: String,
       trim: true,

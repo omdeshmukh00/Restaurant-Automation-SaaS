@@ -65,11 +65,18 @@ export function tenantPlugin(schema: Schema) {
     }
   });
 
-  // Register pre-save hook to auto-populate tenantId from request context if missing
-  schema.pre('save', function (next) {
-    const context = tenantContext.getStore();
-    if (context && context.tenantId && !this.get('tenantId')) {
-      this.set('tenantId', context.tenantId);
+  // Register pre-save hook to auto-populate tenantId from request context or restaurantId if missing
+  schema.pre('save', function (this: any, next) {
+    if (!this.get('tenantId')) {
+      const context = tenantContext.getStore();
+      if (context && context.tenantId) {
+        this.set('tenantId', context.tenantId);
+      } else {
+        const restaurantId = this.get('restaurantId');
+        if (restaurantId) {
+          this.set('tenantId', String(restaurantId));
+        }
+      }
     }
     next();
   });

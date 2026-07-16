@@ -197,7 +197,7 @@ const SuperAdminAuth: React.FC = () => {
     } catch (err: any) {
       setError(
         err.response?.data?.message ||
-        'Authentication failed. Please verify credentials or use demo bypass.'
+        'Authentication failed. Please verify credentials.'
       );
     } finally {
       setLoading(false);

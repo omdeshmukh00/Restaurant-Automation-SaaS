@@ -42,7 +42,7 @@ interface ProfileCardProps {
 
 function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
 
   const stats = [
     { label: "Orders", value: "1.4K" },
@@ -51,8 +51,8 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
   ];
 
   const details = [
-    { icon: Mail, label: "souvik@hq.io" },
-    { icon: Phone, label: "+91 98765 43210" },
+    { icon: Mail, label: user?.email || "souvik@hq.io" },
+    { icon: Phone, label: user?.mobile || "+91 98765 43210" },
     { icon: MapPin, label: "Kolkata, WB" },
   ];
 
@@ -92,11 +92,13 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
       <div className="relative px-4 pb-3">
         <div className="flex items-end justify-between -mt-8 mb-3">
           <div className="relative">
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"
-              alt="Mr. Souvik"
-              className="w-16 h-16 rounded-2xl object-cover border-4 border-white dark:border-slate-950 shadow-md"
-            />
+            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white dark:border-slate-950 shadow-md">
+              <img
+                src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"}
+                alt={user?.name || "Mr. Souvik"}
+                className="w-full h-full object-cover"
+              />
+            </div>
             <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white dark:border-slate-950" />
           </div>
 
@@ -116,7 +118,7 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
 
         {/* Name & role */}
         <div className="mb-3">
-          <h3 className="font-bold text-sm leading-tight">Mr. Souvik Dey</h3>
+          <h3 className="font-bold text-sm leading-tight">{user?.name || "Mr. Souvik Dey"}</h3>
           <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
             Super Administrator · HQ Terminal
           </p>
@@ -190,6 +192,7 @@ export default function Navbar({
   sidebarCollapsed,
 }: NavbarProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -614,12 +617,12 @@ export default function Navbar({
                 aria-label="Open profile menu"
               >
                 <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"
+                  src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"}
                   alt="profile"
-                  className="w-7 h-7 rounded-lg object-cover"
+                  className="w-7 h-7 rounded-full object-cover"
                 />
                 <div className="hidden lg:block text-left leading-none">
-                  <h4 className="font-semibold text-xs">Mr. Souvik</h4>
+                  <h4 className="font-semibold text-xs">{user?.name || "Mr. Souvik"}</h4>
                   <p className="text-[10px] text-slate-400">Global Admin</p>
                 </div>
                 <ChevronDown

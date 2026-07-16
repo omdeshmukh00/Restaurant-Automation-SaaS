@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../../auth/AuthProvider";
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -31,6 +32,7 @@ export default function Sidebar({
   collapsed,
   onToggle,
 }: SidebarProps) {
+  const { user } = useAuth();
   const navItems = [
     { path: "/superadmin", label: "Dashboard", icon: LayoutDashboard },
     { path: "/superadmin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
@@ -141,9 +143,9 @@ export default function Sidebar({
       >
         <button className="flex items-center gap-1.5 p-0.5 rounded-lg">
           <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&h=60&q=80"
+            src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&h=60&q=80"}
             alt="profile"
-            className="w-6 h-6 rounded-md object-cover"
+            className="w-6 h-6 rounded-full object-cover"
           />
           {!isCollapsed && <ChevronDown size={12} className={darkMode ? "text-slate-500" : "text-slate-400"} />}
         </button>

@@ -856,6 +856,39 @@ export async function seedDevelopmentData(): Promise<void> {
     ),
   ]);
 
+  // Post-seed: ensure tenantId is populated for all tenant-scoped documents in the DB
+  const dbConnection = mongoose.connection.db;
+  if (dbConnection) {
+    const collections = await dbConnection.listCollections().toArray();
+    for (const colInfo of collections) {
+      const name = colInfo.name;
+      // Skip system or excluded collections
+      if (name.startsWith('system.') || ['plans', 'featureFlags', 'restaurant_requests', 'platformSettings'].includes(name)) {
+        continue;
+      }
+      
+      const col = dbConnection.collection(name);
+      
+      // 1. For the 'restaurants' collection, set tenantId to the document's _id as a string
+      if (name === 'restaurants') {
+        const docs = await col.find({}).toArray();
+        for (const doc of docs) {
+          if (!doc.tenantId) {
+            await col.updateOne({ _id: doc._id }, { $set: { tenantId: doc._id.toString() } });
+          }
+        }
+      } else {
+        // 2. For other collections, if the document has restaurantId, set tenantId to restaurantId as a string
+        const docs = await col.find({ restaurantId: { $exists: true } }).toArray();
+        for (const doc of docs) {
+          if (doc.restaurantId && !doc.tenantId) {
+            await col.updateOne({ _id: doc._id }, { $set: { tenantId: doc.restaurantId.toString() } });
+          }
+        }
+      }
+    }
+  }
+
   logger.info('Seeded local development data', {
     restaurantCount: await RestaurantModel.countDocuments(),
     userCount: await UserModel.countDocuments(),
