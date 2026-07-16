@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, type PropsWithChildren } from 'react';
+import React, { createContext, useContext, useState, useEffect, type PropsWithChildren } from 'react';
+import { getSocket } from '../../../lib/socket';
 
 export interface AdminNotification {
   id: string;
@@ -26,6 +27,23 @@ const INITIAL_NOTIFICATIONS: AdminNotification[] = [
   { id: '5', message: "Daily revenue target ₹50,000 achieved!", time: '3 hr ago', icon: '🎯', read: true },
 ];
 
+function iconForType(type?: string): string {
+  switch (type) {
+    case 'LOW_STOCK_ALERT':
+    case 'INVENTORY_ALERT':
+      return '⚠️';
+    case 'ORDER_PLACED':
+    case 'ORDER_NEW':
+      return '🛒';
+    case 'RESERVATION':
+      return '📅';
+    case 'STAFF':
+      return '👤';
+    default:
+      return '🔔';
+  }
+}
+
 export function AdminNotificationsProvider({ children }: PropsWithChildren) {
   const [notifications, setNotifications] = useState<AdminNotification[]>(INITIAL_NOTIFICATIONS);
 
@@ -41,10 +59,51 @@ export function AdminNotificationsProvider({ children }: PropsWithChildren) {
 
   function addNotification(n: Omit<AdminNotification, 'id' | 'read'>) {
     setNotifications((prev) => [
-      { ...n, id: String(Date.now()), read: false },
+      { ...n, id: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, read: false },
       ...prev,
     ]);
   }
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handle = (n: Omit<AdminNotification, 'id' | 'read'>) => addNotification(n);
+
+    const onNotificationNew = (payload: any) => {
+      handle({
+        message: payload?.title ? `${payload.title}${payload.message ? ` — ${payload.message}` : ''}` : (payload?.message ?? 'New notification'),
+        time: 'just now',
+        icon: iconForType(payload?.type),
+      });
+    };
+
+    const onOrderCreated = (payload: any) => {
+      handle({
+        message: `New order received${payload?.orderId ? ` (#${payload.orderId})` : ''}`,
+        time: 'just now',
+        icon: '🛒',
+      });
+    };
+
+    const onStaffRequest = (_payload: any) => {
+      handle({
+        message: 'New staff assistance request',
+        time: 'just now',
+        icon: '👤',
+      });
+    };
+
+    socket.on('notification:new', onNotificationNew);
+    socket.on('order.created', onOrderCreated);
+    socket.on('staff:request-new', onStaffRequest);
+
+    return () => {
+      socket.off('notification:new', onNotificationNew);
+      socket.off('order.created', onOrderCreated);
+      socket.off('staff:request-new', onStaffRequest);
+    };
+  }, []);
 
   return (
     <AdminNotificationsContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, addNotification }}>

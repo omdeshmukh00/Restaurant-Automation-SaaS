@@ -33,16 +33,32 @@ export class ReservationsService {
     const currentActivity = await ReservationModel.countDocuments({ restaurantId: data.restaurantId });
     await assertPlanLimit(data.restaurantId, 'reservationLimit', currentActivity + 1, 'Reservations');
 
-    // Upsert Customer Profile
-    const customer = await CustomerProfileModel.findOneAndUpdate(
-      { mobile: data.mobile },
-      {
-        $set: { name: data.customerName },
-        $addToSet: { restaurantsVisited: data.restaurantId },
-        $setOnInsert: { totalVisits: 0, totalSpent: 0 },
-      },
-      { upsert: true, new: true }
-    );
+    // Upsert Customer Profile. The `mobile` index is unique, so we avoid the
+    // upsert+unique race by updating an existing profile when present, and
+    // only insert when absent — retrying a 11000 (concurrent insert) by
+    // resolving to the profile the other request just created.
+    let customer = await CustomerProfileModel.findOne({ mobile: data.mobile });
+    if (!customer) {
+      try {
+        customer = await CustomerProfileModel.create({
+          mobile: data.mobile,
+          name: data.customerName,
+          restaurantsVisited: [data.restaurantId],
+          totalVisits: 0,
+          totalSpent: 0,
+        });
+      } catch (err: any) {
+        if (err?.code === 11000) {
+          customer = await CustomerProfileModel.findOne({ mobile: data.mobile });
+        }
+        if (!customer) throw err;
+      }
+    } else {
+      await CustomerProfileModel.updateOne(
+        { _id: customer._id },
+        { $set: { name: data.customerName }, $addToSet: { restaurantsVisited: data.restaurantId } }
+      );
+    }
 
     let tableId = null;
 
@@ -146,9 +162,10 @@ if (data.tableNumber) {
     if (filters.date) query.date = filters.date;
     if (filters.status) query.status = filters.status;
     if (filters.q) {
+      const escaped = String(filters.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { customerName: { $regex: filters.q, $options: 'i' } },
-        { mobile: { $regex: filters.q, $options: 'i' } },
+        { customerName: { $regex: escaped, $options: 'i' } },
+        { mobile: { $regex: escaped, $options: 'i' } },
       ];
     }
 

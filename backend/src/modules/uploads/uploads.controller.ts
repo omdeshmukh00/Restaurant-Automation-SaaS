@@ -72,8 +72,19 @@ export class UploadController {
 
   static download = asyncHandler(async (req: Request, res: Response) => {
     const file = await UploadService.download(tenantIdFromRequest(req), req.params.id);
+    const isImage = (file.mimeType ?? '').startsWith('image/');
     res.setHeader('Content-Type', file.mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.fileName)}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `${isImage ? 'inline' : 'attachment'}; filename="${encodeURIComponent(file.fileName)}"`,
+    );
+    res.status(200).send(file.buffer);
+  });
+
+  static downloadImagePublic = asyncHandler(async (req: Request, res: Response) => {
+    const file = await UploadService.downloadPublic(req.params.id);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.fileName)}"`);
     res.status(200).send(file.buffer);
   });
 }

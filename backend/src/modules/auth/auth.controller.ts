@@ -135,8 +135,12 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   setRefreshCookie(res, result.refreshToken, panel);
   setAccessCookie(res, result.accessToken, panel);
 
+  const userDoc = result.user as any;
   sendSuccess(res, {
-    user: result.user,
+    user: {
+      ...userDoc,
+      id: userDoc._id?.toString?.() ?? userDoc.id,
+    },
     accessToken: result.accessToken,
     refreshToken: result.refreshToken,
     panel,

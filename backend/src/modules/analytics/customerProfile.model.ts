@@ -7,6 +7,7 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 export interface ICustomerProfile extends Document {
   mobile: string;
   name: string;
+  email?: string;
   totalVisits: number;
   totalSpent: number;
   lastVisitAt: Date;
@@ -31,6 +32,11 @@ const customerProfileSchema = new Schema<ICustomerProfile>(
       required: [true, 'Customer name is required'],
       trim: true,
       maxlength: [100, 'Name cannot exceed 100 characters'],
+    },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
     },
     totalVisits: {
       type: Number,

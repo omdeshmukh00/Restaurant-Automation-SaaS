@@ -228,6 +228,8 @@ export async function createStaffController(req: Request, res: Response, next: N
       kitchen_role: req.body.kitchen_role ?? null,
       staff_role: req.body.staff_role ?? null,
       cleaning_role: req.body.cleaning_role ?? null,
+      salary: typeof req.body.salary === 'number' ? req.body.salary : 0,
+      dateOfBirth: req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : null,
       isEmailVerified: true,
       isMobileVerified: true,
     });
@@ -277,7 +279,13 @@ export async function listStaffController(req: Request, res: Response, next: Nex
     const restaurantId = resolveRestaurantId(req, req.query.restaurantId);
     const filter = buildStaffFilter(restaurantId, req.query);
 
-    const staff = await UserModel.find(filter).sort({ createdAt: -1 }).lean();
+    const staffQuery = UserModel.find(filter).sort({ createdAt: -1 });
+    const effQ = (staffQuery as any).getQuery ? (staffQuery as any).getQuery() : filter;
+    const effLine = `[EFFQ] ${JSON.stringify(effQ)} | coll=${(UserModel as any).collection?.collectionName}`;
+    console.error(effLine);
+    const staff = await staffQuery.lean();
+    const cntLine = `[CNT] ${staff.length} ${staff.map((s: any) => `${s.name}[${s.role}]`).join(',')}`;
+    console.error(cntLine);
     const shiftMap = await getActiveShiftMap(
       restaurantId,
       staff.map((member) => String(member._id)),
@@ -507,6 +515,8 @@ export async function updateStaffController(req: Request, res: Response, next: N
       kitchen_role: req.body.kitchen_role,
       staff_role: req.body.staff_role,
       cleaning_role: req.body.cleaning_role,
+      salary: req.body.salary,
+      dateOfBirth: req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : null,
     };
 
     if (req.body.password) {
@@ -599,6 +609,39 @@ export async function deleteStaffController(req: Request, res: Response, next: N
         deletedAt: new Date().toISOString(),
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getStaffShiftsController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.query.restaurantId);
+    const shifts = await StaffShiftAssignmentModel.find({ restaurantId, active: true })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const staffIds = Array.from(new Set(shifts.map((shift) => String(shift.staffId))));
+    const staff = await UserModel.find({ _id: { $in: staffIds }, restaurantId })
+      .select('name')
+      .lean();
+    const staffNameMap = new Map(staff.map((member) => [String(member._id), member.name]));
+
+    const now = new Date();
+    const data = shifts.map((shift) => ({
+      id: shift._id,
+      staffId: shift.staffId,
+      staffName: staffNameMap.get(String(shift.staffId)) ?? 'Unknown',
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      days: shift.days,
+      notes: shift.notes,
+      scheduledToday: isShiftScheduledToday(shift, now),
+      activeNow: isShiftActiveNow(shift, now),
+    }));
+
+    ok(res, { shifts: data, meta: { count: data.length } });
   } catch (error) {
     next(error);
   }

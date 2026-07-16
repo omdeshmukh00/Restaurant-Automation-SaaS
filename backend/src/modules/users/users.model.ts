@@ -19,6 +19,10 @@ export interface IUser extends Document {
   staff_role?: StaffInternalRole;
   cleaning_role?: CleaningRole;
 
+  // HR / payroll metadata
+  salary?: number;
+  dateOfBirth?: Date | null;
+
   restaurantId?: mongoose.Types.ObjectId;
 
   isEmailVerified: boolean;
@@ -128,6 +132,17 @@ const userSchema = new Schema<IUser>(
     cleaning_role: {
       type: String,
       enum: [...Object.values(CleaningRole), null],
+      default: null,
+    },
+
+    salary: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    dateOfBirth: {
+      type: Date,
       default: null,
     },
 

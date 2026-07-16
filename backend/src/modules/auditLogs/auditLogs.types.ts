@@ -40,6 +40,7 @@ export enum AuditAction {
   ORDER_PICKED          = 'ORDER_PICKED',
   ORDER_SERVED          = 'ORDER_SERVED',
   ORDER_COMPLETED       = 'ORDER_COMPLETED',
+  ORDER_DELETED         = 'ORDER_DELETED',
 
   // Kitchen
   KITCHEN_ORDER_ACCEPTED = 'KITCHEN_ORDER_ACCEPTED',

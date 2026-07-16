@@ -170,6 +170,25 @@ export class OrdersController {
     }
   }
 
+  // DELETE /admin/orders/:id
+  static async deleteAdminOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id } = req.params;
+      const result = await OrdersService.deleteAdminOrder(restaurantId, id);
+
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: id,
+        action: AuditAction.ORDER_DELETED,
+      });
+
+      ok(res, { success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // POST /customer/orders/:id/reorder
   static async reorder(req: Request, res: Response, next: NextFunction) {
     try {

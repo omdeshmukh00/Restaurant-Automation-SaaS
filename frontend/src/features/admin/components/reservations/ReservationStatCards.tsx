@@ -82,9 +82,9 @@ export function ReservationStatCards(): JSX.Element {
         barWidth="8.3%"
       />
       <StatItem
-        title="Walk-ins"
-        value={stats.walkIns}
-        subtitle={stats.walkInsPercent}
+        title="No Shows"
+        value={stats.noShow}
+        subtitle={stats.noShowPercent}
         icon={<Users className="w-4 h-4 sm:w-5 sm:h-5 text-purple-500" />}
         iconBg="bg-purple-50 dark:bg-purple-950/40"
         barColor="bg-purple-400"

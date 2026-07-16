@@ -1,8 +1,8 @@
 import React from 'react';
-import { MoreVertical } from 'lucide-react';
 import type { Customer } from '../../store/customers.store';
 import { LoyaltyBadge } from './LoyaltyBadge';
 import { CustomerStatusBadge } from './CustomerStatusBadge';
+import { CustomerActionsMenu } from './CustomerActionsMenu';
 
 interface CustomersTableProps {
   customers: Customer[];
@@ -53,9 +53,7 @@ function CustomerCard({ c }: { c: Customer }) {
             <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{c.email}</p>
             <p className="text-xs text-gray-400 dark:text-gray-500">{c.phone}</p>
           </div>
-          <button className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0 mt-0.5">
-            <MoreVertical className="w-4 h-4" />
-          </button>
+          <CustomerActionsMenu customer={c} />
         </div>
 
         {/* Badges row */}
@@ -171,9 +169,7 @@ export function CustomersTable({ customers }: CustomersTableProps) {
 
                   {/* Actions */}
                   <td className="px-4 py-3 last:pr-5">
-                    <button className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
+                    <CustomerActionsMenu customer={c} />
                   </td>
                 </tr>
               ))

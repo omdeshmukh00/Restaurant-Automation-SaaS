@@ -5,7 +5,7 @@ import { adminOrdersApi } from '../api/admin.orders.api';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type OrderStatus   = 'Pending' | 'Preparing' | 'Completed' | 'Cancelled' | 'Served';
-export type PaymentMethod = 'Paid' | 'Online' | 'Card' | 'Cash';
+export type PaymentMethod = 'Unpaid' | 'Cash' | 'Card' | 'Online';
 export type OrderSortBy   = 'default' | 'time';
 export type DateFilter    = 'all' | 'today' | 'yesterday' | 'last7' | 'last30' | 'custom';
 
@@ -24,7 +24,7 @@ export interface Order {
   assignedStaff: string;
   staffAvatar: string;
   time: string;
-  timeRaw: number; // minutes ago — used for sort
+  timeRaw: number; // creation timestamp (epoch ms) — used for sort & relative time
   date: string;    // e.g. "2025-05-20"
   notes?: string;
 }
@@ -74,26 +74,50 @@ function mapBackendOrderStatus(status: string): OrderStatus {
   }
 }
 
-function mapBackendPaymentStatus(status: string): PaymentMethod {
-  switch (status) {
-    case 'PAID':
-      return 'Paid';
-    case 'PENDING':
-      return 'Online';
-    case 'FAILED':
-      return 'Card';
-    case 'REFUNDED':
-      return 'Cash';
-    default:
-      return 'Cash';
+function mapBackendPayment(order: any): PaymentMethod {
+  // Paid orders show the actual method the customer used; unpaid orders show "Unpaid".
+  if (order.paymentStatus === 'PAID') {
+    switch (order.paymentMethod) {
+      case 'CARD':
+        return 'Card';
+      case 'ONLINE':
+        return 'Online';
+      default:
+        return 'Cash';
+    }
   }
+  return 'Unpaid';
 }
 
-function formatCurrency(value: number) {
+export function formatCurrency(value: number) {
   return `₹${value.toLocaleString('en-IN')}`;
 }
 
-function mapBackendOrder(order: any): Order {
+export function formatTimeAgo(epoch: number): string {
+  const diffMs = Date.now() - epoch;
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return 'just now';
+
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} min${min > 1 ? 's' : ''} ago`;
+
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} hour${hr > 1 ? 's' : ''} ago`;
+
+  const day = Math.floor(hr / 24);
+  if (day < 7) return `${day} day${day > 1 ? 's' : ''} ago`;
+
+  const wk = Math.floor(day / 7);
+  if (wk < 5) return `${wk} week${wk > 1 ? 's' : ''} ago`;
+
+  const mo = Math.floor(day / 30);
+  if (mo < 12) return `${mo} month${mo > 1 ? 's' : ''} ago`;
+
+  const yr = Math.floor(day / 365);
+  return `${yr} year${yr > 1 ? 's' : ''} ago`;
+}
+
+export function mapBackendOrder(order: any): Order {
   const customerName = order.customerName || 'Guest';
   const assignedStaff =
     typeof order.serviceStaffId === 'object' && order.serviceStaffId?.name
@@ -120,18 +144,18 @@ function mapBackendOrder(order: any): Order {
     table: tableLabel,
     amount: formatCurrency(order.finalAmount ?? order.totalAmount ?? 0),
     amountRaw: order.finalAmount ?? order.totalAmount ?? 0,
-    payment: mapBackendPaymentStatus(order.paymentStatus ?? 'PENDING'),
+    payment: mapBackendPayment(order),
     status: mapBackendOrderStatus(order.status ?? 'PENDING'),
     assignedStaff,
     staffAvatar: getInitials(assignedStaff),
     time: minuteDiff <= 1 ? 'just now' : `${minuteDiff} mins ago`,
-    timeRaw: minuteDiff,
+    timeRaw: created.getTime(),
     date: created.toISOString().split('T')[0],
     notes: order.specialInstructions || '',
   };
 }
 
-function deriveOrderStats(orders: Order[]): OrderStats {
+export function deriveOrderStats(orders: Order[]): OrderStats {
   const totalOrders = orders.length;
   const completed = orders.filter((order) => order.status === 'Completed').length;
   const pending = orders.filter((order) => order.status === 'Pending' || order.status === 'Preparing').length;
@@ -148,6 +172,64 @@ function deriveOrderStats(orders: Order[]): OrderStats {
     avgOrderValue: formatCurrency(avgOrderValue),
     avgOrderValueChange: '+0%',
   };
+}
+
+export interface OrderFilterCriteria {
+  dateFilter: DateFilter;
+  paymentFilter: PaymentMethod | 'All';
+  searchQuery: string;
+  minAmount: string;
+  maxAmount: string;
+}
+
+// Single source of truth for the "filtered scope": every filter EXCEPT the
+// active status tab. Used by both the stat cards and the tab counts so they
+// always reflect the data the user is currently looking at.
+export function getFilteredOrders(allOrders: Order[], criteria: OrderFilterCriteria): Order[] {
+  const { dateFilter, paymentFilter, searchQuery, minAmount, maxAmount } = criteria;
+
+  const filterByDate = (t: number) => {
+    if (dateFilter === 'all') return true;
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfTomorrow = startOfToday + 24 * 60 * 60 * 1000;
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+
+    switch (dateFilter) {
+      case 'today':
+        return t >= startOfToday && t < startOfTomorrow;
+      case 'yesterday':
+        return t >= startOfYesterday && t < startOfToday;
+      case 'last7':
+        return t >= startOfToday - 6 * 24 * 60 * 60 * 1000;
+      case 'last30':
+        return t >= startOfToday - 29 * 24 * 60 * 60 * 1000;
+      default:
+        return true;
+    }
+  };
+
+  const q = searchQuery.toLowerCase();
+  const min = minAmount !== '' ? Number(minAmount) : null;
+  const max = maxAmount !== '' ? Number(maxAmount) : null;
+
+  return allOrders.filter((o) => {
+    if (!filterByDate(o.timeRaw)) return false;
+    if (paymentFilter !== 'All' && o.payment !== paymentFilter) return false;
+    if (
+      q &&
+      !(
+        o.orderNumber.toLowerCase().includes(q) ||
+        o.customer.toLowerCase().includes(q) ||
+        o.table.toLowerCase().includes(q)
+      )
+    ) {
+      return false;
+    }
+    if (min !== null && o.amountRaw < min) return false;
+    if (max !== null && o.amountRaw > max) return false;
+    return true;
+  });
 }
 
 interface OrdersStore {
@@ -173,89 +255,12 @@ interface OrdersStore {
   setMaxAmount:     (v: string) => void;
   resetFilters:     () => void;
   fetchOrders:      () => Promise<void>;
-  createOrder:      (payload: { customerName: string; table: string; payment: PaymentMethod; notes: string; items: { name: string; price: number; quantity: number }[] }) => Promise<void>;
-  updateOrder:      (id: string, patch: Partial<Order>) => Promise<void>;
+  createOrder:      (payload: { customerName: string; table: string; payment: PaymentMethod; notes: string; staffId?: string; items: { name: string; price: number; quantity: number }[] }) => Promise<void>;
+  updateOrder:      (id: string, patch: Partial<Order>, force?: boolean) => Promise<void>;
   updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  deleteOrder:      (id: string) => Promise<void>;
   addOrder:          (order: Order) => void;
 }
-
-// ── Seed Data ─────────────────────────────────────────────────────────────────
-
-const seedOrders: Order[] = [
-  {
-    id: '#ORD-00124', orderNumber: '#ORD-00124', customer: 'Smith Jonith', customerAvatar: 'SJ', items: 4,
-    itemNames: ['Pasta Carbonara', 'Garlic Bread', 'Red Wine', 'Tiramisu'],
-    table: 'T-05', amount: '₹1,245', amountRaw: 1245, payment: 'Paid',
-    status: 'Pending', assignedStaff: 'Jessica', staffAvatar: 'JE',
-    time: '2 mins ago', timeRaw: 2, date: '2025-05-20',
-    notes: 'Extra spicy, no onions.',
-  },
-  {
-    id: '#ORD-00123', orderNumber: '#ORD-00123', customer: 'Sarah Johnson', customerAvatar: 'SA', items: 3,
-    itemNames: ['Grilled Salmon', 'Caesar Salad', 'Fresh Lime Soda'],
-    table: 'T-12', amount: '₹2,840', amountRaw: 2840, payment: 'Paid',
-    status: 'Preparing', assignedStaff: 'Michael', staffAvatar: 'MI',
-    time: '15 mins ago', timeRaw: 15, date: '2025-05-20',
-  },
-  {
-    id: '#ORD-00122', orderNumber: '#ORD-00122', customer: 'Michael Brown', customerAvatar: 'MB', items: 5,
-    itemNames: ['Butter Chicken', 'Naan x2', 'Dal Makhani', 'Raita', 'Lassi'],
-    table: 'T-03', amount: '₹3,610', amountRaw: 3610, payment: 'Online',
-    status: 'Pending', assignedStaff: 'David', staffAvatar: 'DA',
-    time: '25 mins ago', timeRaw: 25, date: '2025-05-20',
-  },
-  {
-    id: '#ORD-00121', orderNumber: '#ORD-00121', customer: 'Emily Davis', customerAvatar: 'ED', items: 2,
-    itemNames: ['Margherita Pizza', 'Coke'],
-    table: 'T-08', amount: '₹1,530', amountRaw: 1530, payment: 'Paid',
-    status: 'Completed', assignedStaff: 'Jessica', staffAvatar: 'JE',
-    time: '35 mins ago', timeRaw: 35, date: '2025-05-20',
-  },
-  {
-    id: '#ORD-00120', orderNumber: '#ORD-00120', customer: 'David Wilson', customerAvatar: 'DW', items: 6,
-    itemNames: ['Lamb Chops', 'Mashed Potato', 'Mushroom Sauce', 'Bread Roll', 'Red Wine x2'],
-    table: 'T-15', amount: '₹5,920', amountRaw: 5920, payment: 'Card',
-    status: 'Completed', assignedStaff: 'Michael', staffAvatar: 'MI',
-    time: '45 mins ago', timeRaw: 45, date: '2025-05-20',
-    notes: 'Medium-rare steak.',
-  },
-  {
-    id: '#ORD-00119', orderNumber: '#ORD-00119', customer: 'Sophia Martinez', customerAvatar: 'SM', items: 4,
-    itemNames: ['Veg Biryani', 'Paneer Tikka', 'Gulab Jamun', 'Masala Chai'],
-    table: 'T-11', amount: '₹2,460', amountRaw: 2460, payment: 'Cash',
-    status: 'Cancelled', assignedStaff: 'David', staffAvatar: 'DA',
-    time: '1 hour ago', timeRaw: 60, date: '2025-05-20',
-    notes: 'Customer left.',
-  },
-  {
-    id: '#ORD-00118', orderNumber: '#ORD-00118', customer: 'James Wilson', customerAvatar: 'JW', items: 3,
-    itemNames: ['Fish & Chips', 'Coleslaw', 'Lemonade'],
-    table: 'T-02', amount: '₹1,850', amountRaw: 1850, payment: 'Paid',
-    status: 'Preparing', assignedStaff: 'Jessica', staffAvatar: 'JE',
-    time: '1 hour ago', timeRaw: 65, date: '2025-05-19',
-  },
-  {
-    id: '#ORD-00117', orderNumber: '#ORD-00117', customer: 'Lisa Martinez', customerAvatar: 'LM', items: 7,
-    itemNames: ['Sushi Platter', 'Miso Soup', 'Edamame', 'Sake', 'Tempura', 'Green Tea', 'Ice Cream'],
-    table: 'T-09', amount: '₹8,240', amountRaw: 8240, payment: 'Card',
-    status: 'Completed', assignedStaff: 'Michael', staffAvatar: 'MI',
-    time: '2 hours ago', timeRaw: 120, date: '2025-05-19',
-  },
-  {
-    id: '#ORD-00116', orderNumber: '#ORD-00116', customer: 'Robert Taylor', customerAvatar: 'RT', items: 2,
-    itemNames: ['Club Sandwich', 'Fresh Juice'],
-    table: 'T-06', amount: '₹890', amountRaw: 890, payment: 'Cash',
-    status: 'Served', assignedStaff: 'David', staffAvatar: 'DA',
-    time: '2 hours ago', timeRaw: 125, date: '2025-05-19',
-  },
-  {
-    id: '#ORD-00115', orderNumber: '#ORD-00115', customer: 'Amanda White', customerAvatar: 'AW', items: 5,
-    itemNames: ['Pasta Arrabiata', 'Bruschetta', 'Tiramisu', 'White Wine', 'Espresso'],
-    table: 'T-14', amount: '₹4,650', amountRaw: 4650, payment: 'Online',
-    status: 'Completed', assignedStaff: 'Jessica', staffAvatar: 'JE',
-    time: '3 hours ago', timeRaw: 180, date: '2025-05-18',
-  },
-];
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
@@ -292,38 +297,13 @@ export const useOrdersStore = create<OrdersStore>()(
 
       fetchOrders: async () => {
         try {
-          const state = get();
+          // Fetch the full order list once. All filtering (date range, payment
+          // method, search, amount, status tab) is applied client-side on the
+          // page so the table and the stat cards always stay in sync.
+          const response = await adminOrdersApi.getOrders({ page: 1, limit: 1000 });
+          const mapped = response.orders.map(mapBackendOrder);
 
-          // Build params common to both calls (date range, min/max amount, payment)
-          const commonParams: Record<string, any> = {};
-          if (state.paymentFilter && state.paymentFilter !== 'All') {
-            commonParams.paymentStatus =
-              state.paymentFilter === 'Paid' ? 'PAID' :
-              state.paymentFilter === 'Online' ? 'PENDING' :
-              state.paymentFilter === 'Card' ? 'PAID' :
-              state.paymentFilter === 'Cash' ? 'PAID' : undefined;
-          }
-          if (state.minAmount) commonParams.minAmount = Number(state.minAmount);
-          if (state.maxAmount) commonParams.maxAmount = Number(state.maxAmount);
-          if (state.dateFilter && ['today', 'yesterday', 'last7', 'last30'].includes(state.dateFilter)) {
-            commonParams.dateRange = state.dateFilter;
-          }
-
-          // 1) Fetch a larger set to compute counts and overall stats (no status filter)
-          const allParams = { ...commonParams, page: 1, limit: 1000 };
-          const allResponse = await adminOrdersApi.getOrders(allParams);
-          const allMapped = allResponse.orders.map(mapBackendOrder);
-          // summary fetch for stats
-
-          // 2) Fetch view-specific page (may include status)
-          const viewParams: Record<string, any> = { ...commonParams, page: state.currentPage, limit: state.perPage };
-          if (state.activeTab && state.activeTab !== 'All') viewParams.status = state.activeTab.toUpperCase();
-
-          const viewResponse = await adminOrdersApi.getOrders(viewParams);
-          const viewMapped = viewResponse.orders.map(mapBackendOrder);
-          // view fetch for page
-
-          set({ orders: viewMapped, allOrders: allMapped, stats: deriveOrderStats(allMapped) });
+          set({ orders: mapped, allOrders: mapped, stats: deriveOrderStats(mapped) });
         } catch (err) {
           console.error('Failed to load admin orders', err);
         }
@@ -334,14 +314,16 @@ export const useOrdersStore = create<OrdersStore>()(
           const created = await adminOrdersApi.createOrder({
             customerName: payload.customerName,
             table: payload.table,
-            paymentStatus:
-              payload.payment === 'Paid'
-                ? 'PAID'
+            paymentStatus: payload.payment === 'Unpaid' ? 'PENDING' : 'PAID',
+            paymentMethod:
+              payload.payment === 'Card'
+                ? 'CARD'
                 : payload.payment === 'Online'
-                ? 'PENDING'
-                : payload.payment === 'Card'
-                ? 'PAID'
-                : 'PAID',
+                ? 'ONLINE'
+                : payload.payment === 'Unpaid'
+                ? undefined
+                : 'CASH',
+            assignedStaff: payload.staffId,
             items: payload.items.map((item) => ({
               name: item.name,
               quantity: item.quantity,
@@ -364,7 +346,7 @@ export const useOrdersStore = create<OrdersStore>()(
         }
       },
 
-      updateOrder: async (id, patch) => {
+      updateOrder: async (id, patch, force = false) => {
         try {
           const payload: any = {};
           if (patch.status !== undefined) {
@@ -374,6 +356,9 @@ export const useOrdersStore = create<OrdersStore>()(
               patch.status === 'Served' ? 'SERVED' :
               patch.status === 'Completed' ? 'COMPLETED' :
               patch.status === 'Cancelled' ? 'CANCELLED' : 'PENDING';
+            // Admin Edit modal forces status changes, bypassing the normal
+            // order state machine on the backend.
+            if (force) payload.adminOverride = true;
           }
           if (patch.table !== undefined) {
             payload.table = patch.table;
@@ -382,14 +367,17 @@ export const useOrdersStore = create<OrdersStore>()(
             payload.specialInstructions = patch.notes;
           }
           if (patch.payment !== undefined) {
-            payload.paymentStatus =
-              patch.payment === 'Paid'
-                ? 'PAID'
-                : patch.payment === 'Online'
-                ? 'PENDING'
-                : patch.payment === 'Card'
-                ? 'PAID'
-                : 'PAID';
+            if (patch.payment === 'Unpaid') {
+              payload.paymentStatus = 'PENDING';
+            } else {
+              payload.paymentStatus = 'PAID';
+              payload.paymentMethod =
+                patch.payment === 'Card'
+                  ? 'CARD'
+                  : patch.payment === 'Online'
+                  ? 'ONLINE'
+                  : 'CASH';
+            }
           }
 
           await adminOrdersApi.updateOrder(id, payload);
@@ -409,11 +397,43 @@ export const useOrdersStore = create<OrdersStore>()(
         }
       },
 
+      deleteOrder: async (id) => {
+        try {
+          await adminOrdersApi.deleteOrder(id);
+          // Remove the deleted order from both the visible and cached lists,
+          // then recompute the stat cards from the remaining orders.
+          set((s) => {
+            const allOrders = s.allOrders.filter((o) => o.id !== id);
+            return {
+              orders: s.orders.filter((o) => o.id !== id),
+              allOrders,
+              stats: deriveOrderStats(allOrders),
+            };
+          });
+        } catch (err) {
+          console.error('Failed to delete admin order', err);
+          throw err;
+        }
+      },
+
       addOrder: (order) =>
         set((state) => ({ orders: [order, ...state.orders] })),
     }),
     {
       name: 'admin-orders-store',
+      // Only persist UI filter state. Order data is always fetched fresh so we
+      // never show stale orders loaded from localStorage.
+      partialize: (state) => ({
+        activeTab: state.activeTab,
+        searchQuery: state.searchQuery,
+        paymentFilter: state.paymentFilter,
+        dateFilter: state.dateFilter,
+        sortBy: state.sortBy,
+        perPage: state.perPage,
+        currentPage: state.currentPage,
+        minAmount: state.minAmount,
+        maxAmount: state.maxAmount,
+      }),
     }
   )
 );

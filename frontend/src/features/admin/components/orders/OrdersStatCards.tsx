@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShoppingBag, Clock, CheckCircle, IndianRupee, TrendingUp, LucideIcon } from 'lucide-react';
-import { useOrdersStore } from '../../store/orders.store';
+import { type OrderStats } from '../../store/orders.store';
 
 interface StatCardProps {
   icon: LucideIcon;
@@ -27,9 +27,12 @@ function StatCard({ icon: Icon, iconBg, iconColor, label, value, sub, subColor }
   );
 }
 
-export function OrdersStatCards() {
-  const { stats } = useOrdersStore();
+interface OrdersStatCardsProps {
+  stats: OrderStats;
+  scopeNote?: string;
+}
 
+export function OrdersStatCards({ stats, scopeNote = 'All orders' }: OrdersStatCardsProps) {
   const cards: StatCardProps[] = [
     {
       icon: ShoppingBag,
@@ -37,8 +40,8 @@ export function OrdersStatCards() {
       iconColor: 'text-orange-500',
       label: 'Total Orders',
       value: String(stats.totalOrders),
-      sub: `↑ ${stats.totalOrdersChange} vs yesterday`,
-      subColor: 'text-green-600 dark:text-green-400 text-xs font-medium',
+      sub: scopeNote,
+      subColor: 'text-gray-500 dark:text-gray-400 text-xs',
     },
     {
       icon: Clock,
@@ -55,8 +58,8 @@ export function OrdersStatCards() {
       iconColor: 'text-green-500',
       label: 'Completed',
       value: String(stats.completed),
-      sub: '↑ 8.3% vs yesterday',
-      subColor: 'text-green-600 dark:text-green-400 text-xs font-medium',
+      sub: scopeNote,
+      subColor: 'text-gray-500 dark:text-gray-400 text-xs',
     },
     {
       icon: IndianRupee,
@@ -64,8 +67,8 @@ export function OrdersStatCards() {
       iconColor: 'text-purple-500',
       label: 'Total Revenue',
       value: stats.totalRevenue,
-      sub: `↑ ${stats.totalRevenueChange} vs yesterday`,
-      subColor: 'text-green-600 dark:text-green-400 text-xs font-medium',
+      sub: scopeNote,
+      subColor: 'text-gray-500 dark:text-gray-400 text-xs',
     },
     {
       icon: TrendingUp,
@@ -73,8 +76,8 @@ export function OrdersStatCards() {
       iconColor: 'text-amber-500',
       label: 'Avg. Order Value',
       value: stats.avgOrderValue,
-      sub: `↑ ${stats.avgOrderValueChange} vs yesterday`,
-      subColor: 'text-green-600 dark:text-green-400 text-xs font-medium',
+      sub: scopeNote,
+      subColor: 'text-gray-500 dark:text-gray-400 text-xs',
     },
   ];
 

@@ -1,93 +1,111 @@
-import React, { useState } from 'react';
-import { Pencil } from 'lucide-react';
+import React from 'react';
 import { useSettingsStore } from '../../store/settings.store';
 
+const ROLE_LABELS: Record<string, string> = {
+  'restaurant-admin': 'Administrator',
+  'restaurant-manager': 'Manager',
+  admin: 'Administrator',
+  manager: 'Manager',
+};
+
+function humanizeRole(role: string): string {
+  if (ROLE_LABELS[role]) return ROLE_LABELS[role];
+  return role
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export function ProfileCard(): JSX.Element {
-  const { profile, editingProfile, setEditingProfile, updateProfile } = useSettingsStore();
-  const [draft, setDraft] = useState({ ...profile });
+  const admin = useSettingsStore((s) => s.admin);
+  const updateProfile = useSettingsStore((s) => s.updateProfile);
 
-  function handleSave() {
-    updateProfile(draft);
-    setEditingProfile(false);
-  }
+  const [formData, setFormData] = React.useState({
+    name: admin.name,
+    mobile: admin.mobile,
+  });
+  const [saving, setSaving] = React.useState(false);
 
-  function handleCancel() {
-    setDraft({ ...profile });
-    setEditingProfile(false);
-  }
+  React.useEffect(() => {
+    setFormData({ name: admin.name, mobile: admin.mobile });
+  }, [admin.name, admin.mobile]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await updateProfile({ name: formData.name, mobile: formData.mobile });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 sm:p-6">
-      <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-5">Profile Settings</h3>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 transition-colors duration-200">
+      <div className="flex items-center gap-4 mb-5">
+        <div className="w-14 h-14 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl font-semibold">
+          {admin.name ? admin.name.charAt(0).toUpperCase() : 'A'}
+        </div>
+        <div>
+          <h3 className="font-semibold text-gray-800 dark:text-gray-100">{admin.name || 'Admin'}</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{humanizeRole(admin.role)}</p>
+        </div>
+      </div>
 
-      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-        {/* Avatar */}
-        <div className="relative flex-shrink-0">
-          <img
-            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.avatarSeed}`}
-            alt={profile.fullName}
-            className="w-20 h-20 rounded-2xl bg-orange-50 dark:bg-orange-950 object-cover border-2 border-orange-100 dark:border-orange-900"
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Full Name</label>
+          <input
+            type="text"
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={formData.name}
+            onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Your name"
           />
-          <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center shadow border-2 border-white dark:border-gray-900">
-            <Pencil className="w-3 h-3 text-white" />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Email</label>
+          <input
+            type="email"
+            disabled
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-sm cursor-not-allowed"
+            value={admin.email}
+            title="Email cannot be changed from here"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Phone</label>
+          <input
+            type="tel"
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={formData.mobile}
+            onChange={(e) => setFormData((f) => ({ ...f, mobile: e.target.value }))}
+            placeholder="Phone number"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Role</label>
+          <input
+            type="text"
+            disabled
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-sm cursor-not-allowed"
+            value={humanizeRole(admin.role)}
+          />
+        </div>
+
+        <div className="md:col-span-2 flex justify-end">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+          >
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
-
-        {/* Fields */}
-        <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          <Field label="Full Name">
-            {editingProfile
-              ? <input className={inputCls} value={draft.fullName} onChange={e => setDraft(d => ({ ...d, fullName: e.target.value }))} />
-              : <Value>{profile.fullName}</Value>}
-          </Field>
-          <Field label="Email Address">
-            {editingProfile
-              ? <input className={inputCls} value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} />
-              : <Value>{profile.email}</Value>}
-          </Field>
-          <Field label="Phone Number">
-            {editingProfile
-              ? <input className={inputCls} value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))} />
-              : <Value>{profile.phone}</Value>}
-          </Field>
-          <Field label="Role">
-            <Value>{profile.role}</Value>
-          </Field>
-        </div>
-      </div>
-
-      <div className="mt-5 flex flex-col sm:flex-row justify-end gap-2">
-        {editingProfile ? (
-          <>
-            <button onClick={handleCancel} className={secondaryBtn}>Cancel</button>
-            <button onClick={handleSave} className={primaryBtn}>Save Changes</button>
-          </>
-        ) : (
-          <button onClick={() => setEditingProfile(true)} className={primaryBtn}>Edit Profile</button>
-        )}
-      </div>
+      </form>
     </div>
   );
 }
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{label}</p>
-      {children}
-    </div>
-  );
-}
-
-function Value({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{children}</p>;
-}
-
-const inputCls =
-  'w-full text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 outline-none focus:ring-2 focus:ring-orange-200 dark:focus:ring-orange-800 focus:border-orange-300 dark:focus:border-orange-600 transition-all';
-
-const primaryBtn =
-  'px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors';
-
-const secondaryBtn =
-  'px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors';

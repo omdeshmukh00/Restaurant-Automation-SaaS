@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { PackageOpen, TrendingDown, Pencil, Trash2, MoreVertical, X } from 'lucide-react';
-import type { MenuItem, MenuItemStatus } from '../../store/menu.store';
+import type { MenuItem } from '../../store/menu.store';
 import { useMenuStore } from '../../store/menu.store';
 import { MenuStatusBadge } from './MenuStatusBadge';
 
 interface Props { item: MenuItem; }
 
-const STATUS_OPTIONS: MenuItemStatus[] = ['Available', 'Unavailable', 'Low Stock', 'Out of Stock'];
-
-const FALLBACK_IMG = 'https://via.placeholder.com/70x70/f3f4f6/9ca3af?text=dish';
+const FALLBACK_IMG =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70" viewBox="0 0 70 70">' +
+      '<rect width="70" height="70" rx="8" fill="#f3f4f6"/>' +
+      '<g fill="none" stroke="#9ca3af" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="35" cy="29" r="12"/>' +
+      '<path d="M22 52c0-7 5.4-12 13-12s13 5 13 12"/>' +
+      '</g></svg>',
+  );
 
 export function MenuItemCard({ item }: Props): JSX.Element {
   const { toggleItemEnabled, updateItem, deleteItem, categories } = useMenuStore();
@@ -18,9 +25,10 @@ export function MenuItemCard({ item }: Props): JSX.Element {
   const [editName,   setEditName]   = useState(item.name);
   const [editDesc,   setEditDesc]   = useState(item.description);
   const [editPrice,  setEditPrice]  = useState(String(item.price));
-  const [editStock,  setEditStock]  = useState(String(item.stock));
-  const [editStatus, setEditStatus] = useState<MenuItemStatus>(item.status);
-  const [editCat,    setEditCat]    = useState(item.category);
+  const [editStock,  setEditStock]  = useState(String(item.stockQuantity));
+  const [editAvailable, setEditAvailable] = useState(item.isAvailable);
+  const [editVeg, setEditVeg] = useState(item.isVeg);
+  const [editCat,    setEditCat]    = useState(item.categoryId);
   const [confirmDel, setConfirmDel] = useState(false);
 
   const validCategories = categories.filter((c) => c.id !== 'all');
@@ -32,8 +40,8 @@ export function MenuItemCard({ item }: Props): JSX.Element {
 
   const stockLabel =
     item.status === 'Out of Stock' ? 'Out of Stock' :
-    item.status === 'Low Stock'    ? `Low Stock (${item.stock})` :
-                                     `In Stock (${item.stock})`;
+    item.status === 'Low Stock'    ? `Low Stock (${item.stockQuantity})` :
+                                     `In Stock (${item.stockQuantity})`;
 
   const stockLabelClass =
     item.status === 'Out of Stock' ? 'text-red-400' :
@@ -42,12 +50,13 @@ export function MenuItemCard({ item }: Props): JSX.Element {
 
   const saveEdit = () => {
     updateItem(item.id, {
-      name:        editName.trim() || item.name,
-      description: editDesc.trim(),
-      price:       parseFloat(editPrice) || item.price,
-      stock:       parseInt(editStock, 10) || 0,
-      status:      editStatus,
-      category:    editCat,
+      name:          editName.trim() || item.name,
+      description:   editDesc.trim(),
+      price:         parseFloat(editPrice) || item.price,
+      stockQuantity: parseInt(editStock, 10) || 0,
+      isAvailable:   editAvailable,
+      isVeg:         editVeg,
+      categoryId:    editCat,
     });
     setShowEdit(false);
   };
@@ -98,9 +107,18 @@ export function MenuItemCard({ item }: Props): JSX.Element {
           </div>
           <input value={editStock} onChange={(e) => setEditStock(e.target.value)} type="number" placeholder="Stock" className={inputClass} />
         </div>
-        <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as MenuItemStatus)} className={inputClass}>
-          {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 dark:border-gray-700 dark:bg-gray-800">
+          <span className="text-xs text-gray-600 dark:text-gray-300">Vegetarian</span>
+          <button type="button" onClick={() => setEditVeg((v) => !v)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editVeg ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${editVeg ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 dark:border-gray-700 dark:bg-gray-800">
+          <span className="text-xs text-gray-600 dark:text-gray-300">Available</span>
+          <button type="button" onClick={() => setEditAvailable((v) => !v)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editAvailable ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${editAvailable ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </button>
+        </div>
         <select value={editCat} onChange={(e) => setEditCat(e.target.value)} className={inputClass}>
           {validCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>

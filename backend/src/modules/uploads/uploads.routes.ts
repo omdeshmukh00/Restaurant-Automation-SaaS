@@ -10,6 +10,11 @@ import { createUploadSchema, replaceUploadSchema, uploadIdParamSchema } from './
 
 const uploadRouter = Router();
 
+// Public image delivery — menu item images are inherently public (also served to
+// unauthenticated customers). Upload IDs are unguessable ObjectIds; only image
+// uploads are served. Registered before auth so <img> tags can load without cookies.
+uploadRouter.get('/:id/image', validate({ params: uploadIdParamSchema }), UploadController.downloadImagePublic);
+
 // Security: Define fine-grained RBAC roles
 const uploadRoles = [
   UserRole.RESTAURANT_ADMIN,
@@ -22,7 +27,7 @@ const deleteRoles = [
   UserRole.SUPER_ADMIN,
 ];
 
-// All endpoints require authentication and tenant isolation checks
+// All other endpoints require authentication and tenant isolation checks
 uploadRouter.use(requireAuth, tenantGuard);
 
 // List and Download: Allow any authenticated user within the same tenant

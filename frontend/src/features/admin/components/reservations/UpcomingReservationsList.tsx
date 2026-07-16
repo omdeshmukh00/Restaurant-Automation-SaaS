@@ -3,11 +3,46 @@ import { ArrowRight, Users, X, Search } from 'lucide-react';
 import { useAdminSearch } from '../../context/Adminsearchcontext';
 import { useReservationsStore, type Reservation, type ReservationStatus } from '../../store/reservations.store';
 
+function to24Minutes(time: string): number {
+  if (!time) return -1;
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(time.trim());
+  if (!match) {
+    const parsed = new Date(`1970-01-01 ${time}`);
+    return Number.isNaN(parsed.getTime()) ? -1 : parsed.getHours() * 60 + parsed.getMinutes();
+  }
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = match[3]?.toUpperCase();
+  if (period === 'PM' && hour < 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+function format12h(time: string): string {
+  if (!time) return '';
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(time.trim());
+  if (match) {
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const period = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+  }
+  const parsed = new Date(`1970-01-01 ${time}`);
+  if (!Number.isNaN(parsed.getTime())) {
+    let hour = parsed.getHours();
+    const minute = parsed.getMinutes();
+    const period = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+  }
+  return time;
+}
+
 const statusStyle: Record<ReservationStatus, string> = {
   Confirmed: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400',
   Pending:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400',
   Cancelled: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400',
-  'Walk-in': 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400',
   Completed: "bg-green-100 text-green-700",
   "Checked In": "bg-blue-100 text-blue-700",
   "No Show": "bg-red-100 text-red-700",
@@ -17,7 +52,6 @@ const timeColor: Record<ReservationStatus, string> = {
   Confirmed: 'text-orange-500',
   Pending:   'text-amber-500',
   Cancelled: 'text-red-500',
-  'Walk-in': 'text-purple-500',
   Completed: "text-green-700",
   "Checked In": "text-blue-700",
   "No Show": "text-red-700",
@@ -48,7 +82,7 @@ function ReservationRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-0.5">
-          <p className={`text-xs sm:text-sm font-semibold ${timeColor[r.status]}`}>{r.time}</p>
+          <p className={`text-xs sm:text-sm font-semibold ${timeColor[r.status]}`}>{format12h(r.time)}</p>
           <span
             className={`text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full flex-shrink-0 ${statusStyle[r.status]}`}
           >
@@ -66,7 +100,7 @@ function ReservationRow({
 }
 
 export function UpcomingReservationsList(): JSX.Element {
-  const { upcomingReservations, allReservations, selectedGuest, setSelectedGuest, filterStatus } =
+  const { upcomingReservations, allReservations, selectedGuest, setSelectedGuest, filterStatus, filterTime } =
     useReservationsStore();
   const { searchQuery: globalSearchQuery } = useAdminSearch();
 
@@ -75,26 +109,21 @@ export function UpcomingReservationsList(): JSX.Element {
 
   const activeSearch = modalSearchQuery.trim() || globalSearchQuery.trim();
   const activeSearchLower = activeSearch.toLowerCase();
+  const fromMinutes = filterTime ? to24Minutes(filterTime) : -1;
 
-  const filteredUpcoming = upcomingReservations.filter((r) => {
+  const matchesFilters = (r: Reservation): boolean => {
     if (filterStatus !== 'All' && r.status !== filterStatus) return false;
+    if (fromMinutes >= 0 && to24Minutes(r.time) < fromMinutes) return false;
     if (!activeSearchLower) return true;
     return (
       r.name.toLowerCase().includes(activeSearchLower) ||
       r.phone.includes(activeSearchLower) ||
       r.email.toLowerCase().includes(activeSearchLower)
     );
-  });
+  };
 
-  const filteredAll = allReservations.filter((r) => {
-    if (filterStatus !== 'All' && r.status !== filterStatus) return false;
-    if (!activeSearchLower) return true;
-    return (
-      r.name.toLowerCase().includes(activeSearchLower) ||
-      r.phone.includes(activeSearchLower) ||
-      r.email.toLowerCase().includes(activeSearchLower)
-    );
-  });
+  const filteredUpcoming = upcomingReservations.filter(matchesFilters);
+  const filteredAll = allReservations.filter(matchesFilters);
 
   return (
     <>

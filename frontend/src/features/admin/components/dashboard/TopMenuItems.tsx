@@ -2,18 +2,12 @@ import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useMenuStore } from '../../store/menu.store';
-
-const items = [
-  { name: 'Grilled Salmon',   category: 'Main Course', orders: 124, revenue: '₹37,200', trend: '+12%' },
-  { name: 'Margherita Pizza', category: 'Pizza',       orders: 98,  revenue: '₹24,500', trend: '+8%'  },
-  { name: 'Tiramisu',         category: 'Dessert',     orders: 87,  revenue: '₹13,050', trend: '+5%'  },
-  { name: 'Caesar Salad',     category: 'Salad',       orders: 76,  revenue: '₹11,400', trend: '-2%'  },
-  { name: 'Chicken Alfredo',  category: 'Pasta',       orders: 65,  revenue: '₹19,500', trend: '+3%'  },
-];
+import { useDashboardStore } from '../../store/dashboard.store';
 
 export function TopMenuItems(): JSX.Element {
   const navigate = useNavigate();
   const { setSortOption, setActiveCategory, setActiveFilter } = useMenuStore();
+  const items = useDashboardStore((s) => s.topItems);
 
   function handleViewAll() {
     setActiveCategory('all');

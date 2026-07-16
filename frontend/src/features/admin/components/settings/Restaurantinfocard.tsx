@@ -3,11 +3,11 @@ import { Store } from 'lucide-react';
 import { useSettingsStore } from '../../store/settings.store';
 
 export function RestaurantInfoCard(): JSX.Element {
-  const { restaurant, editingRestaurant, setEditingRestaurant, updateRestaurant } = useSettingsStore();
+  const { restaurant, editingRestaurant, setEditingRestaurant, updateRestaurantInfo } = useSettingsStore();
   const [draft, setDraft] = useState({ ...restaurant });
 
   function handleSave() {
-    updateRestaurant(draft);
+    updateRestaurantInfo(draft);
     setEditingRestaurant(false);
   }
 

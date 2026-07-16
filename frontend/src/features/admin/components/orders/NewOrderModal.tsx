@@ -1,47 +1,46 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
-import { useOrdersStore, type OrderStatus, type PaymentMethod } from '../../store/orders.store';
+import { useOrdersStore, type PaymentMethod } from '../../store/orders.store';
+import { useTablesStore } from '../../store/tables.store';
+import { useStaffStore } from '../../store/staff.store';
+import { useMenuStore } from '../../store/menu.store';
 
 interface NewOrderModalProps {
   onClose: () => void;
 }
 
-const MENU_ITEMS = [
-  { name: 'Butter Chicken',    price: 480 },
-  { name: 'Margherita Pizza',  price: 350 },
-  { name: 'Grilled Salmon',    price: 650 },
-  { name: 'Caesar Salad',      price: 280 },
-  { name: 'Pasta Carbonara',   price: 420 },
-  { name: 'Paneer Tikka',      price: 320 },
-  { name: 'Chicken Burger',    price: 290 },
-  { name: 'Veg Biryani',       price: 360 },
-  { name: 'Fish & Chips',      price: 390 },
-  { name: 'Tiramisu',          price: 220 },
-  { name: 'Garlic Bread',      price: 120 },
-  { name: 'Fresh Lime Soda',   price: 80  },
-];
-
-const TABLES = ['T-01','T-02','T-03','T-04','T-05','T-06','T-07','T-08','T-09','T-10','T-11','T-12','T-13','T-14','T-15'];
-const PAYMENT_OPTIONS: PaymentMethod[] = ['Paid', 'Online', 'Card', 'Cash'];
-const STAFF_OPTIONS = [
-  { name: 'Jessica', avatar: 'JE' },
-  { name: 'Michael', avatar: 'MI' },
-  { name: 'David',   avatar: 'DA' },
-];
+const PAYMENT_OPTIONS: PaymentMethod[] = ['Unpaid', 'Cash', 'Card', 'Online'];
 
 type CartItem = { name: string; price: number; qty: number };
 
 export function NewOrderModal({ onClose }: NewOrderModalProps) {
-  const { createOrder, orders } = useOrdersStore();
+  const { createOrder } = useOrdersStore();
+  const { tables, fetchTables } = useTablesStore();
+  const { members, fetchMembers } = useStaffStore();
+  const menuItems = useMenuStore((s) => s.items);
 
   const [customerName, setCustomerName] = useState('');
-  const [table,        setTable]        = useState('T-01');
-  const [payment,      setPayment]      = useState<PaymentMethod>('Cash');
-  const [staff,        setStaff]        = useState(STAFF_OPTIONS[0]);
-  const [notes,        setNotes]        = useState('');
-  const [cart,         setCart]         = useState<CartItem[]>([]);
-  const [saving,       setSaving]       = useState(false);
-  const [step,         setStep]         = useState<'details' | 'items'>('details');
+  const [table, setTable] = useState('');
+  const [payment, setPayment] = useState<PaymentMethod>('Cash');
+  const [staffId, setStaffId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<'details' | 'items'>('details');
+
+  useEffect(() => {
+    fetchTables();
+    fetchMembers();
+  }, [fetchTables, fetchMembers]);
+
+  // Default to the first real table so we never send a number the backend can't resolve.
+  useEffect(() => {
+    if (!table && tables.length) setTable(tables[0].label);
+  }, [tables, table]);
+
+  const availableMenu = menuItems.filter(
+    (item) => item.enabled !== false && item.status !== 'Out of Stock',
+  );
 
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
 
@@ -67,13 +66,14 @@ export function NewOrderModal({ onClose }: NewOrderModalProps) {
   }
 
   async function handleCreate() {
-    if (!customerName.trim() || cart.length === 0) return;
+    if (!customerName.trim() || cart.length === 0 || !table) return;
     setSaving(true);
     try {
       await createOrder({
         customerName: customerName.trim(),
         table,
         payment,
+        staffId: staffId || undefined,
         notes: notes.trim(),
         items: cart.map((item) => ({
           name: item.name,
@@ -89,150 +89,130 @@ export function NewOrderModal({ onClose }: NewOrderModalProps) {
     }
   }
 
-  const fieldClass = "w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 focus:border-orange-300 dark:focus:border-orange-700 text-gray-800 dark:text-gray-100 transition-all";
-  const labelClass = "block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5";
+  const fieldClass =
+    'w-full px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-800 dark:text-gray-100 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900/30';
+  const labelClass = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5';
+
   const canNext = customerName.trim().length > 0;
-  const canCreate = canNext && cart.length > 0;
+  const canCreate = canNext && cart.length > 0 && !!table;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button 
-        type="button" 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm w-full h-full cursor-default" 
-        onClick={onClose} 
-        aria-label="Close modal" 
-      />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose}></div>
 
-      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-gray-100 dark:border-gray-800">
-
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl bg-white dark:bg-gray-900 shadow-xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-orange-50 dark:bg-orange-900/30 flex items-center justify-center">
-              <ShoppingBag className="w-4 h-4 text-orange-500" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-gray-900 dark:text-white">New Order</h2>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Step {step === 'details' ? '1' : '2'} of 2 — {step === 'details' ? 'Order details' : 'Select items'}
-              </p>
-            </div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">New Order</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {step === 'details' ? 'Step 1 · Order details' : 'Step 2 · Add items'}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-
-          {step === 'details' && (
+          {step === 'details' ? (
             <div className="space-y-4">
               <div>
-                <label htmlFor="customer-name" className={labelClass}>Customer Name *</label>
+                <label htmlFor="customer-name" className={labelClass}>Customer Name</label>
                 <input
                   id="customer-name"
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Enter customer name"
+                  placeholder="e.g. Aarav Sharma"
                   className={fieldClass}
                 />
               </div>
 
               <div>
                 <label htmlFor="table-select" className={labelClass}>Table</label>
-                <select id="table-select" value={table} onChange={(e) => setTable(e.target.value)} className={fieldClass}>
-                  {TABLES.map((t) => <option key={t} value={t}>{t}</option>)}
+                <select
+                  id="table-select"
+                  value={table}
+                  onChange={(e) => setTable(e.target.value)}
+                  className={fieldClass}
+                >
+                  {tables.length === 0 && <option value="">No tables available</option>}
+                  {tables.map((t) => (
+                    <option key={t.id} value={t.label}>
+                      {t.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
-                <span className={labelClass}>Assigned Staff</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {STAFF_OPTIONS.map((s) => (
-                    <button
-                      key={s.name}
-                      onClick={() => setStaff(s)}
-                      className={`py-2 text-sm font-semibold rounded-xl border transition-all ${
-                        staff.name === s.name
-                          ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800'
-                          : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                    >
-                      {s.name}
-                    </button>
+                <label htmlFor="staff-select" className={labelClass}>Assigned Staff</label>
+                <select
+                  id="staff-select"
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} · {m.role}
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
 
               <div>
-                <span className={labelClass}>Payment Method</span>
-                <div className="grid grid-cols-4 gap-2">
+                <label htmlFor="payment-select" className={labelClass}>Payment Method</label>
+                <select
+                  id="payment-select"
+                  value={payment}
+                  onChange={(e) => setPayment(e.target.value as PaymentMethod)}
+                  className={fieldClass}
+                >
                   {PAYMENT_OPTIONS.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPayment(p)}
-                      className={`py-1.5 text-xs font-semibold rounded-xl border transition-all ${
-                        payment === p
-                          ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800'
-                          : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                      }`}
-                    >
+                    <option key={p} value={p}>
                       {p}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
 
               <div>
-                <label htmlFor="order-notes" className={labelClass}>Notes (optional)</label>
+                <label htmlFor="notes" className={labelClass}>Notes (optional)</label>
                 <textarea
-                  id="order-notes"
+                  id="notes"
+                  rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Special instructions..."
-                  className={`${fieldClass} resize-none`}
+                  placeholder="Allergies, special requests…"
+                  className={fieldClass}
                 />
               </div>
             </div>
-          )}
-
-          {step === 'items' && (
-            <div className="space-y-4">
-              {/* Cart summary */}
-              {cart.length > 0 && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800/40 rounded-xl p-3">
-                  <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-2">
-                    Cart ({cart.reduce((s, i) => s + i.qty, 0)} items) · ₹{total.toLocaleString('en-IN')}
-                  </p>
-                  <div className="space-y-1">
-                    {cart.map((c) => (
-                      <div key={c.name} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700 dark:text-gray-300">{c.name} ×{c.qty}</span>
-                        <span className="text-gray-500 dark:text-gray-400">₹{(c.price * c.qty).toLocaleString('en-IN')}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Menu grid */}
+          ) : (
+            <div className="space-y-3">
               <div className="grid grid-cols-1 gap-2">
-                {MENU_ITEMS.map((item) => {
+                {availableMenu.length === 0 && (
+                  <p className="text-sm text-gray-400 dark:text-gray-500">No menu items available.</p>
+                )}
+                {availableMenu.map((item) => {
                   const qty = qtyOf(item.name);
                   return (
                     <div
-                      key={item.name}
+                      key={item.id}
                       className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl"
                     >
                       <div>
                         <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{item.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">₹{item.price.toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          ₹{item.price.toLocaleString('en-IN')}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
                         {qty > 0 ? (
@@ -243,7 +223,9 @@ export function NewOrderModal({ onClose }: NewOrderModalProps) {
                             >
                               <Minus className="w-3.5 h-3.5" />
                             </button>
-                            <span className="w-5 text-center text-sm font-bold text-gray-800 dark:text-gray-100">{qty}</span>
+                            <span className="w-5 text-center text-sm font-bold text-gray-800 dark:text-gray-100">
+                              {qty}
+                            </span>
                           </>
                         ) : (
                           <span className="w-5 text-center" />
@@ -259,45 +241,59 @@ export function NewOrderModal({ onClose }: NewOrderModalProps) {
                   );
                 })}
               </div>
+
+              {cart.length > 0 && (
+                <div className="mt-4 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">Order Summary</p>
+                  {cart.map((item) => (
+                    <div key={item.name} className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>
+                        {item.qty} × {item.name}
+                      </span>
+                      <span>₹{(item.price * item.qty).toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 text-sm font-bold text-gray-800 dark:text-gray-100">
+                    <span>Total</span>
+                    <span>₹{total.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
-          {step === 'details' ? (
-            <>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setStep('items')}
-                disabled={!canNext}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next: Add Items →
-              </button>
-            </>
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+          {step === 'items' ? (
+            <button
+              onClick={() => setStep('details')}
+              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+            >
+              ← Back
+            </button>
           ) : (
-            <>
-              <button
-                onClick={() => setStep('details')}
-                className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={!canCreate || saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                {saving ? 'Creating…' : `Create Order · ₹${total.toLocaleString('en-IN')}`}
-              </button>
-            </>
+            <span className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+              <ShoppingBag className="w-4 h-4" /> Add items next
+            </span>
+          )}
+
+          {step === 'details' ? (
+            <button
+              disabled={!canNext}
+              onClick={() => setStep('items')}
+              className="px-5 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
+            >
+              Next: Items
+            </button>
+          ) : (
+            <button
+              disabled={!canCreate || saving}
+              onClick={handleCreate}
+              className="px-5 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
+            >
+              {saving ? 'Creating…' : 'Create Order'}
+            </button>
           )}
         </div>
       </div>

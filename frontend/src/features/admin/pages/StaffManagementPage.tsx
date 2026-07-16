@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Download,
   Plus,
@@ -49,6 +49,7 @@ function AddStaffModal({ onClose }: AddStaffModalProps): JSX.Element {
     cleaning_role: '',
     status: 'Active' as StaffStatus,
     salary: '',
+    dateOfBirth: '',
     hireDate: new Date().toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -100,6 +101,7 @@ function AddStaffModal({ onClose }: AddStaffModalProps): JSX.Element {
       department: feDept,
       status: form.status,
       salary: Number(form.salary),
+      dateOfBirth: form.dateOfBirth || undefined,
     });
     onClose();
   };
@@ -256,7 +258,6 @@ function AddStaffModal({ onClose }: AddStaffModalProps): JSX.Element {
                   <option value="service-staff">Service Staff</option>
                   <option value="kitchen-staff">Kitchen Staff</option>
                   <option value="cleaning-staff">Cleaning Staff</option>
-                  <option value="restaurant-admin">Restaurant Admin</option>
                 </select>
                 <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               </div>
@@ -355,6 +356,23 @@ function AddStaffModal({ onClose }: AddStaffModalProps): JSX.Element {
               />
               {errors.salary && <p className="text-xs text-red-500 mt-1">{errors.salary}</p>}
             </div>
+          </div>
+
+          {/* Date of Birth */}
+          <div>
+            <label
+              htmlFor="add-dob"
+              className="text-xs font-semibold text-gray-600 dark:text-gray-400 flex items-center gap-1.5 mb-1.5"
+            >
+              <Calendar className="w-3.5 h-3.5" /> Date of Birth
+            </label>
+            <input
+              id="add-dob"
+              type="date"
+              value={form.dateOfBirth}
+              onChange={(e) => field('dateOfBirth', e.target.value)}
+              className="w-full px-3 py-2.5 sm:py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 text-gray-900 dark:text-gray-100"
+            />
           </div>
         </div>
 
@@ -559,6 +577,14 @@ function ExportReportModal({ onClose }: ExportReportModalProps): JSX.Element {
 export default function StaffManagementPage(): JSX.Element {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+
+  const { fetchAttendance, fetchPerformance, fetchShifts } = useStaffStore();
+
+  useEffect(() => {
+    fetchAttendance();
+    fetchPerformance();
+    fetchShifts();
+  }, [fetchAttendance, fetchPerformance, fetchShifts]);
 
   return (
     <div className="space-y-4 sm:space-y-5">

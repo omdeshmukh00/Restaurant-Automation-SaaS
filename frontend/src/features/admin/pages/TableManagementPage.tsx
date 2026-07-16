@@ -23,12 +23,9 @@ export function TableManagementPage(): JSX.Element {
   const {
     tables,
     viewMode,
-    selectedFloor,
     showAddModal,
     showEditModal,
     selectedTableId,
-    floors,
-    setFloor,
     setShowAddModal,
     setShowEditModal,
     fetchTables,
@@ -48,13 +45,13 @@ export function TableManagementPage(): JSX.Element {
       fetchTables();
     };
 
-    socket.on('table.updated', handleUpdate);
+    socket.on('table.status.changed', handleUpdate);
     socket.on('order.new', handleUpdate);
     socket.on('order.updated', handleUpdate);
     socket.on('menu.updated', handleUpdate);
 
     return () => {
-      socket.off('table.updated', handleUpdate);
+      socket.off('table.status.changed', handleUpdate);
       socket.off('order.new', handleUpdate);
       socket.off('order.updated', handleUpdate);
       socket.off('menu.updated', handleUpdate);
@@ -75,24 +72,6 @@ export function TableManagementPage(): JSX.Element {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Floor switcher */}
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-            {floors.map((f) => (
-              <button
-                key={f.number}
-                type="button"
-                onClick={() => setFloor(f.number)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  selectedFloor === f.number
-                    ? 'bg-white dark:bg-gray-700 text-orange-500 shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400'
-                }`}
-              >
-                {f.name}
-              </button>
-            ))}
-          </div>
-
           {/* Download All QR */}
           {tables.length === 0 && (
             <span className="text-xs text-amber-500 font-semibold bg-amber-50 dark:bg-amber-950/20 px-3 py-2 rounded-xl border border-amber-100 dark:border-amber-900/30">

@@ -14,7 +14,7 @@ export const sharedRouter = Router();
 const uploadBodySchema = z.object({
   fileName: z.string().trim().min(1).max(255),
   text: z.string().max(100_000).optional(),
-  contentBase64: z.string().max(1_000_000).optional(),
+  contentBase64: z.string().max(15_000_000).optional(),
   mimeType: z.string().trim().min(1).max(100).optional(),
 });
 

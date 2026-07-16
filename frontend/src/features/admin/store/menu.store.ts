@@ -1,16 +1,30 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { apiClient } from '../../../shared/services/apiClient';
+import { env } from '../../../lib/env';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 export type MenuItemStatus = 'Available' | 'Unavailable' | 'Low Stock' | 'Out of Stock';
-export type SortOption = 'Name A-Z' | 'Name Z-A' | 'Price Low-High' | 'Price High-Low' | 'Stock Low-High';
 export type FilterTab = 'All Items' | 'Available' | 'Unavailable' | 'Low Stock';
-
+export type SortOption = 'Name A-Z' | 'Name Z-A' | 'Price Low-High' | 'Price High-Low' | 'Stock Low-High';
 export interface AdvancedFilter {
   minPrice: string;
   maxPrice: string;
   statuses: MenuItemStatus[];
+}
+
+const LOW_STOCK_THRESHOLD = 10;
+
+export interface Category {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  isActive: boolean;
+  isHidden: boolean;
+  displayOrder: number;
+  count: number;
 }
 
 export interface MenuItem {
@@ -18,292 +32,459 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
-  category: string;
-  status: MenuItemStatus;
-  stock: number;
+  categoryId: string;
+  categoryName: string;
   image: string;
+  isVeg: boolean;
+  isAvailable: boolean;
+  isHidden: boolean;
   enabled: boolean;
+  stockQuantity: number;
+  status: MenuItemStatus;
 }
 
-export interface Category {
-  id: string;
+export interface ItemCreateInput {
   name: string;
-  count: number;
+  description?: string;
+  price: number;
+  categoryId: string;
+  isVeg: boolean;
+  isAvailable?: boolean;
+  stockQuantity?: number;
+  image?: string;
 }
 
-export interface MenuStore {
-  // Data
+export type ItemUpdateInput = Partial<{
+  name: string;
+  description: string;
+  price: number;
+  categoryId: string;
+  isVeg: boolean;
+  isAvailable: boolean;
+  isHidden: boolean;
+  stockQuantity: number;
+  image: string;
+}>;
+
+// Raw backend shapes (defensive — list uses .lean() so items arrive as `_id`,
+// and categories are full docs with the `id` virtual).
+interface RawItem {
+  id?: string;
+  _id?: string | { toString(): string };
+  name?: string;
+  description?: string;
+  price?: number;
+  categoryId?: string | { toString(): string };
+  image?: string;
+  isVeg?: boolean;
+  isAvailable?: boolean;
+  isHidden?: boolean;
+  stockQuantity?: number;
+}
+interface RawCategory {
+  id?: string;
+  _id?: string | { toString(): string };
+  name?: string;
+  description?: string;
+  image?: string;
+  isActive?: boolean;
+  isHidden?: boolean;
+  displayOrder?: number;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function asString(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object' && typeof (v as { toString?: () => string }).toString === 'function') {
+    return (v as { toString: () => string }).toString();
+  }
+  return String(v);
+}
+
+function deriveStatus(isAvailable: boolean, isHidden: boolean, stockQuantity: number): MenuItemStatus {
+  if (stockQuantity <= 0) return 'Out of Stock';
+  if (stockQuantity <= LOW_STOCK_THRESHOLD) return 'Low Stock';
+  if (!isAvailable) return 'Unavailable';
+  return 'Available';
+}
+
+const BACKEND_ORIGIN = (env.apiUrl ?? '').replace(/\/api\/v\d+$/i, '');
+
+function resolveImage(url: string | undefined): string {
+  if (!url) return '';
+  if (!url.startsWith('/')) return url;
+  if (!/^https?:\/\//i.test(BACKEND_ORIGIN)) return url;
+  return `${BACKEND_ORIGIN}${url}`;
+}
+
+function mapItem(raw: RawItem, categoryName = ''): MenuItem {
+  const id = raw.id ?? asString(raw._id);
+  const categoryId = asString(raw.categoryId);
+  const stockQuantity = typeof raw.stockQuantity === 'number' ? raw.stockQuantity : 0;
+  const isAvailable = raw.isAvailable !== false;
+  const isHidden = !!raw.isHidden;
+  return {
+    id,
+    name: raw.name ?? '',
+    description: raw.description ?? '',
+    price: typeof raw.price === 'number' ? raw.price : 0,
+    categoryId,
+    categoryName,
+    image: resolveImage(raw.image),
+    isVeg: !!raw.isVeg,
+    isAvailable,
+    isHidden,
+    enabled: !isHidden,
+    stockQuantity,
+    status: deriveStatus(isAvailable, isHidden, stockQuantity),
+  };
+}
+
+function mapCategory(raw: RawCategory): Category {
+  return {
+    id: raw.id ?? asString(raw._id),
+    name: raw.name ?? '',
+    description: raw.description ?? '',
+    image: raw.image ?? '',
+    isActive: raw.isActive !== false,
+    isHidden: !!raw.isHidden,
+    displayOrder: typeof raw.displayOrder === 'number' ? raw.displayOrder : 0,
+    count: 0,
+  };
+}
+
+function buildCategoryNameMap(categories: Category[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  categories.forEach((c) => {
+    map[c.id] = c.name;
+  });
+  return map;
+}
+
+function countItemsByCategory(items: MenuItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  items.forEach((i) => {
+    counts[i.categoryId] = (counts[i.categoryId] ?? 0) + 1;
+  });
+  return counts;
+}
+
+function compressImage(
+  file: File,
+  maxDim = 1000,
+  quality = 0.7,
+): Promise<{ base64: string; type: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas not supported'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const type = 'image/jpeg';
+        let dataUrl = canvas.toDataURL(type, quality);
+        let base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        if (base64.length > 6_000_000 && quality > 0.4) {
+          dataUrl = canvas.toDataURL(type, 0.4);
+          base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        }
+        resolve({ base64, type });
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Store ──────────────────────────────────────────────────────────────────
+
+interface MenuStore {
   items: MenuItem[];
   categories: Category[];
-
-  // Filters / UI state
-  activeCategory: string;
-  activeFilter: FilterTab;
-  advancedFilter: AdvancedFilter;
   searchQuery: string;
+  activeCategory: string;
   sortOption: SortOption;
+  activeFilter: FilterTab;
+  statusFilter: MenuItemStatus | null;
+  advancedFilter: AdvancedFilter;
   currentPage: number;
   perPage: number;
-
-  // Actions – items
-  setActiveCategory: (id: string) => void;
-  setActiveFilter: (f: FilterTab) => void;
-  setAdvancedFilter: (f: AdvancedFilter) => void;
-  setSearchQuery: (q: string) => void;
-  setSortOption: (s: SortOption) => void;
   setCurrentPage: (p: number) => void;
-  toggleItemEnabled: (id: string) => void;
-  updateItemStatus: (id: string, status: MenuItemStatus) => void;
-  addItem: (item: Omit<MenuItem, 'id'>) => void;
-  updateItem: (id: string, data: Partial<Omit<MenuItem, 'id'>>) => void;
-  deleteItem: (id: string) => void;
+  isLoading: boolean;
+  error: string | null;
 
-  // Actions – categories
-  addCategory: (name: string) => void;
-  updateCategory: (id: string, name: string) => void;
-  deleteCategory: (id: string) => void;
+  fetchItems: () => Promise<void>;
+  fetchCategories: () => Promise<void>;
+  refresh: () => Promise<void>;
+  addItem: (input: ItemCreateInput) => Promise<void>;
+  updateItem: (id: string, data: ItemUpdateInput) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  toggleItemEnabled: (id: string) => Promise<void>;
+  setItemAvailability: (id: string, isAvailable: boolean) => Promise<void>;
+  uploadImage: (file: File) => Promise<string>;
+  addCategory: (name: string) => Promise<void>;
+  updateCategory: (id: string, name: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  recomputeCounts: () => void;
+
+  setSearchQuery: (q: string) => void;
+  setActiveCategory: (id: string) => void;
+  setSortOption: (opt: SortOption) => void;
+  setActiveFilter: (tab: FilterTab) => void;
+  setStatusFilter: (status: MenuItemStatus | null) => void;
+  setAdvancedFilter: (f: AdvancedFilter) => void;
 }
 
-// ── Seed Data ─────────────────────────────────────────────────────────────────
-
-const seedCategories: Category[] = [
-  { id: 'all',         name: 'All Categories', count: 12 },
-  { id: 'appetizers',  name: 'Appetizers',     count: 1  },
-  { id: 'main-course', name: 'Main Course',    count: 5  },
-  { id: 'beverages',   name: 'Beverages',      count: 2  },
-  { id: 'desserts',    name: 'Desserts',       count: 1  },
-  { id: 'salads',      name: 'Salads',         count: 1  },
-  { id: 'sides',       name: 'Sides',          count: 2  },
-];
-
-const seedItems: MenuItem[] = [
-  {
-    id: 'm1', name: 'Margherita Pizza', description: 'Classic delight with 100% fresh ingredients',
-    price: 1050, category: 'main-course', status: 'Available', stock: 45,
-    image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm2', name: 'Grilled Salmon', description: 'Fresh salmon with lemon butter sauce',
-    price: 1590, category: 'main-course', status: 'Available', stock: 25,
-    image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm3', name: 'Chicken Burger', description: 'Grilled chicken with special sauce',
-    price: 820, category: 'main-course', status: 'Available', stock: 60,
-    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm4', name: 'Caesar Salad', description: 'Crisp romaine with caesar dressing',
-    price: 630, category: 'salads', status: 'Available', stock: 30,
-    image: 'https://images.unsplash.com/photo-1546793665-c74683f339c1?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm5', name: 'Chocolate Cake', description: 'Rich chocolate layered cake',
-    price: 520, category: 'desserts', status: 'Available', stock: 20,
-    image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm6', name: 'Lemonade', description: 'Fresh lemonade with mint',
-    price: 270, category: 'beverages', status: 'Available', stock: 50,
-    image: 'https://images.unsplash.com/photo-1621263764928-df1444c5e859?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm7', name: 'Pasta Alfredo', description: 'Creamy alfredo pasta',
-    price: 990, category: 'main-course', status: 'Available', stock: 40,
-    image: 'https://images.unsplash.com/photo-1645112411341-6c4fd023714a?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm8', name: 'French Fries', description: 'Crispy golden french fries',
-    price: 330, category: 'sides', status: 'Low Stock', stock: 9,
-    image: 'https://images.unsplash.com/photo-1630431341973-02e1b662ec35?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm9', name: 'BBQ Chicken Wings', description: 'Spicy BBQ chicken wings',
-    price: 750, category: 'appetizers', status: 'Available', stock: 35,
-    image: 'https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm10', name: 'Iced Coffee', description: 'Chilled coffee with ice',
-    price: 380, category: 'beverages', status: 'Available', stock: 25,
-    image: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-  {
-    id: 'm11', name: 'Vegetable Stir Fry', description: 'Stir fried veggies with asian sauce',
-    price: 830, category: 'main-course', status: 'Available', stock: 30,
-    image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=120&h=120&fit=crop',
-    enabled: true,
-  },
-];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-}
-
-function rebuildCounts(items: MenuItem[], categories: Category[]): Category[] {
-  return categories.map((cat) => ({
-    ...cat,
-    count: cat.id === 'all' ? items.length : items.filter((i) => i.category === cat.id).length,
-  }));
-}
-
-const DEFAULT_ADVANCED_FILTER: AdvancedFilter = { minPrice: '', maxPrice: '', statuses: [] };
-
-// ── Store ─────────────────────────────────────────────────────────────────────
-
-let nextItemId = 100;
-let nextCatId  = 200;
+const DEFAULT_ADVANCED: AdvancedFilter = { minPrice: '', maxPrice: '', statuses: [] };
 
 export const useMenuStore = create<MenuStore>()(
   persist(
-    (set) => ({
-      items:      seedItems,
-      categories: rebuildCounts(seedItems, seedCategories),
+    (set, get) => ({
+      items: [],
+      categories: [],
+      searchQuery: '',
+      activeCategory: 'all',
+      sortOption: 'Name A-Z',
+      activeFilter: 'All Items',
+      statusFilter: null,
+      advancedFilter: DEFAULT_ADVANCED,
+      currentPage: 1,
+      perPage: 12,
+      isLoading: false,
+      error: null,
 
-      activeCategory:  'all',
-      activeFilter:    'All Items',
-      advancedFilter:  DEFAULT_ADVANCED_FILTER,
-      searchQuery:     '',
-      sortOption:      'Name A-Z',
-      currentPage:     1,
-      perPage:         12,
-
-      setActiveCategory:  (id) => set({ activeCategory: id,  currentPage: 1 }),
-      setActiveFilter:    (f)  => set({ activeFilter: f,     currentPage: 1 }),
-      setAdvancedFilter:  (f)  => set({ advancedFilter: f,   currentPage: 1 }),
-      setSearchQuery:     (q)  => set({ searchQuery: q,      currentPage: 1 }),
-      setSortOption:      (s)  => set({ sortOption: s }),
-      setCurrentPage:     (p)  => set({ currentPage: p }),
-
-      toggleItemEnabled: (id) =>
-        set((state) => {
-          const items = state.items.map((item) =>
-            item.id === id ? { ...item, enabled: !item.enabled } : item
-          );
-          return { items, categories: rebuildCounts(items, state.categories) };
-        }),
-
-      updateItemStatus: (id, status) =>
-        set((state) => ({
-          items: state.items.map((item) =>
-            item.id === id ? { ...item, status } : item
-          ),
-        })),
-
-      addItem: (item) =>
-        set((state) => {
-          const newItem: MenuItem = { ...item, id: `m${++nextItemId}` };
-          const items = [...state.items, newItem];
-          return { items, categories: rebuildCounts(items, state.categories), currentPage: 1 };
-        }),
-
-      updateItem: (id, data) =>
-        set((state) => {
-          const items = state.items.map((item) =>
-            item.id === id ? { ...item, ...data } : item
-          );
-          return { items, categories: rebuildCounts(items, state.categories) };
-        }),
-
-      deleteItem: (id) =>
-        set((state) => {
-          const items = state.items.filter((item) => item.id !== id);
-          return { items, categories: rebuildCounts(items, state.categories) };
-        }),
-
-      addCategory: (name) =>
-        set((state) => {
-          const newCat: Category = {
-            id:    `cat${++nextCatId}-${slugify(name)}`,
-            name,
-            count: 0,
-          };
-          const withoutAll = state.categories.filter((c) => c.id !== 'all');
-          const allCat     = state.categories.find((c)  => c.id === 'all')!;
-          return { categories: [allCat, ...withoutAll, newCat] };
-        }),
-
-      updateCategory: (id, name) =>
-        set((state) => ({
-          categories: state.categories.map((c) =>
-            c.id === id ? { ...c, name } : c
-          ),
-        })),
-
-      deleteCategory: (id) =>
-        set((state) => {
-          const items = state.items.map((item) =>
-            item.category === id ? { ...item, category: 'uncategorised' } : item
-          );
-          const categories = state.categories.filter((c) => c.id !== id && c.id !== 'all');
-          const allCat     = { ...state.categories.find((c) => c.id === 'all')!, count: items.length };
+      recomputeCounts: () => {
+        set((s) => {
+          const counts = countItemsByCategory(s.items);
           return {
-            items,
-            categories: [allCat, ...categories],
-            activeCategory: state.activeCategory === id ? 'all' : state.activeCategory,
+            categories: s.categories.map((c) =>
+              c.id === 'all' ? { ...c, count: s.items.length } : { ...c, count: counts[c.id] ?? 0 },
+            ),
           };
-        }),
+        });
+      },
+
+      fetchCategories: async () => {
+        try {
+          const res = await apiClient.get('/admin/menu/categories');
+          const raw = (res.data?.data ?? []) as RawCategory[];
+          const mapped = raw
+            .map(mapCategory)
+            .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name));
+          const allCategory: Category = {
+            id: 'all',
+            name: 'All Items',
+            description: '',
+            image: '',
+            isActive: true,
+            isHidden: false,
+            displayOrder: -1,
+            count: get().items.length,
+          };
+          set({ categories: [allCategory, ...mapped] });
+          get().recomputeCounts();
+        } catch (e: any) {
+          set({ error: e?.response?.data?.message ?? 'Failed to load categories' });
+        }
+      },
+
+      fetchItems: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const res = await apiClient.get('/admin/menu/items?limit=1000');
+          const rawItems = (res.data?.data?.items ?? []) as RawItem[];
+          const catMap = buildCategoryNameMap(get().categories);
+          const items = rawItems.map((r) => mapItem(r, catMap[asString(r.categoryId)] ?? ''));
+          set({ items, isLoading: false });
+          get().recomputeCounts();
+        } catch (e: any) {
+          set({ isLoading: false, error: e?.response?.data?.message ?? 'Failed to load menu items' });
+        }
+      },
+
+      refresh: async () => {
+        await get().fetchCategories();
+        await get().fetchItems();
+      },
+
+      addItem: async (input) => {
+        const res = await apiClient.post('/admin/menu/items', input);
+        const raw = res.data?.data as RawItem;
+        const catMap = buildCategoryNameMap(get().categories);
+        const created = mapItem(raw, catMap[asString(raw.categoryId)] ?? '');
+        set((s) => ({ items: [created, ...s.items] }));
+        get().recomputeCounts();
+      },
+
+      updateItem: async (id, data) => {
+        const res = await apiClient.patch(`/admin/menu/items/${id}`, data);
+        const raw = res.data?.data as RawItem;
+        const catMap = buildCategoryNameMap(get().categories);
+        const prevName = get().items.find((i) => i.id === id)?.categoryName ?? '';
+        const updated = mapItem(raw, catMap[asString(raw.categoryId)] ?? prevName);
+        set((s) => ({ items: s.items.map((i) => (i.id === id ? updated : i)) }));
+      },
+
+      deleteItem: async (id) => {
+        await apiClient.delete(`/admin/menu/items/${id}`);
+        set((s) => ({ items: s.items.filter((i) => i.id !== id) }));
+        get().recomputeCounts();
+      },
+
+      toggleItemEnabled: async (id) => {
+        const item = get().items.find((i) => i.id === id);
+        if (!item) return;
+        const isHidden = !item.isHidden;
+        const res = await apiClient.patch(`/admin/menu/items/${id}/visibility`, { isHidden });
+        const raw = res.data?.data as RawItem;
+        const catMap = buildCategoryNameMap(get().categories);
+        const updated = mapItem(raw, catMap[asString(raw.categoryId)] ?? item.categoryName);
+        set((s) => ({ items: s.items.map((i) => (i.id === id ? updated : i)) }));
+      },
+
+      setItemAvailability: async (id, isAvailable) => {
+        const res = await apiClient.patch(`/admin/menu/items/${id}/availability`, { isAvailable });
+        const raw = res.data?.data as RawItem;
+        const catMap = buildCategoryNameMap(get().categories);
+        const prevName = get().items.find((i) => i.id === id)?.categoryName ?? '';
+        const updated = mapItem(raw, catMap[asString(raw.categoryId)] ?? prevName);
+        set((s) => ({ items: s.items.map((i) => (i.id === id ? updated : i)) }));
+      },
+
+      uploadImage: async (file) => {
+        const { base64, type } = await compressImage(file);
+        const res = await apiClient.post('/uploads', {
+          fileName: file.name,
+          content: base64,
+          mimeType: type,
+        });
+        const id = res.data?.data?._id;
+        if (!id) return '';
+        return `${env.apiUrl}/uploads/${id}/image`;
+      },
+
+      addCategory: async (name) => {
+        const res = await apiClient.post('/admin/menu/categories', { name });
+        const raw = res.data?.data as RawCategory;
+        const cat = mapCategory(raw);
+        set((s) => ({ categories: [...s.categories, cat] }));
+      },
+
+      updateCategory: async (id, name) => {
+        const res = await apiClient.patch(`/admin/menu/categories/${id}`, { name });
+        const raw = res.data?.data as RawCategory;
+        const updated = mapCategory(raw);
+        set((s) => ({ categories: s.categories.map((c) => (c.id === id ? updated : c)) }));
+      },
+
+      deleteCategory: async (id) => {
+        await apiClient.delete(`/admin/menu/categories/${id}`);
+        set((s) => ({ categories: s.categories.filter((c) => c.id !== id) }));
+        get().recomputeCounts();
+      },
+
+      setSearchQuery: (q) => set({ searchQuery: q, currentPage: 1 }),
+      setActiveCategory: (id) => set({ activeCategory: id, currentPage: 1 }),
+      setSortOption: (opt) => set({ sortOption: opt, currentPage: 1 }),
+      setActiveFilter: (tab) => set({ activeFilter: tab, currentPage: 1 }),
+      setStatusFilter: (status) => set({ statusFilter: status, currentPage: 1 }),
+      setAdvancedFilter: (f) => set({ advancedFilter: f, currentPage: 1 }),
+      setCurrentPage: (p) => set({ currentPage: Math.max(1, Math.floor(p)) }),
     }),
     {
-      name: 'admin-menu-store',
+      name: 'menu-store',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (s) => ({
+        searchQuery: s.searchQuery,
+        activeCategory: s.activeCategory,
+        sortOption: s.sortOption,
+        activeFilter: s.activeFilter,
+        statusFilter: s.statusFilter,
+        advancedFilter: s.advancedFilter,
+      }),
     }
   )
 );
 
-// ── Selector (pure, no hooks) ─────────────────────────────────────────────────
+// ── Selectors ──────────────────────────────────────────────────────────────
 
 export function getFilteredItems(store: MenuStore): MenuItem[] {
-  let result = [...store.items];
+  let items = store.items;
 
-  // Category
   if (store.activeCategory !== 'all') {
-    result = result.filter((i) => i.category === store.activeCategory);
+    items = items.filter((i) => i.categoryId === store.activeCategory);
   }
 
-  // Tab filter
-  if (store.activeFilter === 'Available')   result = result.filter((i) => i.status === 'Available');
-  if (store.activeFilter === 'Unavailable') result = result.filter((i) => i.status === 'Unavailable' || i.status === 'Out of Stock');
-  if (store.activeFilter === 'Low Stock')   result = result.filter((i) => i.status === 'Low Stock');
-
-  // Advanced filter — price range
-  const { minPrice, maxPrice, statuses } = store.advancedFilter;
-  const min = minPrice !== '' ? parseFloat(minPrice) : null;
-  const max = maxPrice !== '' ? parseFloat(maxPrice) : null;
-  if (min !== null && !isNaN(min)) result = result.filter((i) => i.price >= min);
-  if (max !== null && !isNaN(max)) result = result.filter((i) => i.price <= max);
-
-  // Advanced filter — statuses (additive: show any of the selected)
-  if (statuses.length > 0) {
-    result = result.filter((i) => statuses.includes(i.status));
-  }
-
-  // Search
   if (store.searchQuery.trim()) {
-    const q = store.searchQuery.toLowerCase();
-    result = result.filter((i) =>
-      i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
+    const q = store.searchQuery.trim().toLowerCase();
+    items = items.filter(
+      (i) => i.name.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
     );
   }
 
-  // Sort
-  switch (store.sortOption) {
-    case 'Name A-Z':       result.sort((a, b) => a.name.localeCompare(b.name)); break;
-    case 'Name Z-A':       result.sort((a, b) => b.name.localeCompare(a.name)); break;
-    case 'Price Low-High': result.sort((a, b) => a.price - b.price);            break;
-    case 'Price High-Low': result.sort((a, b) => b.price - a.price);            break;
-    case 'Stock Low-High': result.sort((a, b) => a.stock - b.stock);            break;
+  switch (store.activeFilter) {
+    case 'Available':
+      items = items.filter((i) => i.status === 'Available');
+      break;
+    case 'Unavailable':
+      items = items.filter((i) => i.status === 'Unavailable' || i.status === 'Out of Stock');
+      break;
+    case 'Low Stock':
+      items = items.filter((i) => i.status === 'Low Stock');
+      break;
   }
 
-  return result;
+  if (store.statusFilter) {
+    items = items.filter((i) => i.status === store.statusFilter);
+  }
+
+  const af = store.advancedFilter;
+  if (af.minPrice !== '') {
+    const m = parseFloat(af.minPrice);
+    if (!isNaN(m)) items = items.filter((i) => i.price >= m);
+  }
+  if (af.maxPrice !== '') {
+    const m = parseFloat(af.maxPrice);
+    if (!isNaN(m)) items = items.filter((i) => i.price <= m);
+  }
+  if (af.statuses.length) {
+    items = items.filter((i) => af.statuses.includes(i.status));
+  }
+
+  switch (store.sortOption) {
+    case 'Name A-Z':
+      items = [...items].sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case 'Name Z-A':
+      items = [...items].sort((a, b) => b.name.localeCompare(a.name));
+      break;
+    case 'Price Low-High':
+      items = [...items].sort((a, b) => a.price - b.price);
+      break;
+    case 'Price High-Low':
+      items = [...items].sort((a, b) => b.price - a.price);
+      break;
+    case 'Stock Low-High':
+      items = [...items].sort((a, b) => a.stockQuantity - b.stockQuantity);
+      break;
+  }
+
+  return items;
 }

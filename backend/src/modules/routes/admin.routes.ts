@@ -4,6 +4,12 @@ import {
   getRestaurantOverviewController,
   getRestaurantSettingsController,
   updateRestaurantSettingsController,
+  addFloorController,
+  removeFloorController,
+  addSectionController,
+  removeSectionController,
+  getFloorsController,
+  getSectionsController,
 } from '../restaurants/restaurants.controller';
 
 import {
@@ -33,6 +39,7 @@ import offersRouter from '../offers/offers.routes';
 import staffManagementRouter from '../staff/staff.routes';
 import supplierRouter from '../suppliers/supplier.routes';
 import reservationsRouter from '../reservations/reservations.routes';
+import customersRouter from '../customers/customers.routes';
 import adminOrdersRouter from '../orders/admin.orders.routes';
 
 export const adminRouter = Router();
@@ -40,6 +47,16 @@ export const adminRouter = Router();
 adminRouter.get('/restaurant/overview', getRestaurantOverviewController);
 adminRouter.get('/restaurant/settings', getRestaurantSettingsController);
 adminRouter.patch('/restaurant/settings', validate({ body: updateRestaurantSettingsSchema }), updateRestaurantSettingsController);
+
+// Floor management — dedicated create + delete paths backed by MongoDB
+adminRouter.post('/restaurant/floors', addFloorController);
+adminRouter.delete('/restaurant/floors/:number', removeFloorController);
+
+// Section management — dedicated create + delete paths backed by MongoDB
+adminRouter.post('/restaurant/sections', addSectionController);
+adminRouter.delete('/restaurant/sections/:name', removeSectionController);
+adminRouter.get('/restaurant/floors', getFloorsController);
+adminRouter.get('/restaurant/sections', getSectionsController);
 
 
 adminRouter.post('/tables', validate(createTableRequestSchema), createTableController);
@@ -57,6 +74,7 @@ adminRouter.use('/staff', staffManagementRouter);
 adminRouter.use('/offers', offersRouter);
 adminRouter.use('/loyalty', loyaltyRouter);
 adminRouter.use('/reservations', reservationsRouter);
+adminRouter.use('/customers', customersRouter);
 adminRouter.use('/orders', adminOrdersRouter);
 adminRouter.use('/inventory', inventoryRouter);
 adminRouter.use('/suppliers', supplierRouter);

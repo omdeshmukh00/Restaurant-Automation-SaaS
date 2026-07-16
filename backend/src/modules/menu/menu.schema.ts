@@ -82,6 +82,7 @@ export const createItemSchema = z.object({
   isVeg: z.boolean(),
   isAvailable: z.boolean().optional().default(true),
   isHidden: z.boolean().optional().default(false),
+  stockQuantity: z.number().min(0).optional(),
   preparationTime: z.number().int().min(0).optional(),
   spiceLevel: z.number().int().min(0).max(5).optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),

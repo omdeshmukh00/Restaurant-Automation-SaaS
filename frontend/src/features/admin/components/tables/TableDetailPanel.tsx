@@ -7,63 +7,22 @@ import {
   ClipboardList,
   Trash2,
   Edit2,
-  CheckCircle2,
-  Sparkles,
-  Ban,
-  CalendarClock,
 } from 'lucide-react';
 import { useTablesStore } from '../../store/tables.store';
-import type { TableStatus } from '../../store/tables.store';
+import { useStaffStore } from '../../store/staff.store';
 import { TableStatusBadge } from './TableStatusBadge';
 import { TableQRCode } from './TableQRCode';
-
-const statusActions: {
-  status: TableStatus;
-  label: string;
-  icon: React.ElementType;
-  color: string;
-}[] = [
-  {
-    status: 'Available',
-    label: 'Mark Available',
-    icon: CheckCircle2,
-    color: 'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40',
-  },
-  {
-    status: 'Occupied',
-    label: 'Mark Occupied',
-    icon: Users,
-    color: 'text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/40',
-  },
-  {
-    status: 'Reserved',
-    label: 'Mark Reserved',
-    icon: CalendarClock,
-    color: 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40',
-  },
-  {
-    status: 'Cleaning',
-    label: 'Send to Cleaning',
-    icon: Sparkles,
-    color: 'text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-950/40',
-  },
-  {
-    status: 'Blocked',
-    label: 'Block Table',
-    icon: Ban,
-    color: 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800',
-  },
-];
 
 export function TableDetailPanel(): JSX.Element | null {
   const {
     tables,
     selectedTableId,
     selectTable,
-    updateTableStatus,
+    updateTable,
     deleteTable,
     setShowEditModal,
   } = useTablesStore();
+  const { members } = useStaffStore();
 
   if (selectedTableId === null) return null;
   const table = tables.find((t) => t.id === selectedTableId);
@@ -95,6 +54,7 @@ export function TableDetailPanel(): JSX.Element | null {
           { icon: ClipboardList, label: 'Shape',   val: table.shape },
           { icon: ClipboardList, label: 'Floor',   val: `Floor ${table.floor}` },
           { icon: ClipboardList, label: 'Section', val: table.section },
+          { icon: Users,         label: 'Assigned', val: table.assignedStaffName || '—' },
         ].map(({ icon: Icon, label, val }) => (
           <div
             key={label}
@@ -107,6 +67,29 @@ export function TableDetailPanel(): JSX.Element | null {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Assigned staff */}
+      <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-3 mb-4">
+        <label htmlFor="assign-staff" className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <Users className="w-3.5 h-3.5" />
+          Assigned Staff
+        </label>
+        <select
+          id="assign-staff"
+          value={table.assignedStaffId || ''}
+          onChange={(e) =>
+            updateTable(table.id, { assignedStaffId: e.target.value || null })
+          }
+          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl outline-none text-gray-800 dark:text-gray-100"
+        >
+          <option value="">Unassigned</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name} · {m.role}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Active order */}
@@ -129,17 +112,6 @@ export function TableDetailPanel(): JSX.Element | null {
               {table.currentOrder.amount.toLocaleString('en-IN')}
             </span>
           </div>
-        </div>
-      )}
-
-      {/* Reservation */}
-      {table.reservedFor && (
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl p-3 mb-4">
-          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Reserved For</p>
-          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200">{table.reservedFor}</p>
-          {table.reservedAt && (
-            <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">at {table.reservedAt}</p>
-          )}
         </div>
       )}
 
@@ -172,27 +144,6 @@ export function TableDetailPanel(): JSX.Element | null {
           <p className="text-xs text-gray-600 dark:text-gray-300">{table.notes}</p>
         </div>
       )}
-
-      {/* Status actions */}
-      <div className="mb-4">
-        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
-          Change Status
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-1">
-          {statusActions
-            .filter((a) => a.status !== table.status)
-            .map(({ status, label, icon: Icon, color }) => (
-              <button
-                key={status}
-                onClick={() => updateTableStatus(table.id, status)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${color}`}
-              >
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                {label}
-              </button>
-            ))}
-        </div>
-      </div>
 
       {/* Edit / Delete */}
       <div className="flex gap-2 pt-3 border-t border-gray-100 dark:border-gray-800">
