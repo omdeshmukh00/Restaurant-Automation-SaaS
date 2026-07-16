@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
-import { Plus, Upload, X, Check } from 'lucide-react';
-import { useCustomersStore, type LoyaltyTier, type CustomerStatus } from '../../store/customers.store';
-
-const TIERS: LoyaltyTier[] = ['Bronze', 'Silver', 'Gold'];
+import { Plus, X, Check } from 'lucide-react';
+import { useCustomersStore } from '../../store/customers.store';
 
 interface FormState {
   name: string;
   email: string;
   phone: string;
-  loyaltyTier: LoyaltyTier;
-  status: CustomerStatus;
 }
 
 const EMPTY_FORM: FormState = {
   name: '',
   email: '',
   phone: '',
-  loyaltyTier: 'Bronze',
-  status: 'Active',
 };
 
 export function CustomersHeader() {
@@ -26,6 +20,7 @@ export function CustomersHeader() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm]           = useState<FormState>(EMPTY_FORM);
   const [error, setError]         = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved]         = useState(false);
 
   const handleChange = (field: keyof FormState, value: string) => {
@@ -33,39 +28,38 @@ export function CustomersHeader() {
     setError('');
   };
 
-  const handleSubmit = () => {
-    if (!form.name.trim())  { setError('Full name is required.');      return; }
-    if (!form.phone.trim()) { setError('Phone number is required.');   return; }
-    if (!form.email.trim()) { setError('Email address is required.');  return; }
-    if (!/\S+@\S+\.\S+/.test(form.email)) { setError('Enter a valid email address.'); return; }
+  const handleSubmit = async () => {
+    if (!form.name.trim()) { setError('Full name is required.'); return; }
+    if (!form.phone.trim()) { setError('Phone number is required.'); return; }
+    if (form.email.trim() && !/\S+@\S+\.\S+/.test(form.email)) {
+      setError('Enter a valid email address.');
+      return;
+    }
 
-    const initials = form.name
-      .trim()
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-
-    addCustomer({
-      name: form.name.trim(),
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      avatar: initials,
-      loyaltyTier: form.loyaltyTier,
-      status: form.status,
-    });
-
-    setSaved(true);
-    setTimeout(() => {
-      setShowModal(false);
-      setSaved(false);
-      setForm(EMPTY_FORM);
-      setError('');
-    }, 1200);
+    setSubmitting(true);
+    setError('');
+    try {
+      await addCustomer({
+        name: form.name.trim(),
+        email: form.email.trim() || undefined,
+        mobile: form.phone.trim(),
+      });
+      setSaved(true);
+      setTimeout(() => {
+        setShowModal(false);
+        setSaved(false);
+        setForm(EMPTY_FORM);
+        setError('');
+        setSubmitting(false);
+      }, 1200);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to add customer');
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
+    if (submitting) return;
     setShowModal(false);
     setForm(EMPTY_FORM);
     setError('');
@@ -83,12 +77,6 @@ export function CustomersHeader() {
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors whitespace-nowrap">
-            <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />
-            <span className="hidden sm:inline">Import Customers</span>
-            <span className="sm:hidden">Import</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setShowModal(true)}
@@ -128,7 +116,8 @@ export function CustomersHeader() {
               <button
                 type="button"
                 onClick={handleClose}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                disabled={submitting}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -149,8 +138,8 @@ export function CustomersHeader() {
                 {/* Fields */}
                 {(
                   [
-                    { label: 'Full Name',     field: 'name',  type: 'text',  placeholder: 'e.g. Priya Sharma' },
-                    { label: 'Email Address', field: 'email', type: 'email', placeholder: 'customer@email.com' },
+                    { label: 'Full Name',     field: 'name',  type: 'text', placeholder: 'e.g. Priya Sharma' },
+                    { label: 'Email Address (optional)', field: 'email', type: 'email', placeholder: 'customer@email.com' },
                     { label: 'Phone Number',  field: 'phone', type: 'tel',   placeholder: '+91 XXXXX XXXXX' },
                   ] as Array<{ label: string; field: keyof FormState; type: string; placeholder: string }>
                 ).map(({ label, field, type, placeholder }) => (
@@ -172,64 +161,6 @@ export function CustomersHeader() {
                   </div>
                 ))}
 
-                {/* Loyalty Tier */}
-                <div>
-                  <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                    Loyalty Tier
-                  </span>
-                  <div className="flex gap-2">
-                    {TIERS.map((tier) => {
-                      const activeColors: Record<LoyaltyTier, string> = {
-                        Bronze: 'border-orange-300 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400',
-                        Silver: 'border-gray-400 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
-                        Gold:   'border-yellow-400 bg-yellow-50 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-400',
-                      };
-                      const inactive =
-                        'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800';
-                      return (
-                        <button
-                          key={tier}
-                          type="button"
-                          onClick={() => handleChange('loyaltyTier', tier)}
-                          className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                            form.loyaltyTier === tier ? activeColors[tier] : inactive
-                          }`}
-                        >
-                          {tier === 'Gold'   && '🥇 '}
-                          {tier === 'Silver' && '🥈 '}
-                          {tier === 'Bronze' && '🥉 '}
-                          {tier}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-                    Status
-                  </span>
-                  <div className="flex gap-2">
-                    {(['Active', 'Inactive'] as CustomerStatus[]).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => handleChange('status', s)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                          form.status === s
-                            ? s === 'Active'
-                              ? 'border-green-300 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400'
-                              : 'border-red-300 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {error && (
                   <p className="text-xs text-red-500 dark:text-red-400 font-medium">{error}</p>
                 )}
@@ -239,16 +170,18 @@ export function CustomersHeader() {
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="flex-1 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
+                    disabled={submitting}
+                    className="flex-1 py-2.5 text-sm font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors"
+                    disabled={submitting}
+                    className="flex-1 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors disabled:opacity-70"
                   >
-                    Add Customer
+                    {submitting ? 'Adding…' : 'Add Customer'}
                   </button>
                 </div>
               </div>

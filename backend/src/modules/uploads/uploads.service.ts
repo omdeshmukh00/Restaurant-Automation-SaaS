@@ -279,6 +279,33 @@ export class UploadService {
     };
   }
 
+  static async getByIdPublic(uploadId: string): Promise<IUpload> {
+    if (!Types.ObjectId.isValid(uploadId)) {
+      throw new AppError('Upload not found', 404, ErrorCode.NOT_FOUND);
+    }
+    const upload = await UploadModel.findOne({ _id: uploadId });
+    if (!upload) {
+      throw new AppError('Upload not found', 404, ErrorCode.NOT_FOUND);
+    }
+    return upload;
+  }
+
+  static async downloadPublic(uploadId: string): Promise<DownloadedFile> {
+    const upload = await this.getByIdPublic(uploadId);
+    if (!(upload.mimeType ?? '').startsWith('image/')) {
+      throw new AppError('Upload not found', 404, ErrorCode.NOT_FOUND);
+    }
+    const buffer = upload.provider === 's3'
+      ? await s3Request('GET', upload.storageKey)
+      : await readLocal(upload.storageKey);
+
+    return {
+      buffer,
+      mimeType: upload.mimeType,
+      fileName: upload.fileName,
+    };
+  }
+
   static normalizeTenantId(tenantId: string): string {
     if (!Types.ObjectId.isValid(tenantId)) {
       throw new AppError('Tenant ID is required', 400, ErrorCode.INVALID_REQUEST);

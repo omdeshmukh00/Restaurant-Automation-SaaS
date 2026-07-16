@@ -55,6 +55,7 @@ type SeedUserInput = {
   kitchen_role?: KitchenRole;
   staff_role?: StaffInternalRole;
   cleaning_role?: CleaningRole;
+  dateOfBirth?: string;
 };
 
 async function upsertUser(input: SeedUserInput) {
@@ -74,6 +75,7 @@ async function upsertUser(input: SeedUserInput) {
         kitchen_role: input.kitchen_role ?? null,
         staff_role: input.staff_role ?? null,
         cleaning_role: input.cleaning_role ?? null,
+        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
         isEmailVerified: true,
         isMobileVerified: true,
         isDeleted: false,
@@ -171,6 +173,7 @@ export async function seedDevelopmentData(): Promise<void> {
       role: UserRole.SERVICE_STAFF,
       restaurantId: amberTable._id,
       staff_role: StaffInternalRole.FLOOR_SUPERVISOR,
+      dateOfBirth: '2000-03-15',
     }),
     upsertUser({
       name: 'Kabir Kitchen',
@@ -180,6 +183,7 @@ export async function seedDevelopmentData(): Promise<void> {
       role: UserRole.KITCHEN_STAFF,
       restaurantId: amberTable._id,
       kitchen_role: KitchenRole.HEAD_CHEF,
+      dateOfBirth: '1995-07-20',
     }),
     upsertUser({
       name: 'Meera Cleaning',
@@ -189,6 +193,7 @@ export async function seedDevelopmentData(): Promise<void> {
       role: UserRole.CLEANING_STAFF,
       restaurantId: amberTable._id,
       cleaning_role: CleaningRole.CLEANING_SUPERVISOR,
+      dateOfBirth: '1998-12-05',
     }),
     upsertUser({
       name: 'Platform Owner',

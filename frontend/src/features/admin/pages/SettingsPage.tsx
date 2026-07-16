@@ -80,6 +80,12 @@ function SettingsContent(): JSX.Element {
 }
 
 export default function SettingsPage(): JSX.Element {
+  const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+
+  React.useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
   return (
     <div>
       {/* Header */}

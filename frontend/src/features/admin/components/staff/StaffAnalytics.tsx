@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, TrendingUp, TrendingDown, Star } from 'lucide-react';
+import { X, TrendingDown, Star } from 'lucide-react';
 import { useStaffStore } from '../../store/staff.store';
 
 // ── Shared Modal Shell ─────────────────────────────────────────────────────
@@ -44,17 +44,6 @@ function AttendanceReportModal({ onClose }: { onClose: () => void }): JSX.Elemen
   const { attendanceBreakdown, stats } = useStaffStore();
   const total = attendanceBreakdown.reduce((s, a) => s + a.count, 0);
 
-  const weeklyData = [
-    { day: 'Mon', present: 30, absent: 2, late: 1 },
-    { day: 'Tue', present: 32, absent: 1, late: 3 },
-    { day: 'Wed', present: 29, absent: 4, late: 2 },
-    { day: 'Thu', present: 31, absent: 2, late: 1 },
-    { day: 'Fri', present: 33, absent: 1, late: 0 },
-    { day: 'Sat', present: 28, absent: 3, late: 2 },
-    { day: 'Sun', present: 25, absent: 4, late: 1 },
-  ];
-  const maxVal = Math.max(...weeklyData.map(d => d.present));
-
   return (
     <ModalShell title="Attendance Report" subtitle="This Month — Detailed Breakdown" onClose={onClose}>
       <div className="p-5 space-y-5">
@@ -63,7 +52,7 @@ function AttendanceReportModal({ onClose }: { onClose: () => void }): JSX.Elemen
           <div className="bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30 rounded-xl p-4">
             <p className="text-xs text-green-600 dark:text-green-400 font-semibold mb-1">Overall Attendance</p>
             <p className="text-3xl font-black text-green-700 dark:text-green-300">{stats.attendancePct}%</p>
-            <p className="text-xs text-green-500 mt-0.5">↑ 3.2% vs last month</p>
+            <p className="text-xs text-green-500 mt-0.5">Live attendance status</p>
           </div>
           <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-xl p-4">
             <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-1">Total Records</p>
@@ -99,42 +88,16 @@ function AttendanceReportModal({ onClose }: { onClose: () => void }): JSX.Elemen
           </div>
         </div>
 
-        {/* Weekly chart */}
-        <div>
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">This Week — Daily Attendance</p>
-          <div className="flex items-end gap-2 h-28">
-            {weeklyData.map((d) => (
-              <div key={d.day} className="flex-1 flex flex-col items-center gap-1">
-                <span className="text-[10px] text-gray-500">{d.present}</span>
-                <div className="w-full flex flex-col gap-0.5" style={{ height: `${(d.present / maxVal) * 72}px` }}>
-                  <div className="flex-1 rounded-t-md bg-green-400 dark:bg-green-500" />
-                  {d.late > 0 && <div style={{ height: `${d.late * 4}px` }} className="bg-orange-400 dark:bg-orange-500" />}
-                </div>
-                <span className="text-[10px] text-gray-500">{d.day}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-4 mt-2">
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-400" /><span className="text-xs text-gray-500">Present</span></div>
-            <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-orange-400" /><span className="text-xs text-gray-500">Late</span></div>
-          </div>
-        </div>
-
-        {/* Insights */}
+        {/* Real summary */}
         <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 space-y-2">
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-300">Key Insights</p>
-          <div className="flex items-start gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-gray-600 dark:text-gray-400">Attendance improved by 3.2% compared to last month.</p>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-gray-600 dark:text-gray-400">Late arrivals peaked on Tuesday — consider schedule review.</p>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
-            <p className="text-xs text-gray-600 dark:text-gray-400">18 staff currently on approved leave this month.</p>
-          </div>
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300">Summary</p>
+          {attendanceBreakdown.map((ab) => (
+            <div key={ab.label} className="flex items-center gap-2 text-xs">
+              <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: ab.color }} />
+              <span className="text-gray-600 dark:text-gray-400 flex-1">{ab.label}</span>
+              <span className="font-semibold text-gray-800 dark:text-gray-200">{ab.count}</span>
+            </div>
+          ))}
         </div>
       </div>
     </ModalShell>
@@ -146,15 +109,20 @@ function AttendanceReportModal({ onClose }: { onClose: () => void }): JSX.Elemen
 function PayrollReportModal({ onClose }: { onClose: () => void }): JSX.Element {
   const { payrollLines, stats, members } = useStaffStore();
 
-  const deptPayroll = [
-    { dept: 'Management', amount: 135000, pct: 31 },
-    { dept: 'Kitchen',    amount: 107000, pct: 25 },
-    { dept: 'Service',    amount:  91000, pct: 21 },
-    { dept: 'Bar',        amount:  78000, pct: 18 },
-    { dept: 'Front Desk', amount:  35000, pct: 8  },
-    { dept: 'Cleaning',   amount:  29000, pct: 7  },
-  ];
-  const DEPT_COLORS = ['#f97316','#22c55e','#3b82f6','#a855f7','#eab308','#64748b'];
+  const deptPayroll = (() => {
+    const map: Record<string, number> = {};
+    members.forEach((m) => {
+      map[m.department] = (map[m.department] || 0) + (m.salary || 0);
+    });
+    const totalSal = Object.values(map).reduce((a, b) => a + b, 0) || 1;
+    const colors: Record<string, string> = {
+      Management: '#f97316', Kitchen: '#22c55e', Service: '#3b82f6',
+      Bar: '#a855f7', 'Front Desk': '#eab308', Cleaning: '#64748b',
+    };
+    return Object.entries(map)
+      .map(([dept, amount]) => ({ dept, amount, pct: Math.round((amount / totalSal) * 100), color: colors[dept] || '#64748b' }))
+      .sort((a, b) => b.amount - a.amount);
+  })();
 
   const topEarners = [...members]
     .sort((a, b) => b.salary - a.salary)
@@ -202,7 +170,7 @@ function PayrollReportModal({ onClose }: { onClose: () => void }): JSX.Element {
                   <span className="text-xs font-bold text-gray-800 dark:text-gray-200">₹{d.amount.toLocaleString()}</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${d.pct}%`, background: DEPT_COLORS[i] }} />
+                  <div className="h-full rounded-full" style={{ width: `${d.pct}%`, background: d.color }} />
                 </div>
               </div>
             ))}
@@ -233,83 +201,84 @@ function PayrollReportModal({ onClose }: { onClose: () => void }): JSX.Element {
 
 // ── Performance Report Modal ───────────────────────────────────────────────
 
-const PERF_DATA = [
-  { rating: 1, pct: 2  },
-  { rating: 2, pct: 6  },
-  { rating: 3, pct: 18 },
-  { rating: 4, pct: 32 },
-  { rating: 5, pct: 42 },
-];
-
 function PerformanceReportModal({ onClose }: { onClose: () => void }): JSX.Element {
-  const { members, stats } = useStaffStore();
+  const { members, stats, performance } = useStaffStore();
 
   const topPerformers = [...members].sort((a, b) => b.performance - a.performance).slice(0, 5);
-  const needsAttention = [...members].filter(m => m.performance < 4.0).sort((a, b) => a.performance - b.performance);
+  const needsAttention = [...members].filter(m => m.performance < 2.5).sort((a, b) => a.performance - b.performance);
 
-  const deptPerf = [
-    { dept: 'Management', avg: 4.85, color: '#f97316' },
-    { dept: 'Kitchen',    avg: 4.65, color: '#22c55e' },
-    { dept: 'Bar',        avg: 4.20, color: '#a855f7' },
-    { dept: 'Front Desk', avg: 4.40, color: '#eab308' },
-    { dept: 'Service',    avg: 4.05, color: '#3b82f6' },
-  ];
+  const avgService = performance.length ? Math.round(performance.reduce((s, p) => s + (p.serviceCompletionRate || 0), 0) / performance.length) : 0;
+  const avgKitchen = performance.length ? Math.round(performance.reduce((s, p) => s + (p.kitchenCompletionRate || 0), 0) / performance.length) : 0;
 
   return (
     <ModalShell title="Performance Report" subtitle="This Month — Team Overview" onClose={onClose}>
       <div className="p-5 space-y-5">
-        {/* Average rating */}
-        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4 flex items-center gap-4">
+        {/* Average score */}
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-4">
+          <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mb-0.5">Average Performance Score</p>
+          <p className="text-4xl font-black text-gray-900 dark:text-gray-100">{stats.avgPerformance}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Blended service &amp; kitchen completion</p>
+        </div>
+
+        {/* Avg completion rates */}
+        <div className="space-y-3">
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300">Team Completion Rates</p>
           <div>
-            <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mb-0.5">Average Rating</p>
-            <p className="text-4xl font-black text-gray-900 dark:text-gray-100">{stats.avgPerformance}</p>
-            <p className="text-xs text-green-500 mt-0.5 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> {stats.avgPerformanceChange}
-            </p>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Service Completion</span>
+              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{avgService}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-blue-400 transition-all duration-500" style={{ width: `${avgService}%` }} />
+            </div>
           </div>
-          <div className="flex-1 flex items-end gap-1.5 h-16">
-            {PERF_DATA.map((d) => (
-              <div key={d.rating} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className="w-full rounded-t-sm bg-orange-400 dark:bg-orange-500" style={{ height: `${d.pct * 1.2}px` }} />
-                <span className="text-[9px] text-gray-400">{d.rating}★</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Rating distribution */}
-        <div>
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">Rating Distribution</p>
-          <div className="space-y-2.5">
-            {[...PERF_DATA].reverse().map((d) => (
-              <div key={d.rating} className="flex items-center gap-3">
-                <div className="flex items-center gap-0.5 w-14 flex-shrink-0">
-                  {Array.from({ length: d.rating }).map((_, i) => (
-                    <Star key={i} className="w-2.5 h-2.5 fill-orange-400 text-orange-400" />
-                  ))}
-                </div>
-                <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full bg-orange-400 transition-all duration-500" style={{ width: `${d.pct}%` }} />
-                </div>
-                <span className="text-xs text-gray-500 w-8 text-right">{d.pct}%</span>
-              </div>
-            ))}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500 dark:text-gray-400">Kitchen Completion</span>
+              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{avgKitchen}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full rounded-full bg-green-400 transition-all duration-500" style={{ width: `${avgKitchen}%` }} />
+            </div>
           </div>
         </div>
 
-        {/* Dept performance */}
+        {/* Raw metrics */}
         <div>
-          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">Performance by Department</p>
+          <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">Raw Metrics — Per Staff</p>
           <div className="space-y-2">
-            {deptPerf.map((d) => (
-              <div key={d.dept} className="flex items-center gap-3">
-                <span className="text-xs text-gray-600 dark:text-gray-400 w-24 flex-shrink-0">{d.dept}</span>
-                <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(d.avg / 5) * 100}%`, background: d.color }} />
+            {performance.length === 0 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">No performance data available yet.</p>
+            )}
+            {performance.map((p) => {
+              const cleaning = p.startedCleaningTasks ? `${p.completedCleaningTasks}/${p.startedCleaningTasks}` : '—';
+              return (
+                <div key={p.staffId} className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200">{p.name}</p>
+                    <span className="text-xs text-gray-400">{p.role}</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                      <p className="text-sm font-bold text-blue-600 dark:text-blue-400">{Math.round(p.serviceCompletionRate || 0)}%</p>
+                      <p className="text-[9px] text-gray-400">Service</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-green-600 dark:text-green-400">{Math.round(p.kitchenCompletionRate || 0)}%</p>
+                      <p className="text-[9px] text-gray-400">Kitchen</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{p.avgKitchenMinutes || 0}m</p>
+                      <p className="text-[9px] text-gray-400">Avg min</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-200">{cleaning}</p>
+                      <p className="text-[9px] text-gray-400">Cleaning</p>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-xs font-bold text-gray-700 dark:text-gray-300 w-8 text-right">{d.avg}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -337,7 +306,7 @@ function PerformanceReportModal({ onClose }: { onClose: () => void }): JSX.Eleme
         {/* Needs attention */}
         {needsAttention.length > 0 && (
           <div>
-            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">Needs Attention (below 4.0)</p>
+            <p className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-3">Needs Attention (below 2.5)</p>
             <div className="space-y-2">
               {needsAttention.map((m) => (
                 <div key={m.id} className="flex items-center gap-3 p-2.5 bg-red-50 dark:bg-red-950/20 rounded-xl">
@@ -560,8 +529,11 @@ export function PayrollSummary(): JSX.Element {
 // ── Performance Overview ──────────────────────────────────────────────────
 
 export function PerformanceOverview(): JSX.Element {
-  const { stats } = useStaffStore();
+  const { stats, performance } = useStaffStore();
   const [showReport, setShowReport] = useState(false);
+
+  const avgService = performance.length ? Math.round(performance.reduce((s, p) => s + (p.serviceCompletionRate || 0), 0) / performance.length) : 0;
+  const avgKitchen = performance.length ? Math.round(performance.reduce((s, p) => s + (p.kitchenCompletionRate || 0), 0) / performance.length) : 0;
 
   return (
     <>
@@ -569,25 +541,39 @@ export function PerformanceOverview(): JSX.Element {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Performance Overview</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Average Rating</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Avg Score (0–5)</p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-black text-gray-900 dark:text-gray-100">{stats.avgPerformance}</span>
             </div>
-            <p className="text-xs text-green-500">{stats.avgPerformanceChange}</p>
+            <p className="text-xs text-gray-400">Blended service &amp; kitchen</p>
           </div>
           <button onClick={() => setShowReport(true)} className="text-xs font-semibold text-orange-500 hover:underline self-start">View Report</button>
         </div>
-        <div className="flex items-end gap-2 h-24 mt-2">
-          {PERF_DATA.map((d) => (
-            <div key={d.rating} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-[10px] text-gray-500">{d.pct}%</span>
-              <div
-                className="w-full rounded-t-md bg-orange-400 dark:bg-orange-500 transition-all"
-                style={{ height: `${d.pct * 2}px` }}
-              />
-              <span className="text-[10px] text-gray-500">{d.rating}</span>
-            </div>
-          ))}
+        <div className="space-y-3 mt-2">
+          {performance.length === 0 ? (
+            <p className="text-xs text-gray-400">No performance data yet.</p>
+          ) : (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Service Completion</span>
+                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{avgService}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-blue-400 transition-all duration-500" style={{ width: `${avgService}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Kitchen Completion</span>
+                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{avgKitchen}%</span>
+                </div>
+                <div className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-green-400 transition-all duration-500" style={{ width: `${avgKitchen}%` }} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
       {showReport && <PerformanceReportModal onClose={() => setShowReport(false)} />}

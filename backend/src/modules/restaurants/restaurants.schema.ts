@@ -4,8 +4,51 @@
 import { z } from 'zod';
 
 // ── PATCH /admin/restaurant/settings ─────────────────────────────────
-// All fields are optional — admin can update one or all settings at once
+// All fields are optional — admin can update one or all settings at once.
+// Top-level restaurant fields (name, cuisine, city, type, phone, address)
+// and nested settings fields are all accepted here.
 export const updateRestaurantSettingsSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Restaurant name cannot be empty')
+    .max(100)
+    .optional(),
+
+  cuisine: z
+    .string()
+    .trim()
+    .optional(),
+
+  city: z
+    .string()
+    .trim()
+    .optional(),
+
+  type: z
+    .string()
+    .trim()
+    .optional(),
+
+  phone: z
+    .string()
+    .trim()
+    .optional(),
+
+  address: z
+    .string()
+    .trim()
+    .optional(),
+
+  plan: z
+    .enum(['Free', 'Standard', 'Premium', 'Enterprise'])
+    .optional(),
+
+  restaurantId: z
+    .string()
+    .trim()
+    .optional(),
+
   currency: z
     .string()
     .trim()
@@ -53,6 +96,14 @@ export const updateRestaurantSettingsSchema = z.object({
   timezone: z.string().trim().optional(),
   dateFormat: z.string().trim().optional(),
   timeFormat: z.string().trim().optional(),
+
+  integrations: z
+    .record(
+      z.object({
+        connected: z.boolean(),
+      }),
+    )
+    .optional(),
 
   floors: z
     .array(

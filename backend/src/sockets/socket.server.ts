@@ -48,6 +48,29 @@ export function createSocketServer(server: HttpServer): Server {
   io.on('connection', (socket) => {
     logger.info('Socket client connected', { socketId: socket.id });
 
+    const user = socket.data.user as
+      | { _id?: string; restaurantId?: string; role?: string }
+      | undefined;
+    const session = socket.data.session as
+      | { _id?: string; restaurantId?: string }
+      | undefined;
+
+    if (user?.restaurantId) {
+      socket.join(`restaurant:${user.restaurantId}`);
+    }
+    if (user?._id) {
+      socket.join(`user:${user._id}`);
+    }
+    if (user?.role) {
+      socket.join(`role:${user.role}:${user.restaurantId ?? ''}`);
+    }
+    if (session?.restaurantId) {
+      socket.join(`restaurant:${session.restaurantId}`);
+    }
+    if (session?._id) {
+      socket.join(`session:${session._id}`);
+    }
+
     socket.on('disconnect', (reason) => {
       logger.info('Socket client disconnected', { socketId: socket.id, reason });
     });

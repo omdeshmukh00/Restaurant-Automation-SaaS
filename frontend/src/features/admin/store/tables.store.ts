@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { apiClient } from '../../../shared/services/apiClient';
+import { useStaffStore } from './staff.store';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,14 +24,14 @@ export interface Table {
   y: number;
   notes?: string;
   qr_token?: string;
+  assignedStaffId?: string | null;
+  assignedStaffName?: string;
   currentOrder?: {
     id: string;
     time: string;
     amount: number;
     items: number;
   };
-  reservedFor?: string;
-  reservedAt?: string;
   sessionDetails?: {
     sessionId: string;
     customerName: string;
@@ -83,7 +84,7 @@ interface TablesStore {
 
   // Actions
   fetchTables: () => Promise<void>;
-  addTable: (table: Omit<Table, 'id' | 'x' | 'y'>) => Promise<void>;
+  addTable: (table: Omit<Table, 'id'>) => Promise<void>;
   updateTable: (id: string, updates: Partial<Table>) => Promise<void>;
   deleteTable: (id: string) => Promise<void>;
   updateTableStatus: (id: string, status: TableStatus) => Promise<void>;
@@ -96,6 +97,10 @@ interface TablesStore {
   setFilter: (patch: Partial<TableFilter>) => void;
   setSearchQuery: (query: string) => void;
   updateRestaurantSettings: (settings: { floors?: { name: string; number: number }[]; sections?: string[] }) => Promise<void>;
+  addFloor: (floor: { name: string; number: number }) => Promise<{ name: string; number: number }[]>;
+  removeFloor: (number: number) => Promise<{ name: string; number: number }[]>;
+  addSection: (name: string) => Promise<string[]>;
+  removeSection: (name: string) => Promise<string[]>;
 }
 
 // ── Default layout mapping (to preserve map coordinates in UI) ────────────────
@@ -158,7 +163,14 @@ function computeStats(tables: Table[]) {
   const occupancyRate = total > 0 ? Math.round((occupied / total) * 100) : 0;
   const revenueToday = tables.reduce((sum, t) => sum + (t.currentOrder?.amount ?? 0), 0);
   const coversTodday = tables.reduce((sum, t) => sum + (t.currentOrder ? t.seats : 0), 0);
-  const avgTurnover = occupied > 0 ? `50 min` : '—';
+
+  // Real avg turnover: average elapsed minutes of currently active sessions.
+  const elapsed = tables
+    .filter((t) => t.sessionDetails?.sessionCreatedAt)
+    .map((t) => (Date.now() - new Date(t.sessionDetails!.sessionCreatedAt!).getTime()) / 60000);
+  const avgTurnover = elapsed.length
+    ? `${Math.round(elapsed.reduce((a, b) => a + b, 0) / elapsed.length)} min`
+    : '—';
 
   return {
     total,
@@ -202,6 +214,18 @@ export const useTablesStore = create<TablesStore>()(
           ];
           const sections = res.data?.data?.sections || ['Indoor', 'Outdoor', 'Bar', 'Private'];
           
+          // Resolve assigned-staff names from the staff store. Always ensure the
+          // staff list is loaded first — it may be empty if the Staff page hasn't
+          // been visited yet — so table assignments show the real name instead of
+          // silently falling back to "Unassigned".
+          const staffState = useStaffStore.getState();
+          if (!staffState.members || staffState.members.length === 0) {
+            await staffState.fetchMembers().catch(() => undefined);
+          }
+          const staffMembers = useStaffStore.getState().members || [];
+          const staffNameById = (id?: string | null) =>
+            id ? (staffMembers.find((s) => s.id === id)?.name ?? '') : '';
+
           const tablePositions = get().tablePositions || {};
           const mappedTables: Table[] = backendTables.map((t: any) => {
             const tableNumber = t.tableNumber || 'Table';
@@ -214,11 +238,21 @@ export const useTablesStore = create<TablesStore>()(
               floor: t.floor || 1,
             };
 
+            // Position priority: backend-stored value (if meaningful) →
+            // persisted localStorage (migration) → layout default.
             let x = layout.x;
             let y = layout.y;
-            if (tablePositions[tableId]) {
-              x = tablePositions[tableId].x;
-              y = tablePositions[tableId].y;
+            const local = tablePositions[tableId];
+            const backendPos =
+              t.position && (t.position.x !== 0 || t.position.y !== 0)
+                ? { x: t.position.x, y: t.position.y }
+                : null;
+            if (backendPos) {
+              x = backendPos.x;
+              y = backendPos.y;
+            } else if (local) {
+              x = local.x;
+              y = local.y;
             }
 
             let currentOrder = undefined;
@@ -235,7 +269,7 @@ export const useTablesStore = create<TablesStore>()(
               id: tableId,
               label: tableNumber,
               seats: t.capacity,
-              shape: layout.shape || (t.capacity > 4 ? 'Rectangle' : 'Square'),
+              shape: (t.shape as TableShape) || layout.shape,
               section: t.section || layout.section,
               floor: t.floor || layout.floor,
               status: mapBackendStatusToFrontendStatus(t.status, t.isActive !== false),
@@ -243,6 +277,8 @@ export const useTablesStore = create<TablesStore>()(
               y,
               qr_token: t.qrToken,
               notes: t.notes || '',
+              assignedStaffId: t.assignedStaffId || null,
+              assignedStaffName: staffNameById(t.assignedStaffId),
               currentOrder,
               sessionDetails: t.sessionDetails,
             };
@@ -269,15 +305,49 @@ export const useTablesStore = create<TablesStore>()(
         }
       },
 
+      addFloor: async (floor) => {
+        const res = await apiClient.post('/admin/restaurant/floors', floor);
+        const floors = res.data?.data?.floors ?? get().floors;
+        set({ floors });
+        return floors;
+      },
+
+      removeFloor: async (number) => {
+        const res = await apiClient.delete(`/admin/restaurant/floors/${number}`);
+        const floors = res.data?.data?.floors ?? get().floors;
+        set({ floors });
+        return floors;
+      },
+
+      addSection: async (name) => {
+        const res = await apiClient.post('/admin/restaurant/sections', { name });
+        const sections = res.data?.data?.sections ?? get().sections;
+        set({ sections });
+        return sections;
+      },
+
+      removeSection: async (name) => {
+        const res = await apiClient.delete(`/admin/restaurant/sections/${encodeURIComponent(name)}`);
+        const sections = res.data?.data?.sections ?? get().sections;
+        set({ sections });
+        return sections;
+      },
+
       addTable: async (table) => {
         try {
-          const payload = {
+          const payload: any = {
             tableNumber: table.label,
             capacity: table.seats,
             floor: table.floor,
             section: table.section,
             status: mapFrontendStatusToBackendStatus(table.status),
+            notes: table.notes,
+            shape: table.shape,
+            assignedStaffId: table.assignedStaffId ?? null,
           };
+          if (typeof table.x === 'number' && typeof table.y === 'number') {
+            payload.position = { x: table.x, y: table.y };
+          }
           await apiClient.post('/admin/tables', payload);
           await get().fetchTables();
         } catch (err) {
@@ -287,31 +357,39 @@ export const useTablesStore = create<TablesStore>()(
 
       updateTable: async (id, updates) => {
         try {
-          if (updates.x !== undefined || updates.y !== undefined) {
-            set((state) => {
-              const newPositions = {
-                ...state.tablePositions,
-                [id]: {
-                  x: updates.x !== undefined ? updates.x : (state.tablePositions[id]?.x ?? 50),
-                  y: updates.y !== undefined ? updates.y : (state.tablePositions[id]?.y ?? 50),
-                },
-              };
-              return {
-                tablePositions: newPositions,
-                tables: state.tables.map((t) =>
-                  t.id === id ? { ...t, ...updates } : t
-                ),
-              };
-            });
-          }
+          // Optimistic local update for instant feedback. Derive the assigned
+          // staff name from the staff store so the panel updates immediately.
+          set((state) => ({
+            tables: state.tables.map((t) => {
+              if (t.id !== id) return t;
+              const next = { ...t, ...updates };
+              if (updates.assignedStaffId !== undefined) {
+                const staff = useStaffStore.getState().members.find(
+                  (m) => m.id === updates.assignedStaffId
+                );
+                next.assignedStaffName = updates.assignedStaffId ? (staff?.name ?? '') : '';
+              }
+              return next;
+            }),
+          }));
 
+          const current = get().tables.find((t) => t.id === id);
           const payload: any = {};
           if (updates.label !== undefined) payload.tableNumber = updates.label;
           if (updates.seats !== undefined) payload.capacity = updates.seats;
           if (updates.floor !== undefined) payload.floor = updates.floor;
           if (updates.section !== undefined) payload.section = updates.section;
+          if (updates.shape !== undefined) payload.shape = updates.shape;
+          if (updates.notes !== undefined) payload.notes = updates.notes;
+          if (updates.assignedStaffId !== undefined) payload.assignedStaffId = updates.assignedStaffId;
           if (updates.status !== undefined) {
             payload.isActive = updates.status !== 'Blocked';
+          }
+          if (updates.x !== undefined || updates.y !== undefined) {
+            payload.position = {
+              x: updates.x ?? current?.x ?? 50,
+              y: updates.y ?? current?.y ?? 50,
+            };
           }
 
           const hasApiUpdates = Object.keys(payload).length > 0;

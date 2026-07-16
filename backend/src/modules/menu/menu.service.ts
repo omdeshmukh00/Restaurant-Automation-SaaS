@@ -41,17 +41,9 @@ export class MenuService {
     restaurantId: string | Types.ObjectId,
     options: { excludeHidden?: boolean; activeOnly?: boolean } = {}
   ): Promise<ICategory[]> {
-    console.log("Restaurant ID:", restaurantId);
-
     const query: any = { restaurantId };
     if (options.activeOnly) query.isActive = true;
     if (options.excludeHidden) query.isHidden = false;
-
-    console.log("Mongo Query:", query);
-
-const categories = await Category.find(query);
-
-console.log("Found Categories:", categories);
 
     return Category.find(query).sort({ displayOrder: 1 });
   }

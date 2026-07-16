@@ -30,7 +30,6 @@ export function TableList(): JSX.Element {
               <th className="text-left px-4 py-3 font-semibold">Status</th>
               <th className="text-left px-4 py-3 font-semibold">Seats</th>
               <th className="text-left px-4 py-3 font-semibold">Current Order</th>
-              <th className="text-left px-4 py-3 font-semibold">Reserved For</th>
               <th className="text-center px-4 py-3 font-semibold">QR Code</th>
               <th className="px-4 py-3" />
             </tr>
@@ -83,10 +82,8 @@ export function TableList(): JSX.Element {
                   )}
                 </td>
 
-                <td className="px-4 py-3.5 text-sm text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                  {table.reservedFor || (
-                    <span className="text-gray-300 dark:text-gray-600">—</span>
-                  )}
+                <td className="px-4 py-3.5 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  <span className="text-gray-300 dark:text-gray-600">—</span>
                 </td>
 
                 <td className="px-4 py-3.5">

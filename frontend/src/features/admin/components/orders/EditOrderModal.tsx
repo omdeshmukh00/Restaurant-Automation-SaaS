@@ -9,7 +9,7 @@ interface EditOrderModalProps {
 }
 
 const STATUS_OPTIONS: OrderStatus[] = ['Pending', 'Preparing', 'Completed', 'Served', 'Cancelled'];
-const PAYMENT_OPTIONS: PaymentMethod[] = ['Paid', 'Online', 'Card', 'Cash'];
+const PAYMENT_OPTIONS: PaymentMethod[] = ['Unpaid', 'Cash', 'Card', 'Online'];
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
   Pending:   'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800',
@@ -28,14 +28,18 @@ export function EditOrderModal({ order, onClose }: EditOrderModalProps) {
   const [payment, setPayment] = useState<PaymentMethod>(order.payment);
   const [notes,   setNotes]   = useState(order.notes ?? '');
   const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     try {
-      await updateOrder(order.id, { status, table, payment, notes: notes.trim() || undefined });
+      // `true` sends adminOverride so the admin can set any status, bypassing
+      // the normal order state machine.
+      await updateOrder(order.id, { status, table, payment, notes: notes.trim() || undefined }, true);
       onClose();
-    } catch (error) {
-      console.error('Failed to update order', error);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to update order. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -147,6 +151,10 @@ export function EditOrderModal({ order, onClose }: EditOrderModalProps) {
               className={`${fieldClass} resize-none`}
             />
           </div>
+
+          {error && (
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">{error}</p>
+          )}
         </div>
 
         {/* Footer */}

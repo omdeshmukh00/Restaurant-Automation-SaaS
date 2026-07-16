@@ -69,12 +69,20 @@ app.use(
 );
 
 app.use(`${env.API_PREFIX}/payments/webhook/razorpay`, express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '10kb' }));
+app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser(env.COOKIE_SECRET));
 app.use(mongoSanitize());
 app.use(`/${env.UPLOAD_PATH}`, express.static(path.resolve(process.cwd(), env.UPLOAD_PATH)));
 app.use(healthRouter);
+
+// Prevent browsers from caching dynamic API responses (avoids 304 wiping list data)
+app.use((req, res, next) => {
+  if (req.path.startsWith(env.API_PREFIX)) {
+    res.set('Cache-Control', 'no-store');
+  }
+  next();
+});
 
 app.get('/', (_req, res) => {
   res.status(200).json({

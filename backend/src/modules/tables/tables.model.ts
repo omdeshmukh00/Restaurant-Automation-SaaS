@@ -18,15 +18,18 @@ export interface ITable extends Document {
   qrLastRegeneratedAt: Date;
   isActive: boolean;
   currentSessionId?: Types.ObjectId | null;
+  notes?: string;
+  shape?: string;
+  position?: { x: number; y: number };
   createdAt: Date;
   updatedAt: Date;
 }
 
 /** Valid state transitions for the table lifecycle */
 export const TABLE_TRANSITIONS: Record<TableStatus, TableStatus[]> = {
-  [TableStatus.AVAILABLE]: [TableStatus.RESERVED, TableStatus.OCCUPIED, TableStatus.MAINTENANCE],
+  [TableStatus.AVAILABLE]: [TableStatus.RESERVED, TableStatus.OCCUPIED, TableStatus.MAINTENANCE, TableStatus.NEEDS_CLEANING],
   [TableStatus.RESERVED]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
-  [TableStatus.OCCUPIED]: [TableStatus.AVAILABLE, TableStatus.ORDERING, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY],
+  [TableStatus.OCCUPIED]: [TableStatus.AVAILABLE, TableStatus.ORDERING, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY, TableStatus.RESERVED],
   [TableStatus.ORDERING]: [TableStatus.AVAILABLE, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY],
   [TableStatus.BILL_PENDING]: [TableStatus.PAID, TableStatus.DIRTY],
   [TableStatus.PAYMENT_PENDING]: [TableStatus.PAID, TableStatus.DIRTY],
@@ -103,6 +106,18 @@ const tableSchema = new Schema<ITable>(
       type: Schema.Types.ObjectId,
       ref: 'TableSession',
       default: null,
+    },
+    notes: {
+      type: String,
+      default: '',
+    },
+    shape: {
+      type: String,
+      default: 'Square',
+    },
+    position: {
+      x: { type: Number, default: 0 },
+      y: { type: Number, default: 0 },
     },
   },
   {

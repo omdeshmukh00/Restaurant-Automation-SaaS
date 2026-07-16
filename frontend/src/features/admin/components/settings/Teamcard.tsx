@@ -7,9 +7,9 @@ export function TeamCard(): JSX.Element {
 
   const rows = [
     { label: 'Total Team Members', value: team.totalMembers, bold: true },
-    { label: 'Administrators',     value: team.administrators },
     { label: 'Managers',           value: team.managers },
-    { label: 'Staff Members',      value: team.staffMembers },
+    { label: 'Kitchen Staff',      value: team.kitchenStaff },
+    { label: 'Service & Support',  value: team.serviceStaff },
   ];
 
   return (

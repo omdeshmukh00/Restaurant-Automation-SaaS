@@ -25,6 +25,7 @@ type RestaurantSettings = {
   timeFormat: string;
   floors?: { name: string; number: number }[];
   sections?: string[];
+  integrations?: Record<string, { connected: boolean }>;
 };
 
 export interface IRestaurant extends Document {
@@ -34,6 +35,9 @@ export interface IRestaurant extends Document {
   plan?: string;
   cuisine: string;
   city: string;
+  type: string;
+  phone: string;
+  address: string;
   rating: number;
   location_url?: string;
   settings: RestaurantSettings;
@@ -91,6 +95,16 @@ const restaurantSettingsSchema = new Schema<RestaurantSettings>(
     timezone: { type: String, default: 'UTC' },
     dateFormat: { type: String, default: 'YYYY-MM-DD' },
     timeFormat: { type: String, default: 'HH:mm' },
+    integrations: {
+      type: Map,
+      of: new Schema(
+        {
+          connected: { type: Boolean, default: false },
+        },
+        { _id: false },
+      ),
+      default: {},
+    },
     floors: {
       type: [{
         name: { type: String, required: true },
@@ -121,6 +135,9 @@ const restaurantSchema = new Schema<IRestaurant>(
     plan: { type: String, trim: true },
     cuisine: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
+    type: { type: String, trim: true, default: '' },
+    phone: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
     rating: { type: Number, default: 4.5, min: 0, max: 5 },
     ownerName: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },

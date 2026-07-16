@@ -47,6 +47,7 @@ export interface IMenuItem extends Document {
   isVeg: boolean;
   isAvailable: boolean;
   isHidden: boolean;
+  stockQuantity: number;
   preparationTime?: number; // in minutes
   spiceLevel?: number; // 0-5
   tags?: string[];
@@ -72,9 +73,10 @@ const MenuItemSchema = new Schema<IMenuItem>(
     discountPrice: { type: Number, min: 0 },
     image: { type: String, trim: true },
     images: [{ type: String, trim: true }],
-    isVeg: { type: Boolean, required: true },
+    isVeg: { type: Boolean, default: false },
     isAvailable: { type: Boolean, default: true },
     isHidden: { type: Boolean, default: false },
+    stockQuantity: { type: Number, default: 0, min: 0 },
     preparationTime: { type: Number, min: 0 },
     spiceLevel: { type: Number, min: 0, max: 5 },
     tags: [{ type: String, trim: true }],

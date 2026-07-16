@@ -1,16 +1,41 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Search, X, ChevronDown, Filter } from 'lucide-react';
-import { useCustomersStore, type CustomerStatus, type LoyaltyTier } from '../../store/customers.store';
+import { useCustomersStore, type CustomerStatus, type LoyaltyTier, type SpendFilter } from '../../store/customers.store';
 
 const STATUS_OPTIONS: Array<CustomerStatus | 'All'> = ['All', 'Active', 'Inactive'];
 const TIER_OPTIONS: Array<LoyaltyTier | 'All'>      = ['All', 'Gold', 'Silver', 'Bronze'];
+
+// Spend filter thresholds (in INR) used to filter by total amount spent.
+const SPEND_OPTIONS: Array<{ value: SpendFilter; label: string }> = [
+  { value: 'All', label: 'All Spend' },
+  { value: 'above500', label: 'Above ₹500' },
+  { value: 'above1000', label: 'Above ₹1,000' },
+  { value: 'above2000', label: 'Above ₹2,000' },
+  { value: 'above5000', label: 'Above ₹5,000' },
+];
 
 export function CustomersFilterBar() {
   const {
     searchQuery,        setSearchQuery,
     activeStatusFilter, setStatusFilter,
     activeTierFilter,   setTierFilter,
+    activeSpendFilter,  setSpendFilter,
   } = useCustomersStore();
+
+  const [spendOpen, setSpendOpen] = useState(false);
+  const spendRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!spendOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (spendRef.current && !spendRef.current.contains(e.target as Node)) setSpendOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [spendOpen]);
+
+  const spendLabel = SPEND_OPTIONS.find((o) => o.value === activeSpendFilter)?.label ?? 'Filter';
+  const spendActive = activeSpendFilter !== 'All';
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-4 sm:px-5 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -62,11 +87,45 @@ export function CustomersFilterBar() {
         <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
       </div>
 
-      {/* Filter button */}
-      <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-        <Filter className="w-3.5 h-3.5" />
-        Filter
-      </button>
+      {/* Spend filter (driven by the Filter button) */}
+      <div className="relative" ref={spendRef}>
+        <button
+          type="button"
+          onClick={() => setSpendOpen((o) => !o)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-xl border transition-colors ${
+            spendActive
+              ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800'
+              : 'text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+          }`}
+        >
+          <Filter className="w-3.5 h-3.5" />
+          {spendLabel}
+          <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+        </button>
+
+        {spendOpen && (
+          <div className="absolute right-0 z-20 mt-1 w-44 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1">
+            {SPEND_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => {
+                  setSpendFilter(o.value);
+                  setSpendOpen(false);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left transition-colors ${
+                  activeSpendFilter === o.value
+                    ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 font-medium'
+                    : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                {o.label}
+                {activeSpendFilter === o.value && <span className="text-orange-500">•</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

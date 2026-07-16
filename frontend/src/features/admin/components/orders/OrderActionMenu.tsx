@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreVertical, Eye, Edit, Clock, CheckCircle, Trash2, Utensils } from 'lucide-react';
-import { useOrdersStore, type Order, type OrderStatus } from '../../store/orders.store';
+import { MoreVertical, Eye, Edit, Trash2, XCircle } from 'lucide-react';
+import { useOrdersStore, type Order } from '../../store/orders.store';
 import { OrderDetailModal } from './OrderDetailModal';
 import { EditOrderModal } from './EditOrderModal';
 
@@ -9,93 +9,103 @@ interface OrderActionMenuProps {
 }
 
 export function OrderActionMenu({ order }: OrderActionMenuProps) {
-  const [open,       setOpen]       = useState(false);
+  const [open, setOpen] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
-  const [showEdit,   setShowEdit]   = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { updateOrderStatus } = useOrdersStore();
+  const { updateOrder, deleteOrder } = useOrdersStore();
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const statusActions: {
-    label: string;
-    icon: React.ElementType;
-    status?: OrderStatus;
-    danger?: boolean;
-    disabled?: boolean;
-  }[] = [
-    { label: 'Mark Preparing',  icon: Clock,        status: 'Preparing', disabled: order.status === 'Preparing' },
-    { label: 'Mark Served',     icon: Utensils,     status: 'Served',    disabled: order.status === 'Served'    },
-    { label: 'Mark Completed',  icon: CheckCircle,  status: 'Completed', disabled: order.status === 'Completed' },
-    { label: 'Cancel Order',    icon: Trash2,       status: 'Cancelled', danger: true, disabled: order.status === 'Cancelled' },
-  ];
+  const handleCancel = async () => {
+    try {
+      // force:true bypasses the normal state machine so an admin can cancel
+      // from any status (same override used by the Edit Order modal).
+      await updateOrder(order.id, { status: 'Cancelled' }, true);
+    } catch (err) {
+      console.error('Failed to cancel order', err);
+    } finally {
+      setOpen(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete order ${order.orderNumber}? This action cannot be undone.`)) {
+      setOpen(false);
+      return;
+    }
+    try {
+      await deleteOrder(order.id);
+    } catch (err) {
+      console.error('Failed to delete order', err);
+    } finally {
+      setOpen(false);
+    }
+  };
+
+  const itemBase =
+    'flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700';
+
+  const disabled = order.status === 'Cancelled';
 
   return (
     <>
       <div className="relative" ref={ref}>
         <button
+          type="button"
           onClick={() => setOpen((v) => !v)}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+          aria-label="Order actions"
         >
-          <MoreVertical className="w-4 h-4" />
+          <MoreVertical className="h-4 w-4" />
         </button>
 
         {open && (
-          <div className="absolute right-0 top-8 z-50 w-52 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-lg py-1 overflow-hidden">
-
-            {/* Primary actions */}
-            <button
-              onClick={() => { setShowDetail(true); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-            >
-              <Eye className="w-3.5 h-3.5 flex-shrink-0 text-blue-500" />
-              View Details
+          <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+            <button className={itemBase} onClick={() => { setShowDetail(true); setOpen(false); }}>
+              <Eye className="h-4 w-4" /> View Details
+            </button>
+            <button className={itemBase} onClick={() => { setShowEdit(true); setOpen(false); }}>
+              <Edit className="h-4 w-4" /> Edit Order
             </button>
 
+            <div className="my-1 border-t border-gray-100 dark:border-gray-700" />
+
             <button
-              onClick={() => { setShowEdit(true); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+              className={`${itemBase} ${
+                disabled
+                  ? 'cursor-not-allowed text-gray-300 dark:text-gray-600'
+                  : 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30'
+              }`}
+              onClick={disabled ? undefined : handleCancel}
+              disabled={disabled}
             >
-              <Edit className="w-3.5 h-3.5 flex-shrink-0 text-orange-500" />
-              Edit Order
+              <XCircle className="h-4 w-4" /> Cancel Order
             </button>
-
-            {/* Divider */}
-            <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-
-            {/* Status change actions */}
-            {statusActions.map(({ label, icon: Icon, status, danger, disabled }) => (
-              <button
-                key={label}
-                disabled={disabled}
-                onClick={async () => {
-                  if (status) await updateOrderStatus(order.id, status);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm transition-colors text-left ${
-                  disabled
-                    ? 'opacity-40 cursor-not-allowed text-gray-400 dark:text-gray-600'
-                    : danger
-                      ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                {label}
-              </button>
-            ))}
+            <button
+              className={`${itemBase} text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30`}
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4" /> Delete Order
+            </button>
           </div>
         )}
       </div>
 
-      {showDetail && <OrderDetailModal order={order} onClose={() => setShowDetail(false)} />}
-      {showEdit   && <EditOrderModal   order={order} onClose={() => setShowEdit(false)}   />}
+      {showDetail && (
+        <OrderDetailModal order={order} onClose={() => setShowDetail(false)} />
+      )}
+      {showEdit && (
+        <EditOrderModal order={order} onClose={() => setShowEdit(false)} />
+      )}
     </>
   );
 }

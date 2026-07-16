@@ -27,6 +27,7 @@ export const SocketEvent = {
   ORDER_NEW: 'order.created',
   ORDER_STATUS_UPDATED: 'order.updated',
   ORDER_READY: 'order.ready',
+  ORDER_DELETED: 'order.deleted',
 
   // ── Kitchen events ────────────────────────────────────────────────────
   KITCHEN_BATCH_UPDATED: 'kitchen:batch-updated',
