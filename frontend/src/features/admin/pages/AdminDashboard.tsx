@@ -16,80 +16,87 @@ const AdminDashboard = () => {
   const statTiles = useDashboardStore((s) => s.statTiles);
 
   useEffect(() => {
-    // Only connect socket and setup listeners if restaurant is active
+    // Always load dashboard data — it works off the session's restaurantId,
+    // independent of the restaurant.status (ACTIVE / PENDING / etc.).
+    const bootstrap = async () => {
+      await useTablesStore.getState().fetchTables();
+      await useDashboardStore.getState().fetchDashboard();
+    };
+    bootstrap();
+
+    const interval = setInterval(() => {
+      const socket = getSocket();
+      if (!socket || !socket.connected) {
+        useTablesStore.getState().fetchTables();
+      }
+    }, 15000);
+    const dashInterval = setInterval(() => {
+      useDashboardStore.getState().fetchDashboard();
+    }, 30000);
+
+    // Only open the live socket / wire realtime listeners once the
+    // restaurant is ACTIVE (live order + table events).
     if (restaurant && restaurant.status === 'ACTIVE') {
       connectSocket();
-      const bootstrap = async () => {
-    await useTablesStore.getState().fetchTables();
-    await useDashboardStore.getState().fetchDashboard();
-};
-
-bootstrap();
-
-      const interval = setInterval(() => {
-        const socket = getSocket();
-        if (!socket || !socket.connected) {
-          useTablesStore.getState().fetchTables();
-        }
-      }, 15000);
-      const dashInterval = setInterval(() => {
-    useDashboardStore.getState().fetchDashboard();
-      }, 30000);
-  
 
       const socket = getSocket();
       if (socket) {
-  const handleSync = () => {
-    useTablesStore.getState().fetchTables();
-  };
+        const handleSync = () => {
+          useTablesStore.getState().fetchTables();
+        };
 
-  const handleDashboardSync = () => {
-    useDashboardStore.getState().fetchDashboard();
-  };
+        const handleDashboardSync = () => {
+          useDashboardStore.getState().fetchDashboard();
+        };
 
-  socket.on('table.status.changed', handleSync);
-  socket.on('table.session.created', handleSync);
-  socket.on('table.session.closed', handleSync);
-  socket.on('table.session.expired', handleSync);
-  socket.on('order.created', handleSync);
-  socket.on('order.updated', handleSync);
-  socket.on('order.ready', handleSync);
-  socket.on('bill.requested', handleSync);
-  socket.on('bill.paid', handleSync);
-  socket.on('cleaning.started', handleSync);
-  socket.on('cleaning.completed', handleSync);
-  socket.on('staff:request-new', handleSync);
+        socket.on('table.status.changed', handleSync);
+        socket.on('table.session.created', handleSync);
+        socket.on('table.session.closed', handleSync);
+        socket.on('table.session.expired', handleSync);
+        socket.on('order.created', handleSync);
+        socket.on('order.updated', handleSync);
+        socket.on('order.ready', handleSync);
+        socket.on('bill.requested', handleSync);
+        socket.on('bill.paid', handleSync);
+        socket.on('cleaning.started', handleSync);
+        socket.on('cleaning.completed', handleSync);
+        socket.on('staff:request-new', handleSync);
 
-  socket.on('order.created', handleDashboardSync);
-  socket.on('order.updated', handleDashboardSync);
-  socket.on('order.ready', handleDashboardSync);
-  socket.on('bill.paid', handleDashboardSync);
+        socket.on('order.created', handleDashboardSync);
+        socket.on('order.updated', handleDashboardSync);
+        socket.on('order.ready', handleDashboardSync);
+        socket.on('bill.paid', handleDashboardSync);
 
-  return () => {
-    clearInterval(interval);
-    clearInterval(dashInterval);
+        return () => {
+          clearInterval(interval);
+          clearInterval(dashInterval);
 
-    socket.off('table.status.changed', handleSync);
-    socket.off('table.session.created', handleSync);
-    socket.off('table.session.closed', handleSync);
-    socket.off('table.session.expired', handleSync);
-    socket.off('order.created', handleSync);
-    socket.off('order.updated', handleSync);
-    socket.off('order.ready', handleSync);
-    socket.off('bill.requested', handleSync);
-    socket.off('bill.paid', handleSync);
-    socket.off('cleaning.started', handleSync);
-    socket.off('cleaning.completed', handleSync);
-    socket.off('staff:request-new', handleSync);
+          socket.off('table.status.changed', handleSync);
+          socket.off('table.session.created', handleSync);
+          socket.off('table.session.closed', handleSync);
+          socket.off('table.session.expired', handleSync);
+          socket.off('order.created', handleSync);
+          socket.off('order.updated', handleSync);
+          socket.off('order.ready', handleSync);
+          socket.off('bill.requested', handleSync);
+          socket.off('bill.paid', handleSync);
+          socket.off('cleaning.started', handleSync);
+          socket.off('cleaning.completed', handleSync);
+          socket.off('staff:request-new', handleSync);
 
-    socket.off('order.created', handleDashboardSync);
-    socket.off('order.updated', handleDashboardSync);
-    socket.off('order.ready', handleDashboardSync);
-    socket.off('bill.paid', handleDashboardSync);
-  };
-}
+          socket.off('order.created', handleDashboardSync);
+          socket.off('order.updated', handleDashboardSync);
+          socket.off('order.ready', handleDashboardSync);
+          socket.off('bill.paid', handleDashboardSync);
+        };
+      }
     }
-      },[restaurant]);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(dashInterval);
+    };
+  }, [restaurant]);
 
   return (
     <div className="space-y-4 sm:space-y-6">

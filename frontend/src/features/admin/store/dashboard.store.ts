@@ -342,64 +342,72 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       adminAuditLogsApi.getAuditLogs({ limit: 12 }).catch(() => null),
     ]);
 
-    const summary = revData?.summary || { totalRevenue: 0, billCount: 0, averageBillValue: 0, totalTax: 0, totalDiscount: 0 };
-    const orders: Order[] = ordData?.orders ? ordData.orders.map(mapBackendOrder) : [];
-    const today = new Date().toISOString().slice(0, 10);
-    const ordersToday = orders.filter((o) => o.date === today).length;
-    const activeCount = orders.filter(
-      (o) => o.status === 'Pending' || o.status === 'Preparing' || o.status === 'Served'
-    ).length;
-    // "Active Customers" = tables currently hosting a live dine-in party
-    // (occupied, or holding an active session such as a reserved-then-seated
-    // table). Read from the live tables array so it reflects the latest fetch.
-    const activeCustomers = useTablesStore
-      .getState()
-      .tables.filter((t) => t.status === 'Occupied' || t.sessionDetails).length;
+    try {
+      const summary = revData?.summary || { totalRevenue: 0, billCount: 0, averageBillValue: 0, totalTax: 0, totalDiscount: 0 };
+      const backendOrders = Array.isArray(ordData?.orders) ? ordData!.orders : [];
+      const orders: Order[] = backendOrders.map(mapBackendOrder);
+      const today = new Date().toISOString().slice(0, 10);
+      const ordersToday = orders.filter((o) => o.date === today).length;
+      const activeCount = orders.filter(
+        (o) => o.status === 'Pending' || o.status === 'Preparing' || o.status === 'Served'
+      ).length;
+      // "Active Customers" = tables currently hosting a live dine-in party
+      // (occupied, or holding an active session such as a reserved-then-seated
+      // table). Read from the live tables array so it reflects the latest fetch.
+      const activeCustomers = useTablesStore
+        .getState()
+        .tables.filter((t) => t.status === 'Occupied' || t.sessionDetails).length;
 
-    const statTiles: StatTile[] = [
-      {
-        title: 'Total Revenue',
-        value: formatCurrency(Math.round(summary.totalRevenue ?? 0)),
-        change: `${summary.billCount ?? 0} paid bills`,
-        changeType: 'increase',
-        icon: TrendingUp,
-        iconBg: 'bg-orange-50',
-        iconColor: 'text-orange-500',
-      },
-      {
-        title: 'Orders Today',
-        value: String(ordersToday),
-        change: `${activeCount} active`,
-        changeType: ordersToday > 0 ? 'increase' : 'neutral',
-        icon: ShoppingBag,
-        iconBg: 'bg-blue-50',
-        iconColor: 'text-blue-500',
-      },
-      {
-        title: 'Active Customers',
-        value: String(activeCustomers),
-        change: 'live now',
-        changeType: 'neutral',
-        icon: Users,
-        iconBg: 'bg-green-50',
-        iconColor: 'text-green-500',
-      },
-      {
-        title: 'Avg Order Value',
-        value: formatCurrency(Math.round(summary.averageBillValue ?? 0)),
-        change: 'per bill',
-        changeType: 'neutral',
-        icon: IndianRupee,
-        iconBg: 'bg-purple-50',
-        iconColor: 'text-purple-500',
-      },
-    ];
+      const statTiles: StatTile[] = [
+        {
+          title: 'Total Revenue',
+          value: formatCurrency(Math.round(summary.totalRevenue ?? 0)),
+          change: `${summary.billCount ?? 0} paid bills`,
+          changeType: 'increase',
+          icon: TrendingUp,
+          iconBg: 'bg-orange-50',
+          iconColor: 'text-orange-500',
+        },
+        {
+          title: 'Orders Today',
+          value: String(ordersToday),
+          change: `${activeCount} active`,
+          changeType: ordersToday > 0 ? 'increase' : 'neutral',
+          icon: ShoppingBag,
+          iconBg: 'bg-blue-50',
+          iconColor: 'text-blue-500',
+        },
+        {
+          title: 'Active Customers',
+          value: String(activeCustomers),
+          change: 'live now',
+          changeType: 'neutral',
+          icon: Users,
+          iconBg: 'bg-green-50',
+          iconColor: 'text-green-500',
+        },
+        {
+          title: 'Avg Order Value',
+          value: formatCurrency(Math.round(summary.averageBillValue ?? 0)),
+          change: 'per bill',
+          changeType: 'neutral',
+          icon: IndianRupee,
+          iconBg: 'bg-purple-50',
+          iconColor: 'text-purple-500',
+        },
+      ];
 
-    const revenueData = buildRevenueData(revData?.revenue || []);
-    const recentOrders = buildRecentOrders(orders);
-    const topItems = buildTopItems(ordData?.orders || []);
-    const activities = (audData?.logs || []).slice(0, 8).map(mapActivity);
+      const revenueData = buildRevenueData(revData?.revenue || []);
+      const recentOrders = buildRecentOrders(orders);
+      const topItems = buildTopItems(backendOrders);
+      const activities = (audData?.logs || []).slice(0, 8).map(mapActivity);
 
-    set({ loading: false, statTiles, revenueData, recentOrders, topItems, activities });
+      set({ loading: false, statTiles, revenueData, recentOrders, topItems, activities });
+    } catch (err) {
+      // Never leave the dashboard stuck on seed/"Loading…" tiles if a single
+      // derivation throws. Surface the error but still flip loading off.
+      console.error('[dashboard] fetchDashboard derivation failed', err);
+      set({ loading: false });
+    }
   },
 }));
