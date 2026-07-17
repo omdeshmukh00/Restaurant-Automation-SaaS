@@ -119,6 +119,8 @@ export type StoredAuthUser = {
   mobile?: string;
   themeMode?: 'light' | 'dark' | 'system';
   avatar?: string;
+  location?: string;
+  bio?: string;
 };
 
 export function getStoredUser(panel: Panel): StoredAuthUser | null {

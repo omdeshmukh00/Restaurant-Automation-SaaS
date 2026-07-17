@@ -55,6 +55,9 @@ type SeedUserInput = {
   kitchen_role?: KitchenRole;
   staff_role?: StaffInternalRole;
   cleaning_role?: CleaningRole;
+  location?: string;
+  avatar?: string;
+  bio?: string;
 };
 
 async function upsertUser(input: SeedUserInput) {
@@ -74,6 +77,9 @@ async function upsertUser(input: SeedUserInput) {
         kitchen_role: input.kitchen_role ?? null,
         staff_role: input.staff_role ?? null,
         cleaning_role: input.cleaning_role ?? null,
+        location: input.location ?? null,
+        avatar: input.avatar ?? null,
+        bio: input.bio ?? null,
         isEmailVerified: true,
         isMobileVerified: true,
         isDeleted: false,
@@ -196,6 +202,9 @@ export async function seedDevelopmentData(): Promise<void> {
       mobile: '4444444444',
       password: 'Happy@100',
       role: UserRole.SUPER_ADMIN,
+      location: 'Kolkata, WB',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80',
+      bio: 'Super Administrator managing the HQ Terminal platform.',
     }),
   ]);
 

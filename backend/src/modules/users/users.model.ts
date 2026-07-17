@@ -54,6 +54,8 @@ export interface IUser extends Document {
   tenantId?: string;
 
   avatar?: string | null;
+  location?: string | null;
+  bio?: string | null;
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -205,6 +207,14 @@ const userSchema = new Schema<IUser>(
     },
 
     avatar: {
+      type: String,
+      default: null,
+    },
+    location: {
+      type: String,
+      default: null,
+    },
+    bio: {
       type: String,
       default: null,
     },

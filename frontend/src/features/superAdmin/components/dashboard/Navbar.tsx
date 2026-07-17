@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
 import { useAlertsStore } from "../../store/AlertsStore";
+import { useSuperAdminDashboardStore } from "../../store/Superadmindashboard";
 
 interface NavbarProps {
   darkMode: boolean;
@@ -43,17 +44,40 @@ interface ProfileCardProps {
 function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const { data, fetchOverview } = useSuperAdminDashboardStore();
+
+  useEffect(() => {
+    if (!data) {
+      fetchOverview();
+    }
+  }, [data, fetchOverview]);
+
+  const formatVal = (val: number | undefined) => {
+    if (val === undefined) return "0";
+    if (val >= 1000) {
+      return (val / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    }
+    return val.toString();
+  };
+
+  const formatRev = (val: number | undefined) => {
+    if (val === undefined) return "₹0";
+    if (val >= 1000) {
+      return "₹" + (val / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    }
+    return "₹" + val.toString();
+  };
 
   const stats = [
-    { label: "Orders", value: "1.4K" },
-    { label: "Revenue", value: "₹92K" },
-    { label: "Partners", value: "38" },
+    { label: "Orders", value: formatVal(data?.stats?.totalOrders) },
+    { label: "Revenue", value: formatRev(data?.stats?.monthlyRevenue) },
+    { label: "Partners", value: (data?.stats?.totalRestaurants ?? 0).toString() },
   ];
 
   const details = [
     { icon: Mail, label: user?.email || "souvik@hq.io" },
     { icon: Phone, label: user?.mobile || "+91 98765 43210" },
-    { icon: MapPin, label: "Kolkata, WB" },
+    { icon: MapPin, label: user?.location || "Kolkata, WB" },
   ];
 
   const handleEditProfile = () => {

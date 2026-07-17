@@ -248,7 +248,9 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response) =
   }
 
   const { otp, expiresAt } = await otpService.createOTP(email, 'email');
-  await sendOTPEmail(email, otp);
+  sendOTPEmail(email, otp).catch((err) => {
+    logger.error('Failed to send OTP email asynchronously', err);
+  });
 
   logger.warn(`OTP = ${otp}`);
 
@@ -340,16 +342,14 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
     userAgent: req.headers['user-agent'],
   });
 
-  try {
-    await sendPasswordChangedAlertEmail(
-      matchedUser.email,
-      matchedUser.name,
-      req.ip,
-      req.headers['user-agent']
-    );
-  } catch (err) {
-    logger.error('Failed to send password changed alert', err);
-  }
+  sendPasswordChangedAlertEmail(
+    matchedUser.email,
+    matchedUser.name,
+    req.ip,
+    req.headers['user-agent']
+  ).catch((err) => {
+    logger.error('Failed to send password changed alert email asynchronously', err);
+  });
 
   sendSuccess(res, {});
 });

@@ -121,7 +121,7 @@ const CustomerAuth: React.FC = () => {
       // Focus first OTP field
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -194,7 +194,7 @@ const CustomerAuth: React.FC = () => {
         }
       }, 800);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid OTP code. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Invalid OTP code. Please try again.');
     } finally {
       setLoading(false);
     }

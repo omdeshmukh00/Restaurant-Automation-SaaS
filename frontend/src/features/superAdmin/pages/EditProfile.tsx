@@ -18,6 +18,7 @@ import {
 import ImageCropperModal from "../../customer/components/dashboard/ImageCropperModal";
 import { useAuth } from "../../../auth/AuthProvider";
 import { setStoredUser } from "../../../auth/tokenStore";
+import { apiClient } from "../../../shared/services/apiClient";
 
 interface OutletContext {
   darkMode: boolean;
@@ -77,16 +78,14 @@ export default function EditProfile() {
   const { darkMode } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
-  const { user, setUser } = useAuth();
+  const { user, setUser, signOut } = useAuth();
 
   const [form, setForm] = useState(() => ({
-    firstName: user?.name?.split(" ")[0] || "Souvik",
-    lastName: user?.name?.split(" ").slice(1).join(" ") || "Dey",
-    displayName: user?.name || "Mr. Souvik",
-    email: user?.email || "souvik@hq.io",
-    phone: user?.mobile || "+91 98765 43210",
-    location: "Kolkata, WB",
-    bio: "Super Administrator managing the HQ Terminal platform.",
+    name: user?.name || "Platform Owner",
+    email: user?.email || "adminsuper22@gmail.com",
+    phone: user?.mobile || "4444444444",
+    location: user?.location || "Kolkata, WB",
+    bio: user?.bio || "Super Administrator managing the HQ Terminal platform.",
   }));
 
   const [passwords, setPasswords] = useState({
@@ -133,6 +132,57 @@ export default function EditProfile() {
     }
   };
 
+  const saveField = async (updatedFields: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    avatar?: string;
+    bio?: string;
+  }) => {
+    try {
+      setPwError("");
+      
+      const payload = {
+        name: updatedFields.name !== undefined ? updatedFields.name : form.name,
+        email: updatedFields.email !== undefined ? updatedFields.email : form.email,
+        mobile: updatedFields.phone !== undefined ? updatedFields.phone : form.phone,
+        avatar: updatedFields.avatar !== undefined ? updatedFields.avatar : avatarUrl,
+        location: updatedFields.location !== undefined ? updatedFields.location : form.location,
+        bio: updatedFields.bio !== undefined ? updatedFields.bio : form.bio,
+      };
+
+      const response = await apiClient.patch('/users/me', payload);
+
+      if (response.data?.success || response.data) {
+        const updatedUser = response.data.data?.user || response.data.user;
+        const nextUser = {
+          id: updatedUser._id || updatedUser.id,
+          name: updatedUser.name,
+          role: user?.role || "super-admin",
+          panel: "superadmin" as const,
+          email: updatedUser.email,
+          mobile: updatedUser.mobile,
+          avatar: updatedUser.avatar,
+          location: updatedUser.location,
+          bio: updatedUser.bio,
+          restaurantName: user?.restaurantName || "Graphura Cloud",
+        };
+
+        setStoredUser("superadmin", nextUser);
+        if (setUser) {
+          setUser(nextUser);
+        }
+
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (err: any) {
+      console.error("Failed to auto-save profile", err);
+      setPwError(err.response?.data?.error?.message || err.response?.data?.message || "Failed to auto-save changes.");
+    }
+  };
+
   const handleCropConfirm = (croppedBase64: string) => {
     if (avatarUrl.startsWith("blob:")) {
       URL.revokeObjectURL(avatarUrl);
@@ -140,53 +190,35 @@ export default function EditProfile() {
     setAvatarUrl(croppedBase64);
     setCropperOpen(false);
     setTempImageSrc("");
+    saveField({ avatar: croppedBase64 });
   };
 
-  const handleSave = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-
-    if (passwords.current || passwords.next || passwords.confirm) {
-      if (!passwords.current) {
-        setPwError("Enter your current password.");
-        return;
-      }
-      if (passwords.next.length < 8) {
-        setPwError("New password must be at least 8 characters.");
-        return;
-      }
-      if (passwords.next !== passwords.confirm) {
-        setPwError("Passwords don't match.");
-        return;
-      }
+  const handlePasswordUpdate = async () => {
+    if (!passwords.current) {
+      setPwError("Enter your current password.");
+      return;
+    }
+    if (passwords.next.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    if (passwords.next !== passwords.confirm) {
+      setPwError("Passwords don't match.");
+      return;
     }
 
-    // Save updated user to localStorage and update global auth state
-    const updatedStoredUser = {
-      id: user?.id || "demo-super-admin",
-      name: form.displayName,
-      role: user?.role || "super-admin",
-      panel: "superadmin" as const,
-      email: form.email,
-      mobile: form.phone,
-      avatar: avatarUrl,
-    };
-    setStoredUser("superadmin", updatedStoredUser);
-
-    if (setUser) {
-      setUser({
-        id: user?.id || "demo-super-admin",
-        name: form.displayName,
-        role: user?.role || "super-admin",
-        panel: "superadmin" as const,
-        email: form.email,
-        mobile: form.phone,
-        avatar: avatarUrl,
-        restaurantName: user?.restaurantName || "Graphura Cloud",
+    try {
+      setPwError("");
+      await apiClient.patch('/users/me/password', {
+        currentPassword: passwords.current,
+        newPassword: passwords.next,
       });
+      signOut();
+      navigate("/auth/superadmin");
+    } catch (err: any) {
+      console.error("Failed to update password", err);
+      setPwError(err.response?.data?.error?.message || err.response?.data?.message || "Failed to update password.");
     }
-
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
   };
 
   const card = `rounded-2xl border p-5 sm:p-6 space-y-5 ${
@@ -204,7 +236,7 @@ export default function EditProfile() {
       }`}
     >
       <form
-        onSubmit={handleSave}
+        onSubmit={(e) => e.preventDefault()}
         className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 max-w-4xl mx-auto"
       >
         <div className="flex items-center gap-3">
@@ -263,7 +295,7 @@ export default function EditProfile() {
             </div>
             <div className="text-center sm:text-left">
               <p className="font-bold text-base">
-                {form.firstName} {form.lastName}
+                {form.name}
               </p>
               <div
                 className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
@@ -299,43 +331,25 @@ export default function EditProfile() {
 
         <div className={card}>
           <p className={sectionTitle}>Personal Information</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="First Name" icon={User} darkMode={darkMode}>
-              <Input
-                darkMode={darkMode}
-                value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                placeholder="First name"
-              />
-            </Field>
-            <Field label="Last Name" icon={User} darkMode={darkMode}>
-              <Input
-                darkMode={darkMode}
-                value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                placeholder="Last name"
-              />
-            </Field>
-          </div>
           <Field
-            label="Display Name"
+            label="Name"
             icon={User}
             darkMode={darkMode}
             hint="Shown in the navbar and profile card."
           >
             <Input
               darkMode={darkMode}
-              value={form.displayName}
-              onChange={(e) =>
-                setForm({ ...form, displayName: e.target.value })
-              }
-              placeholder="e.g. Mr. Souvik"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onBlur={() => saveField({ name: form.name })}
+              placeholder="Your Name"
             />
           </Field>
           <Field label="Bio" icon={User} darkMode={darkMode}>
             <textarea
               value={form.bio}
               onChange={(e) => setForm({ ...form, bio: e.target.value })}
+              onBlur={() => saveField({ bio: form.bio })}
               rows={3}
               placeholder="A short description about yourself..."
               className={`w-full p-3.5 rounded-xl text-xs font-medium outline-none border transition-all duration-200 resize-none ${
@@ -360,6 +374,7 @@ export default function EditProfile() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onBlur={() => saveField({ email: form.email })}
               placeholder="you@example.com"
             />
           </Field>
@@ -370,6 +385,7 @@ export default function EditProfile() {
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onBlur={() => saveField({ phone: form.phone })}
                 placeholder="+91 XXXXX XXXXX"
               />
             </Field>
@@ -378,6 +394,7 @@ export default function EditProfile() {
                 darkMode={darkMode}
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
+                onBlur={() => saveField({ location: form.location })}
                 placeholder="City, State"
               />
             </Field>
@@ -533,39 +550,39 @@ export default function EditProfile() {
               {pwError}
             </div>
           )}
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={handlePasswordUpdate}
+              className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-md shadow-orange-500/10"
+            >
+              Update Password
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pb-4">
+        <div className="flex items-center justify-between pb-4">
+          <div className="text-xs font-medium">
+            {saved ? (
+              <span className="flex items-center gap-1.5 text-emerald-500">
+                <Check size={14} /> Saved automatically!
+              </span>
+            ) : (
+              <span className={darkMode ? "text-slate-500" : "text-slate-400"}>
+                Changes are saved automatically when you finish typing.
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
               darkMode
-                ? "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800"
-                : "bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 border border-slate-200"
+                ? "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-slate-800"
+                : "bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 border-slate-200"
             }`}
           >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              saved
-                ? "bg-emerald-500 text-white"
-                : "bg-gradient-to-r from-orange-600 to-amber-500 text-white hover:from-orange-500 hover:to-amber-400 shadow-md shadow-orange-500/20"
-            }`}
-          >
-            {saved ? (
-              <>
-                <Check size={14} />
-                Saved!
-              </>
-            ) : (
-              <>
-                <Save size={14} />
-                Save Changes
-              </>
-            )}
+            Back to Dashboard
           </button>
         </div>
       </form>

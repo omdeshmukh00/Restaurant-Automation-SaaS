@@ -31,6 +31,8 @@ export type AuthUser = {
   firstLogin?: boolean;
   themeMode?: 'light' | 'dark' | 'system';
   avatar?: string;
+  location?: string;
+  bio?: string;
 };
 
 type AuthContextValue = {
@@ -160,6 +162,8 @@ function toAuthUser(user: StoredAuthUser, panelOverride?: Panel): AuthUser {
     firstLogin: (user as any).firstLogin,
     themeMode: user.themeMode,
     avatar: user.avatar,
+    location: user.location,
+    bio: user.bio,
   };
 }
 

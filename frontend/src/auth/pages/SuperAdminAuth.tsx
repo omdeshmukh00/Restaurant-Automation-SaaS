@@ -73,7 +73,7 @@ const SuperAdminAuth: React.FC = () => {
         setCountdown(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)));
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to resend OTP. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to resend OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -99,7 +99,7 @@ const SuperAdminAuth: React.FC = () => {
       }
       setAuthMode('verify-otp');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -127,7 +127,7 @@ const SuperAdminAuth: React.FC = () => {
       setOtpExpiresAt(null);
       localStorage.removeItem('otpExpiresAt');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid OTP code. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Invalid OTP code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -164,7 +164,7 @@ const SuperAdminAuth: React.FC = () => {
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to reset password. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to reset password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -196,6 +196,7 @@ const SuperAdminAuth: React.FC = () => {
       navigate('/superadmin', { replace: true });
     } catch (err: any) {
       setError(
+        err.response?.data?.error?.message ||
         err.response?.data?.message ||
         'Authentication failed. Please verify credentials.'
       );
