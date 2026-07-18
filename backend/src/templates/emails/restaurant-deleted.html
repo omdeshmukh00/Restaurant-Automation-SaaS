@@ -1,12 +1,17 @@
 <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-top: 4px solid #EF4444; border-radius: 8px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
   <h2 style="color: #EF4444; margin-top: 0;">Restaurant Account Deleted</h2>
   <p>Dear {{ownerName}},</p>
-  <p>We regret to inform you that your restaurant account <strong>{{restaurantName}}</strong> has been permanently deleted from RestoHub by team RestoHub.</p>
+  <p>We regret to inform you that your restaurant account <strong>{{restaurantName}}</strong> has been permanently deleted from {{platformName}} by team {{platformName}}.</p>
   <div style="background-color: #FEF2F2; border: 1px solid #FEE2E2; border-radius: 6px; padding: 16px; margin: 20px 0; color: #991B1B;">
     <p style="margin: 0; font-weight: bold;">Reason for Deletion:</p>
     <p style="margin: 8px 0 0 0;">{{reason}}</p>
   </div>
   <p>All associated accounts and portals for kitchen, serving staff, cleaning and admin roles have been deactivated as well.</p>
-  <p>If you have any questions, please contact RestoHub support at <a href="mailto:support@restohub.com" style="color: #F97316; font-weight: bold;">support@restohub.com</a>.</p>
-  <p style="margin-top: 30px; font-size: 12px; color: #888;">Sincerely,<br/>The RestoHub Team</p>
+  <p>If you have any questions, please contact {{platformName}} support at <a href="mailto:{{supportEmail}}" style="color: #F97316; font-weight: bold;">{{supportEmail}}</a>.</p>
+  <p style="margin-top: 30px; font-size: 12px; color: #888;">Sincerely,<br/>The {{platformName}} Team</p>
+</div>
+
+<div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px; text-align: center; font-size: 13px; color: #888;">
+  <p style="margin: 0;">© {{year}} {{platformName}}. All rights reserved.</p>
+  <p style="margin-top: 8px; font-size: 13px; color: #aaa;">This is an auto generated email. Please do not reply.</p>
 </div>

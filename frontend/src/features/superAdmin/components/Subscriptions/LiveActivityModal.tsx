@@ -340,7 +340,7 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
 
               {/* Recent Orders */}
               <div>
-                <p className={`text-[10px] font-bold uppercase tracking-wider mb-2.5 ${textMuted}`}>Recent Orders</p>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-2.5 ${textMuted}`}>All Orders</p>
                 {data.orders.recent.length === 0 ? (
                   <div className={`text-center py-6 rounded-xl border ${cardBg}`}>
                     <ShoppingBag size={20} className={`mx-auto mb-1.5 ${textMuted}`} />

@@ -8,7 +8,7 @@ import { RestaurantModel } from '../restaurants/restaurants.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
 import { FeatureFlagModel, PlatformPlanModel } from '../superAdmin/superAdmin.model';
 import { RestaurantRequestModel } from '../superAdmin/restaurantRequest.model';
-import { SubscriptionPaymentModel } from '../subscriptions/subscriptions.model';
+import { SubscriptionPaymentModel, SubscriptionModel } from '../subscriptions/subscriptions.model';
 import { PaymentModel } from '../payments/payments.model';
 import { OrderModel } from '../orders/orders.model';
 import { getPlatformSettings } from '../superAdmin/platformSettings.model';
@@ -20,6 +20,8 @@ import { UserModel } from '../users/users.model';
 import { sendRestaurantDeletedEmail } from '../../services/mail.service';
 
 import { RestaurantStatus, SessionStatus, OrderStatus, QueueStatus, ReservationStatus } from '../../constants/statuses';
+
+import { updateRestaurantCommissionRate } from '../superAdmin/superAdmin.service';
 
 export const superAdminRouter = Router();
 
@@ -35,8 +37,40 @@ superAdminRouter.get('/restaurants', async (req, res, next) => {
     if (plan) query.plan = String(plan);
     if (search) query.name = { $regex: String(search), $options: 'i' };
 
-    const restaurants = await RestaurantModel.find(query).sort({ createdAt: -1 });
-    ok(res, { restaurants, count: restaurants.length });
+    const restaurants = await RestaurantModel.find(query).sort({ createdAt: -1 }).lean();
+
+    // Fetch total revenue (sum of finalAmount for completed orders) grouped by restaurantId
+    const revenueStats = await OrderModel.aggregate([
+      {
+        $match: {
+          paymentStatus: 'PAID',
+        }
+      },
+      {
+        $group: {
+          _id: '$restaurantId',
+          totalRevenue: { $sum: '$finalAmount' }
+        }
+      }
+    ]);
+
+    const revenueMap = new Map(revenueStats.map(s => [s?._id?.toString() || '', s.totalRevenue]));
+
+    const subscriptions = await SubscriptionModel.find().lean();
+    const subMap = new Map(subscriptions.map(s => [s.restaurantId.toString(), s]));
+
+    const enrichedRestaurants = restaurants.map(r => {
+      const sub = subMap.get(r._id.toString());
+      return {
+        ...r,
+        revenue: revenueMap.get(r._id.toString()) || 0,
+        mrr: sub ? (sub.priceMonthly ?? 0) : 0,
+        subscriptionPlan_id: sub ? sub.planId : (r.subscriptionPlan_id || null),
+        customCommissionRate: r.customCommissionRate ?? null,
+      };
+    });
+
+    ok(res, { restaurants: enrichedRestaurants, count: enrichedRestaurants.length });
   } catch (error) {
     next(error);
   }
@@ -44,8 +78,37 @@ superAdminRouter.get('/restaurants', async (req, res, next) => {
 
 superAdminRouter.get('/restaurants/:id', async (req, res, next) => {
   try {
-    const restaurant = await RestaurantModel.findById(req.params.id);
-    ok(res, { restaurant });
+    const restaurant = await RestaurantModel.findById(req.params.id).populate('onboardingRequestId').lean();
+    if (!restaurant) {
+      throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+    }
+    const subscription = await SubscriptionModel.findOne({ restaurantId: req.params.id }).lean();
+    const payments = await SubscriptionPaymentModel.find({ restaurantId: req.params.id }).sort({ createdAt: -1 }).lean();
+
+    const totalOrderRevenue = await OrderModel.aggregate([
+      {
+        $match: {
+          restaurantId: new mongoose.Types.ObjectId(req.params.id),
+          paymentStatus: 'PAID',
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$finalAmount' }
+        }
+      }
+    ]);
+
+    const revenue = totalOrderRevenue[0]?.totalRevenue || 0;
+    const enrichedRestaurant = {
+      ...restaurant,
+      revenue,
+      mrr: subscription ? (subscription.priceMonthly ?? 0) : 0,
+      subscriptionPlan_id: subscription ? subscription.planId : (restaurant.subscriptionPlan_id || null),
+    };
+
+    ok(res, { restaurant: enrichedRestaurant, subscription, payments });
   } catch (error) {
     next(error);
   }
@@ -74,6 +137,38 @@ superAdminRouter.patch('/restaurants/:id/suspend', async (req, res, next) => {
     );
 
     ok(res, { restaurant, suspendedBy: req.body?.actorId ?? req.user?.id ?? null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+superAdminRouter.patch('/restaurants/:id/commission', async (req, res, next) => {
+  try {
+    const { customCommissionRate } = req.body;
+    if (typeof customCommissionRate !== 'number' || customCommissionRate < 0 || customCommissionRate > 100) {
+      throw new AppError('Invalid commission rate. Must be a number between 0 and 100.', 400, ErrorCode.INVALID_REQUEST);
+    }
+    const restaurant = await updateRestaurantCommissionRate(req.params.id, customCommissionRate);
+    ok(res, { message: 'Restaurant custom commission rate updated successfully', restaurant });
+  } catch (error) {
+    next(error);
+  }
+});
+
+superAdminRouter.post('/subscriptions/:id/addons', async (req, res, next) => {
+  try {
+    const { name, priceMonthly } = req.body;
+    if (!name || typeof priceMonthly !== 'number') {
+      throw new AppError('Add-on name and monthly price are required.', 400, ErrorCode.INVALID_REQUEST);
+    }
+    const sub = await SubscriptionModel.findById(req.params.id);
+    if (!sub) {
+      throw new AppError('Subscription not found', 404, ErrorCode.NOT_FOUND);
+    }
+    if (!sub.addons) sub.addons = [];
+    sub.addons.push({ name, priceMonthly, addedAt: new Date() });
+    await sub.save();
+    ok(res, { message: 'Add-on added to subscription successfully', subscription: sub });
   } catch (error) {
     next(error);
   }
@@ -508,10 +603,9 @@ superAdminRouter.get('/restaurants/:id/live-activity', async (req, res, next) =>
         status: { $in: [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY] },
       }),
 
-      // 5. Recent 5 orders
+      // 5. All orders
       OrderModel.find({ restaurantId })
         .sort({ createdAt: -1 })
-        .limit(5)
         .select('orderNumber status finalAmount tableId createdAt customerName')
         .lean(),
 

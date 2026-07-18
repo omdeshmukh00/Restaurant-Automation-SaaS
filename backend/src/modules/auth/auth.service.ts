@@ -79,7 +79,7 @@ export async function login(input: LoginInput, meta?: { userAgent?: string; ip?:
   }
 
   if (userService.isAccountLocked(user)) {
-    throw new AppError('Account is temporarily locked. Please try again later.', 423, ErrorCode.ACCOUNT_LOCKED);
+    throw new AppError('Account is locked for 15 mins. Please try again after 15 mins.', 423, ErrorCode.ACCOUNT_LOCKED);
   }
 
   if (user.status !== 'ACTIVE') {
@@ -104,7 +104,7 @@ export async function login(input: LoginInput, meta?: { userAgent?: string; ip?:
   const isValid = await comparePassword(input.password, user.password);
 
   if (!isValid) {
-    await userService.incrementFailedAttempts(user._id.toString());
+    await userService.incrementFailedAttempts(user._id.toString(), meta);
     throw new AppError('Invalid credentials', 401, ErrorCode.UNAUTHORIZED);
   }
 

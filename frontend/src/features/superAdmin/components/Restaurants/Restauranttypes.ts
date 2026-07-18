@@ -13,6 +13,9 @@ export interface RestaurantsRow {
   status: "Active" | "Trial" | "Inactive";
   revenue: string;
   branches: number;
+  mrr?: number;
+  subscriptionPlan_id?: string | null;
+  customCommissionRate?: number | null;
   joinedDate?: string;
   lastActive?: string;
   tags?: string[];

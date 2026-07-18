@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f8fafc; }
+    .container { padding: 24px; max-width: 600px; margin: 20px auto; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+    .badge { display: inline-block; padding: 4px 12px; background-color: #fef2f2; color: #ef4444; border: 1px solid #fee2e2; border-radius: 6px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 15px; }
+    .header { font-size: 20px; font-weight: 800; margin-bottom: 12px; color: #dc2626; tracking: -0.5px; }
+    .details { background: #f8fafc; padding: 16px; border-radius: 8px; margin: 18px 0; border-left: 4px solid #ef4444; border-top: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; }
+    .details p { margin: 6px 0; font-size: 13px; color: #475569; }
+    .details p strong { color: #1e293b; }
+    .btn-container { text-align: center; margin: 24px 0 16px 0; }
+    .btn { display: inline-block; padding: 12px 28px; background-color: #ea580c; color: #ffffff !important; text-decoration: none; font-size: 13px; font-weight: bold; border-radius: 8px; box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2); }
+    .footer { margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px; text-align: center; font-size: 13px; color: #888888; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="badge">⚠️ Payment Unsuccessful</div>
+    <div class="header">Payment Processing Failed</div>
+    <p>Dear <strong>{{customerName}}</strong>,</p>
+    <p>We were unable to complete your payment for <strong>{{paymentType}}</strong>. Don't worry — no funds were charged for unverified transactions.</p>
+    
+    <div class="details">
+      <p><strong>Payment Purpose:</strong> {{paymentType}}</p>
+      <p><strong>Amount:</strong> {{currency}} {{amount}}</p>
+      <p><strong>Order / Transaction ID:</strong> {{transactionId}}</p>
+      <p><strong>Failure Reason:</strong> {{failureReason}}</p>
+    </div>
+
+    <p>You can retry your payment using another payment method or card by clicking the link below:</p>
+
+    <div class="btn-container">
+      <a href="{{retryUrl}}" class="btn">Retry Payment Now</a>
+    </div>
+
+    <p style="font-size: 12px; color: #64748b; margin-top: 20px;">
+      If you need assistance or believe this was an error, please contact support at <a href="mailto:{{supportEmail}}" style="color: #ea580c; font-weight: bold;">{{supportEmail}}</a>.
+    </p>
+
+    <p>Best regards,<br/>The <strong>{{platformName}}</strong> Billing Team</p>
+  </div>
+
+  <div class="footer">
+    <p style="margin: 0;">© {{year}} {{platformName}}. All rights reserved.</p>
+    <p style="margin-top: 8px; font-size: 13px; color: #aaa;">This is an auto generated email. Please do not reply.</p>
+  </div>
+</body>
+</html>

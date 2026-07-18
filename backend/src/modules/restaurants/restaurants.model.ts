@@ -54,6 +54,8 @@ export interface IRestaurant extends Document {
   onboardingRequestId?: mongoose.Types.ObjectId;
   adminUserId?: mongoose.Types.ObjectId;
   subscriptionId?: mongoose.Types.ObjectId | null;
+  subscriptionPlan_id?: mongoose.Types.ObjectId | null;
+  customCommissionRate?: number | null;
   blockReason?: string;
   revenue?: number;
   lastActive?: Date;
@@ -145,6 +147,8 @@ const restaurantSchema = new Schema<IRestaurant>(
     onboardingRequestId: { type: Schema.Types.ObjectId, ref: 'RestaurantRequest' },
     adminUserId: { type: Schema.Types.ObjectId, ref: 'User' },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription', default: null },
+    subscriptionPlan_id: { type: Schema.Types.ObjectId, ref: 'PlatformPlan', default: null },
+    customCommissionRate: { type: Number, min: 0, max: 100, default: null },
     blockReason: { type: String, default: null },
     revenue: { type: Number, default: 0 },
     lastActive: { type: Date, default: Date.now },

@@ -3,6 +3,7 @@ import { Building2, AlertCircle, CheckCircle, RefreshCw, ShieldAlert, Layout, Cr
 import LocationPicker from './LocationPicker';
 import PaymentDialog from './PaymentDialog';
 import { apiClient } from '../../shared/services/apiClient';
+import MaintenanceAlertModal from '../../shared/components/MaintenanceAlertModal';
 
 interface FormData {
   restaurantName: string;
@@ -45,6 +46,7 @@ interface PlatformSettings {
   applicationFeeAmount: number;
   currency: string;
   refundPolicy: string;
+  enablePartnerRegistration?: boolean;
 }
 
 export default function PartnerForm() {
@@ -69,6 +71,7 @@ export default function PartnerForm() {
     applicationFeeAmount: 0,
     currency: 'INR',
     refundPolicy: 'refundable',
+    enablePartnerRegistration: true,
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
 
@@ -787,6 +790,13 @@ export default function PartnerForm() {
           onPaymentFailure={handlePaymentFailure}
         />
       )}
+
+      {/* Registration Blocked Alert Modal */}
+      <MaintenanceAlertModal
+        isOpen={settings.enablePartnerRegistration === false}
+        type="registration_blocked"
+        message="Due to a temporary issue, new restaurant registration is currently blocked. Please check back later."
+      />
       </div>
     </div>
   );

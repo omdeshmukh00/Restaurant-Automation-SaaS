@@ -1,4 +1,5 @@
-import { NavLink } from "react-router-dom";
+import { useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../../auth/AuthProvider";
 import {
   LayoutDashboard,
@@ -10,6 +11,9 @@ import {
   FileText,
   Settings,
   ChevronDown,
+  ChevronUp,
+  User,
+  LogOut,
   X,
 } from "lucide-react";
 
@@ -32,7 +36,10 @@ export default function Sidebar({
   collapsed,
   onToggle,
 }: SidebarProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+
   const navItems = [
     { path: "/superadmin", label: "Dashboard", icon: LayoutDashboard },
     { path: "/superadmin/restaurants", label: "Restaurants", icon: UtensilsCrossed },
@@ -41,6 +48,7 @@ export default function Sidebar({
     { path: "/superadmin/transactions", label: "Transactions", icon: IndianRupee },
     { path: "/superadmin/alerts", label: "Alerts", icon: Bell },
     { path: "/superadmin/audit-logs", label: "Audit Logs", icon: FileText },
+    { path: "/superadmin/edit-profile", label: "Profile", icon: User },
     { path: "/superadmin/settings", label: "Settings", icon: Settings },
   ];
 
@@ -57,24 +65,27 @@ export default function Sidebar({
       {/* LOGO AREA */}
       <div
         className={`flex ${
-          isCollapsed ? "flex-col items-center gap-3 px-1 py-2" : "items-center justify-between px-2 pb-4"
+          isCollapsed ? "flex-col items-center gap-3 px-1 py-2" : "items-center justify-between px-1 pb-4"
         } border-b mb-6 shrink-0 ${
           darkMode ? "border-slate-800/60" : "border-slate-200/80"
         }`}
       >
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center font-black text-white text-base shadow-md shadow-orange-500/10">
-            ⬢
+        <div className="flex items-center gap-2 min-w-0">
+          <div
+            className="h-10 w-10 p-1 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-md ring-2 ring-white/30"
+          >
+            <img
+              src="/Graphura logo.png"
+              alt="Graphura Logo"
+              className="w-full h-full object-contain rounded-full bg-white"
+            />
           </div>
           {!isCollapsed && (
-            <div className="leading-tight flex-1">
-              <h1 className={`font-bold text-base tracking-tight ${darkMode ? "text-slate-100" : "text-slate-900"}`}>
-                Super Admin
-              </h1>
-              <p className={`text-[10px] font-semibold mt-0.5 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
-                Restaurant Platform
-              </p>
-            </div>
+            <img
+              src={darkMode ? "/Graphura-Dark-Mode.png" : "/Graphuara-Light-Mode.jpg"}
+              alt="Graphura"
+              className="h-7 max-w-[120px] object-contain shrink min-w-0"
+            />
           )}
         </div>
 
@@ -137,17 +148,91 @@ export default function Sidebar({
 
       {/* FOOTER PROFILE */}
       <div
-        className={`pt-4 border-t flex items-center ${isCollapsed ? "justify-center" : "justify-between"} ${
-          darkMode ? "border-slate-800/60" : "border-slate-100"
+        className={`pt-3 mt-2 border-t relative ${
+          darkMode ? "border-slate-800/60" : "border-slate-200/80"
         }`}
+        onMouseLeave={() => setProfileMenuOpen(false)}
       >
-        <button className="flex items-center gap-1.5 p-0.5 rounded-lg">
-          <img
-            src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&h=60&q=80"}
-            alt="profile"
-            className="w-6 h-6 rounded-full object-cover"
-          />
-          {!isCollapsed && <ChevronDown size={12} className={darkMode ? "text-slate-500" : "text-slate-400"} />}
+        {/* Profile Popover Menu */}
+        {profileMenuOpen && (
+          <div
+            className={`absolute bottom-full pb-2 z-50 animate-scaleUp ${
+              isCollapsed ? "left-0 w-48" : "left-0 right-0 w-full"
+            }`}
+          >
+            <div
+              className={`rounded-2xl border p-1.5 shadow-2xl ${
+                darkMode
+                  ? "bg-slate-950 border-slate-800 text-white shadow-black"
+                  : "bg-white border-slate-200 text-slate-900 shadow-slate-300/50"
+              }`}
+            >
+              <button
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  if (onMobileClose) onMobileClose();
+                  navigate("/superadmin/edit-profile");
+                }}
+                className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+                  darkMode ? "hover:bg-orange-500/10 text-slate-200 hover:text-orange-400" : "hover:bg-orange-50 text-slate-700 hover:text-orange-600"
+                }`}
+              >
+                <User size={14} className="text-orange-500" />
+                <span>Edit Profile</span>
+              </button>
+              <button
+                onClick={() => {
+                  setProfileMenuOpen(false);
+                  if (onMobileClose) onMobileClose();
+                  signOut();
+                }}
+                className={`flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+                  darkMode ? "hover:bg-red-500/10 text-red-400" : "hover:bg-red-50 text-red-600"
+                }`}
+              >
+                <LogOut size={14} className="text-red-500" />
+                <span>Log Out</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={() => setProfileMenuOpen((prev) => !prev)}
+          onMouseEnter={() => setProfileMenuOpen(true)}
+          className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-all ${
+            isCollapsed ? "justify-center" : "justify-between"
+          } ${
+            darkMode
+              ? "hover:bg-slate-800/80 text-slate-200"
+              : "hover:bg-slate-100 text-slate-800"
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img
+              src={
+                user?.avatar ||
+                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&h=60&q=80"
+              }
+              alt="profile"
+              className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-orange-500/20"
+            />
+            {!isCollapsed && (
+              <div className="text-left min-w-0 truncate">
+                <p className="text-xs font-bold truncate leading-tight">
+                  {user?.name || "Graphura"}
+                </p>
+                <p className={`text-[10px] truncate ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+                  Super Admin
+                </p>
+              </div>
+            )}
+          </div>
+          {!isCollapsed && (
+            <div className="shrink-0 text-slate-400">
+              {profileMenuOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </div>
+          )}
         </button>
       </div>
     </aside>

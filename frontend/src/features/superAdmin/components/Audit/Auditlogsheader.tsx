@@ -10,9 +10,9 @@ export default function AuditLogsHeader({ darkMode, onExport }: AuditLogsHeaderP
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1">Audit Logs</h1>
-        <p className={`text-xs sm:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-          Complete activity tracking and security monitoring
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Audit Logs</h1>
+        <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+          Complete activity tracking and security monitoring.
         </p>
       </div>
       <button

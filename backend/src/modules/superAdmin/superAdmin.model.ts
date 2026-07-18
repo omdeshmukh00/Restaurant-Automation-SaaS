@@ -21,6 +21,7 @@ export interface IPlatformPlan extends Document {
   reservationLimit?: number | null;
   queueLimit?: number | null;
   features: string[];
+  commissionRate?: number | null;
   isActive: boolean;
   originalPriceMonthly?: number | null;
   createdAt: Date;
@@ -49,6 +50,7 @@ const platformPlanSchema = new Schema<IPlatformPlan>(
     reservationLimit: { type: Number, min: 0, default: null },
     queueLimit: { type: Number, min: 0, default: null },
     features: [{ type: String, trim: true }],
+    commissionRate: { type: Number, min: 0, max: 100, default: 8 },
     isActive: { type: Boolean, default: true },
     originalPriceMonthly: { type: Number, min: 0, default: null },
   },

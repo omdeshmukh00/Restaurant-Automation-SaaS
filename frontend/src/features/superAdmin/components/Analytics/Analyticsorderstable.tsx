@@ -153,6 +153,8 @@ function MobileOrderCard({
   );
 }
 
+import TablePagination from "../common/TablePagination";
+
 export default function AnalyticsOrdersTable({
   darkMode,
   orders,
@@ -162,6 +164,17 @@ export default function AnalyticsOrdersTable({
   onTabChange,
   commissionRate = 10,
 }: AnalyticsOrdersTableProps) {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(25);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusTab]);
+
+  const paginatedOrders = React.useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return orders.slice(start, start + pageSize);
+  }, [orders, currentPage, pageSize]);
   const inputCls = [
     "pl-9 pr-9 py-2 text-xs rounded-lg outline-none border transition-all w-full sm:min-w-[220px]",
     "focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500/50",
@@ -298,7 +311,7 @@ export default function AnalyticsOrdersTable({
       </div>
 
       {/* ── Desktop table (md+) ────────────────────────────────────── */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden md:block max-h-[620px] overflow-auto">
         <table className="w-full text-xs text-left border-collapse">
           <thead>
             <tr
@@ -326,8 +339,8 @@ export default function AnalyticsOrdersTable({
               darkMode ? "divide-slate-800/50" : "divide-slate-100"
             }`}
           >
-            {orders.length > 0 ? (
-              orders.map((order) => (
+            {paginatedOrders.length > 0 ? (
+              paginatedOrders.map((order) => (
                 <tr
                   key={order.id}
                   className={`transition-colors duration-100 ${
@@ -425,8 +438,8 @@ export default function AnalyticsOrdersTable({
 
       {/* ── Mobile card list (< md) ────────────────────────────────── */}
       <div className="md:hidden p-4 space-y-3">
-        {orders.length > 0 ? (
-          orders.map((order) => (
+        {paginatedOrders.length > 0 ? (
+          paginatedOrders.map((order) => (
             <MobileOrderCard
               key={order.id}
               order={order}
@@ -456,6 +469,17 @@ export default function AnalyticsOrdersTable({
           </div>
         )}
       </div>
+
+      {/* Pagination Bar */}
+      <TablePagination
+        currentPage={currentPage}
+        pageSize={pageSize}
+        totalItems={orders.length}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={setPageSize}
+        darkMode={darkMode}
+        itemLabel="orders"
+      />
     </div>
   );
 }

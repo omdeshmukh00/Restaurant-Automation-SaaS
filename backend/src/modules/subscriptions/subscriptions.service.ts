@@ -33,7 +33,13 @@ type PlanDetails = {
 };
 
 async function resolvePlanDetails(plan: string): Promise<PlanDetails> {
-  const planDoc = await PlatformPlanModel.findOne({ name: plan }).lean();
+  let planDoc = null;
+  if (mongoose.Types.ObjectId.isValid(plan)) {
+    planDoc = await PlatformPlanModel.findById(plan).lean();
+  }
+  if (!planDoc) {
+    planDoc = await PlatformPlanModel.findOne({ name: plan }).lean();
+  }
   if (!planDoc) {
     throw new AppError(`Subscription plan '${plan}' not found`, 400, ErrorCode.INVALID_REQUEST);
   }
@@ -50,9 +56,16 @@ function roundToTwoDecimals(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-async function syncRestaurantPlan(restaurantId: string | mongoose.Types.ObjectId, plan: string) {
+async function syncRestaurantPlan(restaurantId: string | mongoose.Types.ObjectId, plan: string, planId?: mongoose.Types.ObjectId) {
   try {
-    const result = RestaurantModel.findByIdAndUpdate(restaurantId, { plan }, { new: true });
+    const updateObj: any = { plan };
+    if (planId) {
+      updateObj.subscriptionPlan_id = planId;
+    } else {
+      const planDoc = await PlatformPlanModel.findOne({ name: plan });
+      if (planDoc) updateObj.subscriptionPlan_id = planDoc._id;
+    }
+    const result = RestaurantModel.findByIdAndUpdate(restaurantId, updateObj, { new: true });
     await Promise.resolve(result).catch(() => null);
   } catch {
     return null;
@@ -236,6 +249,7 @@ const existing = await SubscriptionModel.findOne({ restaurantId: input.restauran
     restaurantId: input.restaurantId as any,
     plan: planDoc.name,
     planId: planDoc._id,
+    priceMonthly: planDoc.priceMonthly || 0,
     status: SubscriptionStatus.ACTIVE,
     billingCycle,
     seats,
@@ -254,7 +268,7 @@ const existing = await SubscriptionModel.findOne({ restaurantId: input.restauran
   } as unknown as Partial<ISubscription>);
 
 
-await syncRestaurantPlan(input.restaurantId as any, planDoc.name);
+await syncRestaurantPlan(input.restaurantId as any, planDoc.name, planDoc._id);
   await logSubscriptionEvent(doc._id.toString(), input.restaurantId as any, SubscriptionEventType.CREATED, {
     plan: planDoc.name,
     planId: planDoc._id,
@@ -885,6 +899,7 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
   if (existingSub) {
     existingSub.plan = planDoc.name;
     existingSub.planId = planDoc._id;
+    existingSub.priceMonthly = planDoc.priceMonthly || 0;
     existingSub.status = SubscriptionStatus.ACTIVE;
     existingSub.billingCycle = billingCycle as BillingCycle;
     existingSub.currentPeriodStart = new Date();
@@ -898,6 +913,7 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
       restaurantId: new mongoose.Types.ObjectId(restaurantId),
       plan: planDoc.name,
       planId: planDoc._id,
+      priceMonthly: planDoc.priceMonthly || 0,
       status: SubscriptionStatus.ACTIVE,
       billingCycle: billingCycle as BillingCycle,
       seats: 1,
@@ -931,6 +947,7 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
 
   restaurant.status = 'ACTIVE' as any;
   restaurant.plan = planDoc.name;
+  restaurant.subscriptionPlan_id = planDoc._id;
   restaurant.billingCycle = billingCycle as any;
   restaurant.subscriptionId = subscription._id;
   await restaurant.save();

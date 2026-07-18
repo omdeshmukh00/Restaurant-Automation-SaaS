@@ -14,11 +14,16 @@ import {
   EyeOff,
   Check,
   AlertCircle,
+  Building2,
+  Globe,
+  Pencil,
+  X,
 } from "lucide-react";
 import ImageCropperModal from "../../customer/components/dashboard/ImageCropperModal";
 import { useAuth } from "../../../auth/AuthProvider";
 import { setStoredUser } from "../../../auth/tokenStore";
 import { apiClient } from "../../../shared/services/apiClient";
+import { usePlatformSettingsGuard } from "../../../shared/hooks/usePlatformSettingsGuard";
 
 interface OutletContext {
   darkMode: boolean;
@@ -74,11 +79,127 @@ function Input({ darkMode, className = "", ...props }: InputProps) {
   );
 }
 
+interface EditPersonalInfoModalProps {
+  initialName: string;
+  initialBio: string;
+  darkMode: boolean;
+  onClose: () => void;
+  onSave: (name: string, bio: string) => void;
+}
+
+function EditPersonalInfoModal({
+  initialName,
+  initialBio,
+  darkMode,
+  onClose,
+  onSave,
+}: EditPersonalInfoModalProps) {
+  const [name, setName] = useState(initialName);
+  const [bio, setBio] = useState(initialBio);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div
+        className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 transition-all ${
+          darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold">Edit Personal Information</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-colors ${
+              darkMode ? "hover:bg-slate-800" : "hover:bg-slate-100"
+            }`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <Field label="Name" icon={User} darkMode={darkMode} hint="Shown in the navbar and profile card.">
+            <Input
+              darkMode={darkMode}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your Name"
+            />
+          </Field>
+
+          <Field label="Bio" icon={User} darkMode={darkMode}>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={3}
+              placeholder="A short description about yourself..."
+              className={`w-full p-3 rounded-xl text-xs font-medium outline-none border transition-all duration-200 resize-none ${
+                darkMode
+                  ? "bg-slate-950 border-slate-800 text-slate-100 focus:border-orange-500/60 placeholder:text-slate-600"
+                  : "bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-400 focus:bg-white placeholder:text-slate-400"
+              }`}
+            />
+          </Field>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+              darkMode
+                ? "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(name, bio)}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-md shadow-orange-500/20"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EditProfile() {
   const { darkMode } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const { user, setUser, signOut } = useAuth();
+  const [isEditInfoModalOpen, setIsEditInfoModalOpen] = useState(false);
+
+  const { settings, refetch: refetchSettings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "HQ Terminal";
+
+  const [platformIdentity, setPlatformIdentity] = useState({
+    platformName: "",
+    supportEmail: "",
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setPlatformIdentity({
+        platformName: settings.platformName || "HQ Terminal",
+        supportEmail: settings.supportEmail || "support@hqterminal.io",
+      });
+    }
+  }, [settings]);
+
+  const updatePlatformIdentity = async (field: "platformName" | "supportEmail", value: string) => {
+    setPlatformIdentity((prev) => ({ ...prev, [field]: value }));
+    try {
+      await apiClient.patch("/superadmin/platform-settings", { [field]: value });
+      refetchSettings();
+    } catch (err) {
+      console.error("Failed to update platform identity:", err);
+    }
+  };
 
   const [form, setForm] = useState(() => ({
     name: user?.name || "Platform Owner",
@@ -245,20 +366,20 @@ export default function EditProfile() {
             onClick={() => navigate(-1)}
             className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
               darkMode
-                ? "bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800"
-                : "bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200"
+                ? "bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800 border border-slate-800"
+                : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 shadow-sm"
             }`}
             aria-label="Go back"
           >
             <ArrowLeft size={16} />
           </button>
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Edit Profile
-            </h2>
+            </h1>
             <p
-              className={`mt-0.5 text-xs sm:text-sm ${
-                darkMode ? "text-slate-400" : "text-slate-500"
+              className={`text-xs sm:text-sm mt-1 font-medium ${
+                darkMode ? "text-slate-400" : "text-slate-600"
               }`}
             >
               Manage your personal information and account settings
@@ -293,10 +414,25 @@ export default function EditProfile() {
                 onChange={handleAvatarChange}
               />
             </div>
-            <div className="text-center sm:text-left">
-              <p className="font-bold text-base">
-                {form.name}
-              </p>
+            <div className="text-center sm:text-left flex-1 min-w-0">
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <p className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">
+                  {form.name}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsEditInfoModalOpen(true)}
+                  className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
+                    darkMode
+                      ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-orange-400 hover:border-orange-500/40"
+                      : "bg-slate-100 border-slate-200 text-slate-600 hover:text-orange-600 hover:border-orange-300"
+                  }`}
+                  title="Edit Personal Information"
+                >
+                  <Pencil size={13} />
+                </button>
+              </div>
+
               <div
                 className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                   darkMode
@@ -305,10 +441,20 @@ export default function EditProfile() {
                 }`}
               >
                 <Shield size={10} />
-                Global Admin · HQ Terminal
+                Global Admin · {platformName}
               </div>
+
+              {/* Bio displayed directly below name and role badge */}
               <p
-                className={`mt-2 text-[11px] max-w-xs ${
+                className={`mt-2 text-xs font-normal leading-relaxed max-w-xl ${
+                  darkMode ? "text-slate-300" : "text-slate-600"
+                }`}
+              >
+                {form.bio}
+              </p>
+
+              <p
+                className={`mt-2.5 text-[11px] max-w-xs ${
                   darkMode ? "text-slate-500" : "text-slate-400"
                 }`}
               >
@@ -328,38 +474,40 @@ export default function EditProfile() {
             </div>
           </div>
         </div>
-
+        
+        {/* Platform Identity Card */}
         <div className={card}>
-          <p className={sectionTitle}>Personal Information</p>
+          <p className={sectionTitle}>Platform Identity</p>
           <Field
-            label="Name"
-            icon={User}
+            label="Platform Name"
+            icon={Building2}
             darkMode={darkMode}
-            hint="Shown in the navbar and profile card."
+            hint="Shown in the browser tab, navbar, emails, and notifications."
           >
             <Input
               darkMode={darkMode}
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              onBlur={() => saveField({ name: form.name })}
-              placeholder="Your Name"
+              value={platformIdentity.platformName}
+              onChange={(e) => updatePlatformIdentity("platformName", e.target.value)}
+              placeholder="e.g. HQ Terminal"
             />
           </Field>
-          <Field label="Bio" icon={User} darkMode={darkMode}>
-            <textarea
-              value={form.bio}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              onBlur={() => saveField({ bio: form.bio })}
-              rows={3}
-              placeholder="A short description about yourself..."
-              className={`w-full p-3.5 rounded-xl text-xs font-medium outline-none border transition-all duration-200 resize-none ${
-                darkMode
-                  ? "bg-slate-900 border-slate-800 text-slate-100 focus:border-orange-500/60 placeholder:text-slate-600"
-                  : "bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-400 focus:bg-white placeholder:text-slate-400"
-              }`}
+          <Field
+            label="Support Email"
+            icon={Globe}
+            darkMode={darkMode}
+            hint="Customers and users receive auto-generated emails from this address."
+          >
+            <Input
+              darkMode={darkMode}
+              type="email"
+              value={platformIdentity.supportEmail}
+              onChange={(e) => updatePlatformIdentity("supportEmail", e.target.value)}
+              placeholder="support@yourplatform.io"
             />
           </Field>
         </div>
+
+
 
         <div className={card}>
           <p className={sectionTitle}>Contact Information</p>
@@ -595,6 +743,19 @@ export default function EditProfile() {
         }}
         onConfirm={handleCropConfirm}
       />
+      {isEditInfoModalOpen && (
+        <EditPersonalInfoModal
+          initialName={form.name}
+          initialBio={form.bio}
+          darkMode={darkMode}
+          onClose={() => setIsEditInfoModalOpen(false)}
+          onSave={(newName, newBio) => {
+            setForm((prev) => ({ ...prev, name: newName, bio: newBio }));
+            saveField({ name: newName, bio: newBio });
+            setIsEditInfoModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

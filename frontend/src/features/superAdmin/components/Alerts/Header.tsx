@@ -13,8 +13,8 @@ export default function Header({ darkMode, toggleTheme, newCount }: HeaderProps)
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
       <div>
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-2xl sm:text-[28px] font-extrabold tracking-tight leading-none">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Alerts
           </h1>
           {newCount > 0 && (
@@ -23,8 +23,8 @@ export default function Header({ darkMode, toggleTheme, newCount }: HeaderProps)
             </span>
           )}
         </div>
-        <p className={cx('text-sm font-medium', darkMode ? 'text-slate-400' : 'text-slate-500')}>
-          Monitor system alerts and performance issues
+        <p className={cx('text-xs sm:text-sm mt-1 font-medium', darkMode ? 'text-slate-400' : 'text-slate-600')}>
+          Monitor system alerts and performance issues.
         </p>
       </div>
 

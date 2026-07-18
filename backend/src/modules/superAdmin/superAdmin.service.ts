@@ -6,6 +6,7 @@ import mongoose, { FilterQuery } from 'mongoose';
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { UserModel } from '../users/users.model';
 import { PlatformPlanModel, FeatureFlagModel, SystemAlertModel } from './superAdmin.model';
+import { getPlatformSettings } from './platformSettings.model';
 import { EmailLogModel } from '../notifications/emailLog.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
@@ -1569,14 +1570,26 @@ export async function updateRestaurantStatus(id: string, statusStr: 'Active' | '
   return restaurant;
 }
 
-export async function updateRestaurantPlan(id: string, planName: string) {
+export async function updateRestaurantPlan(id: string, planNameOrId: string) {
   const restaurant = await RestaurantModel.findById(id);
   if (!restaurant) {
     throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
   }
 
+  // Resolve plan document
+  let newPlanDoc = null;
+  if (mongoose.Types.ObjectId.isValid(planNameOrId)) {
+    newPlanDoc = await PlatformPlanModel.findById(planNameOrId);
+  }
+  if (!newPlanDoc) {
+    newPlanDoc = await PlatformPlanModel.findOne({ name: { $regex: new RegExp(`^${planNameOrId}$`, 'i') } });
+  }
+  if (!newPlanDoc) {
+    throw new AppError(`Subscription plan '${planNameOrId}' not found`, 400, ErrorCode.INVALID_REQUEST);
+  }
+
   const oldPlan = restaurant.plan || 'Basic';
-  if (oldPlan.toLowerCase() === planName.toLowerCase()) {
+  if (oldPlan.toLowerCase() === newPlanDoc.name.toLowerCase() && restaurant.subscriptionPlan_id?.toString() === newPlanDoc._id.toString()) {
     return restaurant.toObject();
   }
 
@@ -1587,21 +1600,78 @@ export async function updateRestaurantPlan(id: string, planName: string) {
     }
   }
 
-  restaurant.plan = planName;
+  restaurant.plan = newPlanDoc.name;
+  restaurant.subscriptionPlan_id = newPlanDoc._id;
   await restaurant.save();
 
   // Determine upgrade vs demotion based on plan pricing
   let isUpgrade = true;
+  let oldPlanDoc = null;
   try {
-    const [oldPlanDoc, newPlanDoc] = await Promise.all([
-      PlatformPlanModel.findOne({ name: oldPlan }),
-      PlatformPlanModel.findOne({ name: planName }),
-    ]);
-    if (oldPlanDoc && newPlanDoc) {
+    oldPlanDoc = await PlatformPlanModel.findOne({ name: { $regex: new RegExp(`^${oldPlan}$`, 'i') } });
+    if (oldPlanDoc) {
       isUpgrade = newPlanDoc.priceMonthly >= oldPlanDoc.priceMonthly;
     }
   } catch (err) {
     logger.error('Failed to compare plan prices', err);
+  }
+
+  // Update subscription and write history payment record
+  try {
+    const newPlanId = newPlanDoc._id;
+    const monthlyPrice = 0; // manual updates by superadmin are rewarded, so count as 0 revenue!
+
+    const {
+      SubscriptionModel,
+      SubscriptionPaymentModel,
+      SubscriptionStatus,
+      SubscriptionPaymentProvider,
+      SubscriptionPaymentStatus,
+      BillingCycle
+    } = await import('../subscriptions/subscriptions.model');
+
+    let sub = await SubscriptionModel.findOne({ restaurantId: restaurant._id });
+    if (!sub) {
+      sub = await SubscriptionModel.create({
+        restaurantId: restaurant._id,
+        plan: newPlanDoc.name,
+        planId: newPlanId,
+        priceMonthly: 0, // Manual update counts as 0 MRR
+        status: SubscriptionStatus.ACTIVE,
+        billingCycle: BillingCycle.MONTHLY,
+        startedAt: new Date(),
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+    } else {
+      sub.plan = newPlanDoc.name;
+      sub.planId = newPlanId as any;
+      sub.priceMonthly = 0; // Manual update counts as 0 MRR
+      sub.status = SubscriptionStatus.ACTIVE;
+      sub.currentPeriodStart = new Date();
+      sub.currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await sub.save();
+    }
+
+    await SubscriptionPaymentModel.create({
+      subscriptionId: sub._id,
+      restaurantId: restaurant._id,
+      planId: newPlanId,
+      provider: SubscriptionPaymentProvider.MANUAL,
+      status: SubscriptionPaymentStatus.COMPLETED,
+      billingCycle: BillingCycle.MONTHLY,
+      amount: monthlyPrice, // 0 for superadmin manual reward
+      currency: 'INR',
+      paidAt: new Date(),
+      metadata: {
+        updatedBy: 'Super Admin',
+        reason: 'Plan changed by Super Admin',
+        oldPlan,
+        newPlan: newPlanDoc.name,
+      },
+    });
+  } catch (err) {
+    logger.error('Failed to update subscription on plan change', err);
   }
 
   if (restaurant.email) {
@@ -1612,7 +1682,7 @@ export async function updateRestaurantPlan(id: string, planName: string) {
         restaurant.ownerName || 'Owner',
         restaurant.name,
         oldPlan,
-        planName,
+        newPlanDoc.name,
         isUpgrade
       );
     } else {
@@ -2031,4 +2101,108 @@ export async function deletePlatformAlert(id: string) {
     throw new AppError('Alert not found', 404, ErrorCode.NOT_FOUND);
   }
   return alert;
+}
+
+// ── Custom Commission & Automated Background Analyzers ──────────────────────────
+
+export async function calculateEffectiveCommissionRate(restaurantId: string | mongoose.Types.ObjectId): Promise<number> {
+  const restaurant = await RestaurantModel.findById(restaurantId).lean();
+  if (restaurant && typeof restaurant.customCommissionRate === 'number' && restaurant.customCommissionRate >= 0) {
+    return restaurant.customCommissionRate;
+  }
+  if (restaurant && (restaurant.subscriptionPlan_id || restaurant.plan)) {
+    let planDoc = null;
+    if (restaurant.subscriptionPlan_id) {
+      planDoc = await PlatformPlanModel.findById(restaurant.subscriptionPlan_id).lean();
+    }
+    if (!planDoc && restaurant.plan) {
+      planDoc = await PlatformPlanModel.findOne({ name: { $regex: new RegExp(`^${restaurant.plan}$`, 'i') } }).lean();
+    }
+    if (planDoc && typeof planDoc.commissionRate === 'number' && planDoc.commissionRate >= 0) {
+      return planDoc.commissionRate;
+    }
+  }
+  const settings = await getPlatformSettings();
+  return settings.platformCommissionRate ?? 8;
+}
+
+export async function updateRestaurantCommissionRate(id: string, customCommissionRate: number): Promise<any> {
+  const restaurant = await RestaurantModel.findByIdAndUpdate(
+    id,
+    { customCommissionRate },
+    { new: true }
+  ).lean();
+  if (!restaurant) {
+    throw new AppError('Restaurant not found', 404, ErrorCode.NOT_FOUND);
+  }
+  return restaurant;
+}
+
+export async function detectSuddenActivityDrops(): Promise<void> {
+  try {
+    const OrderModel = mongoose.model('Order');
+    const restaurants = await RestaurantModel.find({ isDeleted: { $ne: true } }).lean();
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const eightDaysAgo = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+
+    for (const r of restaurants) {
+      const pastWeekOrdersCount = await OrderModel.countDocuments({
+        restaurantId: r._id,
+        createdAt: { $gte: eightDaysAgo, $lt: oneDayAgo }
+      });
+      const avgDailyOrders = pastWeekOrdersCount / 7;
+      
+      const last24hOrdersCount = await OrderModel.countDocuments({
+        restaurantId: r._id,
+        createdAt: { $gte: oneDayAgo }
+      });
+
+      if (avgDailyOrders >= 5 && last24hOrdersCount < 0.3 * avgDailyOrders) {
+        const dropPercent = Math.round((1 - last24hOrdersCount / avgDailyOrders) * 100);
+        await SystemAlertModel.create({
+          title: `Sudden Activity Drop detected for ${r.name}`,
+          type: 'SUDDEN_ACTIVITY_DROP',
+          severity: 'HIGH',
+          restaurantName: r.name,
+          details: `Order volume dropped by ${dropPercent}% in the last 24h compared to 7-day average.`,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to run detectSuddenActivityDrops detector', err);
+  }
+}
+
+export async function checkUsageLimitsAndNotify(): Promise<void> {
+  try {
+    const { SubscriptionModel } = await import('../subscriptions/subscriptions.model');
+    const activeSubs = await SubscriptionModel.find().lean();
+    for (const sub of activeSubs) {
+      const planDoc = sub.planId ? await PlatformPlanModel.findById(sub.planId).lean() : await PlatformPlanModel.findOne({ name: sub.plan }).lean();
+      const limit = planDoc?.monthlyOrderLimit || planDoc?.tenantLimit || 1000;
+      const currentUsage = sub.monthlyOrderCount || sub.usageCount || 0;
+      const rest = await RestaurantModel.findById(sub.restaurantId).lean();
+
+      if (currentUsage >= limit) {
+        await SystemAlertModel.create({
+          title: `Plan Limit Exceeded for ${rest?.name || 'Restaurant'}`,
+          type: 'LIMIT_BREACH',
+          severity: 'CRITICAL',
+          restaurantName: rest?.name || 'Restaurant',
+          details: `Monthly limit of ${limit} orders exceeded (Current: ${currentUsage}).`,
+        });
+      } else if (currentUsage >= 0.8 * limit) {
+        await SystemAlertModel.create({
+          title: `80% Plan Usage Warning for ${rest?.name || 'Restaurant'}`,
+          type: 'LIMIT_WARNING',
+          severity: 'MEDIUM',
+          restaurantName: rest?.name || 'Restaurant',
+          details: `Restaurant has reached 80% of monthly order limit (${currentUsage}/${limit}).`,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Failed to run checkUsageLimitsAndNotify scanner', err);
+  }
 }

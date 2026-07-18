@@ -7,8 +7,11 @@ import { AdminNotificationsProvider } from '../features/admin/context/Adminnotif
 import OnboardingWizard from '../features/admin/components/dashboard/OnboardingWizard';
 import { apiClient } from '../shared/services/apiClient';
 import { RefreshCw, AlertCircle } from 'lucide-react';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
 export default function AdminLayout(): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('admin-sidebar-collapsed');
@@ -132,6 +135,12 @@ export default function AdminLayout(): JSX.Element {
               <OnboardingWizard restaurant={restaurant} onComplete={fetchOverview} />
             </div>
           )}
+          {/* Maintenance Alert Modal overlay */}
+          <MaintenanceAlertModal
+            isOpen={!!settings?.disableAdminPanel}
+            title="Admin Panel Disabled"
+            message="Due to temporary platform maintenance, the Admin Panel is currently disabled. Super Admin panel remains accessible."
+          />
         </div>
       </AdminSearchProvider>
     </AdminNotificationsProvider>

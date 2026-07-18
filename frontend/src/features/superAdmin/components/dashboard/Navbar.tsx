@@ -24,6 +24,7 @@ import {
 import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
 import { useAlertsStore } from "../../store/AlertsStore";
 import { useSuperAdminDashboardStore } from "../../store/Superadmindashboard";
+import { usePlatformSettingsGuard } from "../../../../shared/hooks/usePlatformSettingsGuard";
 
 interface NavbarProps {
   darkMode: boolean;
@@ -45,6 +46,8 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { data, fetchOverview } = useSuperAdminDashboardStore();
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "HQ Terminal";
 
   useEffect(() => {
     if (!data) {
@@ -144,7 +147,7 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
         <div className="mb-3">
           <h3 className="font-bold text-sm leading-tight">{user?.name || "Mr. Souvik Dey"}</h3>
           <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-            Super Administrator · HQ Terminal
+            Super Administrator · {platformName}
           </p>
         </div>
 
@@ -178,12 +181,12 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
         {/* Last active */}
         <div
           className={`flex items-center gap-2 text-[10px] rounded-lg px-2.5 py-2 mb-3 font-medium ${
-            darkMode ? "bg-slate-900 text-slate-500" : "bg-slate-50 text-slate-400"
+            darkMode ? "bg-slate-900 text-slate-400" : "bg-slate-50 text-slate-500"
           }`}
         >
           <Clock size={10} className="text-orange-400" />
-          Last active: Today, 09:42 AM IST
-          <Activity size={10} className="ml-auto text-emerald-400" />
+          Last active: Today, {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })} IST
+          <Activity size={10} className="ml-auto text-emerald-400 animate-pulse" />
         </div>
 
         {/* Divider */}
@@ -363,22 +366,19 @@ export default function Navbar({
             </button>
 
             {/* Brand – mobile */}
-            <div className="flex items-center gap-2.5 lg:hidden">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center font-black text-white text-sm">
-                ⬢
+            <div className="flex items-center gap-2 lg:hidden min-w-0">
+              <div className="h-9 w-9 p-1 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-md ring-2 ring-white/30">
+                <img
+                  src="/Graphura logo.png"
+                  alt="Graphura Logo"
+                  className="w-full h-full object-contain rounded-full bg-white"
+                />
               </div>
-              <div className="leading-tight">
-                <h1 className="font-bold text-xs tracking-tight uppercase text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500">
-                  Super Admin
-                </h1>
-                <p
-                  className={`text-[9px] font-semibold tracking-wider uppercase ${
-                    darkMode ? "text-slate-500" : "text-slate-400"
-                  }`}
-                >
-                  HQ Terminal
-                </p>
-              </div>
+              <img
+                src={darkMode ? "/Graphura-Dark-Mode.png" : "/Graphuara-Light-Mode.jpg"}
+                alt="Graphura"
+                className="h-7 max-w-[115px] object-contain shrink min-w-0"
+              />
             </div>
 
             {/* Brand – desktop (hidden to prevent clashing and redundancy with sidebar) */}

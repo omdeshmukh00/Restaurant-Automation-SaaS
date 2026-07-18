@@ -91,10 +91,10 @@ export const superAdminRestaurantRequestsApi = {
       return Promise.resolve(null);
     }
 
-    const response = await apiClient.get<{ success: boolean; data: { restaurant: any } }>(
+    const response = await apiClient.get<{ success: boolean; data: any }>(
       `/superadmin/restaurants/${id}`
     );
-    return response.data.data.restaurant;
+    return response.data.data;
   },
 
   async getPlans(): Promise<any[]> {

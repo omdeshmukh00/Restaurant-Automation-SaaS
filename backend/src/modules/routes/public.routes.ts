@@ -111,11 +111,13 @@ import {
   submitPartnerRequest,
   verifyPartnerRequestPayment,
   recoverPartnerRequest,
+  notifyPartnerPaymentFailureController,
 } from '../superAdmin/restaurantRequest.controller';
 
 publicRouter.post('/partner-request/create-order', createRazorpayOrderForPlan);
 publicRouter.post('/partner-request', submitPartnerRequest);
 publicRouter.post('/partner-request/verify-payment', verifyPartnerRequestPayment);
+publicRouter.post('/partner-request/payment-failed', notifyPartnerPaymentFailureController);
 publicRouter.post('/partner-request/recover', recoverPartnerRequest);
 
 import { getPlatformSettings } from '../superAdmin/platformSettings.model';

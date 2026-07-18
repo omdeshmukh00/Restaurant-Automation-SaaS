@@ -132,12 +132,12 @@ export default function SuperAdminDashboard() {
                 Live
               </span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Dashboard Overview
-            </h2>
+            </h1>
             <p
-              className={`mt-1 text-xs sm:text-sm ${
-                darkMode ? "text-slate-400" : "text-slate-500"
+              className={`mt-1 text-xs sm:text-sm font-medium ${
+                darkMode ? "text-slate-400" : "text-slate-600"
               }`}
             >
               {dateString} · Last synced at {timeString}

@@ -8,6 +8,8 @@ import TransactionTable from "../components/Transactions/Transactiontable";
 import TransactionSummaryBar from "../components/Transactions/Transactionsummarybar";
 import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
 
+import TablePagination from "../components/common/TablePagination";
+
 interface LayoutContextType {
   darkMode: boolean;
 }
@@ -16,6 +18,8 @@ export default function Transactions() {
   const { darkMode } = useOutletContext<LayoutContextType>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     const handleThemeSync = (e: Event) => {
@@ -51,6 +55,10 @@ export default function Transactions() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [sortField, setSortField] = useState<SortField>("timestamp");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, paymentFilter, dateRange, sortField, sortOrder]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -113,6 +121,16 @@ export default function Transactions() {
     <div className={`min-h-screen px-4 sm:px-6 py-5 sm:py-8 transition-colors duration-300 ${
       darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
     }`}>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transactions</h1>
+          <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
+            Monitor platform payments, commissions, and transaction logs.
+          </p>
+        </div>
+      </div>
+
       <TransactionMetrics metrics={metrics} darkMode={darkMode} />
       <TransactionControls
         searchTerm={searchTerm}
@@ -129,13 +147,28 @@ export default function Transactions() {
         onExport={handleExport}
         onResetAll={handleResetAll}
       />
-      <TransactionTable
-        transactions={sortedTransactions}
-        darkMode={darkMode}
-        sortField={sortField}
-        sortOrder={sortOrder}
-        onSort={handleSort}
-      />
+      <div className={`rounded-2xl border overflow-hidden shadow-sm my-4 ${
+        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+      }`}>
+        <div className="max-h-[620px] overflow-auto">
+          <TransactionTable
+            transactions={sortedTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+            darkMode={darkMode}
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+          />
+        </div>
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={sortedTransactions.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          darkMode={darkMode}
+          itemLabel="transactions"
+        />
+      </div>
       <TransactionSummaryBar
         metrics={metrics}
         darkMode={darkMode}

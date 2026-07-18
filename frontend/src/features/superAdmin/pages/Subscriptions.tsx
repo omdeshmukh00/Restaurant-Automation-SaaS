@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, Trash, Plus, Sparkles, Building2, X, CreditCard, RefreshCw, Percent } from "lucide-react";
+import { BarChart3, Trash, Plus, Sparkles, Building2, X, CreditCard, RefreshCw, Percent, PlusCircle } from "lucide-react";
 import { apiClient } from "../../../shared/services/apiClient";
 
 import type {
@@ -27,6 +27,9 @@ import SubscriptionTable from "../components/Subscriptions/Subcriptiontable";
 import ViewModal from "../components/Restaurants/Viewmodal";
 import AddRestaurantModal from "../components/Restaurants/AddRestaurantModal";
 import LiveActivityModal from "../components/Subscriptions/LiveActivityModal";
+import MrrModal from "../components/Subscriptions/MrrModal";
+import TablePagination from "../components/common/TablePagination";
+import MaintenanceAlertModal from "../../../shared/components/MaintenanceAlertModal";
 
 const EMPTY_FORM: NewRestaurantForm = {
   name: "",
@@ -139,6 +142,7 @@ export default function Subscriptions() {
           yearlyDiscountPercentage: editingPlan.yearlyDiscountPercentage,
           tenantLimit: editingPlan.tenantLimit,
           staffLimit: editingPlan.staffLimit,
+          commissionRate: editingPlan.commissionRate ?? platformSettings.platformCommissionRate ?? 8,
           isActive: editingPlan.isActive,
           features: editingPlan.features
         });
@@ -150,6 +154,7 @@ export default function Subscriptions() {
           yearlyDiscountPercentage: editingPlan.yearlyDiscountPercentage,
           tenantLimit: editingPlan.tenantLimit,
           staffLimit: editingPlan.staffLimit,
+          commissionRate: editingPlan.commissionRate ?? platformSettings.platformCommissionRate ?? 8,
           isActive: editingPlan.isActive,
           features: editingPlan.features
         });
@@ -174,12 +179,48 @@ export default function Subscriptions() {
     }
   };
 
+  const handleAddonSave = async () => {
+    if (!selectedAddonRestaurantId || !addonName.trim()) return;
+    setAddonSaving(true);
+    try {
+      const rest = restaurants.find(r => r.id === selectedAddonRestaurantId);
+      const full = await superAdminRestaurantRequestsApi.getRestaurantById(selectedAddonRestaurantId);
+      const subId = full?.subscription?._id || full?.subscription?.id;
+      if (subId) {
+        await apiClient.post(`/superadmin/subscriptions/${subId}/addons`, {
+          name: addonName.trim(),
+          priceMonthly: addonPrice
+        });
+        window.alert(`Feature Extension "${addonName}" added successfully to ${rest?.name || 'Restaurant'}!`);
+        setIsAddonsModalOpen(false);
+        setAddonName('');
+        setAddonPrice(499);
+      } else {
+        window.alert('No active subscription found for this restaurant.');
+      }
+    } catch (err) {
+      console.error('Failed to add feature extension', err);
+      window.alert('Failed to add feature extension.');
+    } finally {
+      setAddonSaving(false);
+    }
+  };
+
   // ── Modal state ───────────────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [viewingNode, setViewingNode] = useState<any | null>(null);
   const [liveActivityRestaurant, setLiveActivityRestaurant] = useState<RestaurantNode | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isCommissionOpen, setIsCommissionOpen] = useState(false);
+  const [isMrrModalOpen, setIsMrrModalOpen] = useState(false);
+  const [isAddonsModalOpen, setIsAddonsModalOpen] = useState(false);
+  const [selectedAddonRestaurantId, setSelectedAddonRestaurantId] = useState('');
+  const [addonName, setAddonName] = useState('');
+  const [addonPrice, setAddonPrice] = useState(499);
+  const [addonSaving, setAddonSaving] = useState(false);
+  const [isRegistrationBlockedAlertOpen, setIsRegistrationBlockedAlertOpen] = useState(false);
   const [formData, setFormData] = useState<NewRestaurantForm>(() => {
     try {
       const saved = sessionStorage.getItem("ra/subscription-add-restaurant-draft");
@@ -196,7 +237,7 @@ export default function Subscriptions() {
   const handleViewRestaurant = async (row: RestaurantNode) => {
     try {
       const fullDetails = await superAdminRestaurantRequestsApi.getRestaurantById(row.id);
-      setViewingNode(fullDetails || row);
+      setViewingNode(fullDetails?.restaurant || fullDetails || row);
     } catch (err) {
       console.error("Failed to load restaurant details", err);
       setViewingNode(row);
@@ -224,6 +265,7 @@ export default function Subscriptions() {
         setIsAddModalOpen(false); 
         setIsSettingsModalOpen(false);
         setIsCommissionOpen(false);
+        setIsMrrModalOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -447,9 +489,54 @@ export default function Subscriptions() {
       }));
 
     return [...approvedSubscriptionRows, ...restaurants];
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [approvedRestaurants, restaurants]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const tierMetrics = useMemo(() => computeTierMetrics(linkedRestaurants), [linkedRestaurants]);
+
+  const totalPlatformMrr = useMemo(() => {
+    const planPricesMap: Record<string, number> = {};
+    dbPlans.forEach((plan) => {
+      const key = (plan.name || "").toLowerCase();
+      if (key === "free") {
+        planPricesMap["basic"] = plan.priceMonthly || 0;
+        planPricesMap["free"] = plan.priceMonthly || 0;
+      } else {
+        planPricesMap[key] = plan.priceMonthly || 0;
+      }
+    });
+
+    const getMonthlyPrice = (planName: string) => {
+      const key = (planName || "").toLowerCase();
+      if (planPricesMap[key] !== undefined) return planPricesMap[key];
+      switch (key) {
+        case "free":
+        case "basic":
+        case "basic plan":
+          return 0;
+        case "starter":
+          return 299;
+        case "standard":
+          return 599;
+        case "premium":
+        case "pro":
+          return 999;
+        case "enterprise":
+          return 1999;
+        default:
+          return 0;
+      }
+    };
+
+    return linkedRestaurants.reduce((sum, r) => {
+      if (r.status === "Active") {
+        return sum + (r.mrr !== undefined ? r.mrr : getMonthlyPrice(r.plan));
+      }
+      return sum;
+    }, 0);
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  }, [linkedRestaurants, dbPlans]);
 
   const dynamicTierMetrics = useMemo(() => {
     return dbPlans.map(plan => {
@@ -469,6 +556,7 @@ export default function Subscriptions() {
         yearlyDiscountPercentage: plan.yearlyDiscountPercentage,
       };
     });
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [dbPlans, linkedRestaurants]);
 
   const filtered = useMemo(() => {
@@ -483,6 +571,7 @@ export default function Subscriptions() {
       const matchTier = tierFilter === "All" || r.plan === tierFilter;
       return matchSearch && matchStatus && matchTier;
     });
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [linkedRestaurants, searchQuery, statusFilter, tierFilter]);
 
   const sorted = useMemo(() => {
@@ -508,10 +597,10 @@ export default function Subscriptions() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-7">
         <div>
-          <h1 className={`text-2xl font-extrabold tracking-tight ${darkMode ? "text-white" : "text-slate-900"}`}>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Subscriptions
           </h1>
-          <p className={`text-sm mt-0.5 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+          <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
             Manage restaurant accounts, plans, and billing across the platform.
           </p>
         </div>
@@ -519,37 +608,52 @@ export default function Subscriptions() {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setIsBulkOffersOpen(true)}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Sparkles size={13} className="text-orange-500" />
+            <Sparkles size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             Bulk Offers
           </button>
 
           <button
             onClick={() => setIsCommissionOpen(true)}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Percent size={13} className="text-orange-500" />
+            <Percent size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             Commission [{platformSettings.platformCommissionRate ?? 10}%]
           </button>
 
           <button
-            onClick={() => navigate('/superadmin?requests=new')}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            onClick={() => {
+              if (restaurants.length > 0) setSelectedAddonRestaurantId(restaurants[0].id);
+              setIsAddonsModalOpen(true);
+            }}
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Building2 size={13} />
+            <PlusCircle size={13} className="text-orange-500 group-hover:text-white transition-colors" />
+            Feature Add-ons
+          </button>
+
+          <button
+            onClick={() => navigate('/superadmin?requests=new')}
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <Building2 size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             New Requests
             {pendingCount > 0 && (
               <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
@@ -560,13 +664,13 @@ export default function Subscriptions() {
 
           <button
             onClick={() => setIsSettingsModalOpen(true)}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <CreditCard size={13} />
+            <CreditCard size={13} className="text-emerald-500 group-hover:text-white transition-colors" />
             Processing Fee
             {platformSettings.applicationFeeEnabled && (
               <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] flex items-center justify-center font-bold">
@@ -589,25 +693,29 @@ export default function Subscriptions() {
                 isNew: true
               });
             }}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Plus size={13} />
+            <Plus size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             Add New Plan
           </button>
 
-          <div className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border text-xs font-semibold shrink-0 whitespace-nowrap ${
-            darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"
-          }`}>
-            <BarChart3 size={15} className="text-orange-500" />
-            <span className={darkMode ? "text-slate-400" : "text-slate-500"}>Platform MRR</span>
-            <span className="text-emerald-500 font-extrabold text-sm">
-              {formatCurrency(tierMetrics.totalRevenue)}
+          <button
+            onClick={() => setIsMrrModalOpen(true)}
+            title="Click to view monthly restaurant subscription breakdown"
+            className={`group flex items-center gap-2.5 px-4 py-2 rounded-xl border text-xs font-semibold shrink-0 whitespace-nowrap cursor-pointer hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all ${
+              darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <BarChart3 size={15} className="text-emerald-500 group-hover:text-white transition-colors" />
+            <span className={`group-hover:text-white ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Platform MRR</span>
+            <span className="text-emerald-500 group-hover:text-white font-extrabold text-sm transition-colors">
+              {formatCurrency(totalPlatformMrr)}
             </span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -636,6 +744,10 @@ export default function Subscriptions() {
         onExport={() => exportToCSV(sorted)}
         onResetAll={handleResetAll}
         onAddClick={() => {
+          if (platformSettings.enablePartnerRegistration === false) {
+            setIsRegistrationBlockedAlertOpen(true);
+            return;
+          }
           const activePlans = dbPlans.filter((p: any) => p.isActive !== false);
           const defaultPlan = activePlans.length > 0 ? activePlans[0].name : "Basic";
           setFormData({ ...EMPTY_FORM, plan: defaultPlan });
@@ -643,21 +755,37 @@ export default function Subscriptions() {
         }}
       />
 
-      {/* Table */}
-      <SubscriptionTable
-        restaurants={sorted}
-        darkMode={darkMode}
-        searchQuery={searchQuery}
-        statusFilter={statusFilter}
-        tierFilter={tierFilter}
-        onView={handleViewRestaurant}
-        onLiveActivity={handleLiveActivity}
-        onUpdateStatus={updateStatus}
-        onUpdatePlan={updatePlan}
-        onDelete={deleteNode}
-        plans={dbPlans}
-        onResetFilters={handleResetAll}
-      />
+      {/* Table & Pagination Container */}
+      <div className={`rounded-2xl border overflow-hidden shadow-sm ${
+        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+      }`}>
+        <div className="max-h-[620px] overflow-auto">
+          <SubscriptionTable
+            restaurants={sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+            darkMode={darkMode}
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            tierFilter={tierFilter}
+            onView={handleViewRestaurant}
+            onLiveActivity={handleLiveActivity}
+            onUpdateStatus={updateStatus}
+            onUpdatePlan={updatePlan}
+            onDelete={deleteNode}
+            plans={dbPlans}
+            onResetFilters={handleResetAll}
+          />
+        </div>
+
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={sorted.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          darkMode={darkMode}
+          itemLabel="subscriptions"
+        />
+      </div>
 
       {/* Summary footer */}
       <div className={`mt-4 px-5 py-3 rounded-xl border flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs ${
@@ -1092,6 +1220,22 @@ export default function Subscriptions() {
                 </div>
               </div>
 
+              {/* Plan Commission */}
+              <div>
+                <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Plan Commission (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder={String(platformSettings.platformCommissionRate ?? 8)}
+                  value={editingPlan.commissionRate === null || editingPlan.commissionRate === undefined ? (platformSettings.platformCommissionRate ?? 8) : editingPlan.commissionRate}
+                  onChange={(e) => setEditingPlan({ ...editingPlan, commissionRate: parseInt(e.target.value) || 0 })}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                />
+              </div>
+
               {/* Features List */}
               <div>
                 <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Features (comma-separated)</label>
@@ -1111,7 +1255,7 @@ export default function Subscriptions() {
               {!editingPlan.isNew && (
                 <button
                   onClick={handleDeletePlan}
-                  disabled={['Free', 'Standard', 'Premium', 'Enterprise'].includes(editingPlan.name)}
+                  disabled={editingPlan.name === 'Free'}
                   className={`py-2.5 px-4 rounded-xl text-xs font-semibold border border-red-500/20 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-30`}
                 >
                   Delete Plan
@@ -1312,6 +1456,118 @@ export default function Subscriptions() {
         </div>
       )}
 
+      {/* Feature Add-ons Modal */}
+      {isAddonsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
+          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
+              <div>
+                <h3 className="text-base font-bold">Add Feature Extension Module</h3>
+                <p className="text-[11px] text-slate-550 mt-0.5 font-semibold">
+                  Add custom billable feature extensions outside base plan tiers.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAddonsModalOpen(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Select Restaurant
+                </label>
+                <select
+                  value={selectedAddonRestaurantId}
+                  onChange={(e) => setSelectedAddonRestaurantId(e.target.value)}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white bg-slate-950' : 'border-slate-200 text-slate-800 bg-white'
+                  }`}
+                >
+                  {restaurants.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.plan})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Extension Module Name
+                </label>
+                <input
+                  type="text"
+                  value={addonName}
+                  onChange={(e) => setAddonName(e.target.value)}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="eg. WhatsApp Marketing Bot, AI Staff Scheduler"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Monthly Price (₹)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={addonPrice}
+                  onChange={(e) => setAddonPrice(parseInt(e.target.value) || 0)}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="499"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+              <button
+                onClick={() => setIsAddonsModalOpen(false)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border ${
+                  darkMode ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddonSave}
+                disabled={addonSaving || !addonName.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-orange-500/10"
+              >
+                {addonSaving ? 'Saving...' : 'Add Feature Extension'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Platform MRR Breakdown Modal */}
+      <MrrModal
+        isOpen={isMrrModalOpen}
+        onClose={() => setIsMrrModalOpen(false)}
+        darkMode={darkMode}
+        restaurants={linkedRestaurants}
+        dbPlans={dbPlans}
+      />
+
+      {/* Registration Blocked Alert Modal */}
+      <MaintenanceAlertModal
+        isOpen={isRegistrationBlockedAlertOpen}
+        onClose={() => setIsRegistrationBlockedAlertOpen(false)}
+        type="registration_blocked"
+        message="Due to a temporary issue, new restaurant registration is currently blocked. You can enable registrations in Platform Settings."
+      />
     </div>
   );
 }

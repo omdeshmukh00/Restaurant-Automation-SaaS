@@ -10,8 +10,11 @@ import { getRolePermissions } from '../features/staff/utils/roleAccess';
 import { connectSocket, getSocket } from '../lib/socket';
 import { staffStore } from '../features/staff/store/staff.store';
 import { requestsAPI, ordersAPI } from '../features/staff/api/staff.api';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
 export default function StaffLayout(): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
   const { profile } = useStaffProfile();
   const location = useLocation();
 
@@ -240,6 +243,13 @@ export default function StaffLayout(): JSX.Element {
           textMuted: '#94a3b8', // slate-400
           font: 'sans-serif'
         }}
+      />
+
+      {/* Maintenance Alert Modal overlay */}
+      <MaintenanceAlertModal
+        isOpen={!!settings?.disableStaffPanel}
+        title="Staff Panel Disabled"
+        message="Due to temporary platform maintenance, the Staff Panel is currently disabled."
       />
     </StaffSearchProvider>
   );

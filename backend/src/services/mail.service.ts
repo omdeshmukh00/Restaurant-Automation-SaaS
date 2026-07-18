@@ -8,6 +8,7 @@ import { env } from '../config/env';
 import logger from '../config/logger';
 import { EmailLogModel, EmailType, EmailStatus } from '../modules/notifications/emailLog.model';
 import { RestaurantModel } from '../modules/restaurants/restaurants.model';
+import { getPlatformSettings } from '../modules/superAdmin/platformSettings.model';
 
 // Email Subject Constants
 export const EMAIL_SUBJECTS = {
@@ -19,15 +20,17 @@ export const EMAIL_SUBJECTS = {
   DAILY_SALES_REPORT: 'Daily Sales Report',
   RECEIPT: 'Your Payment Receipt',
   PASSWORD_CHANGED_ALERT: 'Security Alert: Your Password Was Changed',
-  RESTAURANT_APPROVAL: 'Welcome to RestoHub - Your Restaurant Has Been Approved',
-  RESTAURANT_REJECTION: 'Your RestoHub Partner Application Status',
-  RESTAURANT_SUBMISSION: 'Your RestoHub Partner Application Received',
-  RESTAURANT_PLAN_UPDATED: 'RestoHub - Your Subscription Plan Has Been Updated',
-  RESTAURANT_SUSPENDED: 'RestoHub - Notice of Account Suspension',
-  RESTAURANT_ACTIVATED: 'RestoHub - Your Restaurant Has Been Activated',
-  USAGE_WARNING: 'RestoHub - Plan Limit Warning',
-  USAGE_EXCEEDED: 'RestoHub - Plan Limit Exceeded',
-  SUBSCRIPTION_EXPIRED: 'RestoHub - Subscription Expired',
+  RESTAURANT_APPROVAL: 'Welcome - Your Restaurant Has Been Approved',
+  RESTAURANT_REJECTION: 'Your Partner Application Status',
+  RESTAURANT_SUBMISSION: 'Your Partner Application Received',
+  RESTAURANT_PLAN_UPDATED: 'Your Subscription Plan Has Been Updated',
+  RESTAURANT_SUSPENDED: 'Notice of Account Suspension',
+  RESTAURANT_ACTIVATED: 'Your Restaurant Has Been Activated',
+  USAGE_WARNING: 'Plan Limit Warning',
+  USAGE_EXCEEDED: 'Plan Limit Exceeded',
+  SUBSCRIPTION_EXPIRED: 'Subscription Expired',
+  PAYMENT_FAILED: 'Notice of Payment Failure',
+  ACCOUNT_LOCKED: 'Security Alert: Account Temporarily Locked',
 };
 
 let transporter: nodemailer.Transporter | null = null;
@@ -120,6 +123,18 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
 
   try {
+    // Retrieve dynamic platform settings
+    const settings = await getPlatformSettings().catch(() => null);
+    const platformName = settings?.platformName || 'HQ Terminal';
+    const supportEmail = settings?.supportEmail || env.SMTP_FROM || 'support@hqterminal.io';
+    const currentYear = new Date().getFullYear().toString();
+    const fromHeader = `"${platformName}" <${supportEmail}>`;
+
+    const finalSubject = options.subject
+      .replace(/RestoHub/g, platformName)
+      .replace(/\{\{platformName\}\}/g, platformName)
+      .replace(/\{\{year\}\}/g, currentYear);
+
     let finalHtml = options.html;
     if (options.restaurantId) {
       const restaurant = await RestaurantModel.findById(options.restaurantId).select('settings.branding').lean();
@@ -146,12 +161,32 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       `;
     }
 
+    // Apply template variable replacements
+    finalHtml = finalHtml
+      .replace(/\{\{year\}\}/g, currentYear)
+      .replace(/\{\{platformName\}\}/g, platformName)
+      .replace(/\{\{supportEmail\}\}/g, supportEmail)
+      .replace(/RestoHub/g, platformName)
+      .replace(/support@restohub\.com|hello@restohub\.in/g, supportEmail)
+      .replace(/automated email/gi, 'auto generated email');
+
+    let finalText = options.text;
+    if (finalText) {
+      finalText = finalText
+        .replace(/\{\{year\}\}/g, currentYear)
+        .replace(/\{\{platformName\}\}/g, platformName)
+        .replace(/\{\{supportEmail\}\}/g, supportEmail)
+        .replace(/RestoHub/g, platformName)
+        .replace(/support@restohub\.com|hello@restohub\.in/g, supportEmail)
+        .replace(/automated email/gi, 'auto generated email');
+    }
+
     const info = await transport.sendMail({
-      from: env.SMTP_FROM || 'noreply@restaurant-saas.com',
+      from: fromHeader,
       to: options.to,
-      subject: options.subject,
+      subject: finalSubject,
       html: finalHtml,
-      text: options.text,
+      text: finalText,
     });
 
     if (options.emailType) {
@@ -462,6 +497,39 @@ export async function sendReceiptEmail(
   }
 }
 
+function formatCleanIp(ip?: string): string {
+  if (!ip) return '127.0.0.1 (Localhost)';
+  let clean = ip;
+  if (clean.startsWith('::ffff:')) {
+    clean = clean.replace('::ffff:', '');
+  }
+  if (clean === '::1' || clean === '127.0.0.1') {
+    return '127.0.0.1 (Localhost)';
+  }
+  return clean;
+}
+
+function parseUserAgentString(ua?: string): string {
+  if (!ua) return 'Browser on Desktop';
+
+  let browser = 'Browser';
+  if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+  else if (ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Edg')) browser = 'Edge';
+  else if (ua.includes('Opera') || ua.includes('OPR')) browser = 'Opera';
+
+  let os = 'Device';
+  if (ua.includes('Windows NT 10.0')) os = 'Windows 10/11';
+  else if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('Mac OS X')) os = 'macOS';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('Linux')) os = 'Linux';
+
+  return `${browser} on ${os}`;
+}
+
 /**
  * Send Password Changed Security Alert Email
  */
@@ -474,9 +542,12 @@ export async function sendPasswordChangedAlertEmail(
   try {
     let html = getTemplate('password-changed-alert');
 
+    const cleanIp = formatCleanIp(ipAddress);
+    const cleanDevice = parseUserAgentString(userAgent);
+
     const datetime = new Date().toLocaleString('en-US', { timeZoneName: 'short' });
-    const ipHtml = ipAddress ? `<p><strong>IP Address:</strong> ${ipAddress}</p>` : '';
-    const deviceHtml = userAgent ? `<p><strong>Device/Browser:</strong> ${userAgent}</p>` : '';
+    const ipHtml = `<p><strong>IP Address:</strong> ${cleanIp}</p>`;
+    const deviceHtml = `<p><strong>Device/Browser:</strong> ${cleanDevice}</p>`;
 
     html = html.replace(/\{\{name\}\}/g, name || 'User');
     html = html.replace(/\{\{email\}\}/g, email);
@@ -492,6 +563,43 @@ export async function sendPasswordChangedAlertEmail(
     });
   } catch (error) {
     logger.error('Failed to prepare or send password changed alert email', { error, email });
+    return false;
+  }
+}
+
+/**
+ * Send Account Locked Security Alert Email
+ */
+export async function sendAccountLockedEmail(
+  email: string,
+  name: string,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<boolean> {
+  try {
+    let html = getTemplate('account-locked');
+
+    const cleanIp = formatCleanIp(ipAddress);
+    const cleanDevice = parseUserAgentString(userAgent);
+
+    const datetime = new Date().toLocaleString('en-US', { timeZoneName: 'short' });
+    const ipHtml = `<p><strong>IP Address:</strong> ${cleanIp}</p>`;
+    const deviceHtml = `<p><strong>Device/Browser:</strong> ${cleanDevice}</p>`;
+
+    html = html.replace(/\{\{name\}\}/g, name || 'User');
+    html = html.replace(/\{\{email\}\}/g, email);
+    html = html.replace(/\{\{datetime\}\}/g, datetime);
+    html = html.replace(/\{\{ipHtml\}\}/g, ipHtml);
+    html = html.replace(/\{\{deviceHtml\}\}/g, deviceHtml);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.ACCOUNT_LOCKED,
+      html,
+      emailType: EmailType.PASSWORD_CHANGED_ALERT,
+    });
+  } catch (error) {
+    logger.error('Failed to prepare or send account locked alert email', { error, email });
     return false;
   }
 }
@@ -915,6 +1023,88 @@ export async function sendRestaurantDeletedEmail(
     });
   } catch (error) {
     logger.error('Failed to send account deletion email', { error, email });
+    return false;
+  }
+}
+
+export async function sendMaintenanceNoticeEmailToAllUsers(): Promise<number> {
+  try {
+    const settings = await getPlatformSettings();
+    const platformName = settings.platformName || 'HQ Terminal';
+    const supportEmail = settings.supportEmail || 'support@hqterminal.io';
+
+    const restaurants = await RestaurantModel.find({ status: { $ne: 'DELETED' } });
+    let sentCount = 0;
+
+    for (const r of restaurants) {
+      if (!r.email) continue;
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+          <h2 style="color: #ea580c; margin-top: 0;">⚠️ ${platformName} Maintenance Notice</h2>
+          <p style="font-size: 14px; color: #334155;">Dear <strong>${(r as any).owner || r.name || 'Valued Partner'}</strong>,</p>
+          <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+            Please be advised that <strong>${platformName}</strong> has temporarily entered System Maintenance Mode for platform upgrades and optimizations.
+          </p>
+          <p style="font-size: 14px; color: #334155; line-height: 1.6;">
+            During this period, selected restaurant panels may be temporarily disabled. Our operations team is working to complete all work as quickly as possible.
+          </p>
+          <p style="font-size: 14px; color: #334155;">
+            For urgent inquiries, please contact <a href="mailto:${supportEmail}" style="color: #ea580c; font-weight: bold;">${supportEmail}</a>.
+          </p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #64748b; margin: 0;">
+            © ${new Date().getFullYear()} ${platformName}. All rights reserved.
+          </p>
+        </div>
+      `;
+
+      const success = await sendEmail({
+        to: r.email,
+        subject: `⚠️ ${platformName} Scheduled System Maintenance Notice`,
+        html,
+        emailType: EmailType.OTHER,
+      });
+
+      if (success) sentCount++;
+    }
+
+    logger.info(`Dispatched maintenance notice emails to ${sentCount} restaurant accounts.`);
+    return sentCount;
+  } catch (error) {
+    logger.error('Failed to send maintenance notice emails', { error });
+    return 0;
+  }
+}
+
+export async function sendPaymentFailedEmail(
+  email: string,
+  customerName: string,
+  amount: number,
+  currency: string,
+  transactionId: string,
+  failureReason: string,
+  retryUrl?: string,
+  paymentType: string = 'Payment Processing'
+): Promise<boolean> {
+  try {
+    let html = getTemplate('payment-failed');
+
+    html = html.replace(/\{\{customerName\}\}/g, customerName);
+    html = html.replace(/\{\{amount\}\}/g, amount.toString());
+    html = html.replace(/\{\{currency\}\}/g, currency || 'INR');
+    html = html.replace(/\{\{transactionId\}\}/g, transactionId || 'N/A');
+    html = html.replace(/\{\{failureReason\}\}/g, failureReason || 'Transaction could not be completed');
+    html = html.replace(/\{\{retryUrl\}\}/g, retryUrl || '#');
+    html = html.replace(/\{\{paymentType\}\}/g, paymentType);
+
+    return await sendEmail({
+      to: email,
+      subject: EMAIL_SUBJECTS.PAYMENT_FAILED,
+      html,
+      emailType: EmailType.OTHER,
+    });
+  } catch (error) {
+    logger.error('Failed to send payment failure email', { error, email });
     return false;
   }
 }

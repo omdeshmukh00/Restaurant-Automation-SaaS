@@ -406,11 +406,7 @@ export default function Settings() {
       case "general":       return <GeneralSettings darkMode={darkMode} />;
       case "notifications": return <NotificationSettings darkMode={darkMode} />;
       case "security":      return <SecuritySettings darkMode={darkMode} />;
-      case "appearance":    return <AppearanceSettings darkMode={darkMode} themePreference={themePreference} setThemePreference={setThemePreference} />;
-      case "billing":       return <BillingSettings darkMode={darkMode} />;
-      case "integrations":  return <IntegrationsSettings darkMode={darkMode} />;
-      case "danger":        return <DangerZoneSettings darkMode={darkMode} />;
-      default:              return null;
+      default:              return <GeneralSettings darkMode={darkMode} />;
     }
   };
 

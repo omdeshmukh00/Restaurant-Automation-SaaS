@@ -32,12 +32,12 @@ export default function SettingsHeader({ darkMode, activeTab }: SettingsHeaderPr
             Settings
           </span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight capitalize">
-          {activeTab === "danger" ? "Danger Zone" : activeTab}
-        </h2>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight capitalize">
+          Settings
+        </h1>
         <p
-          className={`mt-1 text-xs sm:text-sm ${
-            darkMode ? "text-slate-400" : "text-slate-500"
+          className={`mt-1 text-xs sm:text-sm font-medium ${
+            darkMode ? "text-slate-400" : "text-slate-600"
           }`}
         >
           {TAB_SUBTITLES[activeTab] ?? "Manage your platform settings."}

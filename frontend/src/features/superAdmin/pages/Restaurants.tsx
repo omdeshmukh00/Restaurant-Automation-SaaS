@@ -18,6 +18,7 @@ import RestaurantTable from "../components/Restaurants/RestaurantTable";
 import ViewModal from "../components/Restaurants/Viewmodal";
 import AddRestaurantModal from "../components/Restaurants/AddRestaurantModal";
 import LiveActivityModal from "../components/Subscriptions/LiveActivityModal";
+import TablePagination from "../components/common/TablePagination";
 
 const DEFAULT_FORM: NewRestaurantForm = {
   name: "",
@@ -55,6 +56,13 @@ export default function Restaurant() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
   const restaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
   const [plans, setPlans] = useState<any[]>([]);
@@ -110,7 +118,7 @@ export default function Restaurant() {
   const handleViewRestaurant = async (row: RestaurantsRow) => {
     try {
       const fullDetails = await superAdminRestaurantRequestsApi.getRestaurantById(row.id);
-      setViewingRestaurant(fullDetails || row);
+      setViewingRestaurant(fullDetails?.restaurant || fullDetails || row);
     } catch (err) {
       console.error("Failed to load restaurant details", err);
       setViewingRestaurant(row);
@@ -224,82 +232,97 @@ export default function Restaurant() {
       window.alert(msg);
     }
   };
+  const paginatedRestaurants = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRestaurants.slice(start, start + pageSize);
+  }, [filteredRestaurants, currentPage, pageSize]);
 
   return (
     <div
-      className={`min-h-screen px-4 sm:px-6 py-6 sm:py-8 transition-colors duration-300 ${
-        darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
+      className={`min-h-screen font-sans antialiased transition-colors duration-300 px-4 sm:px-6 py-6 sm:py-8 ${
+        darkMode ? "bg-slate-950 text-slate-50" : "bg-slate-50 text-slate-900"
       }`}
     >
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Restaurant Management
-          </h1>
-          <p
-            className={`text-sm mt-1 ${
-              darkMode ? "text-slate-400" : "text-slate-600"
-            }`}
-          >
-            Monitor and manage all restaurant accounts
-          </p>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Restaurants</h1>
+            <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
+              Manage all onboarded restaurants, active plans, and operational statuses.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/superadmin?requests=new')}
+              className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                darkMode
+                  ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                  : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+              }`}
+            >
+              New Requests
+              {pendingCount > 0 && (
+                <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/superadmin?requests=new')}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
-              darkMode
-                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
-                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
-            }`}
-          >
-            <Building2 size={13} />
-            New Requests
-            {pendingCount > 0 && (
-              <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
-                {pendingCount}
-              </span>
-            )}
-          </button>
+
+        {/* Metric Cards */}
+        <MetricCards
+          metrics={metrics}
+          statusFilter={statusFilter}
+          darkMode={darkMode}
+          onFilterChange={setStatusFilter}
+        />
+
+        {/* Filter Bar */}
+        <FilterBar
+          searchQuery={searchQuery}
+          statusFilter={statusFilter}
+          darkMode={darkMode}
+          onSearchChange={setSearchQuery}
+          onResetFilter={() => setStatusFilter("All")}
+          onAddClick={() => setIsModalOpen(true)}
+        />
+
+        {/* Restaurant Table/Cards Container */}
+        <div className={`rounded-2xl border overflow-hidden shadow-sm ${
+          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+        }`}>
+          <div className="max-h-[620px] overflow-auto">
+            <RestaurantTable
+              restaurants={paginatedRestaurants}
+              darkMode={darkMode}
+              searchQuery={searchQuery}
+              statusFilter={statusFilter}
+              onView={handleViewRestaurant}
+              onLiveActivity={setLiveActivityRestaurant}
+              onUpdateStatus={updateStatus}
+              onUpdatePlan={updatePlan}
+              onDelete={deleteRestaurant}
+              plans={plans}
+              onResetFilters={() => {
+                setSearchQuery("");
+                setStatusFilter("All");
+              }}
+            />
+          </div>
+
+          <TablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={filteredRestaurants.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            darkMode={darkMode}
+            itemLabel="restaurants"
+          />
         </div>
       </div>
-
-      {/* Metric Cards */}
-      <MetricCards
-        metrics={metrics}
-        statusFilter={statusFilter}
-        darkMode={darkMode}
-        onFilterChange={setStatusFilter}
-      />
-
-      {/* Filter Bar */}
-      <FilterBar
-        searchQuery={searchQuery}
-        statusFilter={statusFilter}
-        darkMode={darkMode}
-        onSearchChange={setSearchQuery}
-        onResetFilter={() => setStatusFilter("All")}
-        onAddClick={() => setIsModalOpen(true)}
-      />
-
-      {/* Restaurant Table/Cards */}
-      <RestaurantTable
-        restaurants={filteredRestaurants}
-        darkMode={darkMode}
-        searchQuery={searchQuery}
-        statusFilter={statusFilter}
-        onView={handleViewRestaurant}
-        onLiveActivity={setLiveActivityRestaurant}
-        onUpdateStatus={updateStatus}
-        onUpdatePlan={updatePlan}
-        onDelete={deleteRestaurant}
-        plans={plans}
-        onResetFilters={() => {
-          setSearchQuery("");
-          setStatusFilter("All");
-        }}
-      />
 
       {/* View Restaurant Modal */}
       {viewingRestaurant && (

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { RestaurantNode, PlanType, StatusType } from "./Subcriptiontypes";
 import { PLAN_COLORS } from "../../store/Subscriptions";
+import { apiClient } from "../../../../shared/services/apiClient";
 
 interface SubscriptionTableProps {
   restaurants: RestaurantNode[];
@@ -106,7 +107,7 @@ function EditDropdownContent({
           <button
             key={p._id || p.id}
             disabled={cooldown > 0}
-            onClick={() => { onPlanUpdate(row.id, p.name); onClose(); }}
+            onClick={() => { onPlanUpdate(row.id, p._id || p.id); onClose(); }}
             className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors ${
               cooldown > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
             } ${
@@ -136,6 +137,37 @@ function EditDropdownContent({
           </button>
         ))
       )}
+
+      <div className={`h-px my-1.5 ${darkMode ? "bg-slate-800" : "bg-slate-100"}`} />
+      <p className={`text-[10px] font-bold uppercase px-2 py-1 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
+        Commission Rate
+      </p>
+      <button
+        type="button"
+        disabled={cooldown > 0}
+        onClick={async () => {
+          const currentRate = row.customCommissionRate !== undefined && row.customCommissionRate !== null ? row.customCommissionRate : 8;
+          const input = window.prompt(`Enter custom commission rate % for ${row.name}:`, String(currentRate));
+          if (input !== null && !isNaN(Number(input))) {
+            const rate = Math.min(100, Math.max(0, Number(input)));
+            try {
+              await apiClient.patch(`/superadmin/restaurants/${row.id}/commission`, { customCommissionRate: rate });
+              window.alert(`Custom commission set to ${rate}% for ${row.name}`);
+              onClose();
+              window.location.reload();
+            } catch (err) {
+              console.error("Failed to update custom commission rate", err);
+              window.alert("Failed to set custom commission rate.");
+            }
+          }
+        }}
+        className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+          cooldown > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+        } ${darkMode ? "text-slate-300" : "text-slate-700"}`}
+      >
+        <SlidersHorizontal size={12} className="text-orange-500" />
+        Set Custom Rate ({row.customCommissionRate !== undefined && row.customCommissionRate !== null ? `${row.customCommissionRate}%` : "Default"})
+      </button>
     </div>
   );
 }
@@ -449,7 +481,7 @@ export default function SubscriptionTable({
       <div className={`hidden lg:block rounded-2xl border overflow-visible transition-all ${
         darkMode ? "bg-slate-900/40 border-slate-800/80" : "bg-white border-slate-200/70 shadow-sm"
       }`}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[340px]">
           <table className="w-full text-left border-collapse min-w-[1050px]">
             <thead>
               <tr className={`border-b border-inherit text-[11px] font-bold uppercase tracking-wider ${
@@ -467,8 +499,9 @@ export default function SubscriptionTable({
             </thead>
 
             <tbody className={`divide-y text-sm ${darkMode ? "divide-slate-900/80" : "divide-slate-100"}`}>
-              {restaurants.map((row) => {
+              {restaurants.map((row, index) => {
                 const planColors = PLAN_COLORS[row.plan] || PLAN_COLORS['Basic'];
+                const openUpward = restaurants.length > 2 && index >= restaurants.length - 2;
                 return (
                   <tr
                     key={row.id}
@@ -573,7 +606,11 @@ export default function SubscriptionTable({
                         </button>
 
                         {/* Edit dropdown */}
-                        <div className="relative">
+                        <div
+                          className="relative"
+                          onMouseEnter={() => { setMoreDropdownId(null); setEditDropdownId(row.id); }}
+                          onMouseLeave={() => setEditDropdownId(null)}
+                        >
                           <button
                             onClick={() => { setMoreDropdownId(null); setEditDropdownId(editDropdownId === row.id ? null : row.id); }}
                             title="Edit status or plan"
@@ -593,24 +630,25 @@ export default function SubscriptionTable({
                           </button>
 
                           {editDropdownId === row.id && (
-                            <>
-                              <button type="button" className="fixed inset-0 z-10 cursor-default" onClick={() => setEditDropdownId(null)} aria-label="Close dropdown" />
-                              <div className="absolute right-0 mt-2 z-20">
-                                <EditDropdownContent
-                                  row={row} darkMode={darkMode}
-                                  onStatusUpdate={onUpdateStatus}
-                                  onPlanUpdate={onUpdatePlan}
-                                  plans={plans}
-                                  onClose={() => setEditDropdownId(null)}
-                                  cooldown={cooldowns[row.id] || 0}
-                                />
-                              </div>
-                            </>
+                            <div className={`absolute right-0 z-20 ${openUpward ? "bottom-full pb-2" : "top-full pt-2"}`}>
+                              <EditDropdownContent
+                                row={row} darkMode={darkMode}
+                                onStatusUpdate={onUpdateStatus}
+                                onPlanUpdate={onUpdatePlan}
+                                plans={plans}
+                                onClose={() => setEditDropdownId(null)}
+                                cooldown={cooldowns[row.id] || 0}
+                              />
+                            </div>
                           )}
                         </div>
 
                         {/* More dropdown */}
-                        <div className="relative">
+                        <div
+                          className="relative"
+                          onMouseEnter={() => { setEditDropdownId(null); setMoreDropdownId(row.id); }}
+                          onMouseLeave={() => setMoreDropdownId(null)}
+                        >
                           <button
                             onClick={() => { setEditDropdownId(null); setMoreDropdownId(moreDropdownId === row.id ? null : row.id); }}
                             title="More options"
@@ -624,9 +662,8 @@ export default function SubscriptionTable({
                           </button>
 
                           {moreDropdownId === row.id && (
-                            <>
-                              <button type="button" className="fixed inset-0 z-10 cursor-default" onClick={() => setMoreDropdownId(null)} aria-label="Close dropdown" />
-                              <div className={`absolute right-0 mt-2 w-44 rounded-xl border p-1.5 shadow-2xl z-20 ${
+                            <div className={`absolute right-0 z-20 ${openUpward ? "bottom-full pb-2" : "top-full pt-2"}`}>
+                              <div className={`w-44 rounded-xl border p-1.5 shadow-2xl ${
                                 darkMode ? "bg-slate-950 border-slate-800 shadow-black/50" : "bg-white border-slate-200 shadow-slate-200"
                               }`}>
                                 <button onClick={() => { closeAll(); onView(row); }} className={`w-full text-left px-2.5 py-2 text-xs font-medium rounded-lg hover:bg-slate-500/5 flex items-center gap-2 ${darkMode ? "text-slate-300 hover:text-white" : "text-slate-700 hover:text-slate-900"}`}>
@@ -640,7 +677,7 @@ export default function SubscriptionTable({
                                   <Trash2 size={13} /> Remove Account
                                 </button>
                               </div>
-                            </>
+                            </div>
                           )}
                         </div>
                       </div>

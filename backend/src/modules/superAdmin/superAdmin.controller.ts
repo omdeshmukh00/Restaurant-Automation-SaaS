@@ -131,16 +131,37 @@ export const updatePlatformSettingsController = asyncHandler(async (req: Request
   const settings = await getPlatformSettings();
   
   const fields = [
+    'platformName', 'supportEmail', 'timezone', 'language', 'dateFormat', 'maintenanceMode',
+    'disableCustomerPanel', 'disableKitchenPanel', 'disableStaffPanel', 'disableCleaningPanel', 'disableAdminPanel',
     'applicationFeeEnabled', 'applicationFeeAmount', 'currency', 
     'refundPolicy', 'enablePartnerRegistration', 
     'maxPendingApplications', 'applicationExpiryDays',
-    'platformCommissionRate'
+    'platformCommissionRate',
+    'notificationEmail', 'emailNotifications', 'pushNotifications', 'inAppPreferences'
   ];
+
+  const wasMaintenanceOn = settings.maintenanceMode;
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
       (settings as any)[field] = req.body[field];
     }
+  }
+
+  // If maintenanceMode was just enabled, turn ON all panel disable flags
+  if (req.body.maintenanceMode === true && !wasMaintenanceOn) {
+    settings.disableCustomerPanel = true;
+    settings.disableKitchenPanel = true;
+    settings.disableStaffPanel = true;
+    settings.disableCleaningPanel = true;
+    settings.disableAdminPanel = true;
+
+    // Dispatch maintenance notice emails asynchronously
+    import('../../services/mail.service').then(({ sendMaintenanceNoticeEmailToAllUsers }) => {
+      sendMaintenanceNoticeEmailToAllUsers().catch((err) => {
+        console.error('Failed to send maintenance notice emails:', err);
+      });
+    });
   }
 
   await settings.save();
