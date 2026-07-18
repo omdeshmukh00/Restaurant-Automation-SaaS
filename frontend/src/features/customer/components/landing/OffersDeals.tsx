@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Copy, Check, Tag, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 
 interface Offer {
-  id: number;
+  id: number | string;
   discount: string;
   condition: string;
   code: string;
@@ -79,7 +79,7 @@ export default function OffersDeals({ offers }: OffersDealsProps) {
   };
 
   const displayOffers = offers && offers.length > 0
-    ? mapBackendOffers(offers)
+    ? [...mapBackendOffers(offers), ...OFFERS]
     : OFFERS;
 
   const scroll = (direction: 'left' | 'right') => {

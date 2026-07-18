@@ -183,7 +183,7 @@ export default function Subscriptions() {
 
   // ── Data state ────────────────────────────────────────────────────────────
   const navigate = useNavigate();
-  const [restaurants, setRestaurants] = useState<RestaurantNode[]>(restaurantData);
+  const [restaurants, setRestaurants] = useState<RestaurantNode[]>([]);
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
   const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
@@ -197,10 +197,12 @@ export default function Subscriptions() {
     (state) => state.deleteRestaurant
   );
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+  const fetchRestaurants = useRestaurantRequestsStore((state) => state.fetchRestaurants);
 
   useEffect(() => {
     fetchRequests();
-  }, [fetchRequests]);
+    fetchRestaurants();
+  }, [fetchRequests, fetchRestaurants]);
 
   // Platform Settings State
   const [platformSettings, setPlatformSettings] = useState({

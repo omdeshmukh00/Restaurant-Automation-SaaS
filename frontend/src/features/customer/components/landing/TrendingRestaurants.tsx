@@ -3,57 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Crown, TrendingUp } from 'lucide-react';
 import RestaurantCard, { type Restaurant } from './RestaurantCard';
 
-const RESTAURANTS: Restaurant[] = [
-  {
-    id: 1, name: 'The Grand Kitchen', cuisine: 'Italian, Continental',
-    location: 'Bandra West, Mumbai', image: '/images/landing/restaurant-1.png',
-    rating: 4.5, reviewCount: 234, priceLevel: '₹₹₹', distance: '2.3 km',
-    waitTime: '15 min', availableTables: 4, currentOffer: '20% OFF first visit', isOpen: true,
-  },
-  {
-    id: 2, name: 'Spice Route', cuisine: 'North Indian, Mughlai',
-    location: 'Andheri East, Mumbai', image: '/images/landing/restaurant-2.png',
-    rating: 4.7, reviewCount: 567, priceLevel: '₹₹', distance: '1.8 km',
-    waitTime: '10 min', availableTables: 6, currentOffer: 'Free Dessert', isOpen: true,
-  },
-  {
-    id: 3, name: 'Ocean Delight', cuisine: 'Seafood, Asian',
-    location: 'Juhu, Mumbai', image: '/images/landing/restaurant-3.png',
-    rating: 4.6, reviewCount: 389, priceLevel: '₹₹₹', distance: '3.1 km',
-    waitTime: '20 min', availableTables: 2, isOpen: true,
-  },
-  {
-    id: 4, name: 'Urban Bites', cuisine: 'American, Cafe',
-    location: 'Lower Parel, Mumbai', image: '/images/landing/restaurant-4.png',
-    rating: 4.4, reviewCount: 198, priceLevel: '₹', distance: '0.8 km',
-    waitTime: '5 min', availableTables: 8, currentOffer: 'Buy 1 Get 1', isOpen: true,
-  },
-  {
-    id: 5, name: 'Bella Italia', cuisine: 'Italian, Pizza',
-    location: 'Powai, Mumbai', image: '/images/landing/restaurant-1.png',
-    rating: 4.3, reviewCount: 156, priceLevel: '₹₹', distance: '4.2 km',
-    waitTime: '12 min', availableTables: 5, currentOffer: '15% OFF weekdays', isOpen: true,
-  },
-  {
-    id: 6, name: 'Dragon Palace', cuisine: 'Chinese, Thai',
-    location: 'Colaba, Mumbai', image: '/images/landing/restaurant-3.png',
-    rating: 4.5, reviewCount: 312, priceLevel: '₹₹₹', distance: '5.0 km',
-    waitTime: '25 min', availableTables: 3, isOpen: true,
-  },
-  {
-    id: 7, name: 'The Coffee House', cuisine: 'Cafe, Bakery',
-    location: 'Dadar, Mumbai', image: '/images/landing/restaurant-4.png',
-    rating: 4.2, reviewCount: 89, priceLevel: '₹', distance: '1.5 km',
-    waitTime: '0 min', availableTables: 12, isOpen: true,
-  },
-  {
-    id: 8, name: 'Royal Biryani House', cuisine: 'Hyderabadi, Mughlai',
-    location: 'Kurla, Mumbai', image: '/images/landing/restaurant-2.png',
-    rating: 4.8, reviewCount: 678, priceLevel: '₹₹', distance: '2.0 km',
-    waitTime: '30 min', availableTables: 1, currentOffer: 'Flat ₹100 OFF', isOpen: true,
-  },
-];
-
 interface TrendingRestaurantsProps {
   onLoginOpen: () => void;
   restaurants?: any[];
@@ -148,10 +97,7 @@ export default function TrendingRestaurants({ onLoginOpen, restaurants, selected
     });
   };
 
-  const isBackendData = !!(restaurants && restaurants.length > 0);
-  const displayRestaurants = isBackendData
-    ? mapBackendRestaurants(restaurants!)
-    : RESTAURANTS;
+  const displayRestaurants = mapBackendRestaurants(restaurants || []);
 
   const filteredRestaurants = selectedCuisine === 'All'
     ? displayRestaurants
@@ -162,29 +108,13 @@ export default function TrendingRestaurants({ onLoginOpen, restaurants, selected
   let row1: Restaurant[] = [];
   let row2: Restaurant[] = [];
 
-  if (isBackendData) {
-    if (filteredRestaurants.length <= 4) {
-      row1 = filteredRestaurants;
-      row2 = [];
-    } else {
-      const mid = Math.ceil(filteredRestaurants.length / 2);
-      row1 = filteredRestaurants.slice(0, mid);
-      row2 = filteredRestaurants.slice(mid);
-    }
+  if (filteredRestaurants.length <= 4) {
+    row1 = filteredRestaurants;
+    row2 = [];
   } else {
-    const mockFiltered = selectedCuisine === 'All'
-      ? RESTAURANTS
-      : RESTAURANTS.filter((r) =>
-          r.cuisine.toLowerCase().includes(selectedCuisine.toLowerCase())
-        );
-    if (mockFiltered.length <= 4) {
-      row1 = mockFiltered;
-      row2 = [];
-    } else {
-      const mid = Math.ceil(mockFiltered.length / 2);
-      row1 = mockFiltered.slice(0, mid);
-      row2 = mockFiltered.slice(mid);
-    }
+    const mid = Math.ceil(filteredRestaurants.length / 2);
+    row1 = filteredRestaurants.slice(0, mid);
+    row2 = filteredRestaurants.slice(mid);
   }
 
   return (
@@ -236,67 +166,76 @@ export default function TrendingRestaurants({ onLoginOpen, restaurants, selected
           </div>
         </div>
 
-        {/* Row 1 */}
-        <div className="relative mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.1), rgba(255,107,26,0.05))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.15)' }}>
-              <Crown className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
-              <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
-                Featured Selection
-              </span>
+        {filteredRestaurants.length > 0 ? (
+          <>
+            {/* Row 1 */}
+            <div className="relative mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.1), rgba(255,107,26,0.05))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.15)' }}>
+                  <Crown className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
+                  <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
+                    Featured Selection
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => scrollRow(row1Ref, 'left')}
+                    className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
+                    style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+                    aria-label="Scroll row 1 left"
+                  >
+                    <ChevronLeft className="w-[16px] h-[16px]" />
+                  </button>
+                  <button
+                    onClick={() => scrollRow(row1Ref, 'right')}
+                    className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
+                    style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+                    aria-label="Scroll row 1 right"
+                  >
+                    <ChevronRight className="w-[16px] h-[16px]" />
+                  </button>
+                </div>
+              </div>
+              <ScrollableRow restaurants={row1} onLoginOpen={onLoginOpen} rowRef={row1Ref} />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => scrollRow(row1Ref, 'left')}
-                className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
-                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
-                aria-label="Scroll row 1 left"
-              >
-                <ChevronLeft className="w-[16px] h-[16px]" />
-              </button>
-              <button
-                onClick={() => scrollRow(row1Ref, 'right')}
-                className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
-                style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
-                aria-label="Scroll row 1 right"
-              >
-                <ChevronRight className="w-[16px] h-[16px]" />
-              </button>
-            </div>
-          </div>
-          <ScrollableRow restaurants={row1} onLoginOpen={onLoginOpen} rowRef={row1Ref} />
-        </div>
 
-        {/* Row 2 */}
-        {row2 && row2.length > 0 && (
-          <div className="relative mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.1), rgba(255,107,26,0.05))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.15)' }}>
-                <TrendingUp className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
-                <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
-                  Popular Near You
-                </span>
+            {/* Row 2 */}
+            {row2 && row2.length > 0 && (
+              <div className="relative mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.1), rgba(255,107,26,0.05))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.15)' }}>
+                    <TrendingUp className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
+                    <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
+                      Popular Near You
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => scrollRow(row2Ref, 'left')}
+                      className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
+                      style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+                      aria-label="Scroll row 2 left"
+                    >
+                      <ChevronLeft className="w-[16px] h-[16px]" />
+                    </button>
+                    <button
+                      onClick={() => scrollRow(row2Ref, 'right')}
+                      className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
+                      style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+                      aria-label="Scroll row 2 right"
+                    >
+                      <ChevronRight className="w-[16px] h-[16px]" />
+                    </button>
+                  </div>
+                </div>
+                <ScrollableRow restaurants={row2} onLoginOpen={onLoginOpen} rowRef={row2Ref} />
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => scrollRow(row2Ref, 'left')}
-                  className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
-                  style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
-                  aria-label="Scroll row 2 left"
-                >
-                  <ChevronLeft className="w-[16px] h-[16px]" />
-                </button>
-                <button
-                  onClick={() => scrollRow(row2Ref, 'right')}
-                  className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150"
-                  style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
-                  aria-label="Scroll row 2 right"
-                >
-                  <ChevronRight className="w-[16px] h-[16px]" />
-                </button>
-              </div>
-            </div>
-            <ScrollableRow restaurants={row2} onLoginOpen={onLoginOpen} rowRef={row2Ref} />
+            )}
+          </>
+        ) : (
+          <div className="text-center py-16 bg-[#FAFAFA] rounded-2xl border border-dashed border-[#E5E7EB]">
+            <p className="text-[#666666] font-semibold text-[16px]">No restaurants available</p>
+            <p className="text-[#999999] text-[13px] mt-1">Please try selecting a different category or check back later.</p>
           </div>
         )}
 

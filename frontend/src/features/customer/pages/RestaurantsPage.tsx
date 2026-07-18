@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Star, Clock, MapPin, ChevronDown, Search, Filter, Flame, Crown, TrendingUp, Utensils } from 'lucide-react';
 import '../components/landing/landing.css';
 import { apiClient } from '../../../shared/services/apiClient';
-import LandingFooter from '../components/landing/LandingFooter';
+import { LandingNavbar, LandingFooter } from '../components/landing';
 
 const AREAS = ['All Areas', 'Bandra', 'Andheri', 'Colaba', 'Lower Parel', 'Juhu', 'Powai', 'Dadar'];
 const CUISINES = ['All', 'Indian', 'Italian', 'Chinese', 'Japanese', 'Continental', 'Mexican', 'Thai'];
@@ -26,17 +26,7 @@ interface RestaurantData {
   tags: string[];
 }
 
-const RESTAURANTS: RestaurantData[] = [
-  { id: 1, name: 'Burger Barn', cuisine: 'Fast Food, Burgers, American', rating: 4.3, reviews: 645, area: 'Bandra', distance: '0.6 km', time: '5-10 mins', priceRange: '₹300-500', tables: 15, offer: 'Flat 15% OFF', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&auto=format&fit=crop', veg: false, tags: ['Popular', 'Family'] },
-  { id: 2, name: 'Café Heights', cuisine: 'Cafe, Italian, Continental', rating: 4.3, reviews: 645, area: 'Andheri', distance: '0.5 km', time: '15-30 mins', priceRange: '₹400-700', tables: 8, offer: 'Flat 15% OFF', image: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?w=400&auto=format&fit=crop', veg: false, tags: ['Trending', 'Date Night'] },
-  { id: 3, name: 'Spice Garden', cuisine: 'Indian, North Indian, Mughlai', rating: 4.6, reviews: 1200, area: 'Colaba', distance: '1.2 km', time: '20-35 mins', priceRange: '₹500-900', tables: 12, offer: '20% OFF on first order', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&auto=format&fit=crop', veg: false, tags: ['Top Rated', 'Fine Dining'] },
-  { id: 4, name: 'Green Leaf', cuisine: 'Vegan, Healthy, Salads', rating: 4.5, reviews: 380, area: 'Juhu', distance: '2.1 km', time: '15-25 mins', priceRange: '₹250-450', tables: 6, image: 'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=400&auto=format&fit=crop', veg: true, tags: ['Pure Veg', 'Healthy'] },
-  { id: 5, name: 'Tokyo Express', cuisine: 'Japanese, Sushi, Asian', rating: 4.7, reviews: 890, area: 'Lower Parel', distance: '3.0 km', time: '25-40 mins', priceRange: '₹800-1500', tables: 4, offer: 'Free Miso Soup', image: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=400&auto=format&fit=crop', veg: false, tags: ['Premium', 'Top Rated'] },
-  { id: 6, name: 'Pizza Paradise', cuisine: 'Italian, Pizza, Pasta', rating: 4.2, reviews: 520, area: 'Powai', distance: '1.8 km', time: '20-30 mins', priceRange: '₹350-600', tables: 10, offer: 'Buy 1 Get 1', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop', veg: false, tags: ['Popular', 'Family'] },
-  { id: 7, name: 'Tandoori Nights', cuisine: 'Indian, Tandoori, Kebabs', rating: 4.4, reviews: 710, area: 'Bandra', distance: '0.8 km', time: '10-20 mins', priceRange: '₹400-800', tables: 18, image: 'https://images.unsplash.com/photo-1585518419759-7fe2e0fbf8a6?w=400&auto=format&fit=crop', veg: false, tags: ['Trending', 'Non-Veg'] },
-  { id: 8, name: 'The Veg Table', cuisine: 'South Indian, Dosa, Thali', rating: 4.1, reviews: 290, area: 'Dadar', distance: '2.5 km', time: '15-25 mins', priceRange: '₹200-350', tables: 20, offer: 'Flat ₹50 OFF', image: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400&auto=format&fit=crop', veg: true, tags: ['Pure Veg', 'Budget'] },
-  { id: 9, name: 'China Box', cuisine: 'Chinese, Asian, Wok', rating: 4.0, reviews: 450, area: 'Andheri', distance: '1.0 km', time: '15-20 mins', priceRange: '₹300-550', tables: 7, image: 'https://images.unsplash.com/photo-1525755662778-989d0524087e?w=400&auto=format&fit=crop', veg: false, tags: ['Quick Bites'] },
-];
+
 
 export default function RestaurantsPage() {
   const [searchParams] = useSearchParams();
@@ -62,7 +52,7 @@ export default function RestaurantsPage() {
     const fetchRestaurants = async () => {
       try {
         const response = await apiClient.get('/public/landing/data');
-        if (active && response.data?.status === 'success' && response.data?.data?.restaurants) {
+        if (active && (response.data?.success || response.data?.status === 'success') && response.data?.data?.restaurants) {
           setBackendRestaurants(response.data.data.restaurants);
         }
       } catch (err) {
@@ -97,9 +87,7 @@ export default function RestaurantsPage() {
     });
   };
 
-  const displayRestaurants = backendRestaurants.length > 0
-    ? mapBackendRestaurants(backendRestaurants)
-    : RESTAURANTS;
+  const displayRestaurants = mapBackendRestaurants(backendRestaurants);
 
   const dynamicCuisines = ['All', ...Array.from(new Set(displayRestaurants.map(r => r.cuisine).flatMap(c => c.split(',').map(s => s.trim()))))];
 
@@ -111,31 +99,16 @@ export default function RestaurantsPage() {
     return true;
   });
 
-  return (
-    <div className="min-h-screen landing-font-inter" style={{ background: 'linear-gradient(180deg, #0F0F0F 0%, #1A1A1A 100%)', color: '#FFFFFF' }}>
+  const openLogin = () => {
+    navigate('/auth/customer');
+  };
 
-      {/* ── Top Bar with Back Arrow ────────────────────────── */}
-      <header className="sticky top-0 z-50" style={{ background: 'rgba(15,15,15,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-[64px] flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="w-[38px] h-[38px] rounded-full flex items-center justify-center transition-colors duration-150"
-            style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}
-            aria-label="Back to Home"
-          >
-            <ArrowLeft className="w-[18px] h-[18px] text-white" />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-[32px] h-[32px] rounded-full flex items-center justify-center" style={{ backgroundColor: '#FF6B1A' }}>
-              <span className="material-symbols-outlined text-[15px] font-bold text-white block">restaurant</span>
-            </div>
-            <span className="font-bold text-[18px] text-white">Resto<span style={{ color: '#FF6B1A' }}>Hub</span></span>
-          </div>
-          <div className="ml-auto text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
-            {filtered.length} restaurants found
-          </div>
-        </div>
-      </header>
+  return (
+    <div className="min-h-screen landing-font-inter flex flex-col justify-between" style={{ background: 'linear-gradient(180deg, #0F0F0F 0%, #1A1A1A 100%)', color: '#FFFFFF' }}>
+      <LandingNavbar onLoginOpen={openLogin} />
+      
+      {/* Spacer for Navbar */}
+      <div className="h-[72px] shrink-0" />
 
       {/* ── Hero Banner ──────────────────────────────────── */}
       <section

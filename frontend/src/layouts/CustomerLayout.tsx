@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { Outlet, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { CartProvider } from '../features/customer/components/dashboard/CartContext';
 import { SearchProvider } from '../features/customer/components/dashboard/SearchContext';
 import CustomerSidebar from '../features/customer/components/dashboard/CustomerSidebar';
 import CustomerTopBar from '../features/customer/components/dashboard/CustomerTopBar';
 import CustomerBottomNav from '../features/customer/components/dashboard/CustomerBottomNav';
 import CartSidebar from '../features/customer/components/dashboard/CartSidebar';
+import QRScannerModal from '../features/customer/components/dashboard/QRScannerModal';
 import { useCustomerStore } from '../features/customer/store/customer.store';
 import { useAuth } from '../auth/AuthProvider';
 import { apiClient } from '../shared/services/apiClient';
 import { connectSocket, getSocket } from '../lib/socket';
+import { LandingNavbar, LandingFooter } from '../features/customer/components/landing';
 
 export default function CustomerLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const qrToken = searchParams.get('qr_token');
@@ -38,6 +42,15 @@ export default function CustomerLayout() {
       setTableCode('T07');
     }
   }, [searchParams, tableCode, setTableCode]);
+
+  useEffect(() => {
+    if (searchParams.get('scan') === 'true') {
+      setScannerOpen(true);
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('scan');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     document.title = 'Smart-Dining';
@@ -222,6 +235,38 @@ export default function CustomerLayout() {
     location.pathname === p || location.pathname.startsWith(p + '/')
   ) || location.pathname === '/customer' || location.pathname === '/customer/';
 
+  const handleScanSuccess = (tableId: string) => {
+    setScannerOpen(false);
+    setToastMsg(`✅ Connected to Table ${tableId}!`);
+    setTimeout(() => setToastMsg(''), 3000);
+  };
+
+  const isReservationsPage = location.pathname === '/customer/reservations';
+  const navigate = useNavigate();
+
+  if (isReservationsPage) {
+    const openLogin = () => {
+      navigate('/auth/customer');
+    };
+
+    return (
+      <div className="landing-page-container min-h-screen relative overflow-x-hidden flex flex-col justify-between" style={{ backgroundColor: '#FFF8F3' }}>
+        <LandingNavbar onLoginOpen={openLogin} />
+        
+        {/* Spacer for Navbar */}
+        <div className="h-[72px] shrink-0" />
+        
+        <main className="flex-1 py-8 relative overflow-hidden">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 relative z-10">
+            <Outlet />
+          </div>
+        </main>
+
+        <LandingFooter />
+      </div>
+    );
+  }
+
   return (
     <CartProvider>
       <SearchProvider>
@@ -229,6 +274,7 @@ export default function CustomerLayout() {
           <CustomerSidebar
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onOpenScanner={() => setScannerOpen(true)}
           />
 
           <div
@@ -320,7 +366,17 @@ export default function CustomerLayout() {
             />
           )}
 
-          <CustomerBottomNav />
+          <CustomerBottomNav onOpenScanner={() => setScannerOpen(true)} />
+          <QRScannerModal
+            isOpen={scannerOpen}
+            onClose={() => setScannerOpen(false)}
+            onScanSuccess={handleScanSuccess}
+          />
+          {toastMsg && (
+            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-sd-inverse-surface text-white px-6 py-3 rounded-2xl shadow-xl z-[100] animate-fadeIn font-sans text-sm font-semibold">
+              {toastMsg}
+            </div>
+          )}
         </div>
       </SearchProvider>
     </CartProvider>

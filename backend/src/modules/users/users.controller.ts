@@ -80,3 +80,78 @@ export const deleteAccount = asyncHandler(async (req: Request, res: Response) =>
   await userService.softDeleteUser(req.user!._id);
   sendSuccess(res, { message: 'Account deleted successfully' });
 });
+
+/**
+ * GET /users/me/reservations — Get all reservations for the current customer
+ */
+export const getMyReservations = asyncHandler(async (req: Request, res: Response) => {
+  const { UserModel } = await import('./users.model');
+  const user = await UserModel.findById(req.user!._id).lean();
+  if (!user) {
+    throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  const { ReservationModel } = await import('../reservations/reservations.model');
+  const reservations = await ReservationModel.find({ mobile: user.mobile }).sort({ date: -1, slot: -1 }).lean();
+  sendSuccess(res, { reservations });
+});
+
+/**
+ * POST /users/me/reservations — Create a new reservation for the current customer
+ */
+export const createMyReservation = asyncHandler(async (req: Request, res: Response) => {
+  const { UserModel } = await import('./users.model');
+  const user = await UserModel.findById(req.user!._id).lean();
+  if (!user) {
+    throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  const { ReservationsService } = await import('../reservations/reservations.service');
+  const { ReservationStatus } = await import('../../constants/statuses');
+  
+  const { restaurantId, guests, date, slot, notes } = req.body;
+  if (!restaurantId || !guests || !date || !slot) {
+    throw new AppError('Missing required fields', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const reservation = await ReservationsService.createReservation({
+    restaurantId,
+    customerName: user.name,
+    customerEmail: user.email,
+    mobile: user.mobile,
+    guests: Number(guests),
+    date,
+    slot,
+    notes,
+    status: ReservationStatus.CONFIRMED,
+  });
+
+  sendSuccess(res, { reservation }, 201);
+});
+
+/**
+ * PATCH /users/me/reservations/:id — Update or cancel a customer's reservation
+ */
+export const updateMyReservation = asyncHandler(async (req: Request, res: Response) => {
+  const { UserModel } = await import('./users.model');
+  const user = await UserModel.findById(req.user!._id).lean();
+  if (!user) {
+    throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  const { ReservationModel } = await import('../reservations/reservations.model');
+  const { id } = req.params;
+  const updates = req.body;
+
+  const reservation = await ReservationModel.findOneAndUpdate(
+    { _id: id, mobile: user.mobile },
+    updates,
+    { new: true }
+  ).lean();
+
+  if (!reservation) {
+    throw new AppError('Reservation not found or unauthorized', 404, ErrorCode.NOT_FOUND);
+  }
+
+  sendSuccess(res, { reservation });
+});

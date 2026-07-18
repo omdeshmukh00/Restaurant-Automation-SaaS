@@ -3,7 +3,7 @@ import {
   placeholderRestaurantRequests,
   superAdminRestaurantRequestsApi,
 } from "../api/superAdmin.api";
-import { restaurantData } from "./Restaurants";
+import { apiClient } from "../../../shared/services/apiClient";
 import type { RestaurantsRow } from "../components/Restaurants/Restauranttypes";
 
 export interface RestaurantRequest {
@@ -39,18 +39,19 @@ interface RestaurantRequestsState {
   restaurants: RestaurantsRow[];
   requests: RestaurantRequest[];
   fetchRequests: () => Promise<void>;
+  fetchRestaurants: () => Promise<void>;
   approveRequest: (id: string) => Promise<void>;
   denyRequest: (id: string, reason: string, refund?: boolean) => Promise<void>;
-  addRestaurant: (restaurant: RestaurantsRow) => void;
+  addRestaurant: (restaurant: RestaurantsRow) => Promise<void>;
   updateRestaurantStatus: (
     id: string,
     status: "Active" | "Trial" | "Inactive"
-  ) => void;
+  ) => Promise<void>;
   updateRestaurantPlan: (
     id: string,
     plan: "Premium" | "Standard" | "Basic" | "Free"
   ) => void;
-  deleteRestaurant: (id: string) => void;
+  deleteRestaurant: (id: string) => Promise<void>;
 }
 
 const requestToRestaurant = (request: RestaurantRequest): RestaurantsRow => ({
@@ -68,7 +69,7 @@ const requestToRestaurant = (request: RestaurantRequest): RestaurantsRow => ({
 
 export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
   (set, get) => ({
-    restaurants: restaurantData,
+    restaurants: [],
     requests: [],
     fetchRequests: async () => {
       try {
@@ -76,6 +77,27 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
         set({ requests: reqs });
       } catch (error) {
         console.error("Failed to fetch requests", error);
+      }
+    },
+    fetchRestaurants: async () => {
+      try {
+        const response = await apiClient.get('/superadmin/restaurants');
+        const items = response.data?.data?.restaurants || [];
+        const mapped = items.map((r: any) => ({
+          id: r._id || r.id,
+          name: r.name,
+          owner: r.ownerName || 'Unknown',
+          email: r.email || '',
+          phone: r.phone || '',
+          location: `${r.city || 'Mumbai'}, ${r.state || 'Maharashtra'}`,
+          plan: r.plan === 'STARTER' ? 'Basic' : r.plan === 'PRO' ? 'Standard' : 'Premium',
+          status: r.status === 'ACTIVE' ? 'Active' : r.status === 'TRIAL' ? 'Trial' : 'Inactive',
+          revenue: `₹${((r.expectedMonthlyOrders || 0) * 125).toLocaleString('en-IN')}`,
+          branches: r.branches || 1,
+        }));
+        set({ restaurants: mapped });
+      } catch (error) {
+        console.error("Failed to fetch restaurants", error);
       }
     },
     approveRequest: async (id) => {
@@ -123,23 +145,75 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
         throw error;
       }
     },
-    addRestaurant: (restaurant) =>
-      set((state) => ({ restaurants: [restaurant, ...state.restaurants] })),
-    updateRestaurantStatus: (id, status) =>
-      set((state) => ({
-        restaurants: state.restaurants.map((restaurant) =>
-          restaurant.id === id ? { ...restaurant, status } : restaurant
-        ),
-      })),
+    addRestaurant: async (restaurant) => {
+      try {
+        const response = await apiClient.post('/superadmin/restaurants', {
+          name: restaurant.name,
+          owner: restaurant.owner,
+          email: restaurant.email,
+          phone: restaurant.phone,
+          location: restaurant.location,
+          plan: restaurant.plan,
+          status: restaurant.status,
+          branches: restaurant.branches,
+          revenue: restaurant.revenue,
+        });
+        const created = response.data?.data;
+        if (created) {
+          set((state) => ({
+            restaurants: [
+              {
+                id: created.id,
+                name: created.name,
+                owner: created.owner,
+                email: created.email,
+                phone: created.phone,
+                location: created.location,
+                plan: created.plan,
+                status: created.status,
+                revenue: created.revenue,
+                branches: created.branches,
+              },
+              ...state.restaurants,
+            ],
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to add restaurant", error);
+        throw error;
+      }
+    },
+    updateRestaurantStatus: async (id, status) => {
+      try {
+        if (status === 'Active') {
+          await apiClient.patch(`/superadmin/restaurants/${id}/approve`);
+        } else {
+          await apiClient.patch(`/superadmin/restaurants/${id}/suspend`);
+        }
+        set((state) => ({
+          restaurants: state.restaurants.map((restaurant) =>
+            restaurant.id === id ? { ...restaurant, status } : restaurant
+          ),
+        }));
+      } catch (error) {
+        console.error("Failed to update status", error);
+      }
+    },
     updateRestaurantPlan: (id, plan) =>
       set((state) => ({
         restaurants: state.restaurants.map((restaurant) =>
           restaurant.id === id ? { ...restaurant, plan: plan as any } : restaurant
         ),
       })),
-    deleteRestaurant: (id) =>
-      set((state) => ({
-        restaurants: state.restaurants.filter((restaurant) => restaurant.id !== id),
-      })),
+    deleteRestaurant: async (id) => {
+      try {
+        await apiClient.delete(`/superadmin/restaurants/${id}`);
+        set((state) => ({
+          restaurants: state.restaurants.filter((restaurant) => restaurant.id !== id),
+        }));
+      } catch (err) {
+        console.error("Failed to delete restaurant", err);
+      }
+    },
   })
 );
