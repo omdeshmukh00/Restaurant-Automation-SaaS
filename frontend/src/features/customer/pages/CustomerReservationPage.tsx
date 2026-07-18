@@ -40,7 +40,8 @@ const getTomorrowStr = () => {
 
 const parseTimeTo24h = (time12h: string): string => {
   const [time, modifier] = time12h.split(' ');
-  let [hours, minutes] = time.split(':');
+  const [hoursStr, minutes] = time.split(':');
+  let hours = hoursStr;
   if (hours === '12') {
     hours = '00';
   }
@@ -55,7 +56,7 @@ const formatTimeTo12h = (time24h: string): string => {
   if (time24h.includes('AM') || time24h.includes('PM')) {
     return time24h;
   }
-  let [hoursStr, minutes] = time24h.split(':');
+  const [hoursStr, minutes] = time24h.split(':');
   let hours = parseInt(hoursStr, 10);
   if (isNaN(hours)) return '07:00 PM';
   const modifier = hours >= 12 ? 'PM' : 'AM';
