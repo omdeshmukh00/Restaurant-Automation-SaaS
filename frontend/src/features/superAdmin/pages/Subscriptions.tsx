@@ -634,7 +634,7 @@ export default function Subscriptions() {
 
           <button
             onClick={() => {
-              if (restaurants.length > 0) setSelectedAddonRestaurantId(restaurants[0].id);
+              if (linkedRestaurants.length > 0) setSelectedAddonRestaurantId(linkedRestaurants[0].id);
               setIsAddonsModalOpen(true);
             }}
             className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
@@ -1493,11 +1493,15 @@ export default function Subscriptions() {
                     darkMode ? 'border-slate-800 text-white bg-slate-950' : 'border-slate-200 text-slate-800 bg-white'
                   }`}
                 >
-                  {restaurants.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.plan})
-                    </option>
-                  ))}
+                  {linkedRestaurants.length === 0 ? (
+                    <option value="">No restaurants available</option>
+                  ) : (
+                    linkedRestaurants.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.plan})
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
