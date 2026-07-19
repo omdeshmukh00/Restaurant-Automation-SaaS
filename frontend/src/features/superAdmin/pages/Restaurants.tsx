@@ -106,14 +106,6 @@ export default function Restaurant() {
     fetchRequests();
     fetchPlans();
   }, [fetchRequests]);
-=======
-  const fetchRestaurants = useRestaurantRequestsStore((state) => state.fetchRestaurants);
-
-  useEffect(() => {
-    fetchRequests();
-    fetchRestaurants();
-  }, [fetchRequests, fetchRestaurants]);
->>>>>>> 34c69bb3eabe8f804be97357b07a77318ec87369
 
 
 
@@ -342,8 +334,8 @@ export default function Restaurant() {
       {/* Live Activity Modal */}
       {liveActivityRestaurant && (
         <LiveActivityModal
-          restaurantId={liveActivityRestaurant.id}
-          restaurantName={liveActivityRestaurant.name}
+          restaurantId={liveActivityRestaurant!.id}
+          restaurantName={liveActivityRestaurant!.name}
           darkMode={darkMode}
           onClose={() => setLiveActivityRestaurant(null)}
         />
