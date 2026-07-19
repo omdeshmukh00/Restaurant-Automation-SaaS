@@ -101,19 +101,7 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
       try {
         const response = await apiClient.get('/superadmin/restaurants');
         const items = response.data?.data?.restaurants || [];
-        const mapped = items.map((r: any) => ({
-          id: r._id || r.id,
-          name: r.name,
-          owner: r.ownerName || 'Unknown',
-          email: r.email || '',
-          phone: r.phone || '',
-          location: `${r.city || 'Mumbai'}, ${r.state || 'Maharashtra'}`,
-          plan: r.plan === 'STARTER' ? 'Basic' : r.plan === 'PRO' ? 'Standard' : 'Premium',
-          status: r.status === 'ACTIVE' ? 'Active' : r.status === 'TRIAL' ? 'Trial' : 'Inactive',
-          revenue: `₹${((r.expectedMonthlyOrders || 0) * 125).toLocaleString('en-IN')}`,
-          branches: r.branches || 1,
-        }));
-        set({ restaurants: mapped });
+        set({ restaurants: items.map(mapDbRestaurantToRow) });
       } catch (error) {
         console.error("Failed to fetch restaurants", error);
       }
