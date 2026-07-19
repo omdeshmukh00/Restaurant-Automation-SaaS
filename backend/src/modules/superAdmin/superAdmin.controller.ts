@@ -8,6 +8,7 @@ import type {
   RestaurantListQuery,
   AnalyticsQuery,
   SuperAdminAuditLogQuery,
+  RegisterRestaurantInput,
 } from './superAdmin.schema';
 
 // ──────────────────────────────────────────────────────────────────────
@@ -97,10 +98,32 @@ export const getPlatformSettingsController = asyncHandler(async (req: Request, r
     timestamp: r.paymentTimestamp || r.updatedAt
   }));
 
+  const { SubscriptionPaymentModel } = await import('../subscriptions/subscriptions.model');
+  const paidSubscriptions = await SubscriptionPaymentModel.find({
+    status: 'completed'
+  })
+    .populate('restaurantId')
+    .setOptions({ bypassTenant: true })
+    .lean();
+
+  const totalSubscriptionRevenue = paidSubscriptions.reduce((sum: number, sp: any) => sum + (sp.amount || 0), 0);
+
+  const subscriptionHistory = paidSubscriptions.map((sp: any) => ({
+    id: sp._id.toString(),
+    restaurantName: sp.restaurantId?.name || 'Unknown Restaurant',
+    ownerName: sp.restaurantId?.ownerName || 'Unknown Owner',
+    amount: sp.amount,
+    currency: sp.currency || 'INR',
+    paymentId: sp.providerPaymentId || sp.providerOrderId || sp._id.toString(),
+    timestamp: sp.paidAt || sp.createdAt
+  }));
+
   ok(res, {
     ...settings.toObject(),
     totalRevenue,
-    history
+    history,
+    totalSubscriptionRevenue,
+    subscriptionHistory
   });
 });
 
@@ -108,15 +131,37 @@ export const updatePlatformSettingsController = asyncHandler(async (req: Request
   const settings = await getPlatformSettings();
   
   const fields = [
+    'platformName', 'supportEmail', 'timezone', 'language', 'dateFormat', 'maintenanceMode',
+    'disableCustomerPanel', 'disableKitchenPanel', 'disableStaffPanel', 'disableCleaningPanel', 'disableAdminPanel',
     'applicationFeeEnabled', 'applicationFeeAmount', 'currency', 
     'refundPolicy', 'enablePartnerRegistration', 
-    'maxPendingApplications', 'applicationExpiryDays'
+    'maxPendingApplications', 'applicationExpiryDays',
+    'platformCommissionRate',
+    'notificationEmail', 'emailNotifications', 'pushNotifications', 'inAppPreferences'
   ];
+
+  const wasMaintenanceOn = settings.maintenanceMode;
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
       (settings as any)[field] = req.body[field];
     }
+  }
+
+  // If maintenanceMode was just enabled, turn ON all panel disable flags
+  if (req.body.maintenanceMode === true && !wasMaintenanceOn) {
+    settings.disableCustomerPanel = true;
+    settings.disableKitchenPanel = true;
+    settings.disableStaffPanel = true;
+    settings.disableCleaningPanel = true;
+    settings.disableAdminPanel = true;
+
+    // Dispatch maintenance notice emails asynchronously
+    import('../../services/mail.service').then(({ sendMaintenanceNoticeEmailToAllUsers }) => {
+      sendMaintenanceNoticeEmailToAllUsers().catch((err) => {
+        console.error('Failed to send maintenance notice emails:', err);
+      });
+    });
   }
 
   await settings.save();
@@ -200,4 +245,68 @@ export const getPlatformAuditLogs = asyncHandler(async (req: Request, res: Respo
   const query = req.query as unknown as SuperAdminAuditLogQuery;
   const result = await superAdminService.getPlatformAuditLogs(query);
   ok(res, result);
+});
+
+export const updateRestaurantStatusController = asyncHandler(async (req: Request, res: Response) => {
+  const { status, blockReason } = req.body;
+  if (!status || !['Active', 'Trial', 'Inactive'].includes(status)) {
+    throw new AppError('Invalid status value. Must be Active, Trial, or Inactive', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const restaurant = await superAdminService.updateRestaurantStatus(req.params.id, status, blockReason);
+  ok(res, { restaurant });
+});
+
+export const updateRestaurantPlanController = asyncHandler(async (req: Request, res: Response) => {
+  const { plan } = req.body;
+  if (!plan) {
+    throw new AppError('Plan name is required', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const restaurant = await superAdminService.updateRestaurantPlan(req.params.id, plan);
+  ok(res, { restaurant });
+});
+
+export const registerRestaurantController = asyncHandler(async (req: Request, res: Response) => {
+  const reviewerId = req.user!.id;
+  const input = req.body as RegisterRestaurantInput;
+  const result = await superAdminService.registerRestaurantDirectly(input, reviewerId);
+  ok(res, { success: true, ...result }, 201);
+});
+
+export const getReservationQueueAnalyticsController = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await superAdminService.getReservationQueueAnalytics();
+  ok(res, result);
+});
+
+export const getAnalyticsChartsController = asyncHandler(async (_req: Request, res: Response) => {
+  const result = await superAdminService.getAnalyticsCharts();
+  ok(res, result);
+});
+
+export const getPlatformAlertsController = asyncHandler(async (req: Request, res: Response) => {
+  const { status, type } = req.query;
+  const filter: any = {};
+  if (status) filter.status = status;
+  if (type) filter.type = type;
+
+  const result = await superAdminService.getPlatformAlerts(filter);
+  ok(res, result);
+});
+
+export const updatePlatformAlertController = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  if (!status || !['new', 'acknowledged', 'resolved'].includes(status)) {
+    throw new AppError('Invalid alert status', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const result = await superAdminService.updatePlatformAlert(id, status);
+  ok(res, result);
+});
+
+export const deletePlatformAlertController = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  await superAdminService.deletePlatformAlert(id);
+  ok(res, { success: true });
 });

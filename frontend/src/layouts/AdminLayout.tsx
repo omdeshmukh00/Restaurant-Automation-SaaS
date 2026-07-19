@@ -6,9 +6,12 @@ import { AdminSearchProvider } from '../features/admin/context/Adminsearchcontex
 import { AdminNotificationsProvider } from '../features/admin/context/Adminnotificationscontext';
 import OnboardingWizard from '../features/admin/components/dashboard/OnboardingWizard';
 import { apiClient } from '../shared/services/apiClient';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertCircle } from 'lucide-react';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
 export default function AdminLayout(): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('admin-sidebar-collapsed');
@@ -30,6 +33,7 @@ export default function AdminLayout(): JSX.Element {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchOverview();
@@ -84,6 +88,7 @@ export default function AdminLayout(): JSX.Element {
               sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
             }`}
           >
+
             <AdminTopbar onMenuToggle={handleToggleSidebar} />
 
             <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
@@ -91,12 +96,51 @@ export default function AdminLayout(): JSX.Element {
             </main>
           </div>
 
+          {/* Blocked/Inactivated overlay */}
+          {restaurant && restaurant.status === 'SUSPENDED' && (
+            <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-950/95 text-slate-100 p-6 text-center">
+              <div className="max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
+                <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto">
+                  <AlertCircle size={24} />
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">Restaurant Account Suspended</h2>
+                <p className="text-sm text-slate-400">
+                  Your restaurant has been inactivated or blocked by RestoHub.
+                </p>
+                {restaurant.blockReason && (
+                  <div className="p-3.5 bg-slate-950/50 rounded-xl border border-slate-800 text-left">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-slate-500">Reason for Suspension</p>
+                    <p className="text-sm font-medium text-slate-300 mt-1">{restaurant.blockReason}</p>
+                  </div>
+                )}
+                <p className="text-xs text-slate-500">
+                  Please contact RestoHub support at <span className="font-bold text-orange-500">support@restohub.com</span> for details.
+                </p>
+                <button 
+                  onClick={() => {
+                    localStorage.clear();
+                    window.location.href = '/auth/admin';
+                  }}
+                  className="w-full h-10 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl text-xs transition-colors"
+                >
+                  Return to Login
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Onboarding Wizard full-page overlay */}
-          {restaurant && restaurant.status !== 'ACTIVE' && (
+          {restaurant && restaurant.status !== 'ACTIVE' && restaurant.status !== 'SUSPENDED' && (
             <div className="fixed inset-0 z-[999] overflow-y-auto bg-slate-900/75 dark:bg-slate-950/90 p-4 sm:p-6 md:p-10">
               <OnboardingWizard restaurant={restaurant} onComplete={fetchOverview} />
             </div>
           )}
+          {/* Maintenance Alert Modal overlay */}
+          <MaintenanceAlertModal
+            isOpen={!!settings?.disableAdminPanel}
+            title="Admin Panel Disabled"
+            message="Due to temporary platform maintenance, the Admin Panel is currently disabled. Super Admin panel remains accessible."
+          />
         </div>
       </AdminSearchProvider>
     </AdminNotificationsProvider>

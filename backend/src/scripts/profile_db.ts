@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { PlatformPlanModel } from '../modules/superAdmin/superAdmin.model';
 import { connectToDatabase, disconnectFromDatabase } from '../config/db';
 

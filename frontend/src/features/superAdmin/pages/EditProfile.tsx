@@ -1,4 +1,3 @@
-// src/features/superAdmin/pages/EditProfile.tsx
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import {
@@ -15,7 +14,16 @@ import {
   EyeOff,
   Check,
   AlertCircle,
+  Building2,
+  Globe,
+  Pencil,
+  X,
 } from "lucide-react";
+import ImageCropperModal from "../../customer/components/dashboard/ImageCropperModal";
+import { useAuth } from "../../../auth/AuthProvider";
+import { setStoredUser } from "../../../auth/tokenStore";
+import { apiClient } from "../../../shared/services/apiClient";
+import { usePlatformSettingsGuard } from "../../../shared/hooks/usePlatformSettingsGuard";
 
 interface OutletContext {
   darkMode: boolean;
@@ -71,20 +79,135 @@ function Input({ darkMode, className = "", ...props }: InputProps) {
   );
 }
 
+interface EditPersonalInfoModalProps {
+  initialName: string;
+  initialBio: string;
+  darkMode: boolean;
+  onClose: () => void;
+  onSave: (name: string, bio: string) => void;
+}
+
+function EditPersonalInfoModal({
+  initialName,
+  initialBio,
+  darkMode,
+  onClose,
+  onSave,
+}: EditPersonalInfoModalProps) {
+  const [name, setName] = useState(initialName);
+  const [bio, setBio] = useState(initialBio);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div
+        className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 transition-all ${
+          darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold">Edit Personal Information</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-colors ${
+              darkMode ? "hover:bg-slate-800" : "hover:bg-slate-100"
+            }`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <Field label="Name" icon={User} darkMode={darkMode} hint="Shown in the navbar and profile card.">
+            <Input
+              darkMode={darkMode}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your Name"
+            />
+          </Field>
+
+          <Field label="Bio" icon={User} darkMode={darkMode}>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={3}
+              placeholder="A short description about yourself..."
+              className={`w-full p-3 rounded-xl text-xs font-medium outline-none border transition-all duration-200 resize-none ${
+                darkMode
+                  ? "bg-slate-950 border-slate-800 text-slate-100 focus:border-orange-500/60 placeholder:text-slate-600"
+                  : "bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-400 focus:bg-white placeholder:text-slate-400"
+              }`}
+            />
+          </Field>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+              darkMode
+                ? "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(name, bio)}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-md shadow-orange-500/20"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EditProfile() {
   const { darkMode } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const { user, setUser, signOut } = useAuth();
+  const [isEditInfoModalOpen, setIsEditInfoModalOpen] = useState(false);
 
-  const [form, setForm] = useState({
-    firstName: "Souvik",
-    lastName: "Dey",
-    displayName: "Mr. Souvik",
-    email: "souvik@hq.io",
-    phone: "+91 98765 43210",
-    location: "Kolkata, WB",
-    bio: "Super Administrator managing the HQ Terminal platform.",
+  const { settings, refetch: refetchSettings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "HQ Terminal";
+
+  const [platformIdentity, setPlatformIdentity] = useState({
+    platformName: "",
+    supportEmail: "",
   });
+
+  useEffect(() => {
+    if (settings) {
+      setPlatformIdentity({
+        platformName: settings.platformName || "HQ Terminal",
+        supportEmail: settings.supportEmail || "support@hqterminal.io",
+      });
+    }
+  }, [settings]);
+
+  const updatePlatformIdentity = async (field: "platformName" | "supportEmail", value: string) => {
+    setPlatformIdentity((prev) => ({ ...prev, [field]: value }));
+    try {
+      await apiClient.patch("/superadmin/platform-settings", { [field]: value });
+      refetchSettings();
+    } catch (err) {
+      console.error("Failed to update platform identity:", err);
+    }
+  };
+
+  const [form, setForm] = useState(() => ({
+    name: user?.name || "Platform Owner",
+    email: user?.email || "adminsuper22@gmail.com",
+    phone: user?.mobile || "4444444444",
+    location: user?.location || "Kolkata, WB",
+    bio: user?.bio || "Super Administrator managing the HQ Terminal platform.",
+  }));
 
   const [passwords, setPasswords] = useState({
     current: "",
@@ -99,8 +222,11 @@ export default function EditProfile() {
   });
 
   const [avatarUrl, setAvatarUrl] = useState(
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80"
+    () => user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80"
   );
+
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState("");
 
   const [saved, setSaved] = useState(false);
   const [pwError, setPwError] = useState("");
@@ -116,34 +242,104 @@ export default function EditProfile() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (avatarUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(avatarUrl);
-      }
-      const url = URL.createObjectURL(file);
-      setAvatarUrl(url);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Url = reader.result as string;
+        setTempImageSrc(base64Url);
+        setCropperOpen(true);
+        e.target.value = "";
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleSave = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const saveField = async (updatedFields: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    avatar?: string;
+    bio?: string;
+  }) => {
+    try {
+      setPwError("");
+      
+      const payload = {
+        name: updatedFields.name !== undefined ? updatedFields.name : form.name,
+        email: updatedFields.email !== undefined ? updatedFields.email : form.email,
+        mobile: updatedFields.phone !== undefined ? updatedFields.phone : form.phone,
+        avatar: updatedFields.avatar !== undefined ? updatedFields.avatar : avatarUrl,
+        location: updatedFields.location !== undefined ? updatedFields.location : form.location,
+        bio: updatedFields.bio !== undefined ? updatedFields.bio : form.bio,
+      };
 
-    if (passwords.current || passwords.next || passwords.confirm) {
-      if (!passwords.current) {
-        setPwError("Enter your current password.");
-        return;
+      const response = await apiClient.patch('/users/me', payload);
+
+      if (response.data?.success || response.data) {
+        const updatedUser = response.data.data?.user || response.data.user;
+        const nextUser = {
+          id: updatedUser._id || updatedUser.id,
+          name: updatedUser.name,
+          role: user?.role || "super-admin",
+          panel: "superadmin" as const,
+          email: updatedUser.email,
+          mobile: updatedUser.mobile,
+          avatar: updatedUser.avatar,
+          location: updatedUser.location,
+          bio: updatedUser.bio,
+          restaurantName: user?.restaurantName || "Graphura Cloud",
+        };
+
+        setStoredUser("superadmin", nextUser);
+        if (setUser) {
+          setUser(nextUser);
+        }
+
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
       }
-      if (passwords.next.length < 8) {
-        setPwError("New password must be at least 8 characters.");
-        return;
-      }
-      if (passwords.next !== passwords.confirm) {
-        setPwError("Passwords don't match.");
-        return;
-      }
+    } catch (err: any) {
+      console.error("Failed to auto-save profile", err);
+      setPwError(err.response?.data?.error?.message || err.response?.data?.message || "Failed to auto-save changes.");
+    }
+  };
+
+  const handleCropConfirm = (croppedBase64: string) => {
+    if (avatarUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarUrl);
+    }
+    setAvatarUrl(croppedBase64);
+    setCropperOpen(false);
+    setTempImageSrc("");
+    saveField({ avatar: croppedBase64 });
+  };
+
+  const handlePasswordUpdate = async () => {
+    if (!passwords.current) {
+      setPwError("Enter your current password.");
+      return;
+    }
+    if (passwords.next.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    if (passwords.next !== passwords.confirm) {
+      setPwError("Passwords don't match.");
+      return;
     }
 
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      setPwError("");
+      await apiClient.patch('/users/me/password', {
+        currentPassword: passwords.current,
+        newPassword: passwords.next,
+      });
+      signOut();
+      navigate("/auth/superadmin");
+    } catch (err: any) {
+      console.error("Failed to update password", err);
+      setPwError(err.response?.data?.error?.message || err.response?.data?.message || "Failed to update password.");
+    }
   };
 
   const card = `rounded-2xl border p-5 sm:p-6 space-y-5 ${
@@ -161,7 +357,7 @@ export default function EditProfile() {
       }`}
     >
       <form
-        onSubmit={handleSave}
+        onSubmit={(e) => e.preventDefault()}
         className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 max-w-4xl mx-auto"
       >
         <div className="flex items-center gap-3">
@@ -170,20 +366,20 @@ export default function EditProfile() {
             onClick={() => navigate(-1)}
             className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
               darkMode
-                ? "bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800"
-                : "bg-slate-100 text-slate-500 hover:text-slate-800 hover:bg-slate-200"
+                ? "bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800 border border-slate-800"
+                : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 shadow-sm"
             }`}
             aria-label="Go back"
           >
             <ArrowLeft size={16} />
           </button>
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Edit Profile
-            </h2>
+            </h1>
             <p
-              className={`mt-0.5 text-xs sm:text-sm ${
-                darkMode ? "text-slate-400" : "text-slate-500"
+              className={`text-xs sm:text-sm mt-1 font-medium ${
+                darkMode ? "text-slate-400" : "text-slate-600"
               }`}
             >
               Manage your personal information and account settings
@@ -195,15 +391,17 @@ export default function EditProfile() {
           <p className={sectionTitle}>Profile Photo</p>
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <div className="relative shrink-0">
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="w-24 h-24 rounded-2xl object-cover ring-4 ring-orange-500/20"
-              />
+              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-orange-500/20">
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="w-full h-full object-cover"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-2 -right-2 w-8 h-8 rounded-xl bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-md transition-colors"
+                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center shadow-md transition-colors border-2 border-white dark:border-slate-950"
                 aria-label="Change photo"
               >
                 <Camera size={14} />
@@ -216,10 +414,25 @@ export default function EditProfile() {
                 onChange={handleAvatarChange}
               />
             </div>
-            <div className="text-center sm:text-left">
-              <p className="font-bold text-base">
-                {form.firstName} {form.lastName}
-              </p>
+            <div className="text-center sm:text-left flex-1 min-w-0">
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <p className="font-bold text-base text-slate-900 dark:text-slate-100 truncate">
+                  {form.name}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsEditInfoModalOpen(true)}
+                  className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
+                    darkMode
+                      ? "bg-slate-900 border-slate-800 text-slate-400 hover:text-orange-400 hover:border-orange-500/40"
+                      : "bg-slate-100 border-slate-200 text-slate-600 hover:text-orange-600 hover:border-orange-300"
+                  }`}
+                  title="Edit Personal Information"
+                >
+                  <Pencil size={13} />
+                </button>
+              </div>
+
               <div
                 className={`inline-flex items-center gap-1.5 mt-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                   darkMode
@@ -228,10 +441,20 @@ export default function EditProfile() {
                 }`}
               >
                 <Shield size={10} />
-                Global Admin · HQ Terminal
+                Global Admin · {platformName}
               </div>
+
+              {/* Bio displayed directly below name and role badge */}
               <p
-                className={`mt-2 text-[11px] max-w-xs ${
+                className={`mt-2 text-xs font-normal leading-relaxed max-w-xl ${
+                  darkMode ? "text-slate-300" : "text-slate-600"
+                }`}
+              >
+                {form.bio}
+              </p>
+
+              <p
+                className={`mt-2.5 text-[11px] max-w-xs ${
                   darkMode ? "text-slate-500" : "text-slate-400"
                 }`}
               >
@@ -251,56 +474,40 @@ export default function EditProfile() {
             </div>
           </div>
         </div>
-
+        
+        {/* Platform Identity Card */}
         <div className={card}>
-          <p className={sectionTitle}>Personal Information</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="First Name" icon={User} darkMode={darkMode}>
-              <Input
-                darkMode={darkMode}
-                value={form.firstName}
-                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                placeholder="First name"
-              />
-            </Field>
-            <Field label="Last Name" icon={User} darkMode={darkMode}>
-              <Input
-                darkMode={darkMode}
-                value={form.lastName}
-                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-                placeholder="Last name"
-              />
-            </Field>
-          </div>
+          <p className={sectionTitle}>Platform Identity</p>
           <Field
-            label="Display Name"
-            icon={User}
+            label="Platform Name"
+            icon={Building2}
             darkMode={darkMode}
-            hint="Shown in the navbar and profile card."
+            hint="Shown in the browser tab, navbar, emails, and notifications."
           >
             <Input
               darkMode={darkMode}
-              value={form.displayName}
-              onChange={(e) =>
-                setForm({ ...form, displayName: e.target.value })
-              }
-              placeholder="e.g. Mr. Souvik"
+              value={platformIdentity.platformName}
+              onChange={(e) => updatePlatformIdentity("platformName", e.target.value)}
+              placeholder="e.g. HQ Terminal"
             />
           </Field>
-          <Field label="Bio" icon={User} darkMode={darkMode}>
-            <textarea
-              value={form.bio}
-              onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              rows={3}
-              placeholder="A short description about yourself..."
-              className={`w-full p-3.5 rounded-xl text-xs font-medium outline-none border transition-all duration-200 resize-none ${
-                darkMode
-                  ? "bg-slate-900 border-slate-800 text-slate-100 focus:border-orange-500/60 placeholder:text-slate-600"
-                  : "bg-slate-50 border-slate-200 text-slate-800 focus:border-orange-400 focus:bg-white placeholder:text-slate-400"
-              }`}
+          <Field
+            label="Support Email"
+            icon={Globe}
+            darkMode={darkMode}
+            hint="Customers and users receive auto-generated emails from this address."
+          >
+            <Input
+              darkMode={darkMode}
+              type="email"
+              value={platformIdentity.supportEmail}
+              onChange={(e) => updatePlatformIdentity("supportEmail", e.target.value)}
+              placeholder="support@yourplatform.io"
             />
           </Field>
         </div>
+
+
 
         <div className={card}>
           <p className={sectionTitle}>Contact Information</p>
@@ -315,6 +522,7 @@ export default function EditProfile() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onBlur={() => saveField({ email: form.email })}
               placeholder="you@example.com"
             />
           </Field>
@@ -325,6 +533,7 @@ export default function EditProfile() {
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onBlur={() => saveField({ phone: form.phone })}
                 placeholder="+91 XXXXX XXXXX"
               />
             </Field>
@@ -333,6 +542,7 @@ export default function EditProfile() {
                 darkMode={darkMode}
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
+                onBlur={() => saveField({ location: form.location })}
                 placeholder="City, State"
               />
             </Field>
@@ -488,42 +698,64 @@ export default function EditProfile() {
               {pwError}
             </div>
           )}
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={handlePasswordUpdate}
+              className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-md shadow-orange-500/10"
+            >
+              Update Password
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 pb-4">
+        <div className="flex items-center justify-between pb-4">
+          <div className="text-xs font-medium">
+            {saved ? (
+              <span className="flex items-center gap-1.5 text-emerald-500">
+                <Check size={14} /> Saved automatically!
+              </span>
+            ) : (
+              <span className={darkMode ? "text-slate-500" : "text-slate-400"}>
+                Changes are saved automatically when you finish typing.
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
               darkMode
-                ? "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800"
-                : "bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 border border-slate-200"
+                ? "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-slate-800"
+                : "bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 border-slate-200"
             }`}
           >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              saved
-                ? "bg-emerald-500 text-white"
-                : "bg-gradient-to-r from-orange-600 to-amber-500 text-white hover:from-orange-500 hover:to-amber-400 shadow-md shadow-orange-500/20"
-            }`}
-          >
-            {saved ? (
-              <>
-                <Check size={14} />
-                Saved!
-              </>
-            ) : (
-              <>
-                <Save size={14} />
-                Save Changes
-              </>
-            )}
+            Back to Dashboard
           </button>
         </div>
       </form>
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={tempImageSrc}
+        onClose={() => {
+          setCropperOpen(false);
+          setTempImageSrc("");
+        }}
+        onConfirm={handleCropConfirm}
+      />
+      {isEditInfoModalOpen && (
+        <EditPersonalInfoModal
+          initialName={form.name}
+          initialBio={form.bio}
+          darkMode={darkMode}
+          onClose={() => setIsEditInfoModalOpen(false)}
+          onSave={(newName, newBio) => {
+            setForm((prev) => ({ ...prev, name: newName, bio: newBio }));
+            saveField({ name: newName, bio: newBio });
+            setIsEditInfoModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

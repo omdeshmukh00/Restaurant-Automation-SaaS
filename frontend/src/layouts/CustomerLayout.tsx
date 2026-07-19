@@ -10,8 +10,11 @@ import { useCustomerStore } from '../features/customer/store/customer.store';
 import { useAuth } from '../auth/AuthProvider';
 import { apiClient } from '../shared/services/apiClient';
 import { connectSocket, getSocket } from '../lib/socket';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
 export default function CustomerLayout() {
+  const { settings } = usePlatformSettingsGuard();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const location = useLocation();
@@ -321,6 +324,13 @@ export default function CustomerLayout() {
           )}
 
           <CustomerBottomNav />
+
+          {/* Maintenance Alert Modal overlay */}
+          <MaintenanceAlertModal
+            isOpen={!!settings?.disableCustomerPanel}
+            title="Customer Ordering Disabled"
+            message="Due to temporary platform maintenance, online menu and customer ordering services are currently disabled."
+          />
         </div>
       </SearchProvider>
     </CartProvider>

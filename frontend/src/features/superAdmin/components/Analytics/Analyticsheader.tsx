@@ -38,16 +38,15 @@ export default function AnalyticsHeader({
           <Activity size={18} />
         </div>
         <div className="min-w-0">
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight truncate">
-            System Core Matrix
-          </h2>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+            Analytics
+          </h1>
           <p
-            className={`text-xs mt-0.5 leading-relaxed ${
-              darkMode ? "text-slate-400" : "text-slate-500"
+            className={`text-xs sm:text-sm mt-1 font-medium ${
+              darkMode ? "text-slate-400" : "text-slate-600"
             }`}
           >
-            Telemetry routing, resource allocation matrices &amp; cluster state
-            logs.
+            Platform metrics, order telemetry, and cluster state logs.
           </p>
         </div>
       </div>

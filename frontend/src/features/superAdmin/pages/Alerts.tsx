@@ -8,8 +8,12 @@ import Toolbar from '../components/Alerts/Toolbar';
 import AlertCard from '../components/Alerts/Alertcard';
 import EmptyState from '../components/Alerts/Emptystate';
 import { cx } from '../utils/Alertutils';
+import TablePagination from '../components/common/TablePagination';
+
 export default function AlertsDashboard() {
   const { darkMode, toggleTheme } = useOutletContext<{ darkMode: boolean; toggleTheme: () => void }>();
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [pageSize, setPageSize] = React.useState(25);
 
   const {
     alerts,
@@ -27,6 +31,15 @@ export default function AlertsDashboard() {
     markAllRead,
     dismissAll,
   } = useAlerts();
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, searchQuery, sortOrder]);
+
+  const paginatedAlerts = React.useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAlerts.slice(start, start + pageSize);
+  }, [filteredAlerts, currentPage, pageSize]);
 
   // Determine empty state type
   const emptyType = alerts.length === 0
@@ -56,40 +69,44 @@ export default function AlertsDashboard() {
           darkMode={darkMode}
         />
 
-        {/* Alert list */}
-        <div className="space-y-3">
-          {filteredAlerts.length > 0 ? (
-            filteredAlerts.map(alert => (
-              <AlertCard
-                key={alert.id}
-                alert={alert}
+        {/* Alert list container */}
+        <div className={`rounded-2xl border overflow-hidden shadow-sm p-4 ${
+          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+        }`}>
+          <div className="max-h-[620px] overflow-auto pr-1 space-y-3">
+            {paginatedAlerts.length > 0 ? (
+              paginatedAlerts.map(alert => (
+                <AlertCard
+                  key={alert.id}
+                  alert={alert}
+                  darkMode={darkMode}
+                  onDismiss={dismissAlert}
+                  onAcknowledge={acknowledgeAlert}
+                  onResolve={resolveAlert}
+                />
+              ))
+            ) : (
+              <EmptyState
+                type={emptyType}
                 darkMode={darkMode}
-                onDismiss={dismissAlert}
-                onAcknowledge={acknowledgeAlert}
-                onResolve={resolveAlert}
+                onReset={() => {
+                  setActiveFilter('all');
+                  setSearchQuery('');
+                }}
               />
-            ))
-          ) : (
-            <EmptyState
-              type={emptyType}
-              darkMode={darkMode}
-              onReset={() => {
-                setActiveFilter('all');
-                setSearchQuery('');
-              }}
-            />
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Result count */}
-        {filteredAlerts.length > 0 && (
-          <p className={cx(
-            'text-center text-xs font-medium mt-8',
-            darkMode ? 'text-slate-600' : 'text-gray-400'
-          )}>
-            Showing {filteredAlerts.length} of {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
-          </p>
-        )}
+          <TablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={filteredAlerts.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+            darkMode={darkMode}
+            itemLabel="alerts"
+          />
+        </div>
       </div>
     </div>
   );

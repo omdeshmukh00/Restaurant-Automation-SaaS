@@ -1,6 +1,6 @@
 // types/SubscriptionTypes.ts
 
-export type PlanType = "Basic" | "Standard" | "Premium" | "Enterprise";
+export type PlanType = string;
 export type StatusType = "Active" | "Trial" | "Inactive";
 export type TierFilter = "All" | PlanType;
 export type StatusFilter = "All" | StatusType;
@@ -18,9 +18,13 @@ export interface RestaurantNode {
   status: StatusType;
   revenue: string; // stored as "$12,400"
   branches: number;
+  mrr?: number;
+  subscriptionPlan_id?: string | null;
+  customCommissionRate?: number | null;
   joinedDate: string; // "2024-03-15"
   lastActive: string; // "2026-05-18"
   tags?: string[];
+  cooldownRemaining?: number;
 }
 
 export interface NewRestaurantForm {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { LogType } from "../../store/AuditLogs";
-const FILTER_OPTIONS = ['All', 'Admin', 'Restaurant', 'Subscription'] as const;
+const FILTER_OPTIONS = ['All', 'Admin', 'Restaurant', 'Subscription', 'Transaction', 'System'] as const;
 type FilterOption = (typeof FILTER_OPTIONS)[number];
 
 interface AuditLogsFilterBarProps {

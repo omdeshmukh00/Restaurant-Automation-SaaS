@@ -20,6 +20,8 @@ export interface IPayment extends Document {
   status: PaymentStatus;
   verifiedAt?: Date | null;
   failureReason?: string | null;
+  commissionRate?: number | null;
+  commission?: number | null;
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +51,8 @@ const paymentSchema = new Schema<IPayment>(
     },
     verifiedAt: { type: Date, default: null },
     failureReason: { type: String, default: null, trim: true },
+    commissionRate: { type: Number, default: null },
+    commission: { type: Number, default: null },
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
   {

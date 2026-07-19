@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BarChart3, Trash, Plus, Sparkles, Building2, X, CreditCard, RefreshCw } from "lucide-react";
+import { BarChart3, Trash, Plus, Sparkles, Building2, X, CreditCard, RefreshCw, Percent, PlusCircle } from "lucide-react";
 import { apiClient } from "../../../shared/services/apiClient";
 
 import type {
@@ -14,23 +14,45 @@ import type {
   SortOrder,
   PlanType,
   StatusType,
-  NewRestaurantForm,
 } from "../components/Subscriptions/Subcriptiontypes";
+import type { NewRestaurantForm } from "../components/Restaurants/Restauranttypes";
 
-import { restaurantData } from "../store/Subscriptions";
 import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
+import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
 import { computeTierMetrics, exportToCSV, parseRevenue, generateId, formatCurrency } from "../utils/Subscriptionutils";
 
 import TierCards from "../components/Subscriptions/Tiercards";
 import SubscriptionControls from "../components/Subscriptions/Subscriptioncontrols";
 import SubscriptionTable from "../components/Subscriptions/Subcriptiontable";
-import ViewModal from "../components/Subscriptions/Viewmodal";
-import AddRestaurantModal from "../components/Subscriptions/Addrestaurantmodal";
+import ViewModal from "../components/Restaurants/Viewmodal";
+import AddRestaurantModal from "../components/Restaurants/AddRestaurantModal";
+import LiveActivityModal from "../components/Subscriptions/LiveActivityModal";
+import MrrModal from "../components/Subscriptions/MrrModal";
+import TablePagination from "../components/common/TablePagination";
+import MaintenanceAlertModal from "../../../shared/components/MaintenanceAlertModal";
 
 const EMPTY_FORM: NewRestaurantForm = {
-  name: "", owner: "", email: "", phone: "",
-  location: "", plan: "Basic", status: "Trial",
-  revenue: "₹0", branches: 1, tags: "",
+  name: "",
+  owner: "",
+  email: "",
+  phone: "",
+  location: "",
+  plan: "Basic",
+  status: "Trial",
+  revenue: "₹0",
+  branches: 1,
+  address: "",
+  city: "",
+  state: "",
+  country: "India",
+  pinCode: "",
+  gstNumber: "",
+  cuisine: "",
+  expectedMonthlyOrders: 500,
+  latitude: null,
+  longitude: null,
+  googleMapsUrl: "",
+  message: "",
 };
 
 const PLAN_ORDER: Record<PlanType, number> = { Basic: 0, Standard: 1, Premium: 2, Enterprise: 3 };
@@ -120,6 +142,7 @@ export default function Subscriptions() {
           yearlyDiscountPercentage: editingPlan.yearlyDiscountPercentage,
           tenantLimit: editingPlan.tenantLimit,
           staffLimit: editingPlan.staffLimit,
+          commissionRate: editingPlan.commissionRate ?? platformSettings.platformCommissionRate ?? 8,
           isActive: editingPlan.isActive,
           features: editingPlan.features
         });
@@ -131,6 +154,7 @@ export default function Subscriptions() {
           yearlyDiscountPercentage: editingPlan.yearlyDiscountPercentage,
           tenantLimit: editingPlan.tenantLimit,
           staffLimit: editingPlan.staffLimit,
+          commissionRate: editingPlan.commissionRate ?? platformSettings.platformCommissionRate ?? 8,
           isActive: editingPlan.isActive,
           features: editingPlan.features
         });
@@ -155,10 +179,74 @@ export default function Subscriptions() {
     }
   };
 
+  const handleAddonSave = async () => {
+    if (!selectedAddonRestaurantId || !addonName.trim()) return;
+    setAddonSaving(true);
+    try {
+      const rest = restaurants.find(r => r.id === selectedAddonRestaurantId);
+      const full = await superAdminRestaurantRequestsApi.getRestaurantById(selectedAddonRestaurantId);
+      const subId = full?.subscription?._id || full?.subscription?.id;
+      if (subId) {
+        await apiClient.post(`/superadmin/subscriptions/${subId}/addons`, {
+          name: addonName.trim(),
+          priceMonthly: addonPrice
+        });
+        window.alert(`Feature Extension "${addonName}" added successfully to ${rest?.name || 'Restaurant'}!`);
+        setIsAddonsModalOpen(false);
+        setAddonName('');
+        setAddonPrice(499);
+      } else {
+        window.alert('No active subscription found for this restaurant.');
+      }
+    } catch (err) {
+      console.error('Failed to add feature extension', err);
+      window.alert('Failed to add feature extension.');
+    } finally {
+      setAddonSaving(false);
+    }
+  };
+
   // ── Modal state ───────────────────────────────────────────────────────────
-  const [viewingNode, setViewingNode] = useState<RestaurantNode | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [viewingNode, setViewingNode] = useState<any | null>(null);
+  const [liveActivityRestaurant, setLiveActivityRestaurant] = useState<RestaurantNode | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [formData, setFormData] = useState<NewRestaurantForm>(EMPTY_FORM);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isCommissionOpen, setIsCommissionOpen] = useState(false);
+  const [isMrrModalOpen, setIsMrrModalOpen] = useState(false);
+  const [isAddonsModalOpen, setIsAddonsModalOpen] = useState(false);
+  const [selectedAddonRestaurantId, setSelectedAddonRestaurantId] = useState('');
+  const [addonName, setAddonName] = useState('');
+  const [addonPrice, setAddonPrice] = useState(499);
+  const [addonSaving, setAddonSaving] = useState(false);
+  const [isRegistrationBlockedAlertOpen, setIsRegistrationBlockedAlertOpen] = useState(false);
+  const [formData, setFormData] = useState<NewRestaurantForm>(() => {
+    try {
+      const saved = sessionStorage.getItem("ra/subscription-add-restaurant-draft");
+      return saved ? JSON.parse(saved) : EMPTY_FORM;
+    } catch {
+      return EMPTY_FORM;
+    }
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("ra/subscription-add-restaurant-draft", JSON.stringify(formData));
+  }, [formData]);
+
+  const handleViewRestaurant = async (row: RestaurantNode) => {
+    try {
+      const fullDetails = await superAdminRestaurantRequestsApi.getRestaurantById(row.id);
+      setViewingNode(fullDetails?.restaurant || fullDetails || row);
+    } catch (err) {
+      console.error("Failed to load restaurant details", err);
+      setViewingNode(row);
+    }
+  };
+
+  const handleLiveActivity = (row: RestaurantNode) => {
+    setLiveActivityRestaurant(row);
+  };
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -175,6 +263,9 @@ export default function Subscriptions() {
       if (e.key === "Escape") { 
         setViewingNode(null); 
         setIsAddModalOpen(false); 
+        setIsSettingsModalOpen(false);
+        setIsCommissionOpen(false);
+        setIsMrrModalOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -183,10 +274,11 @@ export default function Subscriptions() {
 
   // ── Data state ────────────────────────────────────────────────────────────
   const navigate = useNavigate();
-  const [restaurants, setRestaurants] = useState<RestaurantNode[]>(restaurantData);
+  const [restaurants, setRestaurants] = useState<RestaurantNode[]>([]);
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
   const requests = useRestaurantRequestsStore((state) => state.requests);
   const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
+  const addRestaurant = useRestaurantRequestsStore((state) => state.addRestaurant);
   const updateApprovedRestaurantStatus = useRestaurantRequestsStore(
     (state) => state.updateRestaurantStatus
   );
@@ -211,8 +303,19 @@ export default function Subscriptions() {
     enablePartnerRegistration: true,
     maxPendingApplications: 50,
     applicationExpiryDays: 30,
+    platformCommissionRate: 10,
     totalRevenue: 0,
     history: [] as Array<{
+      id: string;
+      restaurantName: string;
+      ownerName: string;
+      amount: number;
+      currency: string;
+      paymentId: string;
+      timestamp: string;
+    }>,
+    totalSubscriptionRevenue: 0,
+    subscriptionHistory: [] as Array<{
       id: string;
       restaurantName: string;
       ownerName: string;
@@ -252,6 +355,7 @@ export default function Subscriptions() {
         enablePartnerRegistration: platformSettings.enablePartnerRegistration,
         maxPendingApplications: platformSettings.maxPendingApplications,
         applicationExpiryDays: platformSettings.applicationExpiryDays,
+        platformCommissionRate: platformSettings.platformCommissionRate,
       });
       if (res.data?.data) {
         setPlatformSettings(prev => ({
@@ -281,46 +385,68 @@ export default function Subscriptions() {
   };
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
-  const updateStatus = (id: string, status: StatusType) => {
-    updateApprovedRestaurantStatus(id, status);
+  const updateStatus = (id: string, status: StatusType, blockReason?: string) => {
+    updateApprovedRestaurantStatus(id, status as any, blockReason);
     setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
   };
 
-  const updatePlan = (id: string, plan: PlanType) => {
-    if (plan !== "Enterprise") updateApprovedRestaurantPlan(id, plan);
-    setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, plan } : r)));
+  const updatePlan = (id: string, plan: string) => {
+    updateApprovedRestaurantPlan(id, plan);
+    setRestaurants((prev) => prev.map((r) => (r.id === id ? { ...r, plan: plan as any } : r)));
   };
 
-  const deleteNode = (id: string) => {
-    deleteApprovedRestaurant(id);
+  const deleteNode = async (id: string) => {
+    const restaurantObj = linkedRestaurants.find(r => r.id === id);
+    const name = restaurantObj ? restaurantObj.name : "this restaurant";
+
+    let reason = "";
+    let isConfirmed = false;
+    while (!isConfirmed) {
+      const input = window.prompt(`Are you sure you want to permanently delete "${name}"? Enter the reason to confirm (this will be sent to the owner):`);
+      if (input === null) return; // Cancelled
+      if (input.trim().length > 0) {
+        reason = input.trim();
+        isConfirmed = true;
+      } else {
+        window.alert("A reason is required to delete the restaurant.");
+      }
+    }
+
+    await deleteApprovedRestaurant(id, reason);
     setRestaurants((prev) => prev.filter((r) => r.id !== id));
   };
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.owner.trim()) return;
+    if (!formData.name || !formData.owner || !formData.email || !formData.phone) {
+      window.alert("Please fill out all required fields.");
+      return;
+    }
+    if (!formData.googleMapsUrl) {
+      window.alert("Google Maps URL is required to extract coordinates.");
+      return;
+    }
 
-    const newNode: RestaurantNode = {
-      id: generateId(),
-      name: formData.name.trim(),
-      owner: formData.owner.trim(),
-      email: formData.email.trim() || "info@restaurant.com",
-      phone: formData.phone.trim() || "+1 (555) 000-0000",
-      location: formData.location.trim() || "Location TBD",
-      plan: formData.plan,
-      status: formData.status,
-      revenue: formData.revenue.startsWith("₹") ? formData.revenue : `₹${formData.revenue}`,
-      branches: Math.max(1, Number(formData.branches) || 1),
-      joinedDate: new Date().toISOString().slice(0, 10),
-      lastActive: new Date().toISOString().slice(0, 10),
-      tags: formData.tags
-        ? formData.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
-        : [],
-    };
-
-    setRestaurants((prev) => [newNode, ...prev]);
-    setIsAddModalOpen(false);
-    setFormData(EMPTY_FORM);
+    try {
+      await addRestaurant({
+        ...formData,
+        location: `${formData.city || ""}, ${formData.state || ""}, ${formData.country || ""}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim()
+      });
+      setIsAddModalOpen(false);
+      setFormData(EMPTY_FORM);
+      sessionStorage.removeItem("ra/subscription-add-restaurant-draft");
+    } catch (err: any) {
+      console.error(err);
+      let msg = err.response?.data?.error?.message || err.message || "Failed to register new restaurant.";
+      const fields = err.response?.data?.error?.fields;
+      if (fields) {
+        const details = Object.entries(fields)
+          .map(([field, msgs]: any) => `${field}: ${msgs.join(", ")}`)
+          .join("\n");
+        msg = `${msg}\n\n${details}`;
+      }
+      window.alert(msg);
+    }
   };
 
   const handleResetAll = () => {
@@ -330,6 +456,7 @@ export default function Subscriptions() {
   };
 
   // ── Derived data ──────────────────────────────────────────────────────────
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const linkedRestaurants = useMemo<RestaurantNode[]>(() => {
     const existingKeys = new Set(
       restaurants.flatMap((restaurant) => [
@@ -355,15 +482,61 @@ export default function Subscriptions() {
         status: restaurant.status,
         revenue: restaurant.revenue,
         branches: restaurant.branches,
-        joinedDate: new Date().toISOString().slice(0, 10),
-        lastActive: new Date().toISOString().slice(0, 10),
-        tags: ["New Request", "Placeholder"],
+        joinedDate: restaurant.joinedDate || new Date().toISOString().slice(0, 10),
+        lastActive: restaurant.lastActive || new Date().toISOString().slice(0, 10),
+        tags: restaurant.tags || [],
+        cooldownRemaining: restaurant.cooldownRemaining,
       }));
 
     return [...approvedSubscriptionRows, ...restaurants];
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [approvedRestaurants, restaurants]);
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const tierMetrics = useMemo(() => computeTierMetrics(linkedRestaurants), [linkedRestaurants]);
+
+  const totalPlatformMrr = useMemo(() => {
+    const planPricesMap: Record<string, number> = {};
+    dbPlans.forEach((plan) => {
+      const key = (plan.name || "").toLowerCase();
+      if (key === "free") {
+        planPricesMap["basic"] = plan.priceMonthly || 0;
+        planPricesMap["free"] = plan.priceMonthly || 0;
+      } else {
+        planPricesMap[key] = plan.priceMonthly || 0;
+      }
+    });
+
+    const getMonthlyPrice = (planName: string) => {
+      const key = (planName || "").toLowerCase();
+      if (planPricesMap[key] !== undefined) return planPricesMap[key];
+      switch (key) {
+        case "free":
+        case "basic":
+        case "basic plan":
+          return 0;
+        case "starter":
+          return 299;
+        case "standard":
+          return 599;
+        case "premium":
+        case "pro":
+          return 999;
+        case "enterprise":
+          return 1999;
+        default:
+          return 0;
+      }
+    };
+
+    return linkedRestaurants.reduce((sum, r) => {
+      if (r.status === "Active") {
+        return sum + (r.mrr !== undefined ? r.mrr : getMonthlyPrice(r.plan));
+      }
+      return sum;
+    }, 0);
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  }, [linkedRestaurants, dbPlans]);
 
   const dynamicTierMetrics = useMemo(() => {
     return dbPlans.map(plan => {
@@ -383,6 +556,7 @@ export default function Subscriptions() {
         yearlyDiscountPercentage: plan.yearlyDiscountPercentage,
       };
     });
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [dbPlans, linkedRestaurants]);
 
   const filtered = useMemo(() => {
@@ -397,6 +571,7 @@ export default function Subscriptions() {
       const matchTier = tierFilter === "All" || r.plan === tierFilter;
       return matchSearch && matchStatus && matchTier;
     });
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [linkedRestaurants, searchQuery, statusFilter, tierFilter]);
 
   const sorted = useMemo(() => {
@@ -422,36 +597,63 @@ export default function Subscriptions() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-7">
         <div>
-          <h1 className={`text-2xl font-extrabold tracking-tight ${darkMode ? "text-white" : "text-slate-900"}`}>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Subscriptions
           </h1>
-          <p className={`text-sm mt-0.5 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+          <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
             Manage restaurant accounts, plans, and billing across the platform.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setIsBulkOffersOpen(true)}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Sparkles size={13} className="text-orange-500" />
+            <Sparkles size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             Bulk Offers
           </button>
 
           <button
-            onClick={() => navigate('/superadmin?requests=new')}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+            onClick={() => setIsCommissionOpen(true)}
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Building2 size={13} />
+            <Percent size={13} className="text-orange-500 group-hover:text-white transition-colors" />
+            Commission [{platformSettings.platformCommissionRate ?? 10}%]
+          </button>
+
+          <button
+            onClick={() => {
+              if (restaurants.length > 0) setSelectedAddonRestaurantId(restaurants[0].id);
+              setIsAddonsModalOpen(true);
+            }}
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <PlusCircle size={13} className="text-orange-500 group-hover:text-white transition-colors" />
+            Feature Add-ons
+          </button>
+
+          <button
+            onClick={() => navigate('/superadmin?requests=new')}
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              darkMode
+                ? 'bg-slate-900/50 border-slate-800 text-slate-300'
+                : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+            }`}
+          >
+            <Building2 size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             New Requests
             {pendingCount > 0 && (
               <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
@@ -461,17 +663,14 @@ export default function Subscriptions() {
           </button>
 
           <button
-            onClick={() => {
-              const el = document.getElementById('processing-fee-settings');
-              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all flex items-center gap-1.5 ${
+            onClick={() => setIsSettingsModalOpen(true)}
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-emerald-500 hover:text-white hover:border-emerald-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <CreditCard size={13} />
+            <CreditCard size={13} className="text-emerald-500 group-hover:text-white transition-colors" />
             Processing Fee
             {platformSettings.applicationFeeEnabled && (
               <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-emerald-600 text-white text-[9px] flex items-center justify-center font-bold">
@@ -494,25 +693,29 @@ export default function Subscriptions() {
                 isNew: true
               });
             }}
-            className={`py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 ${
+            className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
                 : 'bg-white border-slate-200 text-slate-700 shadow-sm'
             }`}
           >
-            <Plus size={13} />
+            <Plus size={13} className="text-orange-500 group-hover:text-white transition-colors" />
             Add New Plan
           </button>
 
-          <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold shrink-0 ${
-            darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"
-          }`}>
-            <BarChart3 size={15} className="text-orange-500" />
-            <span className={darkMode ? "text-slate-400" : "text-slate-500"}>Platform MRR</span>
-            <span className="text-emerald-500 font-extrabold text-sm">
-              {formatCurrency(tierMetrics.totalRevenue)}
+          <button
+            onClick={() => setIsMrrModalOpen(true)}
+            title="Click to view monthly restaurant subscription breakdown"
+            className={`group flex items-center gap-2.5 px-4 py-2 rounded-xl border text-xs font-semibold shrink-0 whitespace-nowrap cursor-pointer hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all ${
+              darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-200 shadow-sm"
+            }`}
+          >
+            <BarChart3 size={15} className="text-emerald-500 group-hover:text-white transition-colors" />
+            <span className={`group-hover:text-white ${darkMode ? "text-slate-400" : "text-slate-500"}`}>Platform MRR</span>
+            <span className="text-emerald-500 group-hover:text-white font-extrabold text-sm transition-colors">
+              {formatCurrency(totalPlatformMrr)}
             </span>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -540,22 +743,49 @@ export default function Subscriptions() {
         onSortChange={handleSort}
         onExport={() => exportToCSV(sorted)}
         onResetAll={handleResetAll}
-        onAddClick={() => { setFormData(EMPTY_FORM); setIsAddModalOpen(true); }}
+        onAddClick={() => {
+          if (platformSettings.enablePartnerRegistration === false) {
+            setIsRegistrationBlockedAlertOpen(true);
+            return;
+          }
+          const activePlans = dbPlans.filter((p: any) => p.isActive !== false);
+          const defaultPlan = activePlans.length > 0 ? activePlans[0].name : "Basic";
+          setFormData({ ...EMPTY_FORM, plan: defaultPlan });
+          setIsAddModalOpen(true);
+        }}
       />
 
-      {/* Table */}
-      <SubscriptionTable
-        restaurants={sorted}
-        darkMode={darkMode}
-        searchQuery={searchQuery}
-        statusFilter={statusFilter}
-        tierFilter={tierFilter}
-        onView={setViewingNode}
-        onUpdateStatus={updateStatus}
-        onUpdatePlan={updatePlan}
-        onDelete={deleteNode}
-        onResetFilters={handleResetAll}
-      />
+      {/* Table & Pagination Container */}
+      <div className={`rounded-2xl border overflow-hidden shadow-sm ${
+        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+      }`}>
+        <div className="max-h-[620px] overflow-auto">
+          <SubscriptionTable
+            restaurants={sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+            darkMode={darkMode}
+            searchQuery={searchQuery}
+            statusFilter={statusFilter}
+            tierFilter={tierFilter}
+            onView={handleViewRestaurant}
+            onLiveActivity={handleLiveActivity}
+            onUpdateStatus={updateStatus}
+            onUpdatePlan={updatePlan}
+            onDelete={deleteNode}
+            plans={dbPlans}
+            onResetFilters={handleResetAll}
+          />
+        </div>
+
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={sorted.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          darkMode={darkMode}
+          itemLabel="subscriptions"
+        />
+      </div>
 
       {/* Summary footer */}
       <div className={`mt-4 px-5 py-3 rounded-xl border flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs ${
@@ -579,186 +809,255 @@ export default function Subscriptions() {
         </span>
       </div>
 
-      {/* Platform Settings & Onboarding Processing Fee */}
-      <div id="processing-fee-settings" className={`mt-8 p-6 rounded-2xl border ${
-        darkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-800 shadow-sm"
-      }`}>
-        <div className="flex items-center justify-between border-b pb-4 mb-6 border-slate-800/10">
-          <div>
-            <h2 className="text-base font-bold">Platform Settings & Onboarding Fee</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Configure global partner application fees, refund policies, and view onboarding revenue.
-            </p>
-          </div>
-          {settingsSaved && (
-            <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-pulse">
-              Settings Saved!
-            </span>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Config column */}
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+      {/* Platform Settings Modal */}
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
+          {/* Backdrop */}
+          <button 
+            type="button" 
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-0" 
+            onClick={() => setIsSettingsModalOpen(false)} 
+            aria-label="Close modal"
+          />
+          
+          {/* Modal Container */}
+          <div className={`w-full max-w-4xl rounded-2xl border p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto ${
+            darkMode ? "bg-slate-950 border-slate-800 text-white shadow-black/85" : "bg-white border-slate-200 text-slate-800 shadow-slate-300/40"
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-6 border-slate-800/10 dark:border-slate-800">
               <div>
-                <p className="font-bold">Enable Application Processing Fee</p>
-                <p className="text-[10px] text-slate-500">Require paid review fee before a partner can submit their application.</p>
+                <h2 className="text-base font-bold">Platform Settings & Onboarding Fee</h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Configure global partner application fees, refund policies, and view onboarding revenue.
+                </p>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={platformSettings.applicationFeeEnabled}
-                onClick={() => setPlatformSettings(prev => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
-                  platformSettings.applicationFeeEnabled
-                    ? 'bg-orange-500'
-                    : darkMode ? 'bg-slate-700' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    platformSettings.applicationFeeEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Fee Amount</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={platformSettings.applicationFeeAmount}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Currency</label>
-                <select
-                  value={platformSettings.currency}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, currency: e.target.value }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+              <div className="flex items-center gap-2">
+                {settingsSaved && (
+                  <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-pulse">
+                    Settings Saved!
+                  </span>
+                )}
+                <button
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className={`p-1.5 rounded-lg border hover:bg-slate-500/5 transition-all ${
+                    darkMode ? "border-slate-800 text-slate-400 hover:text-slate-200" : "border-slate-200 text-slate-500 hover:text-slate-800"
                   }`}
                 >
-                  <option value="INR">INR — Indian Rupee (₹)</option>
-                  <option value="USD">USD — US Dollar ($)</option>
-                  <option value="EUR">EUR — Euro (€)</option>
-                  <option value="GBP">GBP — British Pound (£)</option>
-                </select>
+                  <X size={15} />
+                </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Refund Policy</label>
-                <select
-                  value={platformSettings.refundPolicy}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, refundPolicy: e.target.value }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
-                  }`}
-                >
-                  <option value="refundable">Refundable upon rejection</option>
-                  <option value="non-refundable">Non-Refundable</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Pending Requests</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={platformSettings.maxPendingApplications}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
-                  className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
-                    darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
-              <div>
-                <p className="font-bold">Allow Partner Self-Registration</p>
-                <p className="text-[10px] text-slate-500">Enable the public registration page for new partners.</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={platformSettings.enablePartnerRegistration}
-                onClick={() => setPlatformSettings(prev => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
-                  platformSettings.enablePartnerRegistration
-                    ? 'bg-orange-500'
-                    : darkMode ? 'bg-slate-700' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    platformSettings.enablePartnerRegistration ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <button
-              onClick={handleSavePlatformSettings}
-              className="py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all shadow-md shadow-orange-600/10"
-            >
-              Save Platform Settings
-            </button>
-          </div>
-
-          {/* Revenue & history column */}
-          <div className="space-y-4 text-xs border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-6 border-slate-800/10">
-            <div>
-              <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
-              <span className="text-xl font-extrabold text-emerald-500">
-                {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
-              </span>
-            </div>
-
-            <div>
-              <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
-              {platformSettings.history && platformSettings.history.length > 0 ? (
-                <div className="max-h-52 overflow-y-auto border border-slate-800/10 rounded-xl">
-                  <table className="w-full text-left text-[11px] border-collapse">
-                    <thead>
-                      <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
-                        <th className="p-2 font-bold">Restaurant</th>
-                        <th className="p-2 font-bold">Amount</th>
-                        <th className="p-2 font-bold">Payment ID</th>
-                        <th className="p-2 font-bold">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {platformSettings.history.map(row => (
-                        <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
-                          <td className="p-2 font-semibold">{row.restaurantName}</td>
-                          <td className="p-2 text-emerald-500 font-bold">
-                            {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
-                          </td>
-                          <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
-                          <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Config column */}
+              <div className="space-y-4 text-xs">
+                <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+                  <div>
+                    <p className="font-bold">Enable Application Processing Fee</p>
+                    <p className="text-[10px] text-slate-500">Require paid review fee before a partner can submit their application.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={platformSettings.applicationFeeEnabled}
+                    onClick={() => setPlatformSettings(prev => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                      platformSettings.applicationFeeEnabled
+                        ? 'bg-orange-500'
+                        : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        platformSettings.applicationFeeEnabled ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
-              ) : (
-                <p className="text-[10px] text-slate-500 italic py-4">No processing fee payments recorded yet.</p>
-              )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Fee Amount</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={platformSettings.applicationFeeAmount}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Currency</label>
+                    <select
+                      value={platformSettings.currency}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, currency: e.target.value }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    >
+                      <option value="INR">INR — Indian Rupee (₹)</option>
+                      <option value="USD">USD — US Dollar ($)</option>
+                      <option value="EUR">EUR — Euro (€)</option>
+                      <option value="GBP">GBP — British Pound (£)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Refund Policy</label>
+                    <select
+                      value={platformSettings.refundPolicy}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    >
+                      <option value="refundable">Refundable upon rejection</option>
+                      <option value="non-refundable">Non-Refundable</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Max Pending Requests</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={platformSettings.maxPendingApplications}
+                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
+                      className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
+                        darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-b border-slate-800/5">
+                  <div>
+                    <p className="font-bold">Allow Partner Self-Registration</p>
+                    <p className="text-[10px] text-slate-500">Enable the public registration page for new partners.</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={platformSettings.enablePartnerRegistration}
+                    onClick={() => setPlatformSettings(prev => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                      platformSettings.enablePartnerRegistration
+                        ? 'bg-orange-500'
+                        : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        platformSettings.enablePartnerRegistration ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleSavePlatformSettings}
+                  className="py-2.5 px-4 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold transition-all shadow-md shadow-orange-600/10"
+                >
+                  Save Platform Settings
+                </button>
+              </div>
+
+              {/* Revenue & history column */}
+              <div className="space-y-4 text-xs border-t lg:border-t-0 lg:border-l pt-6 lg:pt-0 lg:pl-6 border-slate-800/10 dark:border-slate-800">
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Onboarding Revenue</span>
+                    <span className="text-xl font-extrabold text-emerald-500">
+                      {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalRevenue?.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Fee History</span>
+                    {platformSettings.history && platformSettings.history.length > 0 ? (
+                      <div className="max-h-40 overflow-y-auto border border-slate-800/10 dark:border-slate-850 rounded-xl">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
+                              <th className="p-2 font-bold">Restaurant</th>
+                              <th className="p-2 font-bold">Amount</th>
+                              <th className="p-2 font-bold">Payment ID</th>
+                              <th className="p-2 font-bold">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {platformSettings.history.map(row => (
+                              <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
+                                <td className="p-2 font-semibold">{row.restaurantName}</td>
+                                <td className="p-2 text-emerald-500 font-bold">
+                                  {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
+                                </td>
+                                <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
+                                <td className="p-2 text-slate-500">{new Date(row.timestamp).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 italic py-2">No processing fee payments recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-800/10 dark:border-slate-800 space-y-4">
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-1">Total Subscription Revenue</span>
+                    <span className="text-xl font-extrabold text-indigo-500">
+                      {platformSettings.currency === 'INR' ? '₹' : platformSettings.currency + ' '}{platformSettings.totalSubscriptionRevenue?.toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-500 block uppercase tracking-wider text-[10px] font-bold mb-2">Collected Subscription Charges</span>
+                    {platformSettings.subscriptionHistory && platformSettings.subscriptionHistory.length > 0 ? (
+                      <div className="max-h-40 overflow-y-auto border border-slate-800/10 dark:border-slate-850 rounded-xl">
+                        <table className="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr className={`border-b ${darkMode ? "bg-slate-950/60 border-slate-800/80" : "bg-slate-50 border-slate-200"}`}>
+                              <th className="p-2 font-bold">Restaurant</th>
+                              <th className="p-2 font-bold">Amount</th>
+                              <th className="p-2 font-bold">Payment ID</th>
+                              <th className="p-2 font-bold">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {platformSettings.subscriptionHistory.map(row => (
+                              <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
+                                <td className="p-2 font-semibold">{row.restaurantName}</td>
+                                <td className="p-2 text-indigo-500 font-bold">
+                                  {row.currency === 'INR' ? '₹' : row.currency + ' '}{row.amount}
+                                </td>
+                                <td className="p-2 font-mono text-[9px]">{row.paymentId}</td>
+                                <td className="p-2 text-slate-500">
+                                  {new Date(row.timestamp).toLocaleDateString()}{" "}
+                                  {new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-slate-500 italic py-2">No subscription payments recorded yet.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* View Modal */}
       {viewingNode && (
@@ -766,9 +1065,16 @@ export default function Subscriptions() {
           restaurant={viewingNode}
           darkMode={darkMode}
           onClose={() => setViewingNode(null)}
-          onEditClick={() => {
-            setViewingNode(null);
-          }}
+        />
+      )}
+
+      {/* Live Activity Modal */}
+      {liveActivityRestaurant && (
+        <LiveActivityModal
+          restaurantId={liveActivityRestaurant.id}
+          restaurantName={liveActivityRestaurant.name}
+          darkMode={darkMode}
+          onClose={() => setLiveActivityRestaurant(null)}
         />
       )}
 
@@ -777,9 +1083,14 @@ export default function Subscriptions() {
         <AddRestaurantModal
           darkMode={darkMode}
           formData={formData}
+          plans={dbPlans}
           onChange={(partial) => setFormData((prev) => ({ ...prev, ...partial }))}
           onSubmit={handleAddSubmit}
-          onClose={() => { setIsAddModalOpen(false); setFormData(EMPTY_FORM); }}
+          onClose={() => setIsAddModalOpen(false)}
+          onClear={() => {
+            setFormData(EMPTY_FORM);
+            sessionStorage.removeItem("ra/subscription-add-restaurant-draft");
+          }}
         />
       )}
 
@@ -909,6 +1220,22 @@ export default function Subscriptions() {
                 </div>
               </div>
 
+              {/* Plan Commission */}
+              <div>
+                <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Plan Commission (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder={String(platformSettings.platformCommissionRate ?? 8)}
+                  value={editingPlan.commissionRate === null || editingPlan.commissionRate === undefined ? (platformSettings.platformCommissionRate ?? 8) : editingPlan.commissionRate}
+                  onChange={(e) => setEditingPlan({ ...editingPlan, commissionRate: parseInt(e.target.value) || 0 })}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                />
+              </div>
+
               {/* Features List */}
               <div>
                 <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Features (comma-separated)</label>
@@ -928,7 +1255,7 @@ export default function Subscriptions() {
               {!editingPlan.isNew && (
                 <button
                   onClick={handleDeletePlan}
-                  disabled={['Free', 'Standard', 'Premium', 'Enterprise'].includes(editingPlan.name)}
+                  disabled={editingPlan.name === 'Free'}
                   className={`py-2.5 px-4 rounded-xl text-xs font-semibold border border-red-500/20 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-30`}
                 >
                   Delete Plan
@@ -962,7 +1289,7 @@ export default function Subscriptions() {
             <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
               <div>
                 <h3 className="text-base font-bold">Configure Bulk Offers</h3>
-                <p className="text-[11px] text-slate-500 mt-0.5 font-semibold">
+                <p className="text-[11px] text-slate-550 mt-0.5 font-semibold">
                   Apply discounts globally to all active subscription plans.
                 </p>
               </div>
@@ -1061,6 +1388,186 @@ export default function Subscriptions() {
         </div>
       )}
 
+      {/* Commission Modal */}
+      {isCommissionOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
+          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
+              <div>
+                <h3 className="text-base font-bold">Configure Platform Commission</h3>
+                <p className="text-[11px] text-slate-550 mt-0.5 font-semibold">
+                  Set the default platform cut percentage for restaurant dining payments.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsCommissionOpen(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Platform Commission Rate (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={platformSettings.platformCommissionRate ?? 10}
+                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, platformCommissionRate: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="eg. 10"
+                />
+                <p className="text-[9px] text-slate-550 mt-1 leading-normal">
+                  This rate determines the platform commission cut display and metrics on both the Transactions and Analytics dashboards.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+              <button
+                onClick={() => setIsCommissionOpen(false)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border ${
+                  darkMode ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  await handleSavePlatformSettings();
+                  setIsCommissionOpen(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md shadow-orange-500/10"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feature Add-ons Modal */}
+      {isAddonsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
+          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
+            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+          }`}>
+            <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
+              <div>
+                <h3 className="text-base font-bold">Add Feature Extension Module</h3>
+                <p className="text-[11px] text-slate-550 mt-0.5 font-semibold">
+                  Add custom billable feature extensions outside base plan tiers.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAddonsModalOpen(false)}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Select Restaurant
+                </label>
+                <select
+                  value={selectedAddonRestaurantId}
+                  onChange={(e) => setSelectedAddonRestaurantId(e.target.value)}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white bg-slate-950' : 'border-slate-200 text-slate-800 bg-white'
+                  }`}
+                >
+                  {restaurants.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.plan})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Extension Module Name
+                </label>
+                <input
+                  type="text"
+                  value={addonName}
+                  onChange={(e) => setAddonName(e.target.value)}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="eg. WhatsApp Marketing Bot, AI Staff Scheduler"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Monthly Price (₹)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={addonPrice}
+                  onChange={(e) => setAddonPrice(parseInt(e.target.value) || 0)}
+                  className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
+                    darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
+                  }`}
+                  placeholder="499"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t border-slate-800/10">
+              <button
+                onClick={() => setIsAddonsModalOpen(false)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold border ${
+                  darkMode ? 'border-slate-800 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddonSave}
+                disabled={addonSaving || !addonName.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-orange-500/10"
+              >
+                {addonSaving ? 'Saving...' : 'Add Feature Extension'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Platform MRR Breakdown Modal */}
+      <MrrModal
+        isOpen={isMrrModalOpen}
+        onClose={() => setIsMrrModalOpen(false)}
+        darkMode={darkMode}
+        restaurants={linkedRestaurants}
+        dbPlans={dbPlans}
+      />
+
+      {/* Registration Blocked Alert Modal */}
+      <MaintenanceAlertModal
+        isOpen={isRegistrationBlockedAlertOpen}
+        onClose={() => setIsRegistrationBlockedAlertOpen(false)}
+        type="registration_blocked"
+        message="Due to a temporary issue, new restaurant registration is currently blocked. You can enable registrations in Platform Settings."
+      />
     </div>
   );
 }

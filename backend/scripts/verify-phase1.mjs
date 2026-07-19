@@ -266,7 +266,7 @@ async function runSmokeSuite(url, db) {
   const tablesCollection = db.collection('tables');
   const tableSessionsCollection = db.collection('tableSessions');
   const cleaningTasksCollection = db.collection('cleaningTasks');
-  const menuCategoriesCollection = db.collection('menuCategories');
+  const menuCategoriesCollection = db.collection('menucategories');
   const menuItemsCollection = db.collection('menuItems');
   const staffRequestsCollection = db.collection('staffRequests');
   const auditLogsCollection = db.collection('auditLogs');
@@ -363,12 +363,12 @@ async function runSmokeSuite(url, db) {
   });
 
   await runStep('auth login role matrix', async () => {
-    state.admin = await login(url, 'admin@ambertable.com', 'Admin@123', 'Phase1 Verify Admin');
+    state.admin = await login(url, 'adminpanel16@gmail.com', 'Happy@100', 'Phase1 Verify Admin');
     state.customer = await login(url, 'guest@ambertable.com', 'Guest@123', 'Phase1 Verify Customer');
-    state.staff = await login(url, 'staff@ambertable.com', 'Staff@123', 'Phase1 Verify Staff');
-    state.kitchen = await login(url, 'kitchen@ambertable.com', 'Kitchen@123', 'Phase1 Verify Kitchen');
-    state.cleaning = await login(url, 'cleaning@ambertable.com', 'Cleaning@123', 'Phase1 Verify Cleaning');
-    state.superAdmin = await login(url, 'superadmin@graphura.com', 'Super@123', 'Phase1 Verify Super Admin');
+    state.staff = await login(url, 'staffpanel320@gmail.com', 'Happy@100', 'Phase1 Verify Staff');
+    state.kitchen = await login(url, 'kitchenpanel1@gmail.com', 'Happy@100', 'Phase1 Verify Kitchen');
+    state.cleaning = await login(url, 'cleaningpanel14@gmail.com', 'Happy@100', 'Phase1 Verify Cleaning');
+    state.superAdmin = await login(url, 'adminsuper22@gmail.com', 'Happy@100', 'Phase1 Verify Super Admin');
   });
 
   await runStep('auth me sessions refresh logout otp', async () => {
@@ -500,7 +500,7 @@ async function runSmokeSuite(url, db) {
     assert(availability.status === 200, `reservation availability returned ${availability.status}`);
 
     const queueJoin = await request(url, 'POST', '/api/v1/public/queue/join', {
-      body: { restaurantId: state.restaurantId, customerName: 'Queue Guest', guests: 3 },
+      body: { restaurantId: state.restaurantId, customerName: 'Queue Guest', mobile: '9876500001', guests: 3 },
     });
     assert(queueJoin.status === 201, `queue join returned ${queueJoin.status}`);
     state.queueId = getId(queueJoin.json?.data?.queueEntry);
@@ -841,6 +841,7 @@ async function runSmokeSuite(url, db) {
     await tablesCollection.insertOne({
       _id: foreignTableId,
       restaurantId: foreignRestaurantId,
+      tenantId: foreignRestaurantId.toString(),
       tableNumber: `VERIFY-FOREIGN-${spoofedTableNumber + 2}`,
       capacity: 4,
       floor: 9,
@@ -1204,6 +1205,7 @@ async function runSmokeSuite(url, db) {
     await menuItemsCollection.insertOne({
       _id: hiddenItemId,
       restaurantId: restaurantObjectId,
+      tenantId: restaurantObjectId.toString(),
       categoryId: starterCategory._id,
       name: hiddenItemName,
       description: 'Hidden verification item',

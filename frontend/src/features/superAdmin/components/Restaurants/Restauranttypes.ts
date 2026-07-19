@@ -9,10 +9,17 @@ export interface RestaurantsRow {
   email: string;
   phone: string;
   location: string;
-  plan: "Premium" | "Standard" | "Basic";
+  plan: string;
   status: "Active" | "Trial" | "Inactive";
   revenue: string;
   branches: number;
+  mrr?: number;
+  subscriptionPlan_id?: string | null;
+  customCommissionRate?: number | null;
+  joinedDate?: string;
+  lastActive?: string;
+  tags?: string[];
+  cooldownRemaining?: number;
 }
 
 export interface NewRestaurantForm {
@@ -21,8 +28,20 @@ export interface NewRestaurantForm {
   email: string;
   phone: string;
   location: string;
-  plan: "Premium" | "Standard" | "Basic";
+  plan: string;
   status: "Active" | "Trial" | "Inactive";
   revenue: string;
   branches: number;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pinCode?: string;
+  gstNumber?: string;
+  cuisine?: string;
+  expectedMonthlyOrders?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+  googleMapsUrl?: string;
+  message?: string;
 }

@@ -228,7 +228,7 @@ export class OrdersService {
   static async createAdminOrder(
     restaurantId: string | Types.ObjectId,
     payload: AdminOrderCreateInput,
-    actorId?: string | Types.ObjectId | null,
+    _actorId?: string | Types.ObjectId | null,
   ) {
     const table = await TableModel.findOne({ restaurantId, tableNumber: payload.table });
     if (!table) {

@@ -147,3 +147,27 @@ export type FeatureFlagIdParam      = z.infer<typeof featureFlagIdParamSchema>;
 export type UpdateFeatureFlagInput  = z.infer<typeof updateFeatureFlagSchema>;
 export type AnalyticsQuery          = z.infer<typeof analyticsQuerySchema>;
 export type SuperAdminAuditLogQuery = z.infer<typeof superAdminAuditLogQuerySchema>;
+
+export const registerRestaurantSchema = z.object({
+  restaurantName: z.string().trim().min(2, 'Restaurant name must be at least 2 characters'),
+  ownerName: z.string().trim().min(2, 'Owner name must be at least 2 characters'),
+  email: z.string().trim().email('Invalid email address'),
+  phone: z.string().trim().min(10, 'Phone number must be at least 10 digits'),
+  address: z.string().trim().min(5, 'Address must be at least 5 characters'),
+  city: z.string().trim().min(2, 'City must be at least 2 characters'),
+  state: z.string().trim().min(2, 'State must be at least 2 characters'),
+  country: z.string().trim().min(2, 'Country must be at least 2 characters'),
+  pinCode: z.string().trim().min(6, 'Pin code must be at least 6 characters'),
+  gstNumber: z.string().trim().optional().nullable(),
+  cuisine: z.string().trim().min(2, 'Cuisine must be at least 2 characters'),
+  branches: z.number().int().positive().default(1),
+  expectedMonthlyOrders: z.number().int().nonnegative().default(0),
+  latitude: z.number().optional().nullable(),
+  longitude: z.number().optional().nullable(),
+  googleMapsUrl: z.string().trim().min(1, 'Google Maps URL is required'),
+  message: z.string().trim().optional().nullable(),
+  plan: z.string().trim().min(1, 'Plan is required'),
+  status: z.enum(['Active', 'Trial', 'Inactive']),
+});
+
+export type RegisterRestaurantInput = z.infer<typeof registerRestaurantSchema>;

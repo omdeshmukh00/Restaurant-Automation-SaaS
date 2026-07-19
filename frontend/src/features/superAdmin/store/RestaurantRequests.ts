@@ -4,7 +4,7 @@ import {
   superAdminRestaurantRequestsApi,
 } from "../api/superAdmin.api";
 import { restaurantData } from "./Restaurants";
-import type { RestaurantsRow } from "../components/Restaurants/Restauranttypes";
+import type { RestaurantsRow, NewRestaurantForm } from "../components/Restaurants/Restauranttypes";
 
 export interface RestaurantRequest {
   id: string;
@@ -38,66 +38,76 @@ export interface RestaurantRequest {
 interface RestaurantRequestsState {
   restaurants: RestaurantsRow[];
   requests: RestaurantRequest[];
+  plans: any[];
   fetchRequests: () => Promise<void>;
   approveRequest: (id: string) => Promise<void>;
   denyRequest: (id: string, reason: string, refund?: boolean) => Promise<void>;
-  addRestaurant: (restaurant: RestaurantsRow) => void;
+  addRestaurant: (restaurant: NewRestaurantForm) => Promise<void>;
   updateRestaurantStatus: (
     id: string,
-    status: "Active" | "Trial" | "Inactive"
-  ) => void;
+    status: "Active" | "Trial" | "Inactive",
+    blockReason?: string
+  ) => Promise<void>;
   updateRestaurantPlan: (
     id: string,
-    plan: "Premium" | "Standard" | "Basic" | "Free"
-  ) => void;
-  deleteRestaurant: (id: string) => void;
+    plan: string
+  ) => Promise<void>;
+  deleteRestaurant: (id: string, reason?: string) => Promise<void>;
 }
 
-const requestToRestaurant = (request: RestaurantRequest): RestaurantsRow => ({
-  id: `RST-${request.id.slice(-6)}`,
-  name: request.name,
-  owner: request.owner,
-  email: request.email,
-  phone: request.phone,
-  location: request.location,
-  plan: request.plan as any,
-  status: "Active",
-  revenue: "Rs. 0",
-  branches: 1,
+const mapDbRestaurantToRow = (r: any): RestaurantsRow => ({
+  id: r._id || r.id,
+  name: r.name,
+  owner: r.ownerName || "Unknown",
+  email: r.email || "",
+  phone: r.phone || "",
+  location: r.city ? `${r.city}, ${r.state || ""}, ${r.country || ""}`.replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim() : "Unknown",
+  plan: (r.plan || "Basic") as any,
+  status: r.status === "ACTIVE" ? "Active" : r.status === "ONBOARDING" || r.status === "PENDING_APPROVAL" ? "Trial" : "Inactive",
+  revenue: typeof r.revenue === 'number' ? `₹${r.revenue.toLocaleString('en-IN')}` : r.revenue || "₹0",
+  branches: r.branches || 1,
+  mrr: typeof r.mrr === 'number' ? r.mrr : 0,
+  subscriptionPlan_id: r.subscriptionPlan_id || null,
+  customCommissionRate: r.customCommissionRate ?? null,
+  joinedDate: r.joinedDate ? new Date(r.joinedDate).toISOString().slice(0, 10) : r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  lastActive: r.lastActive ? new Date(r.lastActive).toISOString().slice(0, 10) : r.updatedAt ? new Date(r.updatedAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+  tags: r.tags || [],
+  cooldownRemaining: r.cooldownRemaining || 0,
 });
 
 export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
   (set, get) => ({
-    restaurants: restaurantData,
+    restaurants: [],
     requests: [],
+    plans: [],
     fetchRequests: async () => {
       try {
-        const reqs = await superAdminRestaurantRequestsApi.getRequests();
-        set({ requests: reqs });
+        const [reqs, dbRestaurants, dbPlans] = await Promise.all([
+          superAdminRestaurantRequestsApi.getRequests(),
+          superAdminRestaurantRequestsApi.getRestaurants(),
+          superAdminRestaurantRequestsApi.getPlans(),
+        ]);
+        set({
+          requests: reqs,
+          restaurants: dbRestaurants.map(mapDbRestaurantToRow),
+          plans: dbPlans || [],
+        });
       } catch (error) {
         console.error("Failed to fetch requests", error);
       }
     },
     approveRequest: async (id) => {
       try {
-        const request = get().requests.find((item) => item.id === id);
-        if (!request) return;
-
         await superAdminRestaurantRequestsApi.approveRequest(id);
-
-        const restaurant = requestToRestaurant(request);
-        const alreadyAdded = get().restaurants.some(
-          (item) => item.name === restaurant.name
-        );
-
-        set((state) => ({
-          restaurants: alreadyAdded
-            ? state.restaurants
-            : [restaurant, ...state.restaurants],
-          requests: state.requests.map((item) =>
-            item.id === id ? { ...item, status: 'APPLICATION_APPROVED' } : item
-          ),
-        }));
+        // Refresh requests and restaurants from database
+        const [reqs, dbRestaurants] = await Promise.all([
+          superAdminRestaurantRequestsApi.getRequests(),
+          superAdminRestaurantRequestsApi.getRestaurants(),
+        ]);
+        set({
+          requests: reqs,
+          restaurants: dbRestaurants.map(mapDbRestaurantToRow),
+        });
       } catch (error) {
         console.error("Failed to approve request", error);
         throw error;
@@ -123,23 +133,46 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
         throw error;
       }
     },
-    addRestaurant: (restaurant) =>
-      set((state) => ({ restaurants: [restaurant, ...state.restaurants] })),
-    updateRestaurantStatus: (id, status) =>
-      set((state) => ({
-        restaurants: state.restaurants.map((restaurant) =>
-          restaurant.id === id ? { ...restaurant, status } : restaurant
-        ),
-      })),
-    updateRestaurantPlan: (id, plan) =>
-      set((state) => ({
-        restaurants: state.restaurants.map((restaurant) =>
-          restaurant.id === id ? { ...restaurant, plan: plan as any } : restaurant
-        ),
-      })),
-    deleteRestaurant: (id) =>
-      set((state) => ({
-        restaurants: state.restaurants.filter((restaurant) => restaurant.id !== id),
-      })),
+    addRestaurant: async (formData) => {
+      try {
+        await superAdminRestaurantRequestsApi.registerRestaurant(formData);
+        const dbRestaurants = await superAdminRestaurantRequestsApi.getRestaurants();
+        set({ restaurants: dbRestaurants.map(mapDbRestaurantToRow) });
+      } catch (error: any) {
+        console.error("Failed to add restaurant", error);
+        throw error;
+      }
+    },
+    updateRestaurantStatus: async (id, status, blockReason) => {
+      try {
+        await superAdminRestaurantRequestsApi.updateRestaurantStatus(id, status, blockReason);
+        const dbRestaurants = await superAdminRestaurantRequestsApi.getRestaurants();
+        set({ restaurants: dbRestaurants.map(mapDbRestaurantToRow) });
+      } catch (error: any) {
+        console.error("Failed to update restaurant status", error);
+        const errMsg = error.response?.data?.error?.message || error.message || "Failed to update restaurant status";
+        window.alert(errMsg);
+      }
+    },
+    updateRestaurantPlan: async (id, plan) => {
+      try {
+        await superAdminRestaurantRequestsApi.updateRestaurantPlan(id, plan);
+        const dbRestaurants = await superAdminRestaurantRequestsApi.getRestaurants();
+        set({ restaurants: dbRestaurants.map(mapDbRestaurantToRow) });
+      } catch (error: any) {
+        console.error("Failed to update restaurant plan", error);
+        const errMsg = error.response?.data?.error?.message || error.message || "Failed to update restaurant plan";
+        window.alert(errMsg);
+      }
+    },
+    deleteRestaurant: async (id, reason) => {
+      try {
+        await superAdminRestaurantRequestsApi.deleteRestaurant(id, reason);
+        const dbRestaurants = await superAdminRestaurantRequestsApi.getRestaurants();
+        set({ restaurants: dbRestaurants.map(mapDbRestaurantToRow) });
+      } catch (error) {
+        console.error("Failed to delete restaurant", error);
+      }
+    },
   })
 );

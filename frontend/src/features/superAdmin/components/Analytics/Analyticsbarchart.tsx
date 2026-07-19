@@ -86,14 +86,14 @@ export default function AnalyticsBarChart({
             >
               <BarChart3 size={14} />
             </span>
-            Cluster Operations Load
+            Platform Transaction Load
           </h3>
           <p
             className={`text-[12px] mt-0.5 ${
               darkMode ? "text-slate-500" : "text-slate-400"
             }`}
           >
-            Throughput balance configurations — weekly view
+            Completed order volume vs daily threshold capacity
           </p>
         </div>
 
@@ -101,17 +101,17 @@ export default function AnalyticsBarChart({
         <div className="flex-shrink-0 flex items-center gap-2">
           <span className="flex items-center gap-1 text-[10px] font-semibold text-orange-500">
             <span className="w-2 h-2 rounded-sm bg-orange-500 inline-block" />
-            Active
+            Orders Completed
           </span>
           <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-500">
             <span className="w-2 h-2 rounded-sm bg-blue-500 inline-block" />
-            Staging
+            Threshold Limit
           </span>
         </div>
       </div>
 
       {/* Chart */}
-      <div className="flex-1 h-[240px] sm:h-[280px] w-full">
+      <div className="h-[350px] sm:h-[390px] w-full mt-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
@@ -145,12 +145,12 @@ export default function AnalyticsBarChart({
               }}
             />
             <Bar
-              name="Active Clusters"
+              name="Orders Completed"
               dataKey="load"
               fill="#f97316"
             />
             <Bar
-              name="Staging Subnets"
+              name="Threshold Limit"
               dataKey="capacity"
               fill="#3b82f6"
             />

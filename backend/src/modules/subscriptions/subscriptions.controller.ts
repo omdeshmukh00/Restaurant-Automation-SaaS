@@ -128,3 +128,15 @@ export const verifyPurchase = asyncHandler(async (req: Request, res: Response) =
   });
   ok(res, result);
 });
+
+export const getUsageDashboard = asyncHandler(async (req: Request, res: Response) => {
+  let restaurantId = req.query.restaurantId?.toString();
+  if (!restaurantId || req.user?.role !== 'super-admin') {
+    restaurantId = req.user?.restaurantId?.toString();
+  }
+  if (!restaurantId) {
+    throw new AppError('Restaurant context required', 400, ErrorCode.INVALID_REQUEST);
+  }
+  const dashboard = await service.getSubscriptionUsageDashboard(restaurantId);
+  ok(res, dashboard);
+});

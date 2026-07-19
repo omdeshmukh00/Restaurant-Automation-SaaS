@@ -4,9 +4,7 @@ import logger from './logger';
 import { hashPassword } from '../utils/crypto';
 import { UserRole, KitchenRole, StaffInternalRole, CleaningRole } from '../constants/roles';
 import {
-  BatchStatus,
   CleaningStatus,
-  PaymentStatus,
   Priority,
   QueueStatus,
   RequestStatus,
@@ -36,8 +34,6 @@ import { CleaningTaskModel } from '../modules/cleaning/cleaning.model';
 import { OfferModel } from '../modules/offers/offers.model';
 import { AuditLogModel } from '../modules/auditLogs/auditLogs.model';
 import { FeatureFlagModel, PlatformPlanModel } from '../modules/superAdmin/superAdmin.model';
-import { KitchenBatchModel } from '../modules/kitchen/kitchen.model';
-import { PaymentModel } from '../modules/payments/payments.model';
 import {
   SubscriptionModel,
   SubscriptionStatus,
@@ -56,13 +52,16 @@ type SeedUserInput = {
   staff_role?: StaffInternalRole;
   cleaning_role?: CleaningRole;
   dateOfBirth?: string;
+  location?: string;
+  avatar?: string;
+  bio?: string;
 };
 
 async function upsertUser(input: SeedUserInput) {
   const password = await hashPassword(input.password);
 
   return UserModel.findOneAndUpdate(
-    { mobile: input.mobile },
+    { email: input.email.toLowerCase() },
     {
       $set: {
         name: input.name,
@@ -76,6 +75,9 @@ async function upsertUser(input: SeedUserInput) {
         staff_role: input.staff_role ?? null,
         cleaning_role: input.cleaning_role ?? null,
         dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+        location: input.location ?? null,
+        avatar: input.avatar ?? null,
+        bio: input.bio ?? null,
         isEmailVerified: true,
         isMobileVerified: true,
         isDeleted: false,
@@ -201,6 +203,9 @@ export async function seedDevelopmentData(): Promise<void> {
       mobile: '4444444444',
       password: 'Happy@100',
       role: UserRole.SUPER_ADMIN,
+      location: 'Kolkata, WB',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80',
+      bio: 'Super Administrator managing the HQ Terminal platform.',
     }),
   ]);
 
@@ -636,7 +641,7 @@ export async function seedDevelopmentData(): Promise<void> {
     ),
   ]);
 
-  const preparingOrder = await OrderModel.findOneAndUpdate(
+  await OrderModel.findOneAndUpdate(
     { orderNumber: 'ORD-SEED-1001' },
     {
       $set: {
@@ -658,7 +663,7 @@ export async function seedDevelopmentData(): Promise<void> {
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
 
-  const readyOrder = await OrderModel.findOneAndUpdate(
+  await OrderModel.findOneAndUpdate(
     { orderNumber: 'ORD-SEED-1002' },
     {
       $set: {
@@ -787,79 +792,252 @@ export async function seedDevelopmentData(): Promise<void> {
       },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
-    NotificationModel.findOneAndUpdate(
-      { restaurantId: amberTable._id, recipientRole: UserRole.SERVICE_STAFF, title: 'New waiter request' },
-      {
-        $set: {
-          restaurantId: amberTable._id,
-          tableSessionId: activeSession._id,
-          recipientRole: UserRole.SERVICE_STAFF,
-          title: 'New waiter request',
-          message: 'Table T2 requested assistance.',
-          type: 'REQUEST_WAITER',
-          category: NotificationCategory.STAFF,
-          priority: NotificationPriority.HIGH,
-          expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
-          metadata: { tableNumber: 'T2', userId: staffUser._id },
-          isRead: false,
-          readAt: null,
-          readBy: null,
-        },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    ),
     AuditLogModel.findOneAndUpdate(
-      { action: 'APPROVE_RESTAURANT', entityId: String(amberTable._id) },
+      { action: 'Restaurant Deleted', entityId: 'taste-of-bengal-deleted' },
       {
         $set: {
           actorId: superAdminUser._id,
-          action: 'APPROVE_RESTAURANT',
-          entityId: String(amberTable._id),
-          metadata: { restaurant: amberTable.name },
+          actorRole: 'SUPER_ADMIN',
+          entityType: 'ADMIN',
+          entityId: 'taste-of-bengal-deleted',
+          action: 'Restaurant Deleted',
+          metadata: {
+            restaurantName: 'Taste of Bengal',
+            details: 'Super Admin permanently deleted terminated restaurant Taste of Bengal',
+          },
+          ipAddress: '192.168.1.45',
+          userAgent: 'Chrome on Windows 11',
+          createdAt: new Date('2026-06-25T14:30:00Z'),
         },
       },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     AuditLogModel.findOneAndUpdate(
-      { action: 'UPDATE_MENU', entityId: String(mushroomPizzaItem._id) },
+      { action: 'Updated Commission Rate', entityId: 'platformSettings' },
+      {
+        $set: {
+          actorId: superAdminUser._id,
+          actorRole: 'SUPER_ADMIN',
+          entityType: 'ADMIN',
+          entityId: 'platformSettings',
+          action: 'Updated Commission Rate',
+          metadata: {
+            target: 'Platform Settings',
+            details: 'Changed commission rate from 8% to 10%',
+          },
+          ipAddress: '192.168.1.100',
+          userAgent: 'Chrome on Windows 11',
+          createdAt: new Date('2026-06-25T12:15:00Z'),
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    AuditLogModel.findOneAndUpdate(
+      { action: 'Restaurant Request Approved', entityId: 'pohewala-appr' },
+      {
+        $set: {
+          actorId: superAdminUser._id,
+          actorRole: 'SUPER_ADMIN',
+          entityType: 'RESTAURANT',
+          entityId: 'pohewala-appr',
+          action: 'Restaurant Request Approved',
+          metadata: {
+            restaurantName: 'Pohewala',
+            target: 'Pohewala',
+            details: 'Approved onboarding request for Pohewala (Enterprise Plan)',
+          },
+          ipAddress: '192.168.1.102',
+          userAgent: 'Chrome on Windows 11',
+          createdAt: new Date('2026-06-25T11:00:00Z'),
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    AuditLogModel.findOneAndUpdate(
+      { action: 'Onboarding Fee Captured', entityId: 'RZP-PAY-9921' },
+      {
+        $set: {
+          actorId: null,
+          actorRole: 'system',
+          entityType: 'TRANSACTION',
+          entityId: 'RZP-PAY-9921',
+          action: 'Onboarding Fee Captured',
+          metadata: {
+            target: 'Taste of India',
+            details: 'Captured ₹1,499 onboarding fee payment via Razorpay',
+          },
+          ipAddress: '103.21.244.18',
+          userAgent: 'Razorpay Webhook v2',
+          createdAt: new Date('2026-06-24T18:20:00Z'),
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    AuditLogModel.findOneAndUpdate(
+      { action: 'Plan Upgraded', entityId: 'urban-bites-sub' },
+      {
+        $set: {
+          actorId: null,
+          actorRole: 'system',
+          entityType: 'SUBSCRIPTION',
+          entityId: 'urban-bites-sub',
+          action: 'Plan Upgraded',
+          metadata: {
+            target: 'Urban Bites',
+            details: 'Auto-upgraded from Standard to Premium due to order volume',
+          },
+          ipAddress: '127.0.0.1 (Localhost)',
+          userAgent: 'System Automated Job',
+          createdAt: new Date('2026-06-24T16:45:00Z'),
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    AuditLogModel.findOneAndUpdate(
+      { action: 'Maintenance Mode Updated', entityId: 'sys-maint-1' },
+      {
+        $set: {
+          actorId: superAdminUser._id,
+          actorRole: 'SUPER_ADMIN',
+          entityType: 'SYSTEM',
+          entityId: 'sys-maint-1',
+          action: 'Maintenance Mode Updated',
+          metadata: {
+            target: 'Platform Settings',
+            details: 'Platform maintenance mode settings updated by Super Admin',
+          },
+          ipAddress: '127.0.0.1 (Localhost)',
+          userAgent: 'Chrome on Windows 11',
+          createdAt: new Date('2026-06-24T10:10:00Z'),
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    AuditLogModel.findOneAndUpdate(
+      { action: 'Order Payment Settled', entityId: 'ORD-PAY-4012' },
       {
         $set: {
           actorId: adminUser._id,
-          action: 'UPDATE_MENU',
-          entityId: String(mushroomPizzaItem._id),
-          metadata: { item: mushroomPizzaItem.name },
-        },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    ),
-    KitchenBatchModel.findOneAndUpdate(
-      { restaurantId: amberTable._id, name: 'Rush Batch A' },
-      {
-        $set: {
-          restaurantId: amberTable._id,
-          name: 'Rush Batch A',
-          orderIds: [preparingOrder._id, readyOrder._id],
-          status: BatchStatus.IN_PROGRESS,
-          station: 'Hot Line',
-        },
-      },
-      { new: true, upsert: true, setDefaultsOnInsert: true },
-    ),
-    PaymentModel.findOneAndUpdate(
-      { orderId: preparingOrder._id, method: 'UPI' },
-      {
-        $set: {
-          restaurantId: amberTable._id,
-          orderId: preparingOrder._id,
-          sessionId: activeSession._id,
-          amount: 672,
-          method: 'UPI',
-          status: PaymentStatus.PENDING,
+          actorRole: 'RESTAURANT_ADMIN',
+          entityType: 'TRANSACTION',
+          entityId: 'ORD-PAY-4012',
+          action: 'Order Payment Settled',
+          metadata: {
+            target: 'Amber Table',
+            details: 'Settled dine-in order payment of ₹850 via UPI',
+          },
+          ipAddress: '103.21.244.18',
+          userAgent: 'Safari on iPhone',
+          createdAt: new Date('2026-06-23T20:15:00Z'),
         },
       },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
   ]);
+
+  // Seed Subscriptions and Payments for all restaurants
+  try {
+    const { SubscriptionModel, SubscriptionPaymentModel, SubscriptionStatus, SubscriptionPaymentProvider, SubscriptionPaymentStatus, BillingCycle } = await import('../modules/subscriptions/subscriptions.model');
+
+    const allRestaurants = await RestaurantModel.find();
+    for (const rest of allRestaurants) {
+      const planName = rest.plan || 'Free';
+      const planDoc = await PlatformPlanModel.findOne({ name: planName });
+      const planId = planDoc ? planDoc._id : new mongoose.Types.ObjectId();
+      const monthlyPrice = planDoc ? planDoc.priceMonthly : 0;
+
+      const isTrial = rest.status === RestaurantStatus.PENDING_APPROVAL || planName === 'Free' || planName === 'Basic';
+
+      // Sync subscriptionPlan_id on restaurant
+      rest.subscriptionPlan_id = planId;
+      await rest.save();
+
+      let sub = await SubscriptionModel.findOne({ restaurantId: rest._id });
+      if (!sub) {
+        sub = await SubscriptionModel.create({
+          restaurantId: rest._id,
+          plan: planName,
+          planId,
+          priceMonthly: monthlyPrice,
+          status: rest.status === RestaurantStatus.SUSPENDED ? SubscriptionStatus.SUSPENDED : SubscriptionStatus.ACTIVE,
+          billingCycle: BillingCycle.MONTHLY,
+          startedAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+          currentPeriodStart: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+          currentPeriodEnd: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          isTrial,
+        });
+      } else {
+        sub.priceMonthly = monthlyPrice;
+        sub.planId = planId;
+        await sub.save();
+      }
+
+      // Seed 2 completed payments for non-trial restaurants
+      const existingPaymentsCount = await SubscriptionPaymentModel.countDocuments({ restaurantId: rest._id });
+      if (existingPaymentsCount === 0 && !isTrial && monthlyPrice > 0) {
+        await SubscriptionPaymentModel.create({
+          subscriptionId: sub._id,
+          restaurantId: rest._id,
+          planId,
+          provider: SubscriptionPaymentProvider.MOCK,
+          status: SubscriptionPaymentStatus.COMPLETED,
+          billingCycle: BillingCycle.MONTHLY,
+          amount: monthlyPrice,
+          currency: 'INR',
+          paidAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+          metadata: { info: 'Automated initial billing' },
+        });
+
+        await SubscriptionPaymentModel.create({
+          subscriptionId: sub._id,
+          restaurantId: rest._id,
+          planId,
+          provider: SubscriptionPaymentProvider.MOCK,
+          status: SubscriptionPaymentStatus.COMPLETED,
+          billingCycle: BillingCycle.MONTHLY,
+          amount: monthlyPrice,
+          currency: 'INR',
+          paidAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+          metadata: { info: 'Automated renewal billing' },
+        });
+      }
+    }
+  } catch (err) {
+    logger.error('Failed to seed subscriptions and payments', err);
+  }
+
+  // Post-seed: ensure tenantId is populated for all tenant-scoped documents in the DB
+  const dbConnection = mongoose.connection.db;
+  if (dbConnection) {
+    const collections = await dbConnection.listCollections().toArray();
+    for (const colInfo of collections) {
+      const name = colInfo.name;
+      // Skip system or excluded collections
+      if (name.startsWith('system.') || ['plans', 'featureFlags', 'restaurant_requests', 'platformSettings'].includes(name)) {
+        continue;
+      }
+      
+      const col = dbConnection.collection(name);
+      
+      // 1. For the 'restaurants' collection, set tenantId to the document's _id as a string
+      if (name === 'restaurants') {
+        const docs = await col.find({}).toArray();
+        for (const doc of docs) {
+          if (!doc.tenantId) {
+            await col.updateOne({ _id: doc._id }, { $set: { tenantId: doc._id.toString() } });
+          }
+        }
+      } else {
+        // 2. For other collections, if the document has restaurantId, set tenantId to restaurantId as a string
+        const docs = await col.find({ restaurantId: { $exists: true } }).toArray();
+        for (const doc of docs) {
+          if (doc.restaurantId && !doc.tenantId) {
+            await col.updateOne({ _id: doc._id }, { $set: { tenantId: doc.restaurantId.toString() } });
+          }
+        }
+      }
+    }
+  }
 
   logger.info('Seeded local development data', {
     restaurantCount: await RestaurantModel.countDocuments(),

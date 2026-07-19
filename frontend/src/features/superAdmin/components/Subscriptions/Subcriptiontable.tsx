@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Eye, Edit2, MoreVertical, Mail, Phone, MapPin,
   CheckCircle2, AlertCircle, X, Trash2, SlidersHorizontal,
-  Crown, Zap, Package, Building2, GitBranch, ChevronDown
+  Crown, Zap, Package, Building2, GitBranch, ChevronDown, Clock, Activity
 } from "lucide-react";
 import type { RestaurantNode, PlanType, StatusType } from "./Subcriptiontypes";
 import { PLAN_COLORS } from "../../store/Subscriptions";
+import { apiClient } from "../../../../shared/services/apiClient";
 
 interface SubscriptionTableProps {
   restaurants: RestaurantNode[];
@@ -14,9 +15,11 @@ interface SubscriptionTableProps {
   statusFilter: string;
   tierFilter: string;
   onView: (row: RestaurantNode) => void;
-  onUpdateStatus: (id: string, status: StatusType) => void;
-  onUpdatePlan: (id: string, plan: PlanType) => void;
+  onLiveActivity: (row: RestaurantNode) => void;
+  onUpdateStatus: (id: string, status: StatusType, blockReason?: string) => void;
+  onUpdatePlan: (id: string, plan: string) => void;
   onDelete: (id: string) => void;
+  plans: any[];
   onResetFilters: () => void;
 }
 
@@ -38,25 +41,49 @@ const TAG_STYLES: Record<string, string> = {
 // ── Shared edit dropdown content ─────────────────────────────────────────────
 function EditDropdownContent({
   row, darkMode,
-  onStatusUpdate, onPlanUpdate, onClose,
+  onStatusUpdate, onPlanUpdate, plans, onClose,
+  cooldown
 }: {
   row: RestaurantNode; darkMode: boolean;
-  onStatusUpdate: (id: string, s: StatusType) => void;
-  onPlanUpdate: (id: string, p: PlanType) => void;
+  onStatusUpdate: (id: string, s: StatusType, blockReason?: string) => void;
+  onPlanUpdate: (id: string, p: string) => void;
+  plans: any[];
   onClose: () => void;
+  cooldown: number;
 }) {
   return (
     <div className={`w-52 rounded-xl border p-2 shadow-2xl ${
       darkMode ? "bg-slate-950 border-slate-800 shadow-black/50" : "bg-white border-slate-200 shadow-slate-200"
     }`}>
+      {cooldown > 0 && (
+        <div className="mb-2 p-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-bold text-center flex items-center justify-center gap-1 animate-pulse">
+          <Clock size={11} />
+          Cooldown Active: {cooldown}s
+        </div>
+      )}
+
       <p className={`text-[10px] font-bold uppercase px-2 py-1 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
         Set Status
       </p>
       {(["Active", "Trial", "Inactive"] as StatusType[]).map((s) => (
         <button
           key={s}
-          onClick={() => { onStatusUpdate(row.id, s); onClose(); }}
-          className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-slate-500/5 flex items-center gap-2 ${
+          disabled={cooldown > 0}
+          onClick={() => { 
+            if (s === "Inactive") {
+              const blockReason = window.prompt("Type the reason for inactivating/blocking this restaurant account:");
+              if (blockReason === null) {
+                return;
+              }
+              onStatusUpdate(row.id, s, blockReason);
+            } else {
+              onStatusUpdate(row.id, s);
+            }
+            onClose(); 
+          }}
+          className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+            cooldown > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+          } ${
             row.status === s
               ? s === "Active" ? "text-emerald-500" : s === "Trial" ? "text-amber-500" : "text-slate-400"
               : darkMode ? "text-slate-300" : "text-slate-700"
@@ -75,32 +102,87 @@ function EditDropdownContent({
       <p className={`text-[10px] font-bold uppercase px-2 py-1 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
         Change Plan
       </p>
-      {(["Basic", "Standard", "Premium", "Enterprise"] as PlanType[]).map((p) => (
-        <button
-          key={p}
-          onClick={() => { onPlanUpdate(row.id, p); onClose(); }}
-          className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-slate-500/5 flex items-center gap-2 ${
-            row.plan === p ? (PLAN_COLORS[p] || PLAN_COLORS['Basic']).text : darkMode ? "text-slate-300" : "text-slate-700"
-          }`}
-        >
-          <span className={(PLAN_COLORS[p] || PLAN_COLORS['Basic']).text}>{PLAN_ICONS[p] || <Package size={12} />}</span>
-          {p}
-          {row.plan === p && <span className="ml-auto text-[9px] text-orange-500 font-bold">CURRENT</span>}
-        </button>
-      ))}
+      {plans && plans.length > 0 ? (
+        plans.map((p) => (
+          <button
+            key={p._id || p.id}
+            disabled={cooldown > 0}
+            onClick={() => { onPlanUpdate(row.id, p._id || p.id); onClose(); }}
+            className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+              cooldown > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+            } ${
+              row.plan === p.name ? (PLAN_COLORS[p.name] || PLAN_COLORS['Basic']).text : darkMode ? "text-slate-300" : "text-slate-700"
+            }`}
+          >
+            <span className={(PLAN_COLORS[p.name] || PLAN_COLORS['Basic']).text}>{PLAN_ICONS[p.name as PlanType] || <Package size={12} />}</span>
+            {p.name}
+            {row.plan === p.name && <span className="ml-auto text-[9px] text-orange-500 font-bold">CURRENT</span>}
+          </button>
+        ))
+      ) : (
+        (["Basic", "Standard", "Premium", "Enterprise"] as PlanType[]).map((p) => (
+          <button
+            key={p}
+            disabled={cooldown > 0}
+            onClick={() => { onPlanUpdate(row.id, p); onClose(); }}
+            className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+              cooldown > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+            } ${
+              row.plan === p ? (PLAN_COLORS[p] || PLAN_COLORS['Basic']).text : darkMode ? "text-slate-300" : "text-slate-700"
+            }`}
+          >
+            <span className={(PLAN_COLORS[p] || PLAN_COLORS['Basic']).text}>{PLAN_ICONS[p] || <Package size={12} />}</span>
+            {p}
+            {row.plan === p && <span className="ml-auto text-[9px] text-orange-500 font-bold">CURRENT</span>}
+          </button>
+        ))
+      )}
+
+      <div className={`h-px my-1.5 ${darkMode ? "bg-slate-800" : "bg-slate-100"}`} />
+      <p className={`text-[10px] font-bold uppercase px-2 py-1 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
+        Commission Rate
+      </p>
+      <button
+        type="button"
+        disabled={cooldown > 0}
+        onClick={async () => {
+          const currentRate = row.customCommissionRate !== undefined && row.customCommissionRate !== null ? row.customCommissionRate : 8;
+          const input = window.prompt(`Enter custom commission rate % for ${row.name}:`, String(currentRate));
+          if (input !== null && !isNaN(Number(input))) {
+            const rate = Math.min(100, Math.max(0, Number(input)));
+            try {
+              await apiClient.patch(`/superadmin/restaurants/${row.id}/commission`, { customCommissionRate: rate });
+              window.alert(`Custom commission set to ${rate}% for ${row.name}`);
+              onClose();
+              window.location.reload();
+            } catch (err) {
+              console.error("Failed to update custom commission rate", err);
+              window.alert("Failed to set custom commission rate.");
+            }
+          }
+        }}
+        className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+          cooldown > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+        } ${darkMode ? "text-slate-300" : "text-slate-700"}`}
+      >
+        <SlidersHorizontal size={12} className="text-orange-500" />
+        Set Custom Rate ({row.customCommissionRate !== undefined && row.customCommissionRate !== null ? `${row.customCommissionRate}%` : "Default"})
+      </button>
     </div>
   );
 }
 
-// ── Mobile card for a single restaurant ──────────────────────────────────────
 function MobileRestaurantCard({
-  row, darkMode, onView, onUpdateStatus, onUpdatePlan, onDelete,
+  row, darkMode, onView, onLiveActivity, onUpdateStatus, onUpdatePlan, onDelete, plans, cooldown,
 }: {
   row: RestaurantNode; darkMode: boolean;
   onView: (r: RestaurantNode) => void;
-  onUpdateStatus: (id: string, s: StatusType) => void;
-  onUpdatePlan: (id: string, p: PlanType) => void;
+  onLiveActivity: (r: RestaurantNode) => void;
+  onUpdateStatus: (id: string, s: StatusType, blockReason?: string) => void;
+  onUpdatePlan: (id: string, p: string) => void;
   onDelete: (id: string) => void;
+  plans: any[];
+  cooldown: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -159,7 +241,7 @@ function MobileRestaurantCard({
         {/* Plan + owner row */}
         <div className="flex items-center justify-between mt-3">
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide border ${planColors.text} ${planColors.border}`}>
-            {PLAN_ICONS[row.plan]}
+            {PLAN_ICONS[row.plan as PlanType]}
             {row.plan}
           </span>
           <span className={`text-xs font-medium ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
@@ -202,6 +284,17 @@ function MobileRestaurantCard({
         </button>
 
         <div className="flex items-center gap-1">
+          {/* Live Activity */}
+          <button
+            onClick={() => onLiveActivity(row)}
+            className={`p-1.5 rounded-lg transition-all hover:text-orange-500 hover:bg-orange-500/5 ${
+              darkMode ? "text-slate-500" : "text-slate-400"
+            }`}
+            title="Live Activity"
+          >
+            <Activity size={14} />
+          </button>
+
           {/* View */}
           <button
             onClick={() => onView(row)}
@@ -217,13 +310,19 @@ function MobileRestaurantCard({
           <div className="relative">
             <button
               onClick={() => { setShowMore(false); setShowEdit((v) => !v); }}
-              className={`p-1.5 rounded-lg transition-all ${
+              className={`p-1.5 rounded-lg transition-all flex items-center gap-1 ${
                 showEdit ? "text-orange-500 bg-orange-500/10"
                   : `hover:text-orange-500 hover:bg-orange-500/5 ${darkMode ? "text-slate-500" : "text-slate-400"}`
               }`}
               title="Edit status or plan"
             >
               <Edit2 size={14} />
+              {cooldown > 0 && (
+                <span className="text-[10px] font-bold text-red-500 px-1 py-0.5 rounded bg-red-500/10 animate-pulse flex items-center gap-0.5">
+                  <Clock size={9} />
+                  {cooldown}s
+                </span>
+              )}
             </button>
             {showEdit && (
               <>
@@ -233,7 +332,9 @@ function MobileRestaurantCard({
                     row={row} darkMode={darkMode}
                     onStatusUpdate={onUpdateStatus}
                     onPlanUpdate={onUpdatePlan}
+                    plans={plans}
                     onClose={() => setShowEdit(false)}
+                    cooldown={cooldown}
                   />
                 </div>
               </>
@@ -306,10 +407,41 @@ function EmptyState({ darkMode, label, onResetFilters }: { darkMode: boolean; la
 // ── Main component ────────────────────────────────────────────────────────────
 export default function SubscriptionTable({
   restaurants, darkMode, searchQuery, statusFilter, tierFilter,
-  onView, onUpdateStatus, onUpdatePlan, onDelete, onResetFilters,
+  onView, onLiveActivity, onUpdateStatus, onUpdatePlan, onDelete, plans, onResetFilters,
 }: SubscriptionTableProps) {
   const [editDropdownId, setEditDropdownId] = useState<string | null>(null);
   const [moreDropdownId, setMoreDropdownId] = useState<string | null>(null);
+
+  const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const initial: Record<string, number> = {};
+    restaurants.forEach((r) => {
+      if (r.cooldownRemaining && r.cooldownRemaining > 0) {
+        initial[r.id] = r.cooldownRemaining;
+      }
+    });
+    setCooldowns(initial);
+  }, [restaurants]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCooldowns((prev) => {
+        const next: Record<string, number> = {};
+        let changed = false;
+        Object.entries(prev).forEach(([id, val]) => {
+          if (val > 1) {
+            next[id] = val - 1;
+            changed = true;
+          } else {
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const closeAll = () => { setEditDropdownId(null); setMoreDropdownId(null); };
 
@@ -335,9 +467,12 @@ export default function SubscriptionTable({
             row={row}
             darkMode={darkMode}
             onView={onView}
+            onLiveActivity={onLiveActivity}
             onUpdateStatus={onUpdateStatus}
             onUpdatePlan={onUpdatePlan}
             onDelete={onDelete}
+            plans={plans}
+            cooldown={cooldowns[row.id] || 0}
           />
         ))}
       </div>
@@ -346,7 +481,7 @@ export default function SubscriptionTable({
       <div className={`hidden lg:block rounded-2xl border overflow-visible transition-all ${
         darkMode ? "bg-slate-900/40 border-slate-800/80" : "bg-white border-slate-200/70 shadow-sm"
       }`}>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[340px]">
           <table className="w-full text-left border-collapse min-w-[1050px]">
             <thead>
               <tr className={`border-b border-inherit text-[11px] font-bold uppercase tracking-wider ${
@@ -364,8 +499,9 @@ export default function SubscriptionTable({
             </thead>
 
             <tbody className={`divide-y text-sm ${darkMode ? "divide-slate-900/80" : "divide-slate-100"}`}>
-              {restaurants.map((row) => {
+              {restaurants.map((row, index) => {
                 const planColors = PLAN_COLORS[row.plan] || PLAN_COLORS['Basic'];
+                const openUpward = restaurants.length > 2 && index >= restaurants.length - 2;
                 return (
                   <tr
                     key={row.id}
@@ -422,7 +558,7 @@ export default function SubscriptionTable({
                     {/* Plan Badge */}
                     <td className="py-4 px-5 whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wide border ${planColors.text} ${planColors.border} ${planColors.icon.replace("text-", "bg-").replace("400", "500/10")}`}>
-                        {PLAN_ICONS[row.plan] || <Package size={12} />}
+                        {PLAN_ICONS[row.plan as PlanType] || <Package size={12} />}
                         {row.plan}
                       </span>
                     </td>
@@ -452,6 +588,15 @@ export default function SubscriptionTable({
                     <td className="py-4 px-5 whitespace-nowrap text-center relative overflow-visible">
                       <div className="flex items-center justify-center gap-1.5">
 
+                        {/* Live Activity */}
+                        <button
+                          onClick={() => onLiveActivity(row)}
+                          title="Live Activity"
+                          className={`p-1.5 rounded-lg transition-all hover:text-orange-500 hover:bg-orange-500/5 ${darkMode ? "text-slate-500" : "text-slate-400"}`}
+                        >
+                          <Activity size={14} />
+                        </button>
+
                         <button
                           onClick={() => { closeAll(); onView(row); }}
                           title="View details"
@@ -461,36 +606,49 @@ export default function SubscriptionTable({
                         </button>
 
                         {/* Edit dropdown */}
-                        <div className="relative">
+                        <div
+                          className="relative"
+                          onMouseEnter={() => { setMoreDropdownId(null); setEditDropdownId(row.id); }}
+                          onMouseLeave={() => setEditDropdownId(null)}
+                        >
                           <button
                             onClick={() => { setMoreDropdownId(null); setEditDropdownId(editDropdownId === row.id ? null : row.id); }}
                             title="Edit status or plan"
-                            className={`p-1.5 rounded-lg transition-all ${
+                            className={`p-1.5 rounded-lg transition-all flex items-center gap-1 ${
                               editDropdownId === row.id
                                 ? "text-orange-500 bg-orange-500/10"
                                 : `hover:text-orange-500 hover:bg-orange-500/5 ${darkMode ? "text-slate-500" : "text-slate-400"}`
                             }`}
                           >
                             <Edit2 size={14} />
+                            {(cooldowns[row.id] || 0) > 0 && (
+                              <span className="text-[10px] font-bold text-red-500 px-1 py-0.5 rounded bg-red-500/10 animate-pulse flex items-center gap-0.5">
+                                <Clock size={9} />
+                                {cooldowns[row.id]}s
+                              </span>
+                            )}
                           </button>
 
                           {editDropdownId === row.id && (
-                            <>
-                              <button type="button" className="fixed inset-0 z-10 cursor-default" onClick={() => setEditDropdownId(null)} aria-label="Close dropdown" />
-                              <div className="absolute right-0 mt-2 z-20">
-                                <EditDropdownContent
-                                  row={row} darkMode={darkMode}
-                                  onStatusUpdate={onUpdateStatus}
-                                  onPlanUpdate={onUpdatePlan}
-                                  onClose={() => setEditDropdownId(null)}
-                                />
-                              </div>
-                            </>
+                            <div className={`absolute right-0 z-20 ${openUpward ? "bottom-full pb-2" : "top-full pt-2"}`}>
+                              <EditDropdownContent
+                                row={row} darkMode={darkMode}
+                                onStatusUpdate={onUpdateStatus}
+                                onPlanUpdate={onUpdatePlan}
+                                plans={plans}
+                                onClose={() => setEditDropdownId(null)}
+                                cooldown={cooldowns[row.id] || 0}
+                              />
+                            </div>
                           )}
                         </div>
 
                         {/* More dropdown */}
-                        <div className="relative">
+                        <div
+                          className="relative"
+                          onMouseEnter={() => { setEditDropdownId(null); setMoreDropdownId(row.id); }}
+                          onMouseLeave={() => setMoreDropdownId(null)}
+                        >
                           <button
                             onClick={() => { setEditDropdownId(null); setMoreDropdownId(moreDropdownId === row.id ? null : row.id); }}
                             title="More options"
@@ -504,9 +662,8 @@ export default function SubscriptionTable({
                           </button>
 
                           {moreDropdownId === row.id && (
-                            <>
-                              <button type="button" className="fixed inset-0 z-10 cursor-default" onClick={() => setMoreDropdownId(null)} aria-label="Close dropdown" />
-                              <div className={`absolute right-0 mt-2 w-44 rounded-xl border p-1.5 shadow-2xl z-20 ${
+                            <div className={`absolute right-0 z-20 ${openUpward ? "bottom-full pb-2" : "top-full pt-2"}`}>
+                              <div className={`w-44 rounded-xl border p-1.5 shadow-2xl ${
                                 darkMode ? "bg-slate-950 border-slate-800 shadow-black/50" : "bg-white border-slate-200 shadow-slate-200"
                               }`}>
                                 <button onClick={() => { closeAll(); onView(row); }} className={`w-full text-left px-2.5 py-2 text-xs font-medium rounded-lg hover:bg-slate-500/5 flex items-center gap-2 ${darkMode ? "text-slate-300 hover:text-white" : "text-slate-700 hover:text-slate-900"}`}>
@@ -520,7 +677,7 @@ export default function SubscriptionTable({
                                   <Trash2 size={13} /> Remove Account
                                 </button>
                               </div>
-                            </>
+                            </div>
                           )}
                         </div>
                       </div>

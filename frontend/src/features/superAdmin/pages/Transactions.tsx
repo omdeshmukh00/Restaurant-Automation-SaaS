@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { StatusFilter, SortField, SortOrder, DateRange } from "../components/Transactions/Transactiontypes";
+import { StatusFilter, SortField, SortOrder, DateRange, Transaction } from "../components/Transactions/Transactiontypes";
 import { filterByDateRange, computeMetrics, exportToCSV } from "../utils/transactionUtils";
 import TransactionMetrics from "../components/Transactions/Transactionmetrics";
 import TransactionControls from "../components/Transactions/Transactioncontrols";
 import TransactionTable from "../components/Transactions/Transactiontable";
 import TransactionSummaryBar from "../components/Transactions/Transactionsummarybar";
-import { transactionData } from "../store/Transactions";
-import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
+import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
+
+import TablePagination from "../components/common/TablePagination";
 
 interface LayoutContextType {
   darkMode: boolean;
@@ -15,7 +16,10 @@ interface LayoutContextType {
 
 export default function Transactions() {
   const { darkMode } = useOutletContext<LayoutContextType>();
-  const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     const handleThemeSync = (e: Event) => {
@@ -29,6 +33,19 @@ export default function Transactions() {
       }
     };
     window.addEventListener("sync-app-theme", handleThemeSync);
+
+    const fetchTransactions = async () => {
+      try {
+        const txs = await superAdminRestaurantRequestsApi.getTransactions();
+        setTransactions(txs);
+      } catch (error) {
+        console.error("Failed to fetch transactions", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTransactions();
+
     return () => window.removeEventListener("sync-app-theme", handleThemeSync);
   }, []);
 
@@ -38,6 +55,10 @@ export default function Transactions() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [sortField, setSortField] = useState<SortField>("timestamp");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, paymentFilter, dateRange, sortField, sortOrder]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -55,36 +76,9 @@ export default function Transactions() {
     setDateRange("all");
   };
 
-  const linkedTransactions = useMemo(() => {
-    const existingRestaurantNames = new Set(
-      transactionData.map((transaction) => transaction.restaurant.toLowerCase())
-    );
-
-    const placeholderTransactions = approvedRestaurants
-      .filter(
-        (restaurant) => !existingRestaurantNames.has(restaurant.name.toLowerCase())
-      )
-      .map((restaurant, index) => ({
-        id: `ONB-${restaurant.id}`,
-        restaurant: restaurant.name,
-        restaurantId: restaurant.id,
-        amount: 0,
-        commission: 0,
-        commissionRate: 0,
-        paymentMethod: "UPI / Wallet" as const,
-        status: "Pending" as const,
-        timestamp: `2026-05-19 18:${String(30 + index).padStart(2, "0")}:00`,
-        city: restaurant.location.split(",")[0] || "Onboarding",
-        ordersCount: 0,
-        note: "Placeholder onboarding transaction until backend order data is connected",
-      }));
-
-    return [...placeholderTransactions, ...transactionData];
-  }, [approvedRestaurants]);
-
   const dateFiltered = useMemo(
-    () => filterByDateRange(linkedTransactions, dateRange),
-    [linkedTransactions, dateRange]
+    () => filterByDateRange(transactions, dateRange),
+    [transactions, dateRange]
   );
 
   const filteredTransactions = useMemo(() => {
@@ -127,6 +121,16 @@ export default function Transactions() {
     <div className={`min-h-screen px-4 sm:px-6 py-5 sm:py-8 transition-colors duration-300 ${
       darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
     }`}>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Transactions</h1>
+          <p className={`text-xs sm:text-sm mt-1 font-medium ${darkMode ? "text-slate-400" : "text-slate-600"}`}>
+            Monitor platform payments, commissions, and transaction logs.
+          </p>
+        </div>
+      </div>
+
       <TransactionMetrics metrics={metrics} darkMode={darkMode} />
       <TransactionControls
         searchTerm={searchTerm}
@@ -134,7 +138,7 @@ export default function Transactions() {
         paymentFilter={paymentFilter}
         dateRange={dateRange}
         darkMode={darkMode}
-        totalCount={linkedTransactions.length}
+        totalCount={transactions.length}
         filteredCount={filteredTransactions.length}
         onSearchChange={setSearchTerm}
         onStatusChange={setStatusFilter}
@@ -143,13 +147,28 @@ export default function Transactions() {
         onExport={handleExport}
         onResetAll={handleResetAll}
       />
-      <TransactionTable
-        transactions={sortedTransactions}
-        darkMode={darkMode}
-        sortField={sortField}
-        sortOrder={sortOrder}
-        onSort={handleSort}
-      />
+      <div className={`rounded-2xl border overflow-hidden shadow-sm my-4 ${
+        darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200/80'
+      }`}>
+        <div className="max-h-[620px] overflow-auto">
+          <TransactionTable
+            transactions={sortedTransactions.slice((currentPage - 1) * pageSize, currentPage * pageSize)}
+            darkMode={darkMode}
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={handleSort}
+          />
+        </div>
+        <TablePagination
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalItems={sortedTransactions.length}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          darkMode={darkMode}
+          itemLabel="transactions"
+        />
+      </div>
       <TransactionSummaryBar
         metrics={metrics}
         darkMode={darkMode}

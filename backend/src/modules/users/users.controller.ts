@@ -59,16 +59,14 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
   user.refreshTokens = []; // Invalidate all sessions on password change
   await user.save();
 
-  try {
-    await sendPasswordChangedAlertEmail(
-      user.email,
-      user.name,
-      req.ip,
-      req.headers['user-agent']
-    );
-  } catch (err) {
-    logger.error('Failed to send password changed alert', err);
-  }
+  sendPasswordChangedAlertEmail(
+    user.email,
+    user.name,
+    req.ip,
+    req.headers['user-agent']
+  ).catch((err) => {
+    logger.error('Failed to send password changed alert email asynchronously', err);
+  });
 
   sendSuccess(res, { message: 'Password changed successfully. Please log in again.' });
 });

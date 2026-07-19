@@ -83,6 +83,10 @@ export default function PaymentDialog({
             console.error('Payment verification failed:', err);
             const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message || 'Verification failed.';
             setErrorMessage(msg);
+            apiClient.post('/public/partner-request/payment-failed', {
+              orderId,
+              failureReason: msg,
+            }).catch(() => {});
             onPaymentFailure(msg);
           } finally {
             setVerifying(false);
@@ -103,7 +107,12 @@ export default function PaymentDialog({
         modal: {
           ondismiss: function () {
             setLoading(false);
-            onPaymentFailure('Payment checkout cancelled.');
+            const msg = 'Payment checkout cancelled by user.';
+            apiClient.post('/public/partner-request/payment-failed', {
+              orderId,
+              failureReason: msg,
+            }).catch(() => {});
+            onPaymentFailure(msg);
           },
         },
       };
@@ -112,7 +121,12 @@ export default function PaymentDialog({
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (resp: any) {
         setLoading(false);
-        onPaymentFailure(resp.error.description || 'Payment transaction failed.');
+        const reason = resp.error?.description || 'Payment transaction failed.';
+        apiClient.post('/public/partner-request/payment-failed', {
+          orderId,
+          failureReason: reason,
+        }).catch(() => {});
+        onPaymentFailure(reason);
       });
       rzp.open();
 

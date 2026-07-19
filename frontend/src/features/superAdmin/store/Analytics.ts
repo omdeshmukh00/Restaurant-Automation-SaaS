@@ -38,6 +38,7 @@ export interface PlatformOrder {
   type: string;
   grossAmount: number;
   commission: number;
+  commissionRate?: number;
   status: OrderStatus;
   timestamp: string;
 }
