@@ -88,6 +88,8 @@ export default function Restaurant() {
     } catch {
       return DEFAULT_FORM;
     }
+  });
+
   const fetchPlans = async () => {
     try {
       const list = await superAdminRestaurantRequestsApi.getPlans();
