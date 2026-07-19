@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useCleaning } from '../../hooks/usecleaning';
 import { getCleaningRolePermissions } from '../../utils/cleaningRoleAccess';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 interface NavItem {
   to: string;
@@ -28,6 +29,8 @@ interface Props {
 }
 
 export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Props) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "CleanServe";
   const { profile } = useCleaning();
   const allowedPaths = getCleaningRolePermissions(profile.role);
   const filteredNavItems = NAV_ITEMS.filter(({ to }) => allowedPaths.includes(to));
@@ -46,7 +49,7 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h1 className="font-bold text-base text-orange-500 dark:text-white leading-tight font-sans">CleanServe</h1>
+              <h1 className="font-bold text-base text-orange-500 dark:text-white leading-tight font-sans">{platformName}</h1>
               <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase font-sans">Staff Panel</p>
             </div>
           )}

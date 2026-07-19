@@ -5,6 +5,7 @@ import {
   Users, Package, UserCog, BarChart3, Settings,
   ArrowRight, Crown, LayoutGrid, X,
 } from 'lucide-react';
+import { usePlatformSettingsGuard } from '../../../shared/hooks/usePlatformSettingsGuard';
 
 const navItems = [
   { label: 'Dashboard',           icon: LayoutDashboard, to: '/admin' },
@@ -26,6 +27,8 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarProps): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "RestoHub";
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -71,7 +74,7 @@ export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarP
           <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center shadow-md">
             <UtensilsCrossed className="w-5 h-5 text-white" />
           </div>
-          {!collapsed && <span className="font-extrabold text-lg text-orange-500 tracking-tight">RestoHub</span>}
+          {!collapsed && <span className="font-extrabold text-lg text-orange-500 tracking-tight">{platformName}</span>}
         </div>
         <button
           onClick={onToggle}
