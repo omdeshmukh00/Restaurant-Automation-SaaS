@@ -60,11 +60,11 @@ app.use(
 );
 
 app.use(
-  morgan(env.isProduction ? 'combined' : 'dev', {
+  morgan((env.isProduction ? 'combined' : 'dev') as any, {
     stream: {
       write: (message) => logger.http(message.trim()),
     },
-    skip: (req) => !env.ENABLE_REQUEST_LOGS || (req.url && (req.url.includes('/platform-settings') || req.url.includes('/health'))),
+    skip: (req) => !env.ENABLE_REQUEST_LOGS || Boolean(req.url?.includes('/platform-settings') || req.url?.includes('/health')),
   }),
 );
 
