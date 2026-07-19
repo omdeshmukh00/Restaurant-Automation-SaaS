@@ -9,6 +9,10 @@ export interface PlatformSettingsData {
   disableCleaningPanel: boolean;
   disableAdminPanel: boolean;
   enablePartnerRegistration: boolean;
+  applicationFeeEnabled?: boolean;
+  applicationFeeAmount?: number;
+  currency?: string;
+  refundPolicy?: string;
   platformName?: string;
   supportEmail?: string;
 }
@@ -22,8 +26,7 @@ const listeners = new Set<(settings: PlatformSettingsData | null) => void>();
 
 async function fetchGlobalSettings(force = false) {
   const now = Date.now();
-  // Don't re-fetch if already fetching or fetched recently unless forced
-  if (isFetching || (!force && now - lastFetchTime < 15000 && globalSettings !== null)) {
+  if (isFetching || (!force && now - lastFetchTime < 10000 && globalSettings !== null)) {
     return;
   }
 
@@ -43,6 +46,10 @@ async function fetchGlobalSettings(force = false) {
           data.enablePartnerRegistration !== undefined
             ? !!data.enablePartnerRegistration
             : true,
+        applicationFeeEnabled: !!data.applicationFeeEnabled,
+        applicationFeeAmount: data.applicationFeeAmount !== undefined ? Number(data.applicationFeeAmount) : 0,
+        currency: data.currency || 'INR',
+        refundPolicy: data.refundPolicy || 'refundable',
         platformName: data.platformName,
         supportEmail: data.supportEmail,
       };

@@ -78,8 +78,15 @@ export default function PartnerForm() {
   React.useEffect(() => {
     apiClient.get('/public/platform-settings')
       .then((res) => {
-        if (res.data?.data) {
-          setSettings(res.data.data);
+        const data = res.data?.data || res.data;
+        if (data) {
+          setSettings({
+            applicationFeeEnabled: !!data.applicationFeeEnabled,
+            applicationFeeAmount: data.applicationFeeAmount !== undefined ? Number(data.applicationFeeAmount) : 0,
+            currency: data.currency || 'INR',
+            refundPolicy: data.refundPolicy || 'refundable',
+            enablePartnerRegistration: data.enablePartnerRegistration !== undefined ? !!data.enablePartnerRegistration : true,
+          });
         }
       })
       .catch((err) => console.error('Failed to load platform settings', err))
