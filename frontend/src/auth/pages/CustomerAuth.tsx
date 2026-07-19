@@ -17,9 +17,10 @@ const CustomerAuth: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const tableToken = searchParams.get('table_token');
-  const from = (location.state as any)?.from?.pathname || '/customer';
+  const fromPath = (location.state as any)?.from;
+  const from = fromPath ? `${fromPath.pathname}${fromPath.search || ''}` : '/customer';
 
-  const [mobile, setMobile] = useState('');
+  const [mobile, setMobile] = useState(searchParams.get('mobile') || '');
   const [otp, setOtp] = useState<string[]>(['', '', '', '']);
   const [name, setName] = useState('');
   const [userExists, setUserExists] = useState(false);

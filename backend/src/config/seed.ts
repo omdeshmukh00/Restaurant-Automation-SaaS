@@ -150,6 +150,120 @@ export async function seedDevelopmentData(): Promise<void> {
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
 
+  // Seed Super Admin Mock Restaurants into Database
+  await Promise.all([
+    RestaurantModel.findOneAndUpdate(
+      { slug: 'spice-paradise' },
+      {
+        $set: {
+          name: 'Spice Paradise',
+          slug: 'spice-paradise',
+          status: RestaurantStatus.ACTIVE,
+          plan: 'Premium',
+          cuisine: 'Indian',
+          city: 'Mumbai',
+          state: 'Maharashtra',
+          rating: 4.5,
+          ownerName: 'Rajesh Kumar',
+          email: 'rajesh@spiceparadise.com',
+          phone: '+91 98765 43210',
+          branches: 3,
+          expectedMonthlyOrders: 150,
+          settings: { currency: 'INR', taxRate: 0.05, serviceChargeEnabled: true, sessionDurationMinutes: 90 },
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    RestaurantModel.findOneAndUpdate(
+      { slug: 'urban-bites' },
+      {
+        $set: {
+          name: 'Urban Bites',
+          slug: 'urban-bites',
+          status: RestaurantStatus.ACTIVE,
+          plan: 'Standard',
+          cuisine: 'Fast Food',
+          city: 'Delhi',
+          state: 'NCR',
+          rating: 4.3,
+          ownerName: 'Priya Sharma',
+          email: 'priya@urbanbites.com',
+          phone: '+91 98765 43211',
+          branches: 2,
+          expectedMonthlyOrders: 120,
+          settings: { currency: 'INR', taxRate: 0.05, serviceChargeEnabled: true, sessionDurationMinutes: 90 },
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    RestaurantModel.findOneAndUpdate(
+      { slug: 'gourmet-haven' },
+      {
+        $set: {
+          name: 'Gourmet Haven',
+          slug: 'gourmet-haven',
+          status: RestaurantStatus.ACTIVE,
+          plan: 'Premium',
+          cuisine: 'Continental',
+          city: 'Bangalore',
+          state: 'Karnataka',
+          rating: 4.6,
+          ownerName: 'Amit Patel',
+          email: 'amit@gourmethaven.com',
+          phone: '+91 98765 43212',
+          branches: 1,
+          expectedMonthlyOrders: 90,
+          settings: { currency: 'INR', taxRate: 0.05, serviceChargeEnabled: true, sessionDurationMinutes: 90 },
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    RestaurantModel.findOneAndUpdate(
+      { slug: 'fusion-kitchen' },
+      {
+        $set: {
+          name: 'Fusion Kitchen',
+          slug: 'fusion-kitchen',
+          status: RestaurantStatus.ACTIVE,
+          plan: 'Basic',
+          cuisine: 'Italian',
+          city: 'Pune',
+          state: 'Maharashtra',
+          rating: 4.4,
+          ownerName: 'Neha Singh',
+          email: 'neha@fusionkitchen.com',
+          phone: '+91 98765 43213',
+          branches: 2,
+          expectedMonthlyOrders: 80,
+          settings: { currency: 'INR', taxRate: 0.05, serviceChargeEnabled: true, sessionDurationMinutes: 90 },
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+    RestaurantModel.findOneAndUpdate(
+      { slug: 'ocean-delights' },
+      {
+        $set: {
+          name: 'Ocean Delights',
+          slug: 'ocean-delights',
+          status: RestaurantStatus.ACTIVE,
+          plan: 'Standard',
+          cuisine: 'Seafood',
+          city: 'Chennai',
+          state: 'Tamil Nadu',
+          rating: 4.2,
+          ownerName: 'Vikram Reddy',
+          email: 'vikram@oceandelights.com',
+          phone: '+91 98765 43214',
+          branches: 1,
+          expectedMonthlyOrders: 70,
+          settings: { currency: 'INR', taxRate: 0.05, serviceChargeEnabled: true, sessionDurationMinutes: 90 },
+        },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    ),
+  ]);
+
   const [adminUser, customerUser, staffUser, , , superAdminUser] = await Promise.all([
     upsertUser({
       name: 'Admin',

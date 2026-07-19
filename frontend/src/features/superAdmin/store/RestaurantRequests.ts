@@ -3,7 +3,7 @@ import {
   placeholderRestaurantRequests,
   superAdminRestaurantRequestsApi,
 } from "../api/superAdmin.api";
-import { restaurantData } from "./Restaurants";
+import { apiClient } from "../../../shared/services/apiClient";
 import type { RestaurantsRow, NewRestaurantForm } from "../components/Restaurants/Restauranttypes";
 
 export interface RestaurantRequest {
@@ -40,9 +40,10 @@ interface RestaurantRequestsState {
   requests: RestaurantRequest[];
   plans: any[];
   fetchRequests: () => Promise<void>;
+  fetchRestaurants: () => Promise<void>;
   approveRequest: (id: string) => Promise<void>;
   denyRequest: (id: string, reason: string, refund?: boolean) => Promise<void>;
-  addRestaurant: (restaurant: NewRestaurantForm) => Promise<void>;
+  addRestaurant: (restaurant: NewRestaurantForm | any) => Promise<void>;
   updateRestaurantStatus: (
     id: string,
     status: "Active" | "Trial" | "Inactive",
@@ -94,6 +95,27 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
         });
       } catch (error) {
         console.error("Failed to fetch requests", error);
+      }
+    },
+    fetchRestaurants: async () => {
+      try {
+        const response = await apiClient.get('/superadmin/restaurants');
+        const items = response.data?.data?.restaurants || [];
+        const mapped = items.map((r: any) => ({
+          id: r._id || r.id,
+          name: r.name,
+          owner: r.ownerName || 'Unknown',
+          email: r.email || '',
+          phone: r.phone || '',
+          location: `${r.city || 'Mumbai'}, ${r.state || 'Maharashtra'}`,
+          plan: r.plan === 'STARTER' ? 'Basic' : r.plan === 'PRO' ? 'Standard' : 'Premium',
+          status: r.status === 'ACTIVE' ? 'Active' : r.status === 'TRIAL' ? 'Trial' : 'Inactive',
+          revenue: `₹${((r.expectedMonthlyOrders || 0) * 125).toLocaleString('en-IN')}`,
+          branches: r.branches || 1,
+        }));
+        set({ restaurants: mapped });
+      } catch (error) {
+        console.error("Failed to fetch restaurants", error);
       }
     },
     approveRequest: async (id) => {

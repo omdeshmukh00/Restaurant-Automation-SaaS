@@ -20,6 +20,7 @@ import type {
   UpdateFeatureFlagInput,
   AnalyticsQuery,
   SuperAdminAuditLogQuery,
+  CreateRestaurantInput,
 } from './superAdmin.schema';
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -1499,8 +1500,6 @@ export async function rejectRestaurantRequest(
   });
 
   return request;
-}
-
 export async function updateRestaurantStatus(id: string, statusStr: 'Active' | 'Trial' | 'Inactive', blockReason?: string) {
   let status: RestaurantStatus;
   if (statusStr === 'Active') {
@@ -2205,4 +2204,90 @@ export async function checkUsageLimitsAndNotify(): Promise<void> {
   } catch (err) {
     console.error('Failed to run checkUsageLimitsAndNotify scanner', err);
   }
+}
+
+export async function createRestaurant(input: CreateRestaurantInput) {
+  const slug = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  
+  // Check if slug is already used
+  const existingRestaurant = await RestaurantModel.findOne({ slug });
+  if (existingRestaurant) {
+    throw new AppError('A restaurant with this name or slug already exists', 409, ErrorCode.CONFLICT);
+  }
+
+  const existingUser = await UserModel.findOne({ email: input.email });
+  if (existingUser) {
+    throw new AppError('A user with this email already exists', 409, ErrorCode.CONFLICT);
+  }
+
+  const restaurantId = new mongoose.Types.ObjectId();
+  const tenantId = restaurantId.toString();
+
+  // Map plan to backend formats
+  let backendPlan = 'STARTER';
+  if (input.plan === 'Standard') backendPlan = 'PRO';
+  if (input.plan === 'Premium') backendPlan = 'PREMIUM';
+  if (input.plan === 'Free') backendPlan = 'FREE';
+
+  // Map status to backend formats
+  let backendStatus = RestaurantStatus.PENDING_APPROVAL;
+  if (input.status === 'Active') backendStatus = RestaurantStatus.ACTIVE;
+  if (input.status === 'Inactive') backendStatus = RestaurantStatus.SUSPENDED;
+
+  // Create Restaurant
+  const [restaurant] = await RestaurantModel.create([{
+    _id: restaurantId,
+    slug,
+    name: input.name,
+    ownerName: input.owner,
+    email: input.email,
+    phone: input.phone,
+    cuisine: 'Multi-Cuisine',
+    city: input.location,
+    state: 'Maharashtra',
+    country: 'India',
+    pinCode: '400001',
+    plan: backendPlan,
+    status: backendStatus,
+    branches: input.branches || 1,
+    expectedMonthlyOrders: 0,
+    latitude: 0,
+    longitude: 0,
+  }]);
+
+  // Create Admin User
+  const bcrypt = await import('bcryptjs');
+  const tempPassword = 'Password123!';
+  const hashedPassword = await bcrypt.hash(tempPassword, 12);
+
+  const [adminUser] = await UserModel.create([{
+    name: input.owner,
+    email: input.email,
+    password: hashedPassword,
+    role: 'restaurant-admin',
+    status: 'ACTIVE',
+    restaurantId: restaurantId,
+    tenantId: tenantId,
+    isEmailVerified: true,
+    isMobileVerified: true,
+    mustResetPassword: true,
+    firstLogin: true,
+    mustChangePassword: true,
+  }]);
+
+  restaurant.adminUserId = adminUser._id as any;
+  await restaurant.save();
+
+  return {
+    id: restaurant._id,
+    name: restaurant.name,
+    owner: restaurant.ownerName,
+    email: restaurant.email,
+    phone: restaurant.phone,
+    location: restaurant.city,
+    plan: input.plan,
+    status: input.status,
+    revenue: input.revenue,
+    branches: restaurant.branches,
+  };
 }

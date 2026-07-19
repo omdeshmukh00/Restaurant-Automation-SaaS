@@ -18,6 +18,7 @@ import { superAdminRoutes } from '../routes/superAdmin.routes';
 import LandingPage from '../features/customer/pages/LandingPage';
 import RestaurantsPage from '../features/customer/pages/RestaurantsPage';
 import OffersPage from '../features/customer/pages/OffersPage';
+import PricingPage from '../features/customer/pages/PricingPage';
 import PartnerWithUs from '../pages/public/PartnerWithUs';
 import { lazy, Suspense } from 'react';
 
@@ -52,6 +53,13 @@ const router = createBrowserRouter([
   {
     path: '/customer/offers',
     element: <OffersPage />,
+    errorElement: <RootErrorBoundary />,
+  },
+
+  // ── Public pricing page ─────────────────────────────────────────────
+  {
+    path: '/pricing',
+    element: <PricingPage />,
     errorElement: <RootErrorBoundary />,
   },
 

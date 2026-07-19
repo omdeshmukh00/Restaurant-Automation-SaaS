@@ -289,10 +289,12 @@ export default function Subscriptions() {
     (state) => state.deleteRestaurant
   );
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+  const fetchRestaurants = useRestaurantRequestsStore((state) => state.fetchRestaurants);
 
   useEffect(() => {
     fetchRequests();
-  }, [fetchRequests]);
+    fetchRestaurants();
+  }, [fetchRequests, fetchRestaurants]);
 
   // Platform Settings State
   const [platformSettings, setPlatformSettings] = useState({

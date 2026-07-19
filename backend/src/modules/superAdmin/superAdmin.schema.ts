@@ -171,3 +171,17 @@ export const registerRestaurantSchema = z.object({
 });
 
 export type RegisterRestaurantInput = z.infer<typeof registerRestaurantSchema>;
+
+export const createRestaurantSchema = z.object({
+  name: z.string().min(1, 'Name is required').trim(),
+  owner: z.string().min(1, 'Owner name is required').trim(),
+  email: z.string().email('Invalid email').trim().toLowerCase(),
+  phone: z.string().min(1, 'Phone is required').trim(),
+  location: z.string().min(1, 'Location is required').trim(),
+  plan: z.enum(['Premium', 'Standard', 'Basic', 'Free']).optional().default('Basic'),
+  status: z.enum(['Active', 'Trial', 'Inactive']).optional().default('Trial'),
+  branches: z.number().int().min(1).optional().default(1),
+  revenue: z.string().optional().default('₹0'),
+});
+
+export type CreateRestaurantInput = z.infer<typeof createRestaurantSchema>;

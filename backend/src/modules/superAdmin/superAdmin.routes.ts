@@ -13,11 +13,13 @@ import {
   updateFeatureFlagSchema,
   analyticsQuerySchema,
   superAdminAuditLogQuerySchema,
+  createRestaurantSchema,
   registerRestaurantSchema,
 } from './superAdmin.schema';
 import {
   getPlatformOverview,
   listRestaurants,
+  createRestaurantController,
   getRestaurantById,
   approveRestaurant,
   suspendRestaurant,
@@ -93,6 +95,13 @@ router.get(
 // POST /super-admin/restaurants
 router.post(
   '/restaurants',
+  validate({ body: createRestaurantSchema }),
+  createRestaurantController,
+);
+
+// POST /super-admin/restaurants/register
+router.post(
+  '/restaurants/register',
   validate({ body: registerRestaurantSchema }),
   registerRestaurantController,
 );

@@ -88,8 +88,6 @@ export default function Restaurant() {
     } catch {
       return DEFAULT_FORM;
     }
-  });
-
   const fetchPlans = async () => {
     try {
       const list = await superAdminRestaurantRequestsApi.getPlans();
@@ -108,6 +106,14 @@ export default function Restaurant() {
     fetchRequests();
     fetchPlans();
   }, [fetchRequests]);
+=======
+  const fetchRestaurants = useRestaurantRequestsStore((state) => state.fetchRestaurants);
+
+  useEffect(() => {
+    fetchRequests();
+    fetchRestaurants();
+  }, [fetchRequests, fetchRestaurants]);
+>>>>>>> 34c69bb3eabe8f804be97357b07a77318ec87369
 
 
 
