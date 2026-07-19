@@ -21,11 +21,37 @@ if (!parsed.success) {
   throw new Error('Invalid environment variables');
 }
 
+/**
+ * Dynamically resolves localhost URLs to match the current browser hostname
+ * when accessing over local network IP (e.g. 10.x.x.x, 192.168.x.x).
+ */
+function resolveNetworkUrl(urlStr: string): string {
+  if (typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      try {
+        const u = new URL(urlStr);
+        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+          u.hostname = hostname;
+          return u.toString().replace(/\/$/, '');
+        }
+      } catch {
+        return urlStr.replace(/localhost|127\.0\.0\.1/g, hostname);
+      }
+    }
+  }
+  return urlStr;
+}
+
 export const env = {
   appName: parsed.data.VITE_APP_NAME,
   mode: parsed.data.VITE_APP_ENV,
-  apiUrl: parsed.data.VITE_API_URL,
-  socketUrl: parsed.data.VITE_SOCKET_URL,
+  get apiUrl() {
+    return resolveNetworkUrl(parsed.data.VITE_API_URL);
+  },
+  get socketUrl() {
+    return resolveNetworkUrl(parsed.data.VITE_SOCKET_URL);
+  },
   sentryDsn: parsed.data.VITE_SENTRY_DSN ?? '',
   notificationsEnabled: parsed.data.VITE_ENABLE_NOTIFICATIONS,
   analyticsEnabled: parsed.data.VITE_ENABLE_ANALYTICS,
