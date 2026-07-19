@@ -56,3 +56,68 @@ export async function verifyCustomerPayment(input: VerifyCustomerPaymentInput) {
 
   return response.data.data;
 }
+
+export type CustomerReservationInput = {
+  customerName?: string;
+  mobile?: string;
+  guests?: number;
+  date: string;
+  slot: string;
+  tableNumber?: string;
+  notes?: string;
+  occasion?: string;
+  preferredArea?: string;
+  status?: string;
+};
+
+export type CustomerReservationResponse = {
+  _id?: string;
+  id?: string;
+  customerName?: string;
+  mobile?: string;
+  guests?: number;
+  date?: string;
+  slot?: string;
+  status?: string;
+  occasion?: string;
+  preferredArea?: string;
+  notes?: string;
+  tableNumber?: string;
+};
+
+export async function createCustomerReservation(input: CustomerReservationInput) {
+  const response = await apiClient.post<ApiResponse<{ reservation: CustomerReservationResponse }>>(
+    '/customer/reservations',
+    input,
+  );
+
+  return response.data.data.reservation;
+}
+
+export async function getCustomerReservations() {
+  const response = await apiClient.get<ApiResponse<{ reservations: CustomerReservationResponse[] }>>(
+    '/customer/reservations',
+  );
+
+  return response.data.data.reservations ?? [];
+}
+
+export async function updateCustomerReservation(
+  id: string,
+  updates: Partial<CustomerReservationInput>,
+) {
+  const response = await apiClient.patch<ApiResponse<{ reservation: CustomerReservationResponse }>>(
+    `/customer/reservations/${id}`,
+    updates,
+  );
+
+  return response.data.data.reservation;
+}
+
+export async function cancelCustomerReservation(id: string) {
+  const response = await apiClient.post<ApiResponse<{ reservation: CustomerReservationResponse }>>(
+    `/customer/reservations/${id}/cancel`,
+  );
+
+  return response.data.data.reservation;
+}

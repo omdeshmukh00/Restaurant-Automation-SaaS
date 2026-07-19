@@ -1,17 +1,89 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useCustomerStore } from '../store/customer.store';
-import { useReservationsStore, Reservation } from '../../admin/store/reservations.store';
+import {
+  createCustomerReservation,
+  getCustomerReservations,
+  updateCustomerReservation,
+  cancelCustomerReservation,
+  type CustomerReservationResponse,
+} from '../api/customer.api';
 
-const TIME_SLOTS = [
-  { time: '06:00 PM', status: 'available' },
-  { time: '06:30 PM', status: 'available' },
-  { time: '07:00 PM', status: 'available' },
-  { time: '07:30 PM', status: 'available' },
-  { time: '08:00 PM', status: 'available' },
-  { time: '08:30 PM', status: 'limited' },
-  { time: '09:00 PM', status: 'limited' },
-  { time: '09:30 PM', status: 'available' },
-];
+type LocalReservation = {
+  id: string;
+  guestName: string;
+  email: string;
+  phone: string;
+  partySize: number;
+  date: string;
+  time: string;
+  status: string;
+  occasion: string;
+  seating: string;
+  notes: string;
+};
+
+function mapCustomerReservation(r: CustomerReservationResponse): LocalReservation {
+  const id = (r._id || r.id || '') as string;
+  return {
+    id,
+    guestName: r.customerName || '',
+    email: '',
+    phone: r.mobile || '',
+    partySize: r.guests || 1,
+    date: r.date || '',
+    time: r.slot || '',
+    status: r.status || 'PENDING',
+    occasion: r.occasion || '',
+    seating: r.preferredArea || 'Any Preference',
+    notes: r.notes || '',
+  };
+}
+
+// Restaurant serving window: 11:00 AM to 10:30 PM, in 30-minute increments.
+// Covers morning, afternoon and evening reservations.
+const SERVICE_START_HOUR = 11; // 11:00 AM
+const SERVICE_END_HOUR = 22; // 10:00 PM (last slot starts at 10:30 PM)
+const SLOT_INTERVAL_MINUTES = 30;
+
+// A few slots are flagged as "limited" so the UI can hint at lower availability.
+const LIMITED_SLOTS = new Set(['01:00 PM', '07:30 PM', '08:00 PM', '09:00 PM']);
+
+function formatSlotTime(hour24: number, minute: number): string {
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const minStr = minute.toString().padStart(2, '0');
+  return `${hour12.toString().padStart(2, '0')}:${minStr} ${period}`;
+}
+
+function buildTimeSlots(): { time: string; status: 'available' | 'limited' }[] {
+  const slots: { time: string; status: 'available' | 'limited' }[] = [];
+  for (let h = SERVICE_START_HOUR; h <= SERVICE_END_HOUR; h++) {
+    for (let m = 0; m < 60; m += SLOT_INTERVAL_MINUTES) {
+      if (h === SERVICE_END_HOUR && m > 30) break; // cap last slot at 10:30 PM
+      const time = formatSlotTime(h, m);
+      slots.push({ time, status: LIMITED_SLOTS.has(time) ? 'limited' : 'available' });
+    }
+  }
+  return slots;
+}
+
+const TIME_SLOTS = buildTimeSlots();
+
+// Returns true when a slot on the selected date is already in the past.
+function isSlotInPast(dateStr: string, slotTime: string): boolean {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(slotTime.trim());
+  if (!match) return false;
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = match[3].toUpperCase();
+  if (period === 'PM' && hour < 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  if (!y || !mo || !d) return false;
+  const slotDate = new Date(y, mo - 1, d, hour, minute, 0, 0);
+  return slotDate.getTime() <= Date.now();
+}
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 const getTomorrowStr = () => {
@@ -19,21 +91,24 @@ const getTomorrowStr = () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
   return tomorrow.toISOString().split('T')[0];
 };
-const getRandomTableId = () => Math.floor(Math.random() * 12) + 1;
 
 export default function CustomerReservationPage() {
   const { profile, addNotification } = useCustomerStore();
-  const { allReservations, addReservation, updateReservation, updateReservationStatus } = useReservationsStore();
+  const [reservations, setReservations] = useState<LocalReservation[]>([]);
+  const [loadingReservations, setLoadingReservations] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
   const [todayStr] = useState(getTodayStr);
   const [tomorrowStr] = useState(getTomorrowStr);
 
+  const firstValidSlot = TIME_SLOTS.find((s) => !isSlotInPast(todayStr, s.time))?.time ?? TIME_SLOTS[0].time;
+
   const [guests, setGuests] = useState('2 Guests');
   const [date, setDate] = useState(todayStr);
-  const [time, setTime] = useState('07:00 PM');
+  const [time, setTime] = useState(firstValidSlot);
   const [area, setArea] = useState('Any Preference');
   const [specialRequest, setSpecialRequest] = useState('');
+  const [phone, setPhone] = useState(profile.phone || '');
   const [dateTab, setDateTab] = useState<'today' | 'tomorrow' | 'custom'>('today');
 
   // Track modification state
@@ -47,18 +122,55 @@ export default function CustomerReservationPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Filter reservations for current customer
-  const customerReservations = allReservations.filter(
-    (res) => res.email.toLowerCase() === profile.email.toLowerCase()
-  );
+  // Load the customer's own reservations from the backend on mount.
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setLoadingReservations(true);
+      try {
+        const list = await getCustomerReservations();
+        if (active) setReservations(list.map(mapCustomerReservation));
+      } catch (err) {
+        console.error('Failed to load customer reservations', err);
+      } finally {
+        if (active) setLoadingReservations(false);
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const refreshReservations = async () => {
+    try {
+      const list = await getCustomerReservations();
+      setReservations(list.map(mapCustomerReservation));
+    } catch (err) {
+      console.error('Failed to refresh customer reservations', err);
+    }
+  };
+
+  // Reservations for the current customer (already scoped server-side).
+  const customerReservations = reservations;
+
+  const ensureValidTime = (dateStr: string, currentTime: string) => {
+    if (!isSlotInPast(dateStr, currentTime)) return;
+    const valid = TIME_SLOTS.find((s) => !isSlotInPast(dateStr, s.time))?.time ?? TIME_SLOTS[0].time;
+    setTime(valid);
+  };
 
   const handleDateTabChange = (tab: 'today' | 'tomorrow' | 'custom') => {
     setDateTab(tab);
+    let nextDate = date;
     if (tab === 'today') {
+      nextDate = todayStr;
       setDate(todayStr);
     } else if (tab === 'tomorrow') {
+      nextDate = tomorrowStr;
       setDate(tomorrowStr);
     }
+    ensureValidTime(nextDate, time);
   };
 
   const handleDateInputChange = (newDate: string) => {
@@ -70,52 +182,58 @@ export default function CustomerReservationPage() {
     } else {
       setDateTab('custom');
     }
+    ensureValidTime(newDate, time);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const guestCount = parseInt(guests) || 2;
 
-    if (modifyingId) {
-      updateReservation(modifyingId, {
-        guests: guestCount,
-        date,
-        time,
-        occasion: area,
-        specialRequest,
-      });
-      addNotification(
-        'Reservation Updated! 📅',
-        `Your reservation has been modified to ${guestCount} guests on ${formatDateReadable(date)} at ${time}.`,
-        'info',
-        '/customer/reservations'
-      );
-      showToast('Reservation updated successfully!', 'success');
-      setModifyingId(null);
-    } else {
-      const newRes = {
-        name: profile.name,
-        email: profile.email,
-        phone: profile.phone,
-        time,
-        guests: guestCount,
-        tableNumber: `Table ${getRandomTableId()}`,
-        status: 'Confirmed' as const,
-        date,
-        specialRequest,
-        occasion: area,
-        avatar: profile.name.split(' ').map((n) => n[0]).join('').toUpperCase(),
-        avatarColor: 'bg-orange-500',
-      };
-      addReservation(newRes);
-      addNotification(
-        'Reservation Confirmed! 📅',
-        `Your table reservation for ${guestCount} guests on ${formatDateReadable(date)} at ${time} is confirmed.`,
-        'info',
-        '/customer/reservations'
-      );
-      showToast('Table reserved successfully!', 'success');
+    try {
+      if (modifyingId) {
+        await updateCustomerReservation(modifyingId, {
+          guests: guestCount,
+          date,
+          slot: time,
+          occasion: area,
+          notes: specialRequest,
+          preferredArea: area,
+        });
+        await refreshReservations();
+        addNotification(
+          'Reservation Updated! 📅',
+          `Your reservation has been modified to ${guestCount} guests on ${formatDateReadable(date)} at ${time}.`,
+          'info',
+          '/customer/reservations'
+        );
+        showToast('Reservation updated successfully!', 'success');
+        setModifyingId(null);
+      } else {
+        await createCustomerReservation({
+          customerName: profile.name,
+          mobile: phone,
+          guests: guestCount,
+          date,
+          slot: time,
+          occasion: area,
+          notes: specialRequest,
+          preferredArea: area,
+          status: 'CONFIRMED',
+        });
+        await refreshReservations();
+        addNotification(
+          'Reservation Confirmed! 📅',
+          `Your table reservation for ${guestCount} guests on ${formatDateReadable(date)} at ${time} is confirmed.`,
+          'info',
+          '/customer/reservations'
+        );
+        showToast('Table reserved successfully!', 'success');
+      }
+    } catch (err) {
+      console.error('Failed to save reservation', err);
+      showToast('Could not save reservation. Please try again.', 'error');
+      return;
     }
 
     // Reset inputs
@@ -124,16 +242,18 @@ export default function CustomerReservationPage() {
     setTime('07:00 PM');
     setArea('Any Preference');
     setSpecialRequest('');
+    setPhone(profile.phone || '');
     setDateTab('today');
   };
 
-  const handleModify = (res: Reservation) => {
+  const handleModify = (res: LocalReservation) => {
     setModifyingId(res.id);
-    setGuests(`${res.guests} Guests`);
+    setGuests(`${res.partySize} Guests`);
     setDate(res.date);
     setTime(res.time);
-    setArea(res.occasion || 'Any Preference');
-    setSpecialRequest(res.specialRequest || '');
+    setArea(res.seating || 'Any Preference');
+    setSpecialRequest(res.notes || '');
+    setPhone(res.phone || profile.phone || '');
 
     if (res.date === todayStr) {
       setDateTab('today');
@@ -149,15 +269,22 @@ export default function CustomerReservationPage() {
     showToast('Loaded reservation details', 'info');
   };
 
-  const handleCancel = (id: string) => {
-    updateReservationStatus(id, 'Cancelled');
-    addNotification(
-      'Reservation Cancelled 📅',
-      `Your table reservation has been cancelled.`,
-      'info',
-      '/customer/reservations'
-    );
-    showToast('Reservation cancelled', 'info');
+  const handleCancel = async (id: string) => {
+    try {
+      await cancelCustomerReservation(id);
+      await refreshReservations();
+      addNotification(
+        'Reservation Cancelled 📅',
+        `Your table reservation has been cancelled.`,
+        'info',
+        '/customer/reservations'
+      );
+      showToast('Reservation cancelled', 'info');
+    } catch (err) {
+      console.error('Failed to cancel reservation', err);
+      showToast('Could not cancel reservation. Please try again.', 'error');
+      return;
+    }
     if (modifyingId === id) {
       setModifyingId(null);
       setGuests('2 Guests');
@@ -229,6 +356,25 @@ export default function CustomerReservationPage() {
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-sd-outline text-[18px]">expand_more</span>
                 </div>
               </div>
+              {/* Phone */}
+              <div className="space-y-1.5">
+                <label htmlFor="phone-input" className="text-xs font-semibold text-sd-on-surface-variant font-sans">Phone Number</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-sd-outline text-[20px] pointer-events-none">call</span>
+                  <input
+                    id="phone-input"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    required
+                    placeholder="10-digit mobile number"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    className="w-full h-12 pl-10 pr-4 bg-sd-surface rounded-xl border border-sd-surface-variant focus:border-sd-primary-container focus:ring-1 focus:ring-sd-primary-container text-sm font-sans"
+                  />
+                </div>
+              </div>
               {/* Date */}
               <div className="space-y-1.5">
                 <label htmlFor="date-input" className="text-xs font-semibold text-sd-on-surface-variant font-sans">Date</label>
@@ -255,14 +401,14 @@ export default function CustomerReservationPage() {
                     value={time}
                     onChange={(e) => setTime(e.target.value)}
                   >
-                    <option>06:00 PM</option>
-                    <option>06:30 PM</option>
-                    <option>07:00 PM</option>
-                    <option>07:30 PM</option>
-                    <option>08:00 PM</option>
-                    <option>08:30 PM</option>
-                    <option>09:00 PM</option>
-                    <option>09:30 PM</option>
+                    {TIME_SLOTS.map(({ time: slotTime }) => {
+                      const past = isSlotInPast(date, slotTime);
+                      return (
+                        <option key={slotTime} value={slotTime} disabled={past}>
+                          {slotTime}{past ? ' (Unavailable)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-sd-outline text-[18px]">expand_more</span>
                 </div>
@@ -357,20 +503,26 @@ export default function CustomerReservationPage() {
               {TIME_SLOTS.map(({ time: slotTime, status }) => {
                 const isSelected = time === slotTime;
                 const isLimited = status === 'limited';
+                const isPast = isSlotInPast(date, slotTime);
                 return (
                   <button
                     key={slotTime}
                     type="button"
-                    onClick={() => setTime(slotTime)}
+                    disabled={isPast}
+                    onClick={() => !isPast && setTime(slotTime)}
                     className={`p-4 rounded-xl flex flex-col items-center gap-1 transition-all ${
-                      isSelected
+                      isPast
+                        ? 'border border-sd-surface-variant opacity-40 cursor-not-allowed'
+                        : isSelected
                         ? 'border-2 border-sd-primary-container bg-sd-primary-container/5 shadow-md'
                         : 'border border-sd-surface-variant hover:border-sd-primary'
                     }`}
                   >
                     <span className={`text-sm font-bold font-sans ${isSelected ? 'text-sd-primary' : ''}`}>{slotTime}</span>
-                    <span className={`text-[10px] uppercase font-bold font-sans ${isLimited ? 'text-sd-primary' : 'text-sd-secondary'}`}>
-                      {isLimited ? 'Limited' : 'Available'}
+                    <span className={`text-[10px] uppercase font-bold font-sans ${
+                      isPast ? 'text-sd-outline' : isLimited ? 'text-sd-primary' : 'text-sd-secondary'
+                    }`}>
+                      {isPast ? 'Unavailable' : isLimited ? 'Limited' : 'Available'}
                     </span>
                   </button>
                 );
@@ -414,7 +566,11 @@ export default function CustomerReservationPage() {
               </span>
             </div>
             <div className="px-5 pb-5">
-              {customerReservations.length > 0 ? (
+              {loadingReservations ? (
+                <div className="border border-dashed border-sd-surface-variant rounded-2xl p-6 text-center text-sd-on-surface-variant/60 font-sans">
+                  <p className="text-xs font-semibold">Loading reservations…</p>
+                </div>
+              ) : customerReservations.length > 0 ? (
                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1 sd-custom-scrollbar">
                   {customerReservations.map((res) => (
                     <div key={res.id} className="border border-sd-surface-variant rounded-2xl overflow-hidden">
@@ -430,23 +586,23 @@ export default function CustomerReservationPage() {
                                 <span className="material-symbols-outlined text-[12px]">schedule</span> {res.time}
                               </div>
                               <div className="flex items-center gap-1 text-sd-on-surface-variant text-[10px] font-sans">
-                                <span className="material-symbols-outlined text-[12px]">group</span> {res.guests} Guests
+                                <span className="material-symbols-outlined text-[12px]">group</span> {res.partySize} Guests
                               </div>
                             </div>
-                            {res.occasion && res.occasion !== 'Any Preference' && (
+                            {res.seating && res.seating !== 'Any Preference' && (
                               <div className="mt-1 text-[10px] text-sd-primary font-semibold font-sans">
-                                Preference: {res.occasion}
+                                Preference: {res.seating}
                               </div>
                             )}
-                            {res.specialRequest && (
-                              <p className="mt-1.5 text-[10px] text-sd-on-surface-variant italic font-sans max-w-[170px] truncate" title={res.specialRequest}>
-                                &ldquo;{res.specialRequest}&rdquo;
+                            {res.notes && (
+                              <p className="mt-1.5 text-[10px] text-sd-on-surface-variant italic font-sans max-w-[170px] truncate" title={res.notes}>
+                                &ldquo;{res.notes}&rdquo;
                               </p>
                             )}
                           </div>
                           <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase font-sans ${
-                            res.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
-                            res.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                            res.status === 'CONFIRMED' || res.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
+                            res.status === 'CANCELLED' || res.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
                           }`}>{res.status}</span>
                         </div>
                         {res.status !== 'Cancelled' && (

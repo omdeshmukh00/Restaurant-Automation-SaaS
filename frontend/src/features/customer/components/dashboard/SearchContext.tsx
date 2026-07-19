@@ -211,38 +211,50 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 
   const fetchMenu = useCallback(async () => {
     if (!diningSession?.restaurantId) return;
+    const restaurantId = diningSession.restaurantId;
     try {
-      const res = await apiClient.get(`/public/menu?restaurantId=${diningSession.restaurantId}`);
-      const data = res.data?.data || res.data;
-      if (data) {
-        const catMap = new Map(data.categories.map((c: any) => [c._id.toString(), c.name]));
-        
-        const mappedItems: MenuItem[] = data.menuItems
-          .filter((item: any) => item.isAvailable)
-          .map((item: any) => ({
-            id: item._id,
-            name: item.name,
-            price: item.price,
-            image: item.image || '',
-            description: item.description || '',
-            category: catMap.get(item.categoryId?.toString() || '') || 'Main',
-            rating: item.rating || 4.5,
-            reviews: item.reviews || 10,
-            isVeg: item.isVeg,
-            isSpicy: item.isSpicy,
-          }));
+      const [itemsRes, catsRes] = await Promise.all([
+        apiClient.get(`/public/menu/${restaurantId}`),
+        apiClient.get(`/public/menu/${restaurantId}/categories`),
+      ]);
 
-        const mappedCats = [
-          { name: 'All', icon: 'grid_view' },
-          ...data.categories.map((c: any) => ({
-            name: c.name,
-            icon: getCategoryIcon(c.name),
-          })),
-        ];
+      const itemsData = itemsRes.data?.data || itemsRes.data;
+      const catsData = catsRes.data?.data || catsRes.data;
 
-        setMenuItems(mappedItems);
-        setCategories(mappedCats);
-      }
+      const backendCategories: any[] = Array.isArray(catsData) ? catsData : [];
+      const backendItems: any[] = Array.isArray(itemsData?.items)
+        ? itemsData.items
+        : Array.isArray(itemsData)
+          ? itemsData
+          : [];
+
+      const catMap = new Map(backendCategories.map((c: any) => [c._id?.toString(), c.name]));
+
+      const mappedItems: MenuItem[] = backendItems
+        .filter((item: any) => item.isAvailable !== false)
+        .map((item: any) => ({
+          id: item._id,
+          name: item.name,
+          price: item.price,
+          image: item.image || '',
+          description: item.description || '',
+          category: catMap.get(item.categoryId?.toString()) || 'Main',
+          rating: typeof item.rating === 'number' ? item.rating : 0,
+          reviews: typeof item.reviews === 'number' ? item.reviews : 0,
+          isVeg: item.isVeg,
+          isSpicy: item.isSpicy,
+        }));
+
+      const mappedCats = [
+        { name: 'All', icon: 'grid_view' },
+        ...backendCategories.map((c: any) => ({
+          name: c.name,
+          icon: getCategoryIcon(c.name),
+        })),
+      ];
+
+      setMenuItems(mappedItems);
+      setCategories(mappedCats);
     } catch (err) {
       console.error('Failed to fetch menu', err);
     }

@@ -24,8 +24,10 @@ export class ReservationsService {
     slot: string;
     notes?: string;
     occasion?: string;
+    preferredArea?: string;
     status?: ReservationStatus;
     tableNumber?: string;
+    sessionId?: string;
     notificationPreference?: NotificationPreference;
   }) {
     await assertFeatureAccess(data.restaurantId, 'reservationAccess', 'Reservations');
@@ -90,7 +92,9 @@ if (data.tableNumber) {
       tableId,
       notes: data.notes,
       occasion: data.occasion,
+      preferredArea: data.preferredArea || null,
       status: data.status || ReservationStatus.PENDING,
+      sessionId: data.sessionId ? new mongoose.Types.ObjectId(data.sessionId) : null,
       notificationPreference: data.notificationPreference || NotificationPreference.NONE,
     });
 
@@ -201,6 +205,7 @@ if (data.tableNumber) {
       tableNumber?: string;
       notes: string;
       occasion?: string;
+      preferredArea?: string;
       notificationPreference: NotificationPreference;
     }>
   ) {

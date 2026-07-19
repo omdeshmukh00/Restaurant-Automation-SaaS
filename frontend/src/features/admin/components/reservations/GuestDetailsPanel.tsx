@@ -613,6 +613,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   { icon: <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: format12h(selectedGuest.time) },
                   { icon: <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `${selectedGuest.guests} Guests` },
                   { icon: <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `Table ${selectedGuest.tableNumber}` },
+                  { icon: <span className="text-sm sm:text-base">📍</span>, text: selectedGuest.preferredArea ? `Area: ${selectedGuest.preferredArea}` : 'Area: No preference' },
                 ].map(({ icon, text }, idx) => (
                   <div key={idx} className="flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                     {icon}

@@ -227,6 +227,7 @@ export interface Reservation {
   phone: string;
   email: string;
   occasion?: string;
+  preferredArea?: string;
 }
 
 export interface TableSlot {
@@ -553,6 +554,7 @@ export const useReservationsStore = create<ReservationsStore>()(
               phone: reservation.phone || reservation.mobile || '',
               email: reservation.email || reservation.customerEmail || '',
               occasion: reservation.occasion || '',
+              preferredArea: reservation.preferredArea || '',
             } as Reservation;
           });
 

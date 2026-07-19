@@ -17,7 +17,7 @@ export default function CustomerLayout() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const qrToken = searchParams.get('qr_token');
-  const { diningSession, setDiningSession, checkSessionInactivity, tableCode, setTableCode } = useCustomerStore();
+  const { diningSession, setDiningSession, checkSessionInactivity, validateStoredSession, tableCode, setTableCode } = useCustomerStore();
   const { signInAs } = useAuth();
   
   const [loadingSession, setLoadingSession] = useState(false);
@@ -42,6 +42,13 @@ export default function CustomerLayout() {
   useEffect(() => {
     document.title = 'Smart-Dining';
   }, []);
+
+  // Validate any persisted session token on load. If it's stale/invalid
+  // (e.g. carried over from another database), purge it so a dead session
+  // can't auto-revive the old customer on refresh.
+  useEffect(() => {
+    validateStoredSession();
+  }, [validateStoredSession]);
 
   // Inactivity check
   useEffect(() => {

@@ -20,6 +20,8 @@ export interface IReservation extends Document {
   tableId?: Types.ObjectId | null;
   notes?: string;
   occasion?: string;
+  preferredArea?: string | null;
+  sessionId?: Types.ObjectId | null;
   notificationPreference: NotificationPreference;
   notificationSentAt?: Date | null;
   lastNotificationType?: string | null;
@@ -52,6 +54,8 @@ const reservationSchema = new Schema<IReservation>(
     tableId: { type: Schema.Types.ObjectId, ref: 'Table', default: null },
     notes: { type: String, trim: true },
     occasion: { type: String, trim: true, default: null },
+    preferredArea: { type: String, trim: true, default: null },
+    sessionId: { type: Schema.Types.ObjectId, ref: 'TableSession', default: null, index: true },
     notificationPreference: {
       type: String,
       enum: Object.values(NotificationPreference),

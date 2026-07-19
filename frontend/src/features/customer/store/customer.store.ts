@@ -182,6 +182,7 @@ type CustomerStore = {
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
   clearDiningSession: () => Promise<void>;
+  validateStoredSession: () => Promise<void>;
   recordActivity: () => void;
   checkSessionInactivity: () => Promise<void>;
 
@@ -445,8 +446,10 @@ export const useCustomerStore = create<CustomerStore>()(
           try {
             await apiClient.post('/customer/session/end');
           } catch (e: any) {
-            console.error('Failed to end dining session on backend', e);
-            throw new Error(e.response?.data?.message || 'Failed to end dining session');
+            // Backend session may already be gone (e.g. switched DB, token
+            // from another environment). Log but still clear locally so the
+            // customer is logged out regardless.
+            console.warn('Could not end dining session on backend (continuing local logout)', e?.response?.status ?? e?.message);
           }
         }
         localStorage.removeItem('x-session-token');
@@ -455,6 +458,22 @@ export const useCustomerStore = create<CustomerStore>()(
           lastActivity: null,
         });
         disconnectSocket();
+      },
+
+      validateStoredSession: async () => {
+        const token = localStorage.getItem('x-session-token');
+        if (!token) return;
+        try {
+          await apiClient.get('/customer/session');
+        } catch (e: any) {
+          // Token is invalid/stale (e.g. from a different DB). Purge it so a
+          // dead session from another environment can't revive on reload.
+          if (e?.response?.status === 401 || e?.response?.status === 404) {
+            localStorage.removeItem('x-session-token');
+            set({ diningSession: null, lastActivity: null });
+            disconnectSocket();
+          }
+        }
       },
       recordActivity: () => {
         if (get().diningSession) {
@@ -570,6 +589,15 @@ export const useCustomerStore = create<CustomerStore>()(
     }),
     {
       name: 'restohub-customer-store',
+      // Do NOT persist the session-bearing fields. The session token lives in
+      // the separate `x-session-token` localStorage key and is re-validated on
+      // every load via `validateStoredSession`. Persisting `diningSession`
+      // here would let a stale/invalid session (e.g. from a different database)
+      // silently "revive" the UI on reload while every real API call still 401s.
+      partialize: (state) => {
+        const { diningSession, lastActivity, ...rest } = state;
+        return rest;
+      },
     }
   )
 );

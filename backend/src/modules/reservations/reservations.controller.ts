@@ -40,6 +40,7 @@ function mapReservationDto(reservation: any) {
     tableNumber: reservation.tableId?.tableNumber || reservation.tableNumber || '',
     specialRequest: reservation.notes || '',
     occasion: reservation.occasion || '',
+    preferredArea: reservation.preferredArea || '',
   };
 }
 
@@ -58,6 +59,7 @@ export async function createReservationController(req: Request, res: Response, n
       tableNumber: req.body.tableNumber, 
       notes: req.body.notes,
       occasion: req.body.occasion,
+      preferredArea: req.body.preferredArea,
     });
 
     ok(res, { reservation: mapReservationDto(reservation) }, 201);
