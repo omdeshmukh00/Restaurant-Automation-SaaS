@@ -61,7 +61,7 @@ export async function runSessionCleanup(): Promise<void> {
     logger.error('CRITICAL: Failed to execute background session cleanup job', { error });
   } finally {
     const duration = Date.now() - startTime;
-    if (scannedCount > 0) {
+    if (expiredCount > 0 || failedCount > 0) {
       logger.info('🧹 Background session cleanup completed', {
         scannedSessions: scannedCount,
         expiredSessions: expiredCount,
@@ -79,7 +79,6 @@ export async function runSessionCleanup(): Promise<void> {
 export function startExpireSessionsJob(): cron.ScheduledTask {
   // Run every minute
   const task = cron.schedule('* * * * *', async () => {
-    logger.debug('Running scheduled session cleanup job...');
     await runSessionCleanup();
   });
 
