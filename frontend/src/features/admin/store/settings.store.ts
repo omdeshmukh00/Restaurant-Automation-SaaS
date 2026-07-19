@@ -1,26 +1,28 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { adminRestaurantApi } from '../api/admin.restaurants.api';
+import { adminUserApi } from '../api/admin.users.api';
+import { useStaffStore } from './staff.store';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
-export interface ProfileSettings {
-  fullName: string;
+export interface AdminProfileData {
+  id: string;
+  name: string;
   email: string;
-  phone: string;
   role: string;
-  avatarSeed: string;
+  mobile: string;
 }
 
-export interface RestaurantInfo {
+export interface RestaurantInfoData {
   name: string;
   type: string;
   cuisine: string;
   phone: string;
   address: string;
+  city: string;
 }
 
-export interface BillingInfo {
+export interface BillingData {
   plan: string;
+  currency: string;
   cycle: string;
   nextBillingDate: string;
   amount: string;
@@ -28,14 +30,14 @@ export interface BillingInfo {
   cardLast4: string;
 }
 
-export interface TeamPermissions {
+export interface TeamData {
   totalMembers: number;
-  administrators: number;
   managers: number;
-  staffMembers: number;
+  kitchenStaff: number;
+  serviceStaff: number;
 }
 
-export interface NotificationPreference {
+export interface NotificationPref {
   id: string;
   label: string;
   description: string;
@@ -46,170 +48,302 @@ export interface Integration {
   id: string;
   name: string;
   description: string;
-  status: 'Connected' | 'Not Connected';
   icon: string;
   color: string;
+  status: string;
 }
 
-export interface SettingsState {
-  profile: ProfileSettings;
-  restaurant: RestaurantInfo;
-  billing: BillingInfo;
-  team: TeamPermissions;
-  notifications: NotificationPreference[];
-  integrations: Integration[];
+const STATIC_INTEGRATIONS: Integration[] = [
+  {
+    id: 'pos',
+    name: 'POS System',
+    description: 'Sync orders with your point-of-sale',
+    icon: 'CreditCard',
+    color: 'bg-indigo-50 text-indigo-600',
+    status: 'Not connected',
+  },
+  {
+    id: 'accounting',
+    name: 'Accounting',
+    description: 'Connect to accounting software',
+    icon: 'PieChart',
+    color: 'bg-emerald-50 text-emerald-600',
+    status: 'Not connected',
+  },
+  {
+    id: 'delivery',
+    name: 'Delivery Partners',
+    description: 'Integrate with delivery platforms',
+    icon: 'Truck',
+    color: 'bg-orange-50 text-orange-600',
+    status: 'Not connected',
+  },
+  {
+    id: 'marketing',
+    name: 'Marketing',
+    description: 'Email & SMS marketing tools',
+    icon: 'Megaphone',
+    color: 'bg-pink-50 text-pink-600',
+    status: 'Not connected',
+  },
+];
+
+interface SettingsState {
+  loading: boolean;
+  error: string | null;
   activeSection: string;
-  editingProfile: boolean;
+  admin: AdminProfileData;
+  restaurant: RestaurantInfoData;
+  billing: BillingData;
+  team: TeamData;
+  notifications: NotificationPref[];
+  integrations: Integration[];
   editingRestaurant: boolean;
+  saved: string | null;
+
+  setActiveSection: (section: string) => void;
+  setEditingRestaurant: (value: boolean) => void;
+  clearSaved: () => void;
+  fetchSettings: () => Promise<void>;
+  updateProfile: (data: { name?: string; mobile?: string }) => Promise<void>;
+  updateRestaurantInfo: (data: Partial<RestaurantInfoData>) => Promise<void>;
+  changePlan: (plan: string) => Promise<void>;
+  toggleNotification: (id: string) => Promise<void>;
+  toggleIntegration: (id: string) => Promise<void>;
 }
 
-// ── Initial Data ──────────────────────────────────────────────────────────
+const initialIntegrationStatus = () =>
+  STATIC_INTEGRATIONS.map((i) => ({ ...i, status: 'Not connected' }));
 
-const initialState: SettingsState = {
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+  loading: false,
+  error: null,
   activeSection: 'profile',
-  editingProfile: false,
-  editingRestaurant: false,
-
-  profile: {
-    fullName: 'David Brown',
-    email: 'david.brown@restohub.com',
-    phone: '+1 (555) 123-4567',
-    role: 'Administrator',
-    avatarSeed: 'Debesh',
-  },
-
-  restaurant: {
-    name: 'The Gourmet Kitchen',
-    type: 'Fine Dining',
-    cuisine: 'Multi-cuisine',
-    phone: '+1 (555) 987-6543',
-    address: '123 Culinary Street, Foodville, CA 90210, USA',
-  },
-
+  admin: { id: '', name: '', email: '', role: '', mobile: '' },
+  restaurant: { name: '', type: '', cuisine: '', phone: '', address: '', city: '' },
   billing: {
-    plan: 'Premium Plan',
-    cycle: 'Monthly',
-    nextBillingDate: 'Jun 18, 2025',
-    amount: '₹14,900',
-    paymentMethod: 'VISA',
-    cardLast4: '4242',
+    plan: 'Free',
+    currency: 'INR',
+    cycle: '—',
+    nextBillingDate: 'Not available',
+    amount: '—',
+    paymentMethod: 'Not connected',
+    cardLast4: '—',
   },
-
-  team: {
-    totalMembers: 12,
-    administrators: 3,
-    managers: 4,
-    staffMembers: 5,
-  },
-
+  team: { totalMembers: 0, managers: 0, kitchenStaff: 0, serviceStaff: 0 },
   notifications: [
     {
-      id: 'orders',
-      label: 'Order Notifications',
-      description: 'Receive notifications for new orders',
-      enabled: true,
+      id: 'dailySalesReports',
+      label: 'Daily Sales Reports',
+      description: 'Receive a summary of sales at the end of each day',
+      enabled: false,
     },
     {
-      id: 'reservations',
-      label: 'Reservation Alerts',
-      description: 'Receive alerts for new reservations',
-      enabled: true,
+      id: 'inventoryAlerts',
+      label: 'Inventory Alerts',
+      description: 'Get notified when stock runs low',
+      enabled: false,
     },
     {
-      id: 'lowStock',
-      label: 'Low Stock Alerts',
-      description: 'Get notified for low inventory items',
-      enabled: true,
-    },
-    {
-      id: 'systemUpdates',
-      label: 'System Updates',
-      description: 'Important system updates and announcements',
+      id: 'staffNotifications',
+      label: 'Staff Notifications',
+      description: 'Updates about staff shifts and assignments',
       enabled: false,
     },
   ],
+  integrations: initialIntegrationStatus(),
+  editingRestaurant: false,
+  saved: null,
 
-  integrations: [
-    {
-      id: 'stripe',
-      name: 'Stripe',
-      description: 'Payment Processing',
-      status: 'Connected',
-      icon: '💳',
-      color: '#635bff',
-    },
-    {
-      id: 'square',
-      name: 'Square',
-      description: 'POS Integration',
-      status: 'Connected',
-      icon: '⬛',
-      color: '#3e4348',
-    },
-    {
-      id: 'mailchimp',
-      name: 'Mailchimp',
-      description: 'Email Marketing',
-      status: 'Not Connected',
-      icon: '🐒',
-      color: '#ffe01b',
-    },
-    {
-      id: 'googleAnalytics',
-      name: 'Google Analytics',
-      description: 'Analytics & Reporting',
-      status: 'Connected',
-      icon: '📊',
-      color: '#e37400',
-    },
-  ],
-};
+  setActiveSection: (section) => set({ activeSection: section }),
+  setEditingRestaurant: (value) => set({ editingRestaurant: value }),
+  clearSaved: () => set({ saved: null }),
 
-// ── Store ──────────────────────────────────────────────────────────────────
+  fetchSettings: async () => {
+    set({ loading: true, error: null });
+    try {
+      const [settingsRes, overviewRes, meRes] = await Promise.all([
+        adminRestaurantApi.getSettings().catch(() => null),
+        adminRestaurantApi.getOverview().catch(() => null),
+        adminUserApi.getMe().catch(() => null),
+      ]);
 
-interface SettingsStore extends SettingsState {
-  setActiveSection: (section: string) => void;
-  setEditingProfile: (v: boolean) => void;
-  setEditingRestaurant: (v: boolean) => void;
-  updateProfile: (data: Partial<ProfileSettings>) => void;
-  updateRestaurant: (data: Partial<RestaurantInfo>) => void;
-  toggleNotification: (id: string) => void;
-  toggleIntegration: (id: string) => void;
-}
+      // Ensure the staff list is loaded so team counts are accurate.
+      const staffState = useStaffStore.getState();
+      if (!staffState.members || staffState.members.length === 0) {
+        await staffState.fetchMembers().catch(() => undefined);
+      }
+      const members = useStaffStore.getState().members || [];
 
-export const useSettingsStore = create<SettingsStore>()(
-  persist(
-    (set) => ({
-      ...initialState,
+      const settings = settingsRes?.settings;
+      const billingSummary = settingsRes?.billing ?? null;
+      const restaurant = overviewRes?.restaurant;
+      const me = meRes;
 
-      setActiveSection: (section) => set({ activeSection: section }),
-      setEditingProfile: (v) => set({ editingProfile: v }),
-      setEditingRestaurant: (v) => set({ editingRestaurant: v }),
+      const email = settings?.emailPreferences;
+      const notifications: NotificationPref[] = [
+        {
+          id: 'dailySalesReports',
+          label: 'Daily Sales Reports',
+          description: 'Receive a summary of sales at the end of each day',
+          enabled: Boolean(email?.dailySalesReports),
+        },
+        {
+          id: 'inventoryAlerts',
+          label: 'Inventory Alerts',
+          description: 'Get notified when stock runs low',
+          enabled: Boolean(email?.inventoryAlerts),
+        },
+        {
+          id: 'staffNotifications',
+          label: 'Staff Notifications',
+          description: 'Updates about staff shifts and assignments',
+          enabled: Boolean(email?.staffNotifications),
+        },
+      ];
 
-      updateProfile: (data) =>
-        set((state) => ({ profile: { ...state.profile, ...data } })),
+      const managers = members.filter((m) => m.role === 'Manager').length;
+      const kitchenStaff = members.filter((m) => m.role === 'Chef').length;
+      const serviceStaff = members.filter((m) =>
+        ['Server', 'Bartender', 'Host', 'Cleaner'].includes(m.role)
+      ).length;
 
-      updateRestaurant: (data) =>
-        set((state) => ({ restaurant: { ...state.restaurant, ...data } })),
+      const backendIntegrations = settings?.integrations ?? {};
+      const integrations: Integration[] = STATIC_INTEGRATIONS.map((i) => ({
+        ...i,
+        status: backendIntegrations[i.id]?.connected ? 'Connected' : 'Not connected',
+      }));
 
-      toggleNotification: (id) =>
-        set((state) => ({
-          notifications: state.notifications.map((n) =>
-            n.id === id ? { ...n, enabled: !n.enabled } : n
-          ),
-        })),
-
-      toggleIntegration: (id) =>
-        set((state) => ({
-          integrations: state.integrations.map((i) =>
-            i.id === id
-              ? { ...i, status: i.status === 'Connected' ? 'Not Connected' : 'Connected' }
-              : i
-          ) as Integration[],
-        })),
-    }),
-    {
-      name: 'admin-settings-store',
+      set({
+        loading: false,
+        admin: me
+          ? {
+              id: me.id,
+              name: me.name || '',
+              email: me.email,
+              role: me.role,
+              mobile: me.mobile || '',
+            }
+          : get().admin,
+        restaurant: {
+          name: settingsRes?.restaurant?.name ?? restaurant?.name ?? '',
+          type: settingsRes?.restaurant?.type ?? restaurant?.type ?? '',
+          cuisine: settingsRes?.restaurant?.cuisine ?? restaurant?.cuisine ?? '',
+          phone: settingsRes?.restaurant?.phone ?? restaurant?.phone ?? '',
+          address: settingsRes?.restaurant?.address ?? restaurant?.address ?? '',
+          city: settingsRes?.restaurant?.city ?? restaurant?.city ?? '',
+        },
+        billing: {
+          plan: billingSummary?.plan ?? restaurant?.plan ?? 'Free',
+          currency: billingSummary?.currency ?? settings?.currency ?? 'INR',
+          cycle: billingSummary?.cycle ?? '—',
+          nextBillingDate: billingSummary?.nextBillingDate ?? 'Not available',
+          amount: billingSummary?.amount ?? '—',
+          paymentMethod: 'Not connected',
+          cardLast4: '—',
+        },
+        team: {
+          totalMembers: members.length,
+          managers,
+          kitchenStaff,
+          serviceStaff,
+        },
+        notifications,
+        integrations,
+      });
+    } catch (e) {
+      set({
+        loading: false,
+        error: e instanceof Error ? e.message : 'Failed to load settings',
+      });
     }
-  )
-);
+  },
+
+  updateProfile: async (data) => {
+    const updated = await adminUserApi.updateMe(data);
+    set((s) => ({
+      admin: {
+        ...s.admin,
+        name: updated.name || s.admin.name,
+        mobile: updated.mobile || s.admin.mobile,
+      },
+      saved: 'Profile updated',
+    }));
+  },
+
+  updateRestaurantInfo: async (data) => {
+    await adminRestaurantApi.updateSettings(data);
+    set((s) => ({
+      restaurant: { ...s.restaurant, ...data },
+      editingRestaurant: false,
+      saved: 'Restaurant information saved',
+    }));
+  },
+
+  changePlan: async (plan) => {
+    await adminRestaurantApi.updateSettings({ plan });
+    set((s) => ({
+      billing: { ...s.billing, plan },
+      saved: `Plan changed to ${plan}`,
+    }));
+  },
+
+  toggleNotification: async (id) => {
+    const current = get().notifications.find((n) => n.id === id);
+    if (!current) return;
+    const nextEnabled = !current.enabled;
+
+    // Optimistic update
+    set((s) => ({
+      notifications: s.notifications.map((n) =>
+        n.id === id ? { ...n, enabled: nextEnabled } : n
+      ),
+    }));
+
+    const emailPreferences: Record<string, boolean> = {};
+    for (const n of get().notifications) {
+      emailPreferences[n.id] = n.enabled;
+    }
+
+    try {
+      await adminRestaurantApi.updateSettings({ emailPreferences });
+      set({ saved: 'Notification preferences saved' });
+    } catch {
+      // Revert on failure
+      set((s) => ({
+        notifications: s.notifications.map((n) =>
+          n.id === id ? { ...n, enabled: current.enabled } : n
+        ),
+      }));
+    }
+  },
+
+  toggleIntegration: async (id) => {
+    const current = get().integrations.find((i) => i.id === id);
+    if (!current) return;
+    const nextConnected = current.status !== 'Connected';
+
+    // Optimistic update
+    set((s) => ({
+      integrations: s.integrations.map((i) =>
+        i.id === id ? { ...i, status: nextConnected ? 'Connected' : 'Not connected' } : i
+      ),
+    }));
+
+    const integrations: Record<string, { connected: boolean }> = {
+      [id]: { connected: nextConnected },
+    };
+
+    try {
+      await adminRestaurantApi.updateSettings({ integrations });
+      set({ saved: nextConnected ? `${current.name} connected` : `${current.name} disconnected` });
+    } catch {
+      // Revert on failure
+      set((s) => ({
+        integrations: s.integrations.map((i) =>
+          i.id === id ? { ...i, status: current.status } : i
+        ),
+      }));
+    }
+  },
+}));

@@ -240,8 +240,6 @@ export class MenuController {
   static getCustomerCategories = asyncHandler(async (req: Request, res: Response) => {
     const restaurantId = MenuController.getRestaurantIdFromReq(req);
 
-    console.log("Restaurant ID from session:", restaurantId);
-    
     const categories = await MenuService.getCategories(restaurantId, {
       excludeHidden: true,
       activeOnly: true,

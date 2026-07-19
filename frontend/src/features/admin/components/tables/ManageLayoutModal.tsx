@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function ManageLayoutModal({ onClose }: Props): JSX.Element {
-  const { floors: storeFloors, sections: storeSections, updateRestaurantSettings } = useTablesStore();
+  const { floors: storeFloors, sections: storeSections, updateRestaurantSettings, addFloor, removeFloor, addSection, removeSection } = useTablesStore();
 
   const [floors, setFloors] = useState<{ name: string; number: number }[]>(() =>
     storeFloors.map((f) => ({ name: f.name, number: f.number }))
@@ -16,13 +16,28 @@ export function ManageLayoutModal({ onClose }: Props): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAddFloor = () => {
+  const handleAddFloor = async () => {
     const nextNum = floors.length > 0 ? Math.max(...floors.map((f) => f.number)) + 1 : 1;
-    setFloors([...floors, { name: `Floor ${nextNum}`, number: nextNum }]);
+    const newFloor = { name: `Floor ${nextNum}`, number: nextNum };
+    try {
+      const saved = await addFloor(newFloor);
+      setFloors([...floors, saved.find((f) => f.number === nextNum) ?? newFloor]);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err.message || 'Failed to add floor.');
+    }
   };
 
-  const handleRemoveFloor = (index: number) => {
+  const handleRemoveFloor = async (index: number) => {
+    const floor = floors[index];
+    const prev = floors;
     setFloors(floors.filter((_, i) => i !== index));
+    try {
+      const saved = await removeFloor(floor.number);
+      setFloors(saved);
+    } catch (err: any) {
+      setFloors(prev);
+      setError(err?.response?.data?.message || err.message || 'Failed to remove floor.');
+    }
   };
 
   const handleFloorChange = (index: number, field: 'name' | 'number', value: any) => {
@@ -31,12 +46,27 @@ export function ManageLayoutModal({ onClose }: Props): JSX.Element {
     setFloors(updated);
   };
 
-  const handleAddSection = () => {
-    setSections([...sections, `Section ${sections.length + 1}`]);
+  const handleAddSection = async () => {
+    const newName = `Section ${sections.length + 1}`;
+    try {
+      const saved = await addSection(newName);
+      setSections([...sections, saved[saved.length - 1] ?? newName]);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err.message || 'Failed to add section.');
+    }
   };
 
-  const handleRemoveSection = (index: number) => {
+  const handleRemoveSection = async (index: number) => {
+    const section = sections[index];
+    const prev = sections;
     setSections(sections.filter((_, i) => i !== index));
+    try {
+      const saved = await removeSection(section);
+      setSections(saved);
+    } catch (err: any) {
+      setSections(prev);
+      setError(err?.response?.data?.message || err.message || 'Failed to remove section.');
+    }
   };
 
   const handleSectionChange = (index: number, value: string) => {
@@ -65,7 +95,7 @@ export function ManageLayoutModal({ onClose }: Props): JSX.Element {
       onClose();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Failed to save settings.');
+      setError(err?.response?.data?.message || err.message || 'Failed to save settings.');
     } finally {
       setLoading(false);
     }

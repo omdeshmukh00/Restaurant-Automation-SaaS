@@ -27,6 +27,10 @@ export const createTableSchema = z.object({
   assignedStaffId: z.string().optional().nullable(),
   qrCode: z.string().optional(),
   qrToken: z.string().optional(),
+  status: z.nativeEnum(TableStatus).optional(),
+  notes: z.string().optional(),
+  shape: z.string().optional(),
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
 });
 
 export const updateTableSchema = z.object({
@@ -36,6 +40,9 @@ export const updateTableSchema = z.object({
   section: z.string().optional(),
   assignedStaffId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  notes: z.string().optional(),
+  shape: z.string().optional(),
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
 });
 
 export const updateTableStatusSchema = z.object({

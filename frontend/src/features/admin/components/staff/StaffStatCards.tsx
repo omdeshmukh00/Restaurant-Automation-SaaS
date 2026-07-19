@@ -87,7 +87,7 @@ export function StaffStatCards(): JSX.Element {
       <StatCard
         icon={<Wallet className="w-5 h-5 text-blue-500" />}
         iconBg="bg-blue-50 dark:bg-blue-950/40"
-        label="Total Payroll (May)"
+        label="Total Payroll"
         value={stats.totalPayroll}
         sub={stats.totalPayrollChange}
         subColor="text-red-500"

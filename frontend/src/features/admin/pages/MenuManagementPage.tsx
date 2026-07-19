@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { MenuHeader } from '../components/menu/MenuHeader';
 import { MenuCategoryPanel } from '../components/menu/MenuCategoryPanel';
 import { MenuFilterBar } from '../components/menu/MenuFilterBar';
 import { MenuGrid } from '../components/menu/MenuGrid';
+import { useMenuStore } from '../store/menu.store';
 
 export function MenuManagementPage(): JSX.Element {
   const [showCategories, setShowCategories] = useState(false);
+  const refresh = useMenuStore((s) => s.refresh);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-950">

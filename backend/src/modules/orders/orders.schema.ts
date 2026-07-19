@@ -13,6 +13,12 @@ export enum PaymentStatus {
   REFUNDED = "REFUNDED",
 }
 
+export enum PaymentMethod {
+  CASH = "CASH",
+  CARD = "CARD",
+  ONLINE = "ONLINE",
+}
+
 export interface IOrderItem {
   menuItemId: mongoose.Types.ObjectId;
   name: string;
@@ -54,6 +60,7 @@ export interface IOrder extends Document {
   priority: Priority;
 
   paymentStatus: PaymentStatus;
+  paymentMethod?: PaymentMethod | null;
 
   specialInstructions?: string;
 
@@ -233,6 +240,12 @@ export const orderSchema = new Schema<IOrder>(
       default: PaymentStatus.PENDING,
     },
 
+    paymentMethod: {
+      type: String,
+      enum: Object.values(PaymentMethod),
+      default: null,
+    },
+
     specialInstructions: {
       type: String,
       trim: true,
@@ -328,6 +341,7 @@ orderSchema.index({ createdAt: 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ priority: 1 });
 orderSchema.index({ paymentStatus: 1 });
+orderSchema.index({ paymentMethod: 1 });
 orderSchema.index({ kitchenStaffId: 1 });
 orderSchema.index({ serviceStaffId: 1 });
 orderSchema.index({ restaurantId: 1, stockDeducted: 1, createdAt: 1 });
@@ -394,23 +408,31 @@ export const customerOrdersQuerySchema = z.object({
 export const adminOrdersQuerySchema = z.object({
   status: z.nativeEnum(OrderStatus).optional(),
   paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  paymentMethod: z.nativeEnum(PaymentMethod).optional(),
   dateRange: z.enum(['today', 'yesterday', 'last7', 'last30']).optional(),
   table: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().max(100).optional(),
+  limit:  z.coerce.number().int().positive().max(1000).optional(),
 });
 
 export const adminOrderUpdateSchema = z.object({
   status: z.nativeEnum(OrderStatus).optional(),
   table: z.string().optional(),
   paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  paymentMethod: z.nativeEnum(PaymentMethod).optional(),
   specialInstructions: z.string().trim().max(500).optional(),
+  // When true, lets an admin force-set a status, bypassing the normal order
+  // state machine. Only sent by the admin Edit Order modal.
+  adminOverride: z.boolean().optional(),
 });
 
 export const createAdminOrderBodySchema = z.object({
   customerName: z.string().trim().min(1).max(100),
   table: z.string().trim().min(1),
   paymentStatus: z.nativeEnum(PaymentStatus).optional(),
+  paymentMethod: z.nativeEnum(PaymentMethod).optional(),
+  // ObjectId of the staff member to assign to the order (optional).
+  assignedStaff: z.string().optional(),
   items: z.array(z.object({
     menuItemId: z.string().optional(),
     name: z.string().trim().min(1),

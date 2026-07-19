@@ -698,7 +698,7 @@ function LoginHistoryModal({
   useEffect(() => {
     async function fetchLogs() {
       try {
-        const res = await apiClient.get(`/audit-logs?actorId=${member.id}&action=AUTH_LOGIN`);
+        const res = await apiClient.get(`/admin/audit-logs?actorId=${member.id}&action=AUTH_LOGIN`);
         setLogs(res.data.data.logs || []);
       } catch (err) {
         console.error('Failed to fetch login history', err);

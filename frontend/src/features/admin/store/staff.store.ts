@@ -8,7 +8,6 @@ export type StaffRole       = 'Manager' | 'Chef' | 'Server' | 'Bartender' | 'Hos
 export type StaffDepartment = 'Management' | 'Kitchen' | 'Service' | 'Bar' | 'Front Desk' | 'Cleaning';
 export type StaffStatus     = 'Active' | 'On Leave' | 'Inactive';
 export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Leave';
-export type ShiftTime       = 'Morning' | 'Evening' | 'Night';
 
 export interface StaffMember {
   id: string;
@@ -20,21 +19,26 @@ export interface StaffMember {
   phone: string;
   status: StaffStatus;
   hireDate: string;
-  performance: number; // 1-5
-  salary: number; // in INR
+  performance: number; // 0-5, derived from the performance endpoint
+  salary: number; // in INR, from backend
+  dateOfBirth?: string; // ISO date, from backend
   dbRole?: string;
-  kitchen_role?: string;
-  staff_role?: string;
-  cleaning_role?: string;
+  kitchen_role?: string | null;
+  staff_role?: string | null;
+  cleaning_role?: string | null;
 }
 
-export interface Shift {
+export interface ShiftAssignment {
   id: string;
-  label: string;
-  time: string;
-  staffCount: number;
-  staffAvatars: string[];
-  extra: number;
+  staffId: string;
+  staffName: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  days: string[];
+  notes?: string;
+  scheduledToday: boolean;
+  activeNow: boolean;
 }
 
 export interface UpcomingBirthday {
@@ -42,10 +46,11 @@ export interface UpcomingBirthday {
   name: string;
   avatar: string;
   date: string;
+  daysUntil?: number;
 }
 
 export interface AttendanceBreakdown {
-  label: AttendanceStatus;
+  label: string;
   count: number;
   color: string;
 }
@@ -76,11 +81,249 @@ export interface RoleDistribution {
   color: string;
 }
 
+export interface AttendanceRecord {
+  staffId: string;
+  name: string;
+  role: string;
+  status: string;
+  activeShift: { clockIn: string; clockOut: string | null } | null;
+  scheduledToday: boolean;
+  onShiftNow: boolean;
+  attendanceStatus: string;
+}
+
+export interface PerformanceRecord {
+  staffId: string;
+  name: string;
+  role: string;
+  status: string;
+  serviceOrders: number;
+  completedServiceOrders: number;
+  serviceCompletionRate: number;
+  kitchenOrders: number;
+  readyKitchenOrders: number;
+  kitchenCompletionRate: number;
+  avgKitchenMinutes: number;
+  acceptedRequests: number;
+  completedRequests: number;
+  startedCleaningTasks: number;
+  completedCleaningTasks: number;
+  verifiedCleaningTasks: number;
+}
+
+export interface AddStaffInput {
+  name: string;
+  email: string;
+  phone: string;
+  password?: string;
+  dbRole?: string;
+  kitchen_role?: string | null;
+  staff_role?: string | null;
+  cleaning_role?: string | null;
+  role: StaffRole;
+  department: StaffDepartment;
+  status: StaffStatus;
+  salary: number;
+  dateOfBirth?: string;
+}
+
+// ── Mapping Helper ─────────────────────────────────────────────────────────
+
+export function mapBackendUserToStaffMember(user: any): StaffMember {
+  const initials = user.name
+    ? user.name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
+    : 'US';
+
+  let feRole: StaffRole = 'Server';
+  let feDept: StaffDepartment = 'Service';
+
+  if (user.role === 'kitchen-staff') {
+    feRole = 'Chef';
+    feDept = 'Kitchen';
+  } else if (user.role === 'service-staff') {
+    feRole = 'Server';
+    feDept = 'Service';
+  } else if (user.role === 'cleaning-staff') {
+    feRole = 'Cleaner';
+    feDept = 'Cleaning';
+  } else if (user.role === 'restaurant-admin') {
+    feRole = 'Manager';
+    feDept = 'Management';
+  }
+
+  let feStatus: StaffStatus = 'Active';
+  if (user.status === 'INACTIVE' || user.status === 'BLOCKED') {
+    feStatus = 'Inactive';
+  } else if (user.status === 'SUSPENDED') {
+    feStatus = 'On Leave';
+  }
+
+  const hireDate = user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'Jan 1, 2024';
+
+  return {
+    id: user._id || user.id,
+    name: user.name,
+    email: user.email,
+    avatar: initials,
+    role: feRole,
+    department: feDept,
+    phone: user.mobile || '',
+    status: feStatus,
+    hireDate,
+    performance: 0, // filled in from the performance endpoint
+    salary: typeof user.salary === 'number' ? user.salary : 0,
+    dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString() : undefined,
+    dbRole: user.role,
+    kitchen_role: user.kitchen_role ?? null,
+    staff_role: user.staff_role ?? null,
+    cleaning_role: user.cleaning_role ?? null,
+  };
+}
+
+// ── Derived data helpers (all computed from real backend data) ─────────────
+
+const ROLE_COLORS: Record<StaffRole, string> = {
+  Manager: '#f97316',
+  Chef: '#22c55e',
+  Server: '#3b82f6',
+  Bartender: '#a855f7',
+  Host: '#eab308',
+  Cleaner: '#64748b',
+};
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function computePerformanceScore(p?: PerformanceRecord): number {
+  if (!p) return 0;
+  const blend = ((p.serviceCompletionRate || 0) + (p.kitchenCompletionRate || 0)) / 2;
+  return Math.round(blend * 5 * 10) / 10;
+}
+
+function withPerformance(members: StaffMember[], performance: PerformanceRecord[]): StaffMember[] {
+  const map = new Map(performance.map((p) => [p.staffId, p]));
+  return members.map((m) => ({ ...m, performance: computePerformanceScore(map.get(m.id)) }));
+}
+
+function deriveStats(
+  members: StaffMember[],
+  attendance: AttendanceRecord[],
+  performance: PerformanceRecord[],
+): StaffStats {
+  const totalStaff = members.length;
+  const activeToday = attendance.filter((a) => a.onShiftNow || a.attendanceStatus === 'ON_SHIFT').length;
+  const onLeave = members.filter((m) => m.status === 'On Leave').length;
+  const totalSalary = members.reduce((s, m) => s + (m.salary || 0), 0);
+  const avgPerf = performance.length
+    ? Math.round((performance.reduce((s, p) => s + computePerformanceScore(p), 0) / performance.length) * 10) / 10
+    : 0;
+  const onShiftNow = attendance.filter((a) => a.onShiftNow).length;
+  const attendancePct = attendance.length ? Math.round((onShiftNow / attendance.length) * 100) : 0;
+
+  return {
+    totalStaff,
+    totalStaffChange: '',
+    activeToday,
+    activeTodayPct: `${totalStaff ? Math.round((activeToday / totalStaff) * 100) : 0}% of total staff`,
+    onLeave,
+    onLeavePct: `${totalStaff ? Math.round((onLeave / totalStaff) * 100) : 0}% of total staff`,
+    totalPayroll: `₹${totalSalary.toLocaleString('en-IN')}`,
+    totalPayrollChange: '',
+    avgPerformance: `${avgPerf.toFixed(1)} / 5.0`,
+    avgPerformanceChange: '',
+    attendancePct,
+  };
+}
+
+function deriveAttendanceBreakdown(attendance: AttendanceRecord[], members: StaffMember[]): AttendanceBreakdown[] {
+  const onShift = attendance.filter((a) => a.attendanceStatus === 'ON_SHIFT').length;
+  const offShift = attendance.filter((a) => a.attendanceStatus === 'OFF_SHIFT').length;
+  const noShift = attendance.filter((a) => a.attendanceStatus === 'NO_SHIFT').length;
+  const onLeave = members.filter((m) => m.status === 'On Leave').length;
+  return [
+    { label: 'On Shift', count: onShift, color: '#22c55e' },
+    { label: 'Off Shift', count: offShift, color: '#f97316' },
+    { label: 'No Shift', count: noShift, color: '#64748b' },
+    { label: 'On Leave', count: onLeave, color: '#a855f7' },
+  ];
+}
+
+function derivePayrollLines(members: StaffMember[]): PayrollLine[] {
+  const salaries = members.map((m) => m.salary || 0);
+  const total = salaries.reduce((a, b) => a + b, 0);
+  const avg = salaries.length ? Math.round(total / salaries.length) : 0;
+  const max = salaries.length ? Math.max(...salaries) : 0;
+  const min = salaries.length ? Math.min(...salaries) : 0;
+  return [
+    { label: 'Total Payroll', amount: `₹${total.toLocaleString('en-IN')}` },
+    { label: 'Average Salary', amount: `₹${avg.toLocaleString('en-IN')}` },
+    { label: 'Highest', amount: `₹${max.toLocaleString('en-IN')}` },
+    { label: 'Lowest', amount: `₹${min.toLocaleString('en-IN')}` },
+  ];
+}
+
+function deriveRoleDistribution(members: StaffMember[]): RoleDistribution[] {
+  const counts: Record<string, number> = {};
+  members.forEach((m) => {
+    counts[m.role] = (counts[m.role] || 0) + 1;
+  });
+  const total = members.length || 1;
+  return (Object.keys(ROLE_COLORS) as StaffRole[]).map((role) => ({
+    role,
+    count: counts[role] || 0,
+    pct: `${Math.round(((counts[role] || 0) / total) * 100)}%`,
+    color: ROLE_COLORS[role],
+  }));
+}
+
+function deriveBirthdays(members: StaffMember[]): UpcomingBirthday[] {
+  const now = new Date();
+  return members
+    .filter((m) => m.dateOfBirth)
+    .map((m) => {
+      const dob = new Date(m.dateOfBirth as string);
+      const month = dob.getMonth();
+      const day = dob.getDate();
+      let next = new Date(now.getFullYear(), month, day);
+      if (next < now) next = new Date(now.getFullYear() + 1, month, day);
+      const daysUntil = Math.ceil((next.getTime() - now.getTime()) / 86400000);
+      return {
+        id: m.id,
+        name: m.name,
+        avatar: m.avatar,
+        date: `${MONTHS[month]} ${day}`,
+        daysUntil,
+      };
+    })
+    .sort((a, b) => (a.daysUntil || 0) - (b.daysUntil || 0));
+}
+
+function recompute(
+  set: (partial: Partial<StaffStore>) => void,
+  get: () => StaffStore,
+): void {
+  const { members, attendance, performance } = get();
+  const membersWithPerf = withPerformance(members, performance);
+  set({
+    members: membersWithPerf,
+    stats: deriveStats(membersWithPerf, attendance, performance),
+    attendanceBreakdown: deriveAttendanceBreakdown(attendance, membersWithPerf),
+    payrollLines: derivePayrollLines(membersWithPerf),
+    roleDistribution: deriveRoleDistribution(membersWithPerf),
+    birthdays: deriveBirthdays(membersWithPerf),
+  });
+}
+
+// ── Store ──────────────────────────────────────────────────────────────────
+
 interface StaffStore {
   stats: StaffStats;
   members: StaffMember[];
-  shifts: Shift[];
+  shifts: ShiftAssignment[];
   birthdays: UpcomingBirthday[];
+  attendance: AttendanceRecord[];
+  performance: PerformanceRecord[];
   attendanceBreakdown: AttendanceBreakdown[];
   payrollLines: PayrollLine[];
   roleDistribution: RoleDistribution[];
@@ -102,137 +345,40 @@ interface StaffStore {
   setShowAll: (v: boolean) => void;
   updateMemberStatus: (id: string, status: StaffStatus) => Promise<void>;
   fetchMembers: () => Promise<void>;
-  addMember: (m: Omit<StaffMember, 'id' | 'avatar' | 'hireDate' | 'performance'> & { password?: string }) => Promise<void>;
-  updateMember: (id: string, updates: Partial<StaffMember> & { password?: string }) => Promise<void>;
+  fetchAttendance: () => Promise<void>;
+  fetchPerformance: () => Promise<void>;
+  fetchShifts: () => Promise<void>;
+  addMember: (m: AddStaffInput) => Promise<void>;
+  updateMember: (id: string, updates: Partial<StaffMember> & { password?: string; dateOfBirth?: string }) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
 }
 
-// ── Mapping Helper ─────────────────────────────────────────────────────────
-
-export function mapBackendUserToStaffMember(user: any): StaffMember {
-  const initials = user.name
-    ? user.name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()
-    : 'US';
-    
-  let feRole: StaffRole = 'Server';
-  let feDept: StaffDepartment = 'Service';
-  
-  if (user.role === 'kitchen-staff') {
-    feRole = 'Chef';
-    feDept = 'Kitchen';
-  } else if (user.role === 'service-staff') {
-    feRole = 'Server';
-    feDept = 'Service';
-  } else if (user.role === 'cleaning-staff') {
-    feRole = 'Cleaner';
-    feDept = 'Cleaning';
-  } else if (user.role === 'restaurant-admin') {
-    feRole = 'Manager';
-    feDept = 'Management';
-  }
-  
-  let feStatus: StaffStatus = 'Active';
-  if (user.status === 'INACTIVE' || user.status === 'BLOCKED') {
-    feStatus = 'Inactive';
-  } else if (user.status === 'SUSPENDED') {
-    feStatus = 'On Leave';
-  }
-  
-  const hireDate = user.createdAt 
-    ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : 'Jan 1, 2024';
-
-  return {
-    id: user._id || user.id,
-    name: user.name,
-    email: user.email,
-    avatar: initials,
-    role: feRole,
-    department: feDept,
-    phone: user.mobile || '',
-    status: feStatus,
-    hireDate,
-    performance: 4.2,
-    salary: 40000,
-    dbRole: user.role,
-    kitchen_role: user.kitchen_role,
-    staff_role: user.staff_role,
-    cleaning_role: user.cleaning_role,
-  };
-}
-
-// ── Seed Data (Fallback) ───────────────────────────────────────────────────
-
-const seedMembers: StaffMember[] = [
-  { id: 's1',  name: 'John Smith',      email: 'john.smith@email.com',    avatar: 'JS', role: 'Manager',   department: 'Management', phone: '+91 98765 43210', status: 'Active',   hireDate: 'Jan 15, 2023', performance: 4.8, salary: 65000 },
-  { id: 's2',  name: 'Sarah Johnson',   email: 'sarah.j@email.com',       avatar: 'SJ', role: 'Server',    department: 'Service',    phone: '+91 98765 43211', status: 'Active',   hireDate: 'Feb 10, 2023', performance: 4.2, salary: 32000 },
-  { id: 's3',  name: 'Michael Brown',   email: 'michael.b@email.com',     avatar: 'MB', role: 'Chef',      department: 'Kitchen',    phone: '+91 98765 43212', status: 'Active',   hireDate: 'Mar 5, 2023',  performance: 4.6, salary: 55000 },
-  { id: 's4',  name: 'Emily Davis',     email: 'emily.d@email.com',       avatar: 'ED', role: 'Bartender', department: 'Bar',        phone: '+91 98765 43213', status: 'Active',   hireDate: 'Mar 20, 2023', performance: 4.1, salary: 38000 },
-  { id: 's5',  name: 'David Wilson',    email: 'david.w@email.com',       avatar: 'DW', role: 'Server',    department: 'Service',    phone: '+91 98765 43214', status: 'On Leave', hireDate: 'Apr 8, 2023',  performance: 3.9, salary: 30000 },
-  { id: 's6',  name: 'Lisa Martinez',   email: 'lisa.m@email.com',        avatar: 'LM', role: 'Host',      department: 'Front Desk', phone: '+91 98765 43215', status: 'Active',   hireDate: 'May 12, 2023', performance: 4.4, salary: 35000 },
-  { id: 's7',  name: 'Robert Taylor',   email: 'robert.t@email.com',      avatar: 'RT', role: 'Chef',      department: 'Kitchen',    phone: '+91 98765 43216', status: 'Active',   hireDate: 'Jun 1, 2023',  performance: 4.7, salary: 52000 },
-  { id: 's8',  name: 'Amanda White',    email: 'amanda.w@email.com',      avatar: 'AW', role: 'Server',    department: 'Service',    phone: '+91 98765 43217', status: 'Inactive', hireDate: 'Jul 18, 2023', performance: 3.5, salary: 29000 },
-  { id: 's9',  name: 'James Garcia',    email: 'james.g@email.com',       avatar: 'JG', role: 'Bartender', department: 'Bar',        phone: '+91 98765 43218', status: 'Active',   hireDate: 'Aug 3, 2023',  performance: 4.3, salary: 40000 },
-  { id: 's10', name: 'Priya Sharma',    email: 'priya.s@email.com',       avatar: 'PS', role: 'Manager',   department: 'Management', phone: '+91 98765 43219', status: 'Active',   hireDate: 'Sep 9, 2023',  performance: 4.9, salary: 70000 },
-];
-
-// ── Store ──────────────────────────────────────────────────────────────────
+const EMPTY_STATS: StaffStats = {
+  totalStaff: 0,
+  totalStaffChange: '',
+  activeToday: 0,
+  activeTodayPct: '',
+  onLeave: 0,
+  onLeavePct: '',
+  totalPayroll: '₹0',
+  totalPayrollChange: '',
+  avgPerformance: '0.0 / 5.0',
+  avgPerformanceChange: '',
+  attendancePct: 0,
+};
 
 export const useStaffStore = create<StaffStore>()(
   persist(
     (set, get) => ({
-      stats: {
-        totalStaff: 48,
-        totalStaffChange: '+12.5%',
-        activeToday: 32,
-        activeTodayPct: '66.7% of total staff',
-        onLeave: 4,
-        onLeavePct: '8.3% of total staff',
-        totalPayroll: '₹18,750.00',
-        totalPayrollChange: '↓ 5.4% vs last month',
-        avgPerformance: '4.6 / 5.0',
-        avgPerformanceChange: '↑ 0.3 vs last month',
-        attendancePct: 92,
-      },
-
-      members: seedMembers,
-
-      shifts: [
-        { id: 'sh1', label: 'Morning Shift', time: '09:00 AM – 05:00 PM', staffCount: 12, staffAvatars: ['JS','SJ','MB','ED'], extra: 8  },
-        { id: 'sh2', label: 'Evening Shift', time: '05:00 PM – 01:00 AM', staffCount: 15, staffAvatars: ['DW','LM','RT','AW'], extra: 11 },
-        { id: 'sh3', label: 'Night Shift',   time: '01:00 AM – 09:00 AM', staffCount: 5,  staffAvatars: ['JG','PS'],           extra: 3  },
-      ],
-
-      birthdays: [
-        { id: 'b1', name: 'Sarah Johnson', avatar: 'SJ', date: 'May 24' },
-        { id: 'b2', name: 'Michael Brown', avatar: 'MB', date: 'May 26' },
-        { id: 'b3', name: 'Emily Davis',   avatar: 'ED', date: 'May 28' },
-        { id: 'b4', name: 'David Wilson',  avatar: 'DW', date: 'Jun 2'  },
-        { id: 'b5', name: 'Lisa Martinez', avatar: 'LM', date: 'Jun 10' },
-      ],
-
-      attendanceBreakdown: [
-        { label: 'Present', count: 441, color: '#22c55e' },
-        { label: 'Absent',  count: 23,  color: '#ef4444' },
-        { label: 'Late',    count: 14,  color: '#f97316' },
-        { label: 'Leave',   count: 18,  color: '#a855f7' },
-      ],
-
-      payrollLines: [
-        { label: 'Regular Pay',  amount: '₹14,250.00' },
-        { label: 'Overtime Pay', amount: '₹2,260.00'  },
-        { label: 'Deductions',   amount: '₹750.00'    },
-        { label: 'Bonuses',      amount: '₹1,290.00'  },
-      ],
-
-      roleDistribution: [
-        { role: 'Manager',   count: 5,  pct: '10.4%', color: '#f97316' },
-        { role: 'Chef',      count: 8,  pct: '16.7%', color: '#22c55e' },
-        { role: 'Server',    count: 20, pct: '41.7%', color: '#3b82f6' },
-        { role: 'Bartender', count: 7,  pct: '14.6%', color: '#a855f7' },
-        { role: 'Host',      count: 0,  pct: '0%',    color: '#eab308' },
-        { role: 'Cleaner',   count: 8,  pct: '16.7%', color: '#64748b' },
-      ],
+      stats: EMPTY_STATS,
+      members: [],
+      shifts: [],
+      birthdays: [],
+      attendance: [],
+      performance: [],
+      attendanceBreakdown: [],
+      payrollLines: [],
+      roleDistribution: [],
 
       searchQuery: '',
       roleFilter: 'All Roles',
@@ -252,11 +398,39 @@ export const useStaffStore = create<StaffStore>()(
       fetchMembers: async () => {
         try {
           const res = await apiClient.get('/admin/staff');
-          const backendUsers = res.data.data.staff || [];
-          const mapped = backendUsers.map(mapBackendUserToStaffMember);
-          set({ members: mapped });
+          set({ members: (res.data.data.staff || []).map(mapBackendUserToStaffMember) });
+          recompute(set, get);
         } catch (err) {
           console.error('Failed to fetch staff members', err);
+        }
+      },
+
+      fetchAttendance: async () => {
+        try {
+          const res = await apiClient.get('/admin/staff/attendance');
+          set({ attendance: res.data.data.attendance || [] });
+          recompute(set, get);
+        } catch (err) {
+          console.error('Failed to fetch attendance', err);
+        }
+      },
+
+      fetchPerformance: async () => {
+        try {
+          const res = await apiClient.get('/admin/staff/performance');
+          set({ performance: res.data.data.performance || [] });
+          recompute(set, get);
+        } catch (err) {
+          console.error('Failed to fetch performance', err);
+        }
+      },
+
+      fetchShifts: async () => {
+        try {
+          const res = await apiClient.get('/admin/staff/shifts/list');
+          set({ shifts: res.data.data.shifts || [] });
+        } catch (err) {
+          console.error('Failed to fetch shifts', err);
         }
       },
 
@@ -267,6 +441,7 @@ export const useStaffStore = create<StaffStore>()(
           set((state) => ({
             members: state.members.map((m) => (m.id === id ? { ...m, status } : m)),
           }));
+          recompute(set, get);
         } catch (err) {
           console.error('Failed to update member status', err);
         }
@@ -284,16 +459,14 @@ export const useStaffStore = create<StaffStore>()(
             kitchen_role: m.kitchen_role || null,
             staff_role: m.staff_role || null,
             cleaning_role: m.cleaning_role || null,
+            salary: typeof m.salary === 'number' ? m.salary : 0,
+            dateOfBirth: m.dateOfBirth ? new Date(m.dateOfBirth).toISOString() : null,
           };
           const res = await apiClient.post('/admin/staff', payload);
-          const newMember = mapBackendUserToStaffMember(res.data.data.staff);
           set((state) => ({
-            members: [...state.members, newMember],
-            stats: {
-              ...state.stats,
-              totalStaff: state.stats.totalStaff + 1,
-            },
+            members: [...state.members, mapBackendUserToStaffMember(res.data.data.staff)],
           }));
+          recompute(set, get);
         } catch (err) {
           console.error('Failed to add staff member', err);
           throw err;
@@ -311,17 +484,24 @@ export const useStaffStore = create<StaffStore>()(
           }
           if (updates.dbRole !== undefined) payload.role = updates.dbRole;
           if (updates.status !== undefined) {
-            payload.status = updates.status === 'Active' ? 'ACTIVE' : updates.status === 'On Leave' ? 'SUSPENDED' : 'INACTIVE';
+            payload.status =
+              updates.status === 'Active' ? 'ACTIVE' : updates.status === 'On Leave' ? 'SUSPENDED' : 'INACTIVE';
           }
           if (updates.kitchen_role !== undefined) payload.kitchen_role = updates.kitchen_role;
           if (updates.staff_role !== undefined) payload.staff_role = updates.staff_role;
           if (updates.cleaning_role !== undefined) payload.cleaning_role = updates.cleaning_role;
+          if (updates.salary !== undefined) payload.salary = updates.salary;
+          if (updates.dateOfBirth !== undefined) {
+            payload.dateOfBirth = updates.dateOfBirth ? new Date(updates.dateOfBirth).toISOString() : null;
+          }
 
           const res = await apiClient.patch(`/admin/staff/${id}`, payload);
-          const updated = mapBackendUserToStaffMember(res.data.data.staff);
           set((state) => ({
-            members: state.members.map((m) => (m.id === id ? updated : m)),
+            members: state.members.map((m) =>
+              m.id === id ? mapBackendUserToStaffMember(res.data.data.staff) : m,
+            ),
           }));
+          recompute(set, get);
         } catch (err) {
           console.error('Failed to update staff member', err);
           throw err;
@@ -333,11 +513,8 @@ export const useStaffStore = create<StaffStore>()(
           await apiClient.delete(`/admin/staff/${id}`);
           set((state) => ({
             members: state.members.filter((m) => m.id !== id),
-            stats: {
-              ...state.stats,
-              totalStaff: Math.max(0, state.stats.totalStaff - 1),
-            },
           }));
+          recompute(set, get);
         } catch (err) {
           console.error('Failed to delete staff member', err);
           throw err;
@@ -345,15 +522,16 @@ export const useStaffStore = create<StaffStore>()(
       },
     }),
     {
-      name: 'admin-staff-store',
+      name: 'admin-staff-store-v2',
       partialize: (state) => ({
-        stats: state.stats,
-        shifts: state.shifts,
-        birthdays: state.birthdays,
-        attendanceBreakdown: state.attendanceBreakdown,
-        payrollLines: state.payrollLines,
-        roleDistribution: state.roleDistribution,
+        searchQuery: state.searchQuery,
+        roleFilter: state.roleFilter,
+        departmentFilter: state.departmentFilter,
+        statusFilter: state.statusFilter,
+        currentPage: state.currentPage,
+        perPage: state.perPage,
+        showAll: state.showAll,
       }),
-    }
-  )
+    },
+  ),
 );

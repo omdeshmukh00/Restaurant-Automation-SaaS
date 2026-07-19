@@ -23,4 +23,8 @@ export const adminOrdersApi = {
     const response = await apiClient.patch(`/admin/orders/${id}`, payload);
     return response.data.data.order;
   },
+
+  deleteOrder: async (id: string) => {
+    await apiClient.delete(`/admin/orders/${id}`);
+  },
 };

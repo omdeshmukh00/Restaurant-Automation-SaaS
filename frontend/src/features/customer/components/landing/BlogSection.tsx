@@ -159,7 +159,7 @@ export default function BlogSection() {
         </div>
 
         {/* Carousel — Center Focus */}
-        <div className="flex items-center justify-center gap-4 sm:gap-5 lg:gap-6 relative min-h-[380px]">
+        <div className="flex items-center justify-center gap-4 sm:gap-5 lg:gap-6 relative min-h-[400px]">
           {visibleIndices.map((postIdx, i) => {
             const post = BLOG_POSTS[postIdx];
             const offset = i - 2; // -2, -1, 0, 1, 2
@@ -169,7 +169,7 @@ export default function BlogSection() {
 
             return (
               <div
-                key={`${post.id}-${i}`}
+                key={post.id}
                 role="button"
                 tabIndex={0}
                 className="landing-shiny flex flex-col bg-white overflow-hidden cursor-pointer absolute transition-all duration-500 ease-out"
@@ -179,9 +179,9 @@ export default function BlogSection() {
                   boxShadow: isCenter
                     ? '0 12px 40px rgba(0,0,0,0.12)'
                     : '0 2px 8px rgba(0,0,0,0.06)',
-                  width: isCenter ? '380px' : isAdjacent ? '320px' : '280px',
-                  transform: `translateX(${offset * (isCenter ? 0 : isAdjacent ? 340 : 620)}px) scale(${isCenter ? 1 : isAdjacent ? 0.9 : 0.8})`,
-                  opacity: isFar ? 0.4 : isAdjacent ? 0.7 : 1,
+                  width: 'min(88vw, 380px)',
+                  transform: `translateX(${offset * (isCenter ? 0 : isAdjacent ? 320 : 540)}px) scale(${isCenter ? 1 : isAdjacent ? 0.85 : 0.72})`,
+                  opacity: isFar ? 0.3 : isAdjacent ? 0.7 : 1,
                   zIndex: isCenter ? 10 : isAdjacent ? 5 : 1,
                   pointerEvents: isCenter ? 'auto' : 'none',
                 }}
@@ -196,7 +196,7 @@ export default function BlogSection() {
                 }}
               >
                 {/* Image */}
-                <div className="landing-img-overlay-wrap shrink-0" style={{ height: isCenter ? '200px' : '160px' }}>
+                <div className="landing-img-overlay-wrap shrink-0 w-full h-[180px]">
                   <img
                     src={post.image}
                     alt={post.title}
@@ -213,21 +213,30 @@ export default function BlogSection() {
                 </div>
 
                 {/* Content */}
-                <div className="p-5 flex flex-col flex-1">
-                  <h3
-                    className="font-semibold leading-snug line-clamp-2"
-                    style={{ color: '#222222', fontSize: isCenter ? '18px' : '15px' }}
-                  >
-                    {post.title}
-                  </h3>
-                  {isCenter && (
-                    <p
-                      className="text-[14px] mt-2 leading-relaxed line-clamp-2 flex-1"
-                      style={{ color: '#666666' }}
+                <div className="p-5 flex flex-col flex-1 min-h-[160px] justify-between">
+                  <div>
+                    <h3
+                      className="font-semibold leading-snug line-clamp-2"
+                      style={{ color: '#222222', fontSize: '18px' }}
                     >
-                      {post.description}
-                    </p>
-                  )}
+                      {post.title}
+                    </h3>
+                    
+                    {/* Smooth Description Expand/Collapse */}
+                    <div
+                      className="transition-all duration-500 ease-out"
+                      style={{
+                        maxHeight: isCenter ? '80px' : '0px',
+                        opacity: isCenter ? 1 : 0,
+                        marginTop: isCenter ? '8px' : '0px',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <p className="text-[14px] leading-relaxed line-clamp-2" style={{ color: '#666666' }}>
+                        {post.description}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Footer */}
                   <div
@@ -241,7 +250,16 @@ export default function BlogSection() {
                         {post.readTime}
                       </span>
                     </div>
-                    {isCenter && (
+
+                    {/* Smooth Read More Fade */}
+                    <div
+                      className="transition-all duration-500 ease-out"
+                      style={{
+                        opacity: isCenter ? 1 : 0,
+                        transform: `translateX(${isCenter ? 0 : 10}px)`,
+                        pointerEvents: isCenter ? 'auto' : 'none'
+                      }}
+                    >
                       <span
                         className="flex items-center gap-1 text-[13px] font-semibold"
                         style={{ color: '#FF6B1A' }}
@@ -249,7 +267,7 @@ export default function BlogSection() {
                         Read More
                         <ArrowRight className="w-[13px] h-[13px]" />
                       </span>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,13 +1,23 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
-import { useOrdersStore, type OrderStatus } from '../../store/orders.store';
+import { useOrdersStore, getFilteredOrders, type OrderStatus } from '../../store/orders.store';
 import { STATUS_TABS } from './orders.constants';
 
 export function OrdersTabBar() {
-  const { allOrders, activeTab, searchQuery, setActiveTab, setSearchQuery } = useOrdersStore();
+  const {
+    allOrders, activeTab, searchQuery,
+    dateFilter, paymentFilter, minAmount, maxAmount,
+    setActiveTab, setSearchQuery,
+  } = useOrdersStore();
 
-  const tabCount = (tab: OrderStatus | 'All') =>
-    tab === 'All' ? allOrders.length : allOrders.filter((o) => o.status === tab).length;
+  // Counts reflect the applied date / payment / search / amount filters, not
+  // the full list — so they update together with the table data.
+  const tabCount = (tab: OrderStatus | 'All') => {
+    const scoped = getFilteredOrders(allOrders, {
+      dateFilter, paymentFilter, searchQuery, minAmount, maxAmount,
+    });
+    return tab === 'All' ? scoped.length : scoped.filter((o) => o.status === tab).length;
+  };
 
   return (
     <div className="border-b border-gray-100 dark:border-gray-800">

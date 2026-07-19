@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { TrendingUp, ShoppingBag, Users, Clock } from 'lucide-react';
 import { StatCard } from '../components/dashboard/StatCard';
 import { RecentOrdersTable } from '../components/dashboard/RecentOrdersTable';
 import { RevenueChart } from '../components/dashboard/RevenueChart';
@@ -9,28 +8,42 @@ import { TableOverview } from '../components/dashboard/TableOverview';
 import { TopMenuItems } from '../components/dashboard/TopMenuItems';
 import { connectSocket, getSocket } from '../../../lib/socket';
 import { useTablesStore } from '../store/tables.store';
+import { useDashboardStore } from '../store/dashboard.store';
 
 const AdminDashboard = () => {
-<<<<<<< Updated upstream
   const { restaurant, fetchOverview } = useOutletContext<{ restaurant: any; fetchOverview: () => Promise<void> }>();
 
+  const statTiles = useDashboardStore((s) => s.statTiles);
+
   useEffect(() => {
-    // Only connect socket and setup listeners if restaurant is active
+    // Always load dashboard data — it works off the session's restaurantId,
+    // independent of the restaurant.status (ACTIVE / PENDING / etc.).
+    const bootstrap = async () => {
+      await useTablesStore.getState().fetchTables();
+      await useDashboardStore.getState().fetchDashboard();
+    };
+    bootstrap();
+
+    const interval = setInterval(() => {
+      useTablesStore.getState().fetchTables();
+    }, 15000);
+    const dashInterval = setInterval(() => {
+      useDashboardStore.getState().fetchDashboard();
+    }, 30000);
+
+    // Only open the live socket / wire realtime listeners once the
+    // restaurant is ACTIVE (live order + table events).
     if (restaurant && restaurant.status === 'ACTIVE') {
       connectSocket();
-      useTablesStore.getState().fetchTables();
-
-      const interval = setInterval(() => {
-        const socket = getSocket();
-        if (!socket || !socket.connected) {
-          useTablesStore.getState().fetchTables();
-        }
-      }, 15000);
 
       const socket = getSocket();
       if (socket) {
         const handleSync = () => {
           useTablesStore.getState().fetchTables();
+        };
+
+        const handleDashboardSync = () => {
+          useDashboardStore.getState().fetchDashboard();
         };
 
         socket.on('table.status.changed', handleSync);
@@ -46,8 +59,15 @@ const AdminDashboard = () => {
         socket.on('cleaning.completed', handleSync);
         socket.on('staff:request-new', handleSync);
 
+        socket.on('order.created', handleDashboardSync);
+        socket.on('order.updated', handleDashboardSync);
+        socket.on('order.ready', handleDashboardSync);
+        socket.on('bill.paid', handleDashboardSync);
+
         return () => {
           clearInterval(interval);
+          clearInterval(dashInterval);
+
           socket.off('table.status.changed', handleSync);
           socket.off('table.session.created', handleSync);
           socket.off('table.session.closed', handleSync);
@@ -60,62 +80,20 @@ const AdminDashboard = () => {
           socket.off('cleaning.started', handleSync);
           socket.off('cleaning.completed', handleSync);
           socket.off('staff:request-new', handleSync);
+
+          socket.off('order.created', handleDashboardSync);
+          socket.off('order.updated', handleDashboardSync);
+          socket.off('order.ready', handleDashboardSync);
+          socket.off('bill.paid', handleDashboardSync);
         };
       }
-
-      return () => clearInterval(interval);
     }
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(dashInterval);
+    };
   }, [restaurant]);
-
-  // We don't render OnboardingWizard inline anymore as it is managed as a full-screen overlay in AdminLayout.tsx
-=======
-  React.useEffect(() => {
-    connectSocket();
-    useTablesStore.getState().fetchTables();
-
-    const interval = setInterval(() => {
-      useTablesStore.getState().fetchTables();
-    }, 15000);
-
-    const socket = getSocket();
-    if (socket) {
-      const handleSync = () => {
-        useTablesStore.getState().fetchTables();
-      };
-
-      socket.on('table.status.changed', handleSync);
-      socket.on('table.session.created', handleSync);
-      socket.on('table.session.closed', handleSync);
-      socket.on('table.session.expired', handleSync);
-      socket.on('order.created', handleSync);
-      socket.on('order.updated', handleSync);
-      socket.on('order.ready', handleSync);
-      socket.on('bill.requested', handleSync);
-      socket.on('bill.paid', handleSync);
-      socket.on('cleaning.started', handleSync);
-      socket.on('cleaning.completed', handleSync);
-      socket.on('staff:request-new', handleSync);
-
-      return () => {
-        clearInterval(interval);
-        socket.off('table.status.changed', handleSync);
-        socket.off('table.session.created', handleSync);
-        socket.off('table.session.closed', handleSync);
-        socket.off('table.session.expired', handleSync);
-        socket.off('order.created', handleSync);
-        socket.off('order.updated', handleSync);
-        socket.off('order.ready', handleSync);
-        socket.off('bill.requested', handleSync);
-        socket.off('bill.paid', handleSync);
-        socket.off('cleaning.started', handleSync);
-        socket.off('cleaning.completed', handleSync);
-        socket.off('staff:request-new', handleSync);
-      };
-    }
-
-    return () => clearInterval(interval);
-  }, []);
->>>>>>> Stashed changes
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -126,10 +104,18 @@ const AdminDashboard = () => {
 
       {/* Stat cards — 2 cols on mobile, 4 on lg */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard title="Total Revenue"     value="₹48,200" change="+12% from yesterday" changeType="increase" icon={TrendingUp} iconBg="bg-orange-50" iconColor="text-orange-500" />
-        <StatCard title="Orders Today"      value="142"     change="+8 in last hour"     changeType="increase" icon={ShoppingBag} iconBg="bg-blue-50"   iconColor="text-blue-500"   />
-        <StatCard title="Active Customers"  value="67"      change="12 tables occupied"  changeType="neutral"  icon={Users}      iconBg="bg-green-50"  iconColor="text-green-500"  />
-        <StatCard title="Avg Order Time"    value="18 min"  change="-2 min vs last week" changeType="increase" icon={Clock}      iconBg="bg-purple-50" iconColor="text-purple-500" />
+        {statTiles.map((tile) => (
+          <StatCard
+            key={tile.title}
+            title={tile.title}
+            value={tile.value}
+            change={tile.change}
+            changeType={tile.changeType}
+            icon={tile.icon}
+            iconBg={tile.iconBg}
+            iconColor={tile.iconColor}
+          />
+        ))}
       </div>
 
       {/* Revenue chart + Activity feed */}

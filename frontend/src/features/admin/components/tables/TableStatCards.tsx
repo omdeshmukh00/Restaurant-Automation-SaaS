@@ -76,8 +76,6 @@ export function TableStatCards(): JSX.Element {
         icon={TrendingUp}
         iconBg="bg-orange-50 dark:bg-orange-950/40"
         iconColor="text-orange-500"
-        trend="+5% vs yesterday"
-        trendUp
       />
       <StatCard
         label="Revenue Today"
@@ -86,8 +84,6 @@ export function TableStatCards(): JSX.Element {
         icon={IndianRupee}
         iconBg="bg-green-50 dark:bg-green-950/40"
         iconColor="text-green-500"
-        trend="+₹4,200 vs yesterday"
-        trendUp
       />
       <StatCard
         label="Avg. Turnover"

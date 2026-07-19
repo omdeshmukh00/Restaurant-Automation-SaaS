@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useReservationsStore, type ReservationStatus } from '../../store/reservations.store';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -11,7 +11,6 @@ const MONTHS = [
 const statusPriority: Record<ReservationStatus, number> = {
   Cancelled: 0,
   Pending: 1,
-  'Walk-in': 2,
   Confirmed: 3,
   'Checked In': 4,
   Completed: 4,
@@ -19,7 +18,7 @@ const statusPriority: Record<ReservationStatus, number> = {
 };
 
 export function ReservationCalendar(): JSX.Element {
-  const { calendarView, setCalendarView, allReservations } = useReservationsStore();
+  const { allReservations, setSelectedDate, fetchReservations } = useReservationsStore();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth());
   const [year, setYear] = useState(now.getFullYear());
@@ -61,7 +60,6 @@ export function ReservationCalendar(): JSX.Element {
     Confirmed: 'bg-green-500',
     Pending: 'bg-amber-400',
     Cancelled: 'bg-red-400',
-    'Walk-in': 'bg-purple-400',
     'Checked In': 'bg-green-500',
     Completed: 'bg-green-500',
     'No Show': 'bg-red-400',
@@ -72,21 +70,18 @@ export function ReservationCalendar(): JSX.Element {
       {/* Header */}
       <div className="flex items-center justify-between mb-3 sm:mb-4">
         <h3 className="text-sm sm:text-base font-semibold text-gray-800 dark:text-gray-100">Reservation Calendar</h3>
-        <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-          {(['Day', 'Week', 'Month'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setCalendarView(v)}
-              className={`px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-medium rounded-lg transition-all ${
-                calendarView === v
-                  ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedDay(now.getDate());
+            setSelectedDate('All');
+            fetchReservations();
+          }}
+          className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset
+        </button>
       </div>
 
       {/* Month navigation */}
@@ -132,7 +127,14 @@ export function ReservationCalendar(): JSX.Element {
           return (
             <button
               key={i}
-              onClick={() => cell.current && setSelectedDay(cell.day)}
+              onClick={() => {
+                if (!cell.current) return;
+                setSelectedDay(cell.day);
+                const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
+                const humanDate = `${MONTHS[month].slice(0, 3)} ${cell.day}, ${year}`;
+                setSelectedDate(humanDate);
+                fetchReservations(isoDate);
+              }}
               className={`relative flex flex-col items-center justify-center w-full aspect-square rounded-xl text-[11px] sm:text-xs transition-all ${
                 isSelected
                   ? 'bg-orange-500 text-white font-bold'
@@ -158,7 +160,6 @@ export function ReservationCalendar(): JSX.Element {
           { label: 'Confirmed', color: 'bg-green-500' },
           { label: 'Pending', color: 'bg-amber-400' },
           { label: 'Cancelled', color: 'bg-red-400' },
-          { label: 'Walk-in', color: 'bg-purple-400' },
         ].map(({ label, color }) => (
           <span key={label} className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] text-gray-400 dark:text-gray-500">
             <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${color}`} />

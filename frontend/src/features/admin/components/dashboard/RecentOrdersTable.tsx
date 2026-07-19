@@ -1,19 +1,13 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useOrdersStore } from '../../store/orders.store';
-
-const orders = [
-  { id: '#ORD-1042', table: 'Table 7',  items: 'Pasta, Wine, Tiramisu',   total: '₹1,240', status: 'Served',    time: '2 min ago',  statusColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
-  { id: '#ORD-1041', table: 'Table 12', items: 'Burger, Fries, Coke',      total: '₹680',   status: 'Preparing', time: '8 min ago',  statusColor: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400' },
-  { id: '#ORD-1040', table: 'Table 3',  items: 'Sushi Platter, Sake',      total: '₹2,100', status: 'Pending',   time: '12 min ago', statusColor: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' },
-  { id: '#ORD-1039', table: 'Table 5',  items: 'Steak, Salad, Juice',      total: '₹1,850', status: 'Served',    time: '18 min ago', statusColor: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' },
-  { id: '#ORD-1038', table: 'Table 9',  items: 'Pizza, Garlic Bread',      total: '₹920',   status: 'Cancelled', time: '25 min ago', statusColor: 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400' },
-];
+import { useOrdersStore, formatTimeAgo } from '../../store/orders.store';
+import { useDashboardStore } from '../../store/dashboard.store';
 
 export function RecentOrdersTable(): JSX.Element {
   const navigate = useNavigate();
   const { setSortBy, setActiveTab, setCurrentPage } = useOrdersStore();
+  const orders = useDashboardStore((s) => s.recentOrders);
 
   function handleViewAll() {
     setActiveTab('All');
@@ -61,7 +55,9 @@ export function RecentOrdersTable(): JSX.Element {
                     {order.status}
                   </span>
                 </td>
-                <td className="px-4 sm:px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500 hidden sm:table-cell whitespace-nowrap">{order.time}</td>
+                <td className="px-4 sm:px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500 hidden sm:table-cell whitespace-nowrap">
+                  {order.timeRaw ? formatTimeAgo(order.timeRaw) : order.time}
+                </td>
               </tr>
             ))}
           </tbody>

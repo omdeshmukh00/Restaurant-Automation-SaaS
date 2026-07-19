@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Phone, Mail, Calendar, Clock, Users, Utensils, ChevronRight,
   Edit3, X, Check, History, MessageSquare,
@@ -9,6 +9,56 @@ import {
   type Reservation,
 } from '../../store/reservations.store';
 import { useTablesStore } from "../../store/tables.store";
+import { reservationApi } from "../../api/reservation.api";
+
+function to24h(time: string): string {
+  if (!time) return '';
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(time.trim());
+  if (!match) {
+    const parsed = new Date(`1970-01-01 ${time}`);
+    if (!Number.isNaN(parsed.getTime())) {
+      return `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+    }
+    return '';
+  }
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = match[3]?.toUpperCase();
+  if (period === 'PM' && hour < 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+function format12h(time: string): string {
+  if (!time) return '';
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec(time.trim());
+  if (match) {
+    let hour = Number(match[1]);
+    const minute = Number(match[2]);
+    const period = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+  }
+  const parsed = new Date(`1970-01-01 ${time}`);
+  if (!Number.isNaN(parsed.getTime())) {
+    let hour = parsed.getHours();
+    const minute = parsed.getMinutes();
+    const period = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+  }
+  return time;
+}
+
+function applyPeriod(time24: string, period: 'AM' | 'PM'): string {
+  if (!time24) return time24;
+  const parts = time24.split(':').map(Number);
+  let hour = parts[0];
+  const minute = parts[1];
+  if (period === 'PM' && hour < 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
 
 const statusStyle: Record<ReservationStatus, string> = {
   Confirmed:
@@ -20,7 +70,7 @@ const statusStyle: Record<ReservationStatus, string> = {
   Cancelled:
     'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400',
 
-  'Walk-in':
+  'No Show':
     'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-400',
 
   'Checked In':
@@ -28,9 +78,6 @@ const statusStyle: Record<ReservationStatus, string> = {
 
   Completed:
     'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400',
-
-  'No Show':
-    'bg-gray-100 dark:bg-gray-900/40 text-gray-700 dark:text-gray-400',
 };
 
 function EmptyState() {
@@ -58,7 +105,7 @@ function EditModal({ guest, onClose, onSave }: EditModalProps) {
     name: guest.name,
     phone: guest.phone,
     email: guest.email,
-    time: guest.time,
+    time: to24h(guest.time),
     guests: guest.guests,
     tableNumber: guest.tableNumber,
     specialRequest: guest.specialRequest ?? '',
@@ -156,6 +203,43 @@ setTimeout(onClose, 800);
               </div>
             ))}
 
+            {(() => {
+              const period: 'AM' | 'PM' = form.time
+                ? parseInt(form.time.split(':')[0], 10) >= 12
+                  ? 'PM'
+                  : 'AM'
+                : 'AM';
+              return (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                    Time (12-hour)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="edit-time"
+                      type="time"
+                      value={form.time}
+                      onChange={(e) => setForm((p) => ({ ...p, time: e.target.value }))}
+                      className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 text-gray-800 dark:text-gray-100 transition-all"
+                    />
+                    <select
+                      value={period}
+                      onChange={(e) => setForm((p) => ({ ...p, time: applyPeriod(p.time, e.target.value as 'AM' | 'PM') }))}
+                      className="w-20 px-2 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900 text-gray-800 dark:text-gray-100 transition-all"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                  {form.time && (
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">
+                      Selected: {format12h(form.time)}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label
@@ -214,7 +298,7 @@ setTimeout(onClose, 800);
                 }
                 className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 text-gray-800 dark:text-gray-100 transition-all"
               >
-                {(['Confirmed', 'Pending', 'Cancelled', 'Walk-in'] as ReservationStatus[]).map((s) => (
+                {(['Confirmed', 'Pending', 'Cancelled', 'Checked In'] as ReservationStatus[]).map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>
@@ -267,14 +351,46 @@ interface HistoryModalProps {
   onClose: () => void;
 }
 
+function formatHistoryDate(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function HistoryModal({ guest, onClose }: HistoryModalProps) {
-  const history: Array<{
-  date: string;
-  occasion?: string;
-  guests: number;
-  total: string;
-  note?: string;
-}> = [];
+  const [history, setHistory] = useState<
+    Array<{ date: string; rawDate: string; occasion?: string; guests: number; total: string; note?: string }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    reservationApi
+      .getReservations({ q: guest.phone })
+      .then((reservations: any[]) => {
+        if (!active) return;
+        const mapped = reservations
+          .map((r) => ({
+            date: formatHistoryDate(r.date),
+            rawDate: r.date,
+            occasion: r.occasion || undefined,
+            guests: r.guests || 0,
+            total: '₹0',
+            note: r.specialRequest || undefined,
+          }))
+          .sort((a, b) => (a.rawDate < b.rawDate ? 1 : -1));
+        setHistory(mapped);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to load guest history', err);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [guest.phone]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -347,7 +463,11 @@ function HistoryModal({ guest, onClose }: HistoryModalProps) {
 
         {/* History list */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
-          {history.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8 sm:py-10">
+              <p className="text-sm text-gray-400 dark:text-gray-500">Loading visit history…</p>
+            </div>
+          ) : history.length === 0 ? (
             <div className="text-center py-8 sm:py-10">
               <History className="w-7 h-7 sm:w-8 sm:h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
               <p className="text-sm text-gray-400 dark:text-gray-500">No previous visits on record.</p>
@@ -401,9 +521,10 @@ function HistoryModal({ guest, onClose }: HistoryModalProps) {
 }
 
 export function GuestDetailsPanel(): JSX.Element {
-  const { selectedGuest, updateReservation } = useReservationsStore();
+  const { selectedGuest, updateReservation, updateReservationStatus } = useReservationsStore();
   const [showEdit, setShowEdit] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<ReservationStatus | null>(null);
 
   const handleSaveEdits = async (updates: Partial<Reservation>) => {
     if (!selectedGuest) return;
@@ -414,6 +535,18 @@ export function GuestDetailsPanel(): JSX.Element {
         console.error(error);
     }
 };
+
+  const handleQuickStatus = async (status: ReservationStatus) => {
+    if (!selectedGuest) return;
+    setPendingStatus(status);
+    try {
+      await updateReservationStatus(selectedGuest.id, status);
+    } catch {
+      // Error is already logged by the store; UI reconciles on refetch.
+    } finally {
+      setPendingStatus(null);
+    }
+  };
 
   return (
     <>
@@ -477,7 +610,7 @@ export function GuestDetailsPanel(): JSX.Element {
               <div className="space-y-1.5 sm:space-y-2">
                 {[
                   { icon: <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: selectedGuest.date },
-                  { icon: <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: selectedGuest.time },
+                  { icon: <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: format12h(selectedGuest.time) },
                   { icon: <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `${selectedGuest.guests} Guests` },
                   { icon: <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `Table ${selectedGuest.tableNumber}` },
                 ].map(({ icon, text }, idx) => (
@@ -492,6 +625,47 @@ export function GuestDetailsPanel(): JSX.Element {
                     {selectedGuest.occasion}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Quick status actions */}
+            <div className="space-y-1.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                Quick Actions
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={pendingStatus !== null || selectedGuest.status === 'Confirmed'}
+                  onClick={() => handleQuickStatus('Confirmed')}
+                  className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-green-500 hover:bg-green-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pendingStatus === 'Confirmed' ? 'Updating…' : 'Confirm'}
+                </button>
+                <button
+                  type="button"
+                  disabled={pendingStatus !== null || selectedGuest.status === 'Checked In'}
+                  onClick={() => handleQuickStatus('Checked In')}
+                  className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pendingStatus === 'Checked In' ? 'Updating…' : 'Check In'}
+                </button>
+                <button
+                  type="button"
+                  disabled={pendingStatus !== null || selectedGuest.status === 'Cancelled'}
+                  onClick={() => handleQuickStatus('Cancelled')}
+                  className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pendingStatus === 'Cancelled' ? 'Updating…' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={pendingStatus !== null || selectedGuest.status === 'No Show'}
+                  onClick={() => handleQuickStatus('No Show')}
+                  className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-gray-500 hover:bg-gray-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pendingStatus === 'No Show' ? 'Updating…' : 'No Show'}
+                </button>
               </div>
             </div>
 

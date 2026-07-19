@@ -85,9 +85,11 @@ export const createStaffBodySchema = z.object({
   password: passwordSchema.optional(),
   role: staffRoleSchema,
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'BLOCKED']).optional(),
-  kitchen_role: z.nativeEnum(KitchenRole).optional(),
-  staff_role: z.nativeEnum(StaffInternalRole).optional(),
-  cleaning_role: z.nativeEnum(CleaningRole).optional(),
+  kitchen_role: z.nativeEnum(KitchenRole).nullish(),
+  staff_role: z.nativeEnum(StaffInternalRole).nullish(),
+  cleaning_role: z.nativeEnum(CleaningRole).nullish(),
+  salary: z.number().min(0).optional(),
+  dateOfBirth: z.string().nullish(),
 });
 
 export const updateStaffBodySchema = z
@@ -101,6 +103,8 @@ export const updateStaffBodySchema = z
     kitchen_role: z.nativeEnum(KitchenRole).optional().nullable(),
     staff_role: z.nativeEnum(StaffInternalRole).optional().nullable(),
     cleaning_role: z.nativeEnum(CleaningRole).optional().nullable(),
+    salary: z.number().min(0).optional(),
+    dateOfBirth: z.string().nullish(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field is required',

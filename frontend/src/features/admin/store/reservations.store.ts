@@ -9,7 +9,6 @@ export type ReservationStatus =
   | 'Confirmed'
   | 'Pending'
   | 'Cancelled'
-  | 'Walk-in'
   | 'Checked In'
   | 'Completed'
   | 'No Show';
@@ -54,7 +53,6 @@ function normalizeReservationStatus(status: string): ReservationStatus {
   if (normalized.includes('confirmed')) return 'Confirmed';
   if (normalized.includes('pending')) return 'Pending';
   if (normalized.includes('cancelled')) return 'Cancelled';
-  if (normalized.includes('walk')) return 'Walk-in';
   if (normalized.includes('checked in')) return 'Checked In';
   if (normalized.includes('completed')) return 'Completed';
   if (normalized.includes('no show')) return 'No Show';
@@ -141,9 +139,8 @@ const INITIAL_TIME_SLOTS: TimeSlot[] = [
   { time: '09:00 PM', busyness: 'Available', tableCount: 0 },
 ];
 
-function deriveAnalytics(reservations: Reservation[]): ReservationAnalytics {
-  const todayIso = new Date().toISOString().split('T')[0];
-  const todayReservations = reservations.filter((reservation) => parseIsoDate(reservation.date) === todayIso && reservation.status !== 'Cancelled');
+function deriveAnalytics(reservations: Reservation[], refIso: string, tableCount: number): ReservationAnalytics {
+  const todayReservations = reservations.filter((reservation) => parseIsoDate(reservation.date) === refIso && reservation.status !== 'Cancelled');
   const total = reservations.length;
   const noShowCount = reservations.filter((reservation) => reservation.status === 'No Show').length;
   const totalGuests = reservations.reduce((sum, reservation) => sum + reservation.guests, 0);
@@ -158,7 +155,7 @@ function deriveAnalytics(reservations: Reservation[]): ReservationAnalytics {
     .sort((a, b) => b[1] - a[1])
     .map(([time]) => time)[0] || 'No data';
 
-  const occupancyRate = `${Math.round((todayReservations.length / 12) * 100)}%`;
+  const occupancyRate = `${Math.round((todayReservations.length / Math.max(1, tableCount)) * 100)}%`;
 
   return {
     noShowRate: total ? `${Math.round((noShowCount / total) * 100)}%` : '0%',
@@ -173,9 +170,8 @@ function deriveAnalytics(reservations: Reservation[]): ReservationAnalytics {
   };
 }
 
-function deriveTimeSlots(reservations: Reservation[]): TimeSlot[] {
-  const todayIso = new Date().toISOString().split('T')[0];
-  const todayReservations = reservations.filter((reservation) => parseIsoDate(reservation.date) === todayIso && reservation.status !== 'Cancelled');
+function deriveTimeSlots(reservations: Reservation[], refIso: string): TimeSlot[] {
+  const todayReservations = reservations.filter((reservation) => parseIsoDate(reservation.date) === refIso && reservation.status !== 'Cancelled');
 
   if (todayReservations.length === 0) {
     return INITIAL_TIME_SLOTS;
@@ -254,8 +250,8 @@ export interface ReservationStats {
   pendingPercent: string;
   cancelled: number;
   cancelledPercent: string;
-  walkIns: number;
-  walkInsPercent: string;
+  noShow: number;
+  noShowPercent: string;
 }
 
 export interface ReservationAnalytics {
@@ -278,7 +274,7 @@ export interface ReservationsState {
   timeSlots: TimeSlot[];
   analytics: ReservationAnalytics;
   selectedDate: string;
-  calendarView: 'Day' | 'Week' | 'Month';
+  lastDate?: string;
   selectedGuest: Reservation | null;
   filterStatus: ReservationStatus | 'All';
   filterTime: string;
@@ -379,7 +375,7 @@ const ALL_RESERVATIONS: Reservation[] = [
     time: '01:00 PM',
     guests: 4,
     tableNumber: 'L6',
-    status: 'Walk-in',
+    status: 'Confirmed',
     date: 'May 20, 2025',
     phone: '+91 32109 87654',
     email: 'rahul.g@email.com',
@@ -438,8 +434,8 @@ const initialState: ReservationsState = {
     pendingPercent: '16.7% of total',
     cancelled: 4,
     cancelledPercent: '8.3% of total',
-    walkIns: 12,
-    walkInsPercent: '25% of total',
+    noShow: 2,
+    noShowPercent: '4.2% of total',
   },
 
   upcomingReservations: ALL_RESERVATIONS.slice(0, 5),
@@ -479,8 +475,8 @@ const initialState: ReservationsState = {
     occupancyChange: '↑ 8% vs last month',
   },
 
-  selectedDate: `Today, ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-  calendarView: 'Month',
+  selectedDate: 'All',
+  lastDate: undefined,
   selectedGuest: null,
   filterStatus: 'All',
   filterTime: '',
@@ -490,12 +486,11 @@ const initialState: ReservationsState = {
 
 interface ReservationsStore extends ReservationsState {
   setSelectedGuest: (reservation: Reservation | null) => void;
-  updateReservationStatus: (id: string, status: ReservationStatus) => void;
-  setCalendarView: (view: 'Day' | 'Week' | 'Month') => void;
+  updateReservationStatus: (id: string, status: ReservationStatus) => Promise<void>;
   setSelectedDate: (date: string) => void;
   setFilterStatus: (status: ReservationStatus | 'All') => void;
   setFilterTime: (time: string) => void;
-  fetchReservations: () => Promise<void>;
+  fetchReservations: (date?: string) => Promise<void>;
   addReservation: (reservation: Omit<Reservation, 'id' | 'avatar' | 'avatarColor'>) => Promise<void>;
   updateReservation: (id: string, updates: Partial<Reservation>) => Promise<void>;
 }
@@ -507,17 +502,30 @@ export const useReservationsStore = create<ReservationsStore>()(
       setSelectedGuest: (reservation) =>
         set({ selectedGuest: reservation }),
 
-      updateReservationStatus: (id, status) =>
-        set((state) => ({
-          upcomingReservations: state.upcomingReservations.map((r) =>
-            r.id === id ? { ...r, status } : r
-          ),
-          allReservations: state.allReservations.map((r) =>
-            r.id === id ? { ...r, status } : r
-          ),
-        })),
-
-      setCalendarView: (view) => set({ calendarView: view }),
+      updateReservationStatus: async (id, status) => {
+        // Optimistic UI update (list + selected guest).
+        set((state) => {
+          const patch = (r: Reservation): Reservation =>
+            r.id === id ? { ...r, status } : r;
+          return {
+            upcomingReservations: state.upcomingReservations.map(patch),
+            allReservations: state.allReservations.map(patch),
+            selectedGuest:
+              state.selectedGuest?.id === id
+                ? { ...state.selectedGuest, status }
+                : state.selectedGuest,
+          };
+        });
+        try {
+          const payload = { status: status.toUpperCase().replace(/[- ]/g, '_') };
+          await reservationApi.updateReservation(id, payload);
+          await get().fetchReservations(get().lastDate);
+        } catch (err) {
+          console.error('Failed to update reservation status', err);
+          await get().fetchReservations(); // reconcile with server truth
+          throw err;
+        }
+      },
 
       setSelectedDate: (date) => set({ selectedDate: date }),
 
@@ -525,9 +533,10 @@ export const useReservationsStore = create<ReservationsStore>()(
 
       setFilterTime: (filterTime) => set({ filterTime }),
 
-      fetchReservations: async () => {
+      fetchReservations: async (date?: string) => {
         try {
-          const reservations = await reservationApi.getReservations();
+          const todayIso = new Date().toISOString().split('T')[0];
+          const reservations = await reservationApi.getReservations(date ? { date } : undefined);
           const mapped: Reservation[] = reservations.map((reservation: any) => {
             const name = reservation.name || reservation.guestName || 'Guest';
             return {
@@ -557,7 +566,7 @@ export const useReservationsStore = create<ReservationsStore>()(
           const confirmed = sorted.filter((r) => r.status === 'Confirmed').length;
           const pending = sorted.filter((r) => r.status === 'Pending').length;
           const cancelled = sorted.filter((r) => r.status === 'Cancelled').length;
-          const walkIns = sorted.filter((r) => r.status === 'Walk-in').length;
+          const noShow = sorted.filter((r) => r.status === 'No Show').length;
 
           const stats = {
             total,
@@ -568,18 +577,23 @@ export const useReservationsStore = create<ReservationsStore>()(
             pendingPercent: total ? `${Math.round((pending / total) * 100)}% of total` : '0%',
             cancelled,
             cancelledPercent: total ? `${Math.round((cancelled / total) * 100)}% of total` : '0%',
-            walkIns,
-            walkInsPercent: total ? `${Math.round((walkIns / total) * 100)}% of total` : '0%',
+            noShow,
+            noShowPercent: total ? `${Math.round((noShow / total) * 100)}% of total` : '0%',
           };
 
           const currentTables = get().tables;
+          const realTableCount = useTablesStore.getState().tables.length || currentTables.length || 0;
+          const refIso = date || todayIso;
           const selectedGuestId = get().selectedGuest?.id;
           set({
             allReservations: sorted,
-            upcomingReservations: sorted.slice(0, 5),
+            upcomingReservations: sorted
+              .filter((r) => parseIsoDate(r.date) >= todayIso)
+              .slice(0, 8),
+            lastDate: date,
             stats,
-            analytics: deriveAnalytics(sorted),
-            timeSlots: deriveTimeSlots(sorted),
+            analytics: deriveAnalytics(sorted, refIso, realTableCount),
+            timeSlots: deriveTimeSlots(sorted, refIso),
             tables: deriveTableSlots(currentTables, sorted),
             selectedGuest: selectedGuestId ? sorted.find((r) => r.id === selectedGuestId) ?? null : null,
           });
@@ -592,18 +606,18 @@ export const useReservationsStore = create<ReservationsStore>()(
         try {
           const payload: any = {
             customerName: reservation.name,
-            customerEmail: reservation.email,
+            customerEmail: reservation.email?.trim() || undefined,
             mobile: reservation.phone,
             guests: reservation.guests,
             date: reservation.date,
             slot: reservation.time,
-            tableNumber: reservation.tableNumber,
-            notes: reservation.specialRequest,
-            occasion: reservation.occasion,
+            tableNumber: reservation.tableNumber?.trim() || undefined,
+            notes: reservation.specialRequest?.trim() || undefined,
+            occasion: reservation.occasion?.trim() || undefined,
           };
 
           await reservationApi.createReservation(payload);
-          await get().fetchReservations();
+          await get().fetchReservations(get().lastDate);
         } catch (err) {
           console.error('Failed to create reservation via API', err);
           throw err;

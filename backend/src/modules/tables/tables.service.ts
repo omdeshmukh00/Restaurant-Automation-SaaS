@@ -37,7 +37,7 @@ export async function createTable(input: CreateTableInput & { qrToken?: string }
     floor: input.floor ?? 1,
     section: input.section ?? 'Main',
     assignedStaffId: input.assignedStaffId ?? null,
-    status: TableStatus.AVAILABLE,
+    status: input.status ?? TableStatus.AVAILABLE,
     isActive: true,
   });
 

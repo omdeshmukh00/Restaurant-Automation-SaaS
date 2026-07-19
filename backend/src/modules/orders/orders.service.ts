@@ -116,6 +116,7 @@ export class OrdersService {
     options: {
       status?: string;
       paymentStatus?: string;
+      paymentMethod?: string;
       table?: string;
       dateRange?: string;
       page?: number;
@@ -141,6 +142,10 @@ export class OrdersService {
 
     if (options.paymentStatus) {
       query.paymentStatus = options.paymentStatus;
+    }
+
+    if (options.paymentMethod) {
+      query.paymentMethod = options.paymentMethod;
     }
 
     if (options.table) {
@@ -186,7 +191,13 @@ export class OrdersService {
     }
 
     const [orders, total] = await Promise.all([
-      OrderModel.find(query).populate('tableId', 'tableNumber').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      OrderModel.find(query)
+        .populate('tableId', 'tableNumber')
+        .populate('serviceStaffId', 'name')
+        .populate('kitchenStaffId', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
       OrderModel.countDocuments(query),
     ]);
 
@@ -204,7 +215,10 @@ export class OrdersService {
     restaurantId: string | Types.ObjectId,
     orderId: string | Types.ObjectId,
   ) {
-    const order = await OrderModel.findOne({ _id: orderId, restaurantId }).populate('tableId', 'tableNumber');
+    const order = await OrderModel.findOne({ _id: orderId, restaurantId })
+      .populate('tableId', 'tableNumber')
+      .populate('serviceStaffId', 'name')
+      .populate('kitchenStaffId', 'name');
     if (!order) {
       throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
     }
@@ -246,10 +260,21 @@ export class OrdersService {
       discountAmount: 0,
       finalAmount: totalAmount,
       status: OrderStatus.PENDING,
-      paymentStatus: payload.paymentStatus ?? PaymentStatus.PENDING,
+      paymentStatus: payload.paymentStatus ?? (payload.paymentMethod ? PaymentStatus.PAID : PaymentStatus.PENDING),
+      paymentMethod: payload.paymentMethod ?? null,
       priority: Priority.NORMAL,
       specialInstructions: payload.specialInstructions || '',
+      serviceStaffId:
+        payload.assignedStaff && mongoose.Types.ObjectId.isValid(payload.assignedStaff)
+          ? new mongoose.Types.ObjectId(payload.assignedStaff)
+          : null,
     });
+
+    await order.populate([
+      { path: 'tableId', select: 'tableNumber' },
+      { path: 'serviceStaffId', select: 'name' },
+      { path: 'kitchenStaffId', select: 'name' },
+    ]);
 
     return order;
   }
@@ -275,6 +300,14 @@ export class OrdersService {
 
     if (updates.paymentStatus !== undefined) {
       order.paymentStatus = updates.paymentStatus;
+      // An unpaid order cannot carry a payment method.
+      if (updates.paymentStatus !== PaymentStatus.PAID) {
+        order.paymentMethod = null;
+      }
+    }
+
+    if (updates.paymentMethod !== undefined) {
+      order.paymentMethod = updates.paymentMethod;
     }
 
     if (updates.specialInstructions !== undefined) {
@@ -282,7 +315,9 @@ export class OrdersService {
     }
 
     if (updates.status !== undefined) {
-      ensureOrderTransition(order.status as OrderStatus, updates.status, 'Order cannot be updated to requested status');
+      if (!updates.adminOverride) {
+        ensureOrderTransition(order.status as OrderStatus, updates.status, 'Order cannot be updated to requested status');
+      }
       order.status = updates.status;
 
       if (updates.status === OrderStatus.CANCELLED) {
@@ -300,6 +335,30 @@ export class OrdersService {
 
     await order.save();
     return order;
+  }
+
+  static async deleteAdminOrder(
+    restaurantId: string | Types.ObjectId,
+    orderId: string | Types.ObjectId,
+  ) {
+    const order = await OrderModel.findOne({ _id: orderId, restaurantId });
+    if (!order) {
+      throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    // Restore any inventory that was deducted when the order was started.
+    if (order.stockDeducted) {
+      await InventoryService.restoreStock(restaurantId, order.items, order._id, undefined);
+    }
+
+    await OrderModel.deleteOne({ _id: order._id });
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, {
+      orderId: order._id,
+      status: 'DELETED',
+    });
+
+    return { deleted: true, orderId: order._id };
   }
 
   static async placeOrder(

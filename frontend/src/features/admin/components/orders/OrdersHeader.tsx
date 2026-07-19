@@ -59,7 +59,7 @@ function DatePickerDropdown() {
   );
 }
 
-const PAYMENT_OPTIONS: (PaymentMethod | 'All')[] = ['All', 'Paid', 'Online', 'Card', 'Cash'];
+const PAYMENT_OPTIONS: (PaymentMethod | 'All')[] = ['All', 'Unpaid', 'Cash', 'Card', 'Online'];
 
 function FilterDropdown() {
   const [open, setOpen] = useState(false);

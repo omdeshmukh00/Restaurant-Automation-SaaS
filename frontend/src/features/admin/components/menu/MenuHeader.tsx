@@ -74,10 +74,7 @@ export function MenuHeader({ onToggleCategories }: Props): JSX.Element {
         items.forEach((item) => {
           if (item.status === 'Low Stock' || item.status === 'Out of Stock') {
             const newStock = Math.floor(Math.random() * 40) + 10;
-            updateItem(item.id, {
-              stock: newStock,
-              status: newStock > 10 ? 'Available' : 'Low Stock',
-            });
+            updateItem(item.id, { stockQuantity: newStock, isAvailable: newStock > 10 });
           }
         });
         setSyncState('synced');
@@ -145,15 +142,18 @@ export function MenuHeader({ onToggleCategories }: Props): JSX.Element {
           );
           const catId = matchedCat?.id ?? defaultCat;
 
+          const vegRaw = (row['veg'] ?? row['vegetarian'] ?? '').toString().toLowerCase();
+          const isVeg = vegRaw === 'true' || vegRaw === 'yes' || vegRaw === 'veg' || vegRaw === 'vegetarian';
+          const isAvailable = status === 'Available' || status === 'Low Stock';
           addItem({
             name,
             description: row['description']?.trim() ?? '',
             price,
-            stock: isNaN(stock) ? 0 : stock,
-            category: catId,
-            status,
-            image: row['image']?.trim() || 'https://via.placeholder.com/120x120/f3f4f6/9ca3af?text=dish',
-            enabled: true,
+            categoryId: catId,
+            stockQuantity: isNaN(stock) ? 0 : stock,
+            isVeg,
+            isAvailable,
+            image: row['image']?.trim() || undefined,
           });
           imported++;
         });
@@ -261,7 +261,7 @@ export function MenuHeader({ onToggleCategories }: Props): JSX.Element {
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-relaxed">
-                  Upload a CSV file with columns: <span className="font-mono font-semibold">name, price, description, category, status, stock, image</span>.
+                  Upload a CSV file with columns: <span className="font-mono font-semibold">name, price, description, category, status, stock, veg, image</span>.
                   Only <span className="font-semibold">name</span> and <span className="font-semibold">price</span> are required.
                 </p>
                 <div className="flex gap-2">

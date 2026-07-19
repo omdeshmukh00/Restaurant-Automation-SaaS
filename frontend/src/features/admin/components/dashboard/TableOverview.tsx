@@ -48,12 +48,13 @@ const getDurationStr = (createdAt: string | null) => {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 };
 
-function TableCard({ tableId, label, seats, status, sessionDetails }: {
+function TableCard({ tableId, label, seats, status, sessionDetails, floor }: {
   tableId: string;
   label: string;
   seats: number;
   status: TableStatus;
   sessionDetails?: any;
+  floor?: number;
 }) {
   const { updateTableStatus } = useTablesStore();
   const [open, setOpen] = React.useState(false);
@@ -74,7 +75,7 @@ function TableCard({ tableId, label, seats, status, sessionDetails }: {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        title={`${label} — ${status} — ${seats} seats`}
+        title={`${label} — Floor ${floor ?? 1} — ${status} — ${seats} seats`}
         className={`w-full border rounded-xl p-2.5 flex flex-col items-center gap-1 transition-all hover:shadow-md hover:scale-105 active:scale-100 ${cfg.card}`}
       >
         <span className={`text-[11px] font-bold ${cfg.text}`}>{label}</span>
@@ -126,11 +127,13 @@ function TableCard({ tableId, label, seats, status, sessionDetails }: {
 export function TableOverview(): JSX.Element {
   const { tables } = useTablesStore();
 
-  // Show floor 1 tables only (all sections) — max 18 to keep widget compact
-  const floor1 = tables.filter((t) => t.floor === 1).slice(0, 18);
+  // Show every real table across all floors, ordered by floor then label.
+  const visibleTables = tables
+    .slice()
+    .sort((a, b) => a.floor - b.floor || a.label.localeCompare(b.label));
 
   const counts = STATUS_OPTIONS.reduce((acc, s) => {
-    acc[s] = floor1.filter((t) => t.status === s).length;
+    acc[s] = tables.filter((t) => t.status === s).length;
     return acc;
   }, {} as Record<TableStatus, number>);
 
@@ -140,7 +143,9 @@ export function TableOverview(): JSX.Element {
       <div className="flex items-start justify-between mb-4 gap-2 flex-wrap">
         <div>
           <h3 className="font-semibold text-gray-800 dark:text-gray-100">Table Status</h3>
-          <p className="text-[11px] text-gray-400 mt-0.5">Click a table to change its status</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">
+            {tables.length} table{tables.length === 1 ? '' : 's'} · click a table to change its status
+          </p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
           {([
@@ -160,7 +165,7 @@ export function TableOverview(): JSX.Element {
 
       {/* Table grid */}
       <div className="grid grid-cols-6 gap-2">
-        {floor1.map((table) => (
+        {visibleTables.map((table) => (
           <TableCard
             key={table.id}
             tableId={table.id}
@@ -168,6 +173,7 @@ export function TableOverview(): JSX.Element {
             seats={table.seats}
             status={table.status}
             sessionDetails={table.sessionDetails}
+            floor={table.floor}
           />
         ))}
       </div>

@@ -8,3 +8,6 @@ export { CustomerStatusBadge }   from './CustomerStatusBadge';
 export { TopCustomersPanel }     from './TopCustomersPanel';
 export { CustomerOverviewChart } from './CustomerOverviewChart';
 export { LoyaltyTierChart }      from './LoyaltyTierChart';
+export { CustomerActionsMenu }   from './CustomerActionsMenu';
+export { EditCustomerModal }     from './EditCustomerModal';
+export { DeleteCustomerModal }   from './DeleteCustomerModal';

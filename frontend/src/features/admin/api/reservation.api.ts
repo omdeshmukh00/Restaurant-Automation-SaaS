@@ -1,13 +1,18 @@
 import { apiClient } from "../../../shared/services/apiClient";
 
 export const reservationApi = {
-  getReservations: async () => {
-  const response = await apiClient.get("/admin/reservations");
+  getReservations: async (params?: { date?: string; status?: string; q?: string }) => {
+  const response = await apiClient.get("/admin/reservations", { params });
   return response.data.data.reservations;
 },
 
   getReservation: async (id: string) => {
     const response = await apiClient.get(`/admin/reservations/${id}`);
+    return response.data.data;
+  },
+
+  getAvailability: async (date: string) => {
+    const response = await apiClient.get("/admin/reservations/availability", { params: { date } });
     return response.data.data;
   },
 

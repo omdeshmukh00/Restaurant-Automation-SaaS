@@ -1,5 +1,5 @@
-import React from 'react';
-import { useCustomersStore } from '../store/customers.store';
+import React, { useEffect } from 'react';
+import { useCustomersStore, type SpendFilter } from '../store/customers.store';
 import {
   CustomersHeader,
   CustomersStatCards,
@@ -9,7 +9,17 @@ import {
   TopCustomersPanel,
   CustomerOverviewChart,
   LoyaltyTierChart,
+  EditCustomerModal,
+  DeleteCustomerModal,
 } from '../components/customers';
+
+const SPEND_THRESHOLDS: Record<SpendFilter, number> = {
+  All: 0,
+  above500: 500,
+  above1000: 1000,
+  above2000: 2000,
+  above5000: 5000,
+};
 
 export function CustomersPage() {
   const {
@@ -17,9 +27,17 @@ export function CustomersPage() {
     searchQuery,
     activeStatusFilter,
     activeTierFilter,
+    activeSpendFilter,
     currentPage,
     perPage,
+    loading,
+    error,
+    fetchCustomers,
   } = useCustomersStore();
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   // Filter
   const filtered = customers.filter((c) => {
@@ -30,7 +48,8 @@ export function CustomersPage() {
       || c.name.toLowerCase().includes(q)
       || c.email.toLowerCase().includes(q)
       || c.phone.toLowerCase().includes(q);
-    return matchStatus && matchTier && matchSearch;
+    const matchSpend = c.totalSpentRaw >= SPEND_THRESHOLDS[activeSpendFilter];
+    return matchStatus && matchTier && matchSearch && matchSpend;
   });
 
   // Paginate
@@ -43,6 +62,17 @@ export function CustomersPage() {
     <div className="space-y-4 sm:space-y-5">
       {/* 1. Page header */}
       <CustomersHeader />
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-600 dark:text-red-400">
+          {error}
+        </div>
+      )}
+      {loading && !error && (
+        <div className="rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          Loading customers…
+        </div>
+      )}
 
       {/* 2. Stat cards */}
       <CustomersStatCards />
@@ -66,6 +96,10 @@ export function CustomersPage() {
           <LoyaltyTierChart />
         </div>
       </div>
+
+      {/* Edit / Remove customer dialogs */}
+      <EditCustomerModal />
+      <DeleteCustomerModal />
     </div>
   );
 }

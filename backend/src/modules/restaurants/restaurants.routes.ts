@@ -16,6 +16,12 @@ import {
   getRestaurantSettingsController,
   updateRestaurantSettingsController,
   updateRestaurantProfileController,
+  addFloorController,
+  removeFloorController,
+  addSectionController,
+  removeSectionController,
+  getFloorsController,
+  getSectionsController,
 } from './restaurants.controller';
 
 const router = Router();
@@ -73,6 +79,48 @@ router.patch(
   roleGuard(...adminRoles),
   validate({ body: updateRestaurantProfileSchema }),
   updateRestaurantProfileController,
+);
+
+// Floor management — dedicated create + delete paths backed by MongoDB
+router.post(
+  '/admin/restaurant/floors',
+  requireAuth,
+  roleGuard(...adminRoles),
+  addFloorController,
+);
+router.delete(
+  '/admin/restaurant/floors/:number',
+  requireAuth,
+  roleGuard(...adminRoles),
+  removeFloorController,
+);
+
+// Section management — dedicated create + delete paths backed by MongoDB
+router.post(
+  '/admin/restaurant/sections',
+  requireAuth,
+  roleGuard(...adminRoles),
+  addSectionController,
+);
+router.delete(
+  '/admin/restaurant/sections/:name',
+  requireAuth,
+  roleGuard(...adminRoles),
+  removeSectionController,
+);
+
+// Read floors / sections
+router.get(
+  '/admin/restaurant/floors',
+  requireAuth,
+  roleGuard(...adminRoles),
+  getFloorsController,
+);
+router.get(
+  '/admin/restaurant/sections',
+  requireAuth,
+  roleGuard(...adminRoles),
+  getSectionsController,
 );
 
 export default router;

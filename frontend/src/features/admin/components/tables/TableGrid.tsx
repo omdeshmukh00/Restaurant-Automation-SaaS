@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Clock, IndianRupee, CalendarClock } from 'lucide-react';
+import { Users, Clock, IndianRupee } from 'lucide-react';
 import { useTablesStore } from '../../store/tables.store';
 import { TableStatusBadge } from './TableStatusBadge';
 
@@ -57,13 +57,6 @@ export function TableGrid(): JSX.Element {
                   <IndianRupee className="w-3 h-3" />
                   {table.currentOrder.amount.toLocaleString('en-IN')}
                 </span>
-              </div>
-            )}
-
-            {table.reservedFor && !table.currentOrder && (
-              <div className="mt-1 pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1 text-[11px] text-blue-500 dark:text-blue-400">
-                <CalendarClock className="w-3 h-3 flex-shrink-0" />
-                <span className="truncate">{table.reservedFor}</span>
               </div>
             )}
           </button>
