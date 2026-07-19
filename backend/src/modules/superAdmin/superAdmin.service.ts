@@ -1500,6 +1500,8 @@ export async function rejectRestaurantRequest(
   });
 
   return request;
+}
+
 export async function updateRestaurantStatus(id: string, statusStr: 'Active' | 'Trial' | 'Inactive', blockReason?: string) {
   let status: RestaurantStatus;
   if (statusStr === 'Active') {
