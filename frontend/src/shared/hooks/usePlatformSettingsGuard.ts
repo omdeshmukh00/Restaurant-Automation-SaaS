@@ -13,18 +13,17 @@ export interface PlatformSettingsData {
   supportEmail?: string;
 }
 
-// Global shared state & subscriber store to eliminate duplicate network requests across components
+// Global cached state & subscriber store to eliminate repeated background requests
 let globalSettings: PlatformSettingsData | null = null;
 let globalLoading = true;
 let isFetching = false;
 let lastFetchTime = 0;
 const listeners = new Set<(settings: PlatformSettingsData | null) => void>();
-let pollTimer: any = null;
 
-async function fetchGlobalSettings() {
+async function fetchGlobalSettings(force = false) {
   const now = Date.now();
-  // Throttle: don't re-fetch if a fetch is in-flight or occurred < 3 seconds ago
-  if (isFetching || (now - lastFetchTime < 3000 && globalSettings !== null)) {
+  // Don't re-fetch if already fetching or fetched recently unless forced
+  if (isFetching || (!force && now - lastFetchTime < 15000 && globalSettings !== null)) {
     return;
   }
 
@@ -50,28 +49,13 @@ async function fetchGlobalSettings() {
       lastFetchTime = Date.now();
       globalLoading = false;
 
-      // Broadcast to all active component subscribers
+      // Broadcast to active component subscribers
       listeners.forEach((listener) => listener(globalSettings));
     }
   } catch (err) {
     console.error("Failed to fetch public platform settings guard:", err);
   } finally {
     isFetching = false;
-  }
-}
-
-function startGlobalPolling() {
-  if (!pollTimer) {
-    fetchGlobalSettings();
-    // 10-second interval for lightweight background polling
-    pollTimer = setInterval(fetchGlobalSettings, 10000);
-  }
-}
-
-function stopGlobalPollingIfNoListeners() {
-  if (listeners.size === 0 && pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
   }
 }
 
@@ -86,22 +70,21 @@ export function usePlatformSettingsGuard() {
     };
 
     listeners.add(listener);
-    startGlobalPolling();
 
     if (globalSettings) {
       setSettings(globalSettings);
       setLoading(false);
+    } else {
+      fetchGlobalSettings();
     }
 
     return () => {
       listeners.delete(listener);
-      stopGlobalPollingIfNoListeners();
     };
   }, []);
 
   const refetch = useCallback(() => {
-    lastFetchTime = 0; // force immediate fetch
-    fetchGlobalSettings();
+    fetchGlobalSettings(true);
   }, []);
 
   return { settings, loading, refetch };

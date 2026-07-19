@@ -64,7 +64,7 @@ app.use(
     stream: {
       write: (message) => logger.http(message.trim()),
     },
-    skip: () => !env.ENABLE_REQUEST_LOGS,
+    skip: (req) => !env.ENABLE_REQUEST_LOGS || (req.url && (req.url.includes('/platform-settings') || req.url.includes('/health'))),
   }),
 );
 
