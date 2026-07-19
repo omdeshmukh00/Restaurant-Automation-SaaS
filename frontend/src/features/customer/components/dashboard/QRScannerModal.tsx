@@ -32,21 +32,43 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
     }
   }
 
+  const extractQrToken = (scannedText: string): string => {
+    if (!scannedText) return '';
+    const text = scannedText.trim();
+    if (text.includes('qr_token=')) {
+      const match = text.match(/qr_token=([^&/#]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      try {
+        const url = new URL(text);
+        const token = url.searchParams.get('qr_token');
+        if (token) return token;
+      } catch (e) {
+        // ignore
+      }
+    }
+    return text;
+  };
+
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = manualTableId.trim().toUpperCase();
-    if (!cleanId) return;
+    const rawText = manualTableId.trim();
+    if (!rawText) return;
+    const cleanId = extractQrToken(rawText);
     setScanned(true);
     setTimeout(() => {
       onScanSuccess(cleanId);
-    }, 800);
+    }, 500);
   };
 
   const handleSimulateScan = () => {
     setScanned(true);
     setTimeout(() => {
       onScanSuccess('T07'); // Default mock table
-    }, 1000);
+    }, 800);
   };
 
   const handleRetryScan = () => {
@@ -55,6 +77,48 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
     setShowManualInput(false);
     setScanRetryTrigger((prev) => prev + 1);
   };
+
+  // Live Camera Barcode Detector scanning loop
+  useEffect(() => {
+    if (!isOpen || scanned || hasTimedOut || !cameraActive) return;
+
+    let animId: number;
+    let detector: any = null;
+
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        // @ts-ignore
+        detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      } catch (e) {
+        console.warn('BarcodeDetector error:', e);
+      }
+    }
+
+    const scanFrame = async () => {
+      if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && detector) {
+        try {
+          const barcodes = await detector.detect(videoRef.current);
+          if (barcodes && barcodes.length > 0) {
+            const rawValue = barcodes[0]?.rawValue;
+            if (rawValue) {
+              setScanned(true);
+              onScanSuccess(rawValue);
+              return;
+            }
+          }
+        } catch (e) {
+          // ignore frame errors
+        }
+      }
+      animId = requestAnimationFrame(scanFrame);
+    };
+
+    animId = requestAnimationFrame(scanFrame);
+
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [isOpen, cameraActive, scanned, hasTimedOut, onScanSuccess]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,7 +130,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
       if (isMounted && !scanned) {
         setHasTimedOut(true);
       }
-    }, 10000);
+    }, 15000);
 
     // Request camera stream safely without taking photos
     if (navigator?.mediaDevices?.getUserMedia) {
@@ -158,12 +222,11 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
             <form onSubmit={handleManualSubmit} className="space-y-4">
               <input
                 type="text"
-                maxLength={5}
                 required
                 value={manualTableId}
                 onChange={(e) => setManualTableId(e.target.value)}
-                placeholder="e.g. T07"
-                className="w-full text-center text-xl font-bold uppercase py-3 px-4 bg-white/10 border border-white/20 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sd-primary-container text-white placeholder-white/30"
+                placeholder="e.g. T07 or Paste QR Link"
+                className="w-full text-center text-sm font-bold py-3 px-4 bg-white/10 border border-white/20 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sd-primary-container text-white placeholder-white/30"
               />
               <div className="flex gap-3 pt-2">
                 <button

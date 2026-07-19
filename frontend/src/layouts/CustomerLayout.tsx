@@ -238,10 +238,71 @@ export default function CustomerLayout() {
     location.pathname === p || location.pathname.startsWith(p + '/')
   ) || location.pathname === '/customer' || location.pathname === '/customer/';
 
-  const handleScanSuccess = (tableId: string) => {
+  const extractQrToken = (scannedText: string): string => {
+    if (!scannedText) return '';
+    const text = scannedText.trim();
+    if (text.includes('qr_token=')) {
+      const match = text.match(/qr_token=([^&/#]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      try {
+        const url = new URL(text);
+        const token = url.searchParams.get('qr_token');
+        if (token) return token;
+      } catch (e) {
+        // ignore
+      }
+    }
+    return text;
+  };
+
+  const handleScanSuccess = async (scannedData: string) => {
     setScannerOpen(false);
-    setToastMsg(`✅ Connected to Table ${tableId}!`);
-    setTimeout(() => setToastMsg(''), 3000);
+    const token = extractQrToken(scannedData);
+
+    if (!token) {
+      setToastMsg('❌ Invalid QR code scanned');
+      setTimeout(() => setToastMsg(''), 3000);
+      return;
+    }
+
+    setLoadingSession(true);
+    setToastMsg('⏳ Verifying QR token & starting session...');
+
+    try {
+      const res = await apiClient.post('/public/table-session/init', { token });
+      const data = res.data?.data || res.data;
+
+      if (data && data.sessionToken) {
+        setDiningSession({
+          sessionId: data.session?.session_id || '',
+          restaurantId: data.session?.restaurant?.id || '',
+          restaurantName: data.session?.restaurant?.name || 'Restaurant',
+          tableId: data.session?.table?.id || '',
+          tableNumber: data.session?.table?.table_no || 'Unknown Table',
+          customerName: 'Guest',
+          sessionToken: data.sessionToken,
+          expiresAt: data.session?.expires_at || '',
+          status: 'ACTIVE',
+        });
+
+        signInAs('customer');
+        setToastMsg(`✅ Connected to Table ${data.session?.table?.table_no || ''}!`);
+        navigate('/customer/menu');
+      } else {
+        setToastMsg('❌ Invalid or expired QR token');
+      }
+    } catch (err: any) {
+      console.error('Failed to initialize session from QR scan:', err);
+      const errMsg = err.response?.data?.message || 'Invalid or expired QR token';
+      setToastMsg(`❌ ${errMsg}`);
+    } finally {
+      setLoadingSession(false);
+      setTimeout(() => setToastMsg(''), 4000);
+    }
   };
 
   const isReservationsPage = location.pathname === '/customer/reservations';
