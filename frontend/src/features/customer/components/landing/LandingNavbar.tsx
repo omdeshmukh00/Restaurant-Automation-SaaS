@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, Menu, X, ChevronRight } from 'lucide-react';
+import { useCustomerStore } from '../../store/customer.store';
+import { useAuth } from '../../../../auth/AuthProvider';
 import './landing.css';
 
 interface LandingNavbarProps {
@@ -14,6 +16,7 @@ interface NavLink {
 }
 
 const NAV_LINKS: NavLink[] = [
+  { label: 'Home', href: '/', requiresAuth: false },
   { label: 'Restaurants', href: '/customer/restaurants', requiresAuth: false },
   { label: 'Reservations', href: '/customer/reservations', requiresAuth: true },
   { label: 'Offers', href: '/customer/offers', requiresAuth: false },
@@ -22,7 +25,21 @@ const NAV_LINKS: NavLink[] = [
 export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const { isPanelAuthenticated } = useAuth();
+  const isCustomerAuth = isPanelAuthenticated('customer');
+
+  const {
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    deleteNotification,
+    clearAllNotifications,
+  } = useCustomerStore();
+  const unreadCount = isCustomerAuth ? notifications.filter((n) => !n.read).length : 0;
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -77,57 +94,169 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
 
           {/* Desktop Nav Links */}
           <nav className="hidden lg:flex items-center gap-1.5">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={(e) => handleNavClick(e, link)}
-                className="landing-nav-capsule text-[14px] font-medium landing-focus-ring relative z-10 flex items-center gap-1.5"
-                style={{ color: 'rgba(255,255,255,0.7)', textDecoration: 'none' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = '#FF6B1A'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}
-              >
-                {link.label}
-                {link.requiresAuth && (
-                  <span
-                    className="w-[6px] h-[6px] rounded-full shrink-0"
-                    style={{ backgroundColor: 'rgba(255,107,26,0.5)' }}
-                    title="Login required"
-                  />
-                )}
-              </a>
-            ))}
+            {NAV_LINKS.map((link) => {
+              const isActive = location.pathname === link.href;
+              return (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={(e) => handleNavClick(e, link)}
+                  className={`landing-nav-capsule text-[14px] font-medium landing-focus-ring relative z-10 flex items-center gap-1.5 ${
+                    isActive ? 'active' : ''
+                  }`}
+                  style={{
+                    color: isActive ? '#FF6B1A' : 'rgba(255,255,255,0.7)',
+                    textDecoration: 'none',
+                    backgroundColor: isActive ? 'rgba(255,107,26,0.08)' : undefined,
+                    borderRadius: '12px',
+                    padding: '8px 16px'
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#FF6B1A'; }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = isActive ? '#FF6B1A' : 'rgba(255,255,255,0.7)';
+                  }}
+                >
+                  {link.label}
+                </a>
+              );
+            })}
           </nav>
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">
-            <button
-              className="w-[40px] h-[40px] rounded-full flex items-center justify-center transition-colors duration-150 landing-focus-ring"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                color: '#FFFFFF',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-              aria-label="Search"
-            >
-              <Search className="w-[18px] h-[18px]" />
-            </button>
 
-            <button
-              className="hidden sm:flex w-[40px] h-[40px] rounded-full items-center justify-center transition-colors duration-150 landing-focus-ring relative"
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                color: '#FFFFFF',
-                border: '1px solid rgba(255,255,255,0.1)',
-              }}
-              aria-label="Notifications"
-            >
-              <Bell className="w-[18px] h-[18px]" />
-              <span
-                className="absolute top-[8px] right-[8px] w-[8px] h-[8px] rounded-full landing-pulse-dot"
-                style={{ backgroundColor: '#FF6B1A' }}
-              />
-            </button>
+            {/* Notifications Icon with Interactive Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                className="hidden sm:flex w-[40px] h-[40px] rounded-full items-center justify-center transition-colors duration-150 landing-focus-ring relative cursor-pointer"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  color: '#FFFFFF',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+                aria-label="Notifications"
+              >
+                <Bell className="w-[18px] h-[18px]" />
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute top-[8px] right-[8px] w-[8px] h-[8px] rounded-full landing-pulse-dot bg-orange-500"
+                  />
+                )}
+              </button>
+
+              {/* Notifications Dropdown */}
+              {notificationsOpen && (
+                <>
+                  {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+                  <div className="fixed inset-0 z-40" onClick={() => setNotificationsOpen(false)} />
+                  <div className="absolute right-0 mt-2.5 w-80 sm:w-96 bg-white border border-[#E5E7EB] rounded-2xl shadow-xl z-50 overflow-hidden animate-fadeIn max-h-[500px] flex flex-col">
+                    {!isCustomerAuth ? (
+                      <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
+                        <div className="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 mb-3">
+                          <Bell className="w-5 h-5 animate-bounce" />
+                        </div>
+                        <p className="text-sm font-bold text-slate-800 font-sans">Login to view notifications</p>
+                        <p className="text-xs text-slate-500 font-sans mt-1">Get real-time updates on your table reservations and orders.</p>
+                        <button
+                          onClick={() => {
+                            setNotificationsOpen(false);
+                            onLoginOpen();
+                          }}
+                          className="mt-4 px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-orange-500 to-red-500 rounded-xl hover:opacity-90 transition-opacity font-sans"
+                        >
+                          Login / Sign Up
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Header */}
+                        <div className="p-4 border-b border-[#E5E7EB] bg-slate-50 flex justify-between items-center shrink-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-slate-800 font-sans">Notifications</span>
+                            {unreadCount > 0 && (
+                              <span className="text-[10px] font-bold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-sans animate-pulse">
+                                {unreadCount} New
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {unreadCount > 0 && (
+                              <button
+                                onClick={() => markAllNotificationsRead()}
+                                className="text-xs text-orange-600 font-bold hover:underline font-sans bg-transparent border-0 p-0 cursor-pointer"
+                              >
+                                Mark all read
+                              </button>
+                            )}
+                            {notifications.length > 0 && (
+                              <button
+                                onClick={() => clearAllNotifications()}
+                                className="text-xs text-red-500 font-bold hover:underline font-sans bg-transparent border-0 p-0 cursor-pointer"
+                              >
+                                Clear all
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto max-h-96 divide-y divide-slate-100">
+                          {notifications.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                              <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 mb-3">
+                                <span className="material-symbols-outlined text-2xl text-slate-400/50">notifications_off</span>
+                              </div>
+                              <p className="text-sm font-bold text-slate-800 font-sans">All caught up!</p>
+                              <p className="text-xs text-slate-500 font-sans mt-0.5">No new notifications at the moment.</p>
+                            </div>
+                          ) : (
+                            notifications.map((n) => {
+                              let iconColor = 'bg-blue-50 text-blue-500';
+                              let iconName = 'info';
+
+                              if (n.type === 'order') {
+                                iconColor = 'bg-orange-50 text-orange-500';
+                                iconName = 'shopping_bag';
+                              } else if (n.type === 'offer') {
+                                iconColor = 'bg-purple-50 text-purple-500';
+                                iconName = 'sell';
+                              }
+
+                              return (
+                                <div
+                                  key={n.id}
+                                  className={`p-4 flex gap-3 transition-colors ${
+                                    !n.read ? 'bg-orange-50/10' : 'hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${iconColor}`}>
+                                    <span className="material-symbols-outlined text-lg">{iconName}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className={`text-xs font-bold font-sans text-left ${!n.read ? 'text-slate-900' : 'text-slate-700'}`}>
+                                        {n.title}
+                                      </p>
+                                      <span className="text-[10px] text-slate-400 font-sans shrink-0">
+                                        {new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-sans mt-0.5 leading-relaxed text-left">
+                                      {n.message}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
 
             <button
               onClick={onLoginOpen}
@@ -187,28 +316,35 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
           </div>
 
           <nav className="flex-1 flex flex-col justify-center px-8 overflow-y-auto py-4 gap-1">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                onClick={(e) => {
-                  handleNavClick(e, link);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="flex items-center justify-between py-3.5 text-[20px] font-semibold text-white border-b transition-colors duration-150"
-                style={{ borderColor: 'rgba(255,255,255,0.1)', textDecoration: 'none' }}
-              >
-                <span className="flex items-center gap-2">
-                  {link.label}
-                  {link.requiresAuth && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(255,107,26,0.15)', color: '#FF6B1A' }}>
-                      Login
-                    </span>
-                  )}
-                </span>
-                <ChevronRight className="w-[18px] h-[18px]" style={{ color: '#FF6B1A' }} />
-              </a>
-            ))}
+            {NAV_LINKS.map((link) => {
+              const isActive = location.pathname === link.href;
+              return (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={(e) => {
+                    handleNavClick(e, link);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center justify-between py-3.5 text-[20px] font-semibold border-b transition-colors duration-150"
+                  style={{
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    textDecoration: 'none',
+                    color: isActive ? '#FF6B1A' : '#FFFFFF'
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    {link.label}
+                    {link.requiresAuth && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(255,107,26,0.15)', color: '#FF6B1A' }}>
+                        Login
+                      </span>
+                    )}
+                  </span>
+                  <ChevronRight className="w-[18px] h-[18px]" style={{ color: isActive ? '#FF6B1A' : 'rgba(255,255,255,0.5)' }} />
+                </a>
+              );
+            })}
           </nav>
 
           <div className="px-8 pb-8 shrink-0">

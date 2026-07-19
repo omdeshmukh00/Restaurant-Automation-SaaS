@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 import PartnerForm from '../../components/partner/PartnerForm';
 
 export default function PartnerWithUs() {
@@ -21,9 +21,18 @@ export default function PartnerWithUs() {
 
       {/* Main Title & Subtitle Area */}
       <section className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4 pb-6 text-center space-y-3 relative z-10">
-        <div className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200/60 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider text-[#FF6B1A] uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B1A] animate-pulse" />
-          Partner With Us
+        <div
+          className="inline-flex items-center gap-2.5 px-4 py-1.5 mx-auto"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,107,26,0.12), rgba(255,107,26,0.06))',
+            borderRadius: '999px',
+            border: '1px solid rgba(255,107,26,0.2)',
+          }}
+        >
+          <Sparkles className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
+          <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
+            Partner With Us
+          </span>
         </div>
         
         <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">

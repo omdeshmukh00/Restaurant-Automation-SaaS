@@ -8,6 +8,7 @@ import type {
   RestaurantListQuery,
   AnalyticsQuery,
   SuperAdminAuditLogQuery,
+  CreateRestaurantInput,
 } from './superAdmin.schema';
 
 // ──────────────────────────────────────────────────────────────────────
@@ -26,6 +27,12 @@ export const getPlatformOverview = asyncHandler(async (req: Request, res: Respon
 export const listRestaurants = asyncHandler(async (req: Request, res: Response) => {
   const query = req.query as unknown as RestaurantListQuery;
   const result = await superAdminService.listRestaurants(query);
+  ok(res, result);
+});
+
+export const createRestaurantController = asyncHandler(async (req: Request, res: Response) => {
+  const input = req.body as CreateRestaurantInput;
+  const result = await superAdminService.createRestaurant(input);
   ok(res, result);
 });
 

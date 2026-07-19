@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Copy, Check, Tag, Sparkles, Clock, Star, Gift, Zap, Percent } from 'lucide-react';
 import '../components/landing/landing.css';
-import LandingFooter from '../components/landing/LandingFooter';
+import { LandingNavbar, LandingFooter } from '../components/landing';
 
 interface Offer {
   id: number;
@@ -43,29 +43,17 @@ export default function OffersPage() {
   };
 
   const filtered = activeCategory === 'All' ? OFFERS : OFFERS.filter((o) => o.category === activeCategory);
+  
+  const openLogin = () => {
+    navigate('/auth/customer');
+  };
 
   return (
-    <div className="min-h-screen landing-font-inter" style={{ background: '#FFF8F3', color: '#222222' }}>
-
-      {/* ── Top Bar ────────────────────────────────────── */}
-      <header className="sticky top-0 z-50" style={{ background: 'rgba(255,248,243,0.9)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(255,107,26,0.1)' }}>
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-[64px] flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="w-[38px] h-[38px] rounded-full flex items-center justify-center transition-colors duration-150"
-            style={{ backgroundColor: 'rgba(255,107,26,0.08)', border: '1px solid rgba(255,107,26,0.15)' }}
-            aria-label="Back to Home"
-          >
-            <ArrowLeft className="w-[18px] h-[18px]" style={{ color: '#FF6B1A' }} />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="w-[32px] h-[32px] rounded-full flex items-center justify-center" style={{ backgroundColor: '#FF6B1A' }}>
-              <span className="material-symbols-outlined text-[15px] font-bold text-white block">restaurant</span>
-            </div>
-            <span className="font-bold text-[18px]" style={{ color: '#222222' }}>Resto<span style={{ color: '#FF6B1A' }}>Hub</span></span>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen landing-font-inter flex flex-col justify-between" style={{ background: '#FFF8F3', color: '#222222' }}>
+      <LandingNavbar onLoginOpen={openLogin} />
+      
+      {/* Spacer for Navbar */}
+      <div className="h-[72px] shrink-0" />
 
       {/* ── Hero ───────────────────────────────────────── */}
       <section

@@ -55,10 +55,12 @@ export default function Restaurant() {
     (state) => state.deleteRestaurant
   );
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
+  const fetchRestaurants = useRestaurantRequestsStore((state) => state.fetchRestaurants);
 
   useEffect(() => {
     fetchRequests();
-  }, [fetchRequests]);
+    fetchRestaurants();
+  }, [fetchRequests, fetchRestaurants]);
 
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [viewingRestaurant, setViewingRestaurant] = useState<RestaurantsRow | null>(null);
@@ -121,7 +123,7 @@ export default function Restaurant() {
     deleteRestaurantById(id);
 
   // Handle form submission for new restaurant
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRestaurant.name || !newRestaurant.owner) return;
 
@@ -140,9 +142,13 @@ export default function Restaurant() {
       branches: Number(newRestaurant.branches) || 1,
     };
 
-    addRestaurant(row);
-    setIsModalOpen(false);
-    setNewRestaurant(DEFAULT_FORM);
+    try {
+      await addRestaurant(row);
+      setIsModalOpen(false);
+      setNewRestaurant(DEFAULT_FORM);
+    } catch (err) {
+      console.error("Failed to add restaurant", err);
+    }
   };
 
   return (

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
-import QRScannerModal from './QRScannerModal';
 import { useCustomerStore } from '../../store/customer.store';
 import { useAuth } from '../../../../auth/AuthProvider';
 
@@ -15,11 +14,10 @@ const NAV_ITEMS = [
 interface Props {
   collapsed: boolean;
   onToggle: () => void;
+  onOpenScanner: () => void;
 }
 
-export default function CustomerSidebar({ collapsed, onToggle }: Props) {
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [toastMsg, setToastMsg] = useState('');
+export default function CustomerSidebar({ collapsed, onToggle, onOpenScanner }: Props) {
   const { profile, diningSession } = useCustomerStore();
   const { isAuthenticated } = useAuth();
 
@@ -113,7 +111,7 @@ export default function CustomerSidebar({ collapsed, onToggle }: Props) {
         {/* Center/Middle: Scan QR Action button */}
         {!diningSession && (
           <button
-            onClick={() => setScannerOpen(true)}
+            onClick={onOpenScanner}
             className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 font-sans text-sm font-semibold text-sd-on-surface-variant hover:bg-sd-surface-container w-full ${
               collapsed ? 'justify-center' : ''
             }`}
@@ -198,23 +196,6 @@ export default function CustomerSidebar({ collapsed, onToggle }: Props) {
         </div>
       )}
 
-      {/* QR Scanner Modal Overlay */}
-      <QRScannerModal
-        isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScanSuccess={(tableId) => {
-          setScannerOpen(false);
-          setToastMsg(`✅ Connected to Table ${tableId}!`);
-          setTimeout(() => setToastMsg(''), 3000);
-        }}
-      />
-
-      {/* Local Success Toast */}
-      {toastMsg && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-sd-inverse-surface text-white px-6 py-3 rounded-2xl shadow-xl z-[100] animate-fadeIn font-sans text-sm font-semibold">
-          {toastMsg}
-        </div>
-      )}
     </aside>
   );
 }
