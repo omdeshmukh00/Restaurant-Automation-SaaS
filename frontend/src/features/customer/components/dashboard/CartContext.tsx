@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { OfferCoupon, useCustomerStore } from '../../store/customer.store';
+import { setCartHasItems } from '../../store/cartSnapshot';
 import { apiClient } from '../../../../shared/services/apiClient';
 
 export interface CartItem {
@@ -53,6 +54,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           description: i.menuItem?.description || '',
         }));
         setItems(mappedItems);
+        setCartHasItems(mappedItems.length > 0);
+      } else {
+        setItems([]);
+        setCartHasItems(false);
       }
     } catch (err) {
       console.error('Failed to fetch cart', err);
@@ -67,6 +72,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiClient.post('/customer/cart/items', { menuItem: item.id, quantity: 1 });
       await fetchCart();
+      useCustomerStore.getState().recordActivity();
     } catch (err) {
       console.error('Failed to add item', err);
     }
@@ -78,6 +84,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiClient.delete(`/customer/cart/items/${existing.cartItemId}`);
       await fetchCart();
+      useCustomerStore.getState().recordActivity();
     } catch (err) {
       console.error('Failed to remove item', err);
     }
@@ -93,6 +100,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         await apiClient.patch(`/customer/cart/items/${existing.cartItemId}`, { quantity });
       }
       await fetchCart();
+      useCustomerStore.getState().recordActivity();
     } catch (err) {
       console.error('Failed to update quantity', err);
     }
@@ -102,7 +110,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     try {
       await apiClient.delete('/customer/cart');
       setItems([]);
+      setCartHasItems(false);
       setAppliedCoupon(null);
+      useCustomerStore.getState().recordActivity();
     } catch (err) {
       console.error('Failed to clear cart', err);
     }

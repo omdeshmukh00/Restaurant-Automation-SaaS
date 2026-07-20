@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 import { BillingModel } from './billing.model';
 import { OrderModel } from '../orders/orders.model';
-import { BillStatus, PaymentMethod, PaymentStatus } from './billing.schema';
+import { BillStatus, PaymentMethod, PaymentStatus as BillingPaymentStatus } from './billing.schema';
+import { PaymentStatus } from '../../constants/statuses';
 import { TableModel } from '../tables/tables.model';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
 import { TableStatus, OrderStatus } from '../../constants/statuses';
@@ -29,20 +30,37 @@ export class BillingService {
       status: { $ne: OrderStatus.CANCELLED }
     });
 
-    if (!orders || orders.length === 0) {
+    const payments = await PaymentModel.find({
+      restaurantId,
+      sessionId,
+      status: PaymentStatus.COMPLETED
+    });
+
+    const session = await TableSessionModel.findById(sessionId);
+
+    if ((!orders || orders.length === 0) && (!payments || payments.length === 0)) {
       return {
+        session,
+        orders: [],
         subtotal: 0,
         taxAmount: 0,
         discountAmount: 0,
         serviceCharge: 0,
         finalAmount: 0,
-        orders: []
+        financialSummary: {
+          grossTotal: 0,
+          tax: 0,
+          discount: 0,
+          paymentsApplied: 0,
+          outstandingBalance: 0
+        }
       };
     }
 
     let subtotal = 0;
     let taxAmount = 0;
     let discountAmount = 0;
+    let paymentsApplied = 0;
 
     orders.forEach(order => {
       subtotal += order.totalAmount;
@@ -50,19 +68,33 @@ export class BillingService {
       discountAmount += order.discountAmount;
     });
 
+    payments.forEach(payment => {
+      paymentsApplied += payment.amount;
+    });
+
     // Fetch service charge configuration dynamically from restaurant settings
     const restaurant = await RestaurantModel.findById(restaurantId);
     const serviceChargeEnabled = restaurant?.settings?.serviceChargeEnabled ?? true;
     const serviceCharge = serviceChargeEnabled ? subtotal * 0.05 : 0;
-    const finalAmount = subtotal + taxAmount + serviceCharge - discountAmount;
+
+    const grossTotal = subtotal + taxAmount + serviceCharge;
+    const outstandingBalance = (grossTotal - discountAmount) - paymentsApplied;
 
     return {
+      session,
+      orders,
       subtotal,
       taxAmount,
       serviceCharge,
       discountAmount,
-      finalAmount,
-      orders
+      finalAmount: Math.max(0, outstandingBalance),
+      financialSummary: {
+        grossTotal,
+        tax: taxAmount,
+        discount: discountAmount,
+        paymentsApplied,
+        outstandingBalance: Math.max(0, outstandingBalance)
+      }
     };
   }
 
@@ -111,8 +143,11 @@ export class BillingService {
       bill.serviceCharge = liveBill.serviceCharge;
 
       const couponDiscount = bill.appliedCoupons.reduce((sum, c) => sum + c.discountAmount, 0);
-      bill.discountAmount = liveBill.discountAmount + couponDiscount;
-      bill.finalAmount = bill.subtotal + bill.taxAmount + bill.serviceCharge - bill.discountAmount;
+      bill.discountAmount = liveBill.financialSummary.discount + couponDiscount;
+      bill.grossTotal = liveBill.financialSummary.grossTotal;
+      bill.paymentsApplied = liveBill.financialSummary.paymentsApplied;
+      bill.outstandingBalance = Math.max(0, (bill.grossTotal - bill.discountAmount) - bill.paymentsApplied);
+      bill.finalAmount = bill.outstandingBalance;
 
       bill.orderIds = orderIds;
       bill.status = BillStatus.GENERATED;
@@ -133,8 +168,11 @@ export class BillingService {
         subtotal: liveBill.subtotal,
         taxAmount: liveBill.taxAmount,
         serviceCharge: liveBill.serviceCharge,
-        discountAmount: liveBill.discountAmount,
-        finalAmount: liveBill.finalAmount,
+        discountAmount: liveBill.financialSummary.discount,
+        grossTotal: liveBill.financialSummary.grossTotal,
+        paymentsApplied: liveBill.financialSummary.paymentsApplied,
+        outstandingBalance: liveBill.financialSummary.outstandingBalance,
+        finalAmount: liveBill.financialSummary.outstandingBalance,
         status: BillStatus.GENERATED,
         requestedAt: new Date(),
         customerEmail,
@@ -144,10 +182,24 @@ export class BillingService {
       });
     }
 
-    // Transition table status to BILL_PENDING
+    // Transition table status to BILL_PENDING and session to PAYMENT_PENDING
     if (session) {
       await TableModel.findByIdAndUpdate(session.tableId, {
         status: TableStatus.BILL_PENDING,
+      });
+
+      const { SessionStatus } = await import('../../constants/statuses');
+      await TableSessionModel.findByIdAndUpdate(session._id, {
+        status: SessionStatus.PAYMENT_PENDING,
+      });
+
+      const { socketService } = await import('../../sockets/socket.service');
+      const { SocketEvent } = await import('../../constants/events');
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.BILL_REQUESTED, {
+        sessionId: session._id,
+        tableId: session.tableId,
+        billId: bill._id,
+        outstandingBalance: bill.outstandingBalance || bill.finalAmount
       });
     }
 
@@ -218,87 +270,59 @@ export class BillingService {
     return bill;
   }
 
-  static async createPayment(restaurantId: string, sessionId: string, paymentMethod: PaymentMethod, customerEmail?: string) {
-    let bill = await BillingModel.findOne({ restaurantId, sessionId });
+  /**
+   * Single source of truth for settling a dining session after money has been verified.
+   * Modifies only the Billing domain and delegates Order updates.
+   * Does NOT emit sockets or close sessions directly.
+   */
+  static async settleSession(
+    sessionId: string | mongoose.Types.ObjectId,
+    dbSession?: mongoose.ClientSession,
+  ) {
+    const bill = await BillingModel.findOne({ sessionId }).session(dbSession || null);
     if (!bill) {
-      bill = await this.requestFinalBill(restaurantId, sessionId, customerEmail);
-    } else {
-      // Update customer details if they are finalizing payment directly
-      if (customerEmail) bill.customerEmail = customerEmail;
-      const session = await TableSessionModel.findById(sessionId);
-      if (session) {
-        bill.customerName = session.customerName;
-        bill.customerPhone = session.mobile;
-      }
-      await bill.save();
+      throw new AppError('Bill not found for this session.', 404, ErrorCode.NOT_FOUND);
     }
 
     if (bill.status === BillStatus.PAID) {
-      throw new AppError('Bill is already paid.', 400, ErrorCode.INVALID_REQUEST);
+      return { bill, updatedOrders: [] }; // Idempotent
     }
 
-    const intentId = `pay_mock_${restaurantId}_${Date.now()}`;
+    // 1. Mark orders as paid via OrdersService
+    const { OrdersService } = await import('../orders/orders.service');
+    const updatedOrders = await OrdersService.markOrdersPaid(sessionId, dbSession);
 
-    bill.paymentId = intentId;
-    bill.paymentMethod = paymentMethod;
-    bill.status = BillStatus.PENDING_PAYMENT;
-    bill.paymentStatus = PaymentStatus.PENDING;
-    await bill.save();
+    // 2. Settle the bill
+    bill.status = BillStatus.PAID;
+    bill.paymentStatus = BillingPaymentStatus.PAID;
+    bill.paidAt = new Date();
 
-    // Get active platform settings for commission
-    let commissionRate = 10;
-    let commission = 0;
-    try {
-      const { getPlatformSettings } = await import('../superAdmin/platformSettings.model');
-      const settings = await getPlatformSettings();
-      commissionRate = settings?.platformCommissionRate ?? 10;
-      commission = Math.round(bill.finalAmount * (commissionRate / 100) * 100) / 100;
-    } catch (e) {
-      commission = Math.round(bill.finalAmount * 0.1 * 100) / 100;
+    // Idempotent Invoice Number Generation
+    if (!bill.invoiceNumber) {
+      const currentYear = new Date().getFullYear();
+      const { InvoiceCounterModel } = await import('./invoice-counter.model');
+      const counter = await InvoiceCounterModel.findOneAndUpdate(
+        { year: currentYear },
+        { $inc: { sequence: 1 } },
+        { new: true, upsert: true, session: dbSession }
+      );
+      const sequenceStr = String(counter.sequence).padStart(6, '0');
+      bill.invoiceNumber = `INV-${currentYear}-${sequenceStr}`;
     }
 
-    // v2.1 Requirement: Write transaction details to PaymentModel
-    await PaymentModel.create({
-      restaurantId: bill.restaurantId,
-      billId: bill._id,
-      orderId: bill.orderIds[0],
-      sessionId: bill.sessionId,
-      amount: bill.finalAmount,
-      currency: 'INR',
-      method: paymentMethod,
-      provider: 'mock',
-      providerPaymentId: intentId,
-      status: PaymentStatus.PENDING as any,
-      commissionRate,
-      commission,
-      metadata: {
-        source: 'billing_create_payment',
-      },
-    });
+    await bill.save({ session: dbSession });
 
-    return {
-      billId: bill._id,
-      paymentIntentId: intentId,
-      amount: bill.finalAmount,
-      currency: 'INR',
-      payment: {
-        id: intentId,
-        _id: intentId,
-        amount: bill.finalAmount,
-        method: paymentMethod,
-        status: PaymentStatus.PENDING
-      }
-    };
+    return { bill, updatedOrders };
   }
 
-  static async verifyPayment(restaurantId: string, sessionId: string, paymentId: string, simulateStatus?: PaymentStatus) {
+  static async verifyPayment(restaurantId: string, sessionId: string, paymentId: string, simulateStatus?: BillingPaymentStatus) {
     const bill = await BillingModel.findOne({ restaurantId, sessionId });
     if (!bill) {
       throw new AppError('Bill not found.', 404, ErrorCode.NOT_FOUND);
     }
 
     // Idempotency check
-    if (bill.paymentId === paymentId && bill.status === BillStatus.PAID && bill.paymentStatus === PaymentStatus.PAID) {
+    if (bill.paymentId === paymentId && bill.status === BillStatus.PAID && bill.paymentStatus === BillingPaymentStatus.PAID) {
       return bill; // Already processed
     }
 
@@ -314,8 +338,8 @@ export class BillingService {
     });
 
     // Mock failure behavior
-    if (simulateStatus === PaymentStatus.FAILED || paymentId.includes('fail')) {
-      bill.paymentStatus = PaymentStatus.FAILED;
+    if (simulateStatus === BillingPaymentStatus.FAILED || paymentId.includes('fail')) {
+      bill.paymentStatus = BillingPaymentStatus.FAILED;
       bill.status = BillStatus.FAILED;
       await bill.save();
 
@@ -328,8 +352,8 @@ export class BillingService {
     }
 
     // Mock expired behavior
-    if (simulateStatus === PaymentStatus.EXPIRED) {
-      bill.paymentStatus = PaymentStatus.EXPIRED;
+    if (simulateStatus === BillingPaymentStatus.EXPIRED) {
+      bill.paymentStatus = BillingPaymentStatus.EXPIRED;
       bill.status = BillStatus.DRAFT; // Revert to a pre-payment state
       await bill.save();
 
@@ -342,28 +366,12 @@ export class BillingService {
     }
 
     // Mock pending behavior (doing nothing and waiting)
-    if (simulateStatus === PaymentStatus.PENDING) {
+    if (simulateStatus === BillingPaymentStatus.PENDING) {
       return bill;
     }
 
-    bill.status = BillStatus.PAID;
-    bill.paymentStatus = PaymentStatus.PAID;
-    bill.paidAt = new Date();
-
-    // Idempotent Invoice Number Generation
-    if (!bill.invoiceNumber) {
-      const currentYear = new Date().getFullYear();
-      const counter = await InvoiceCounterModel.findOneAndUpdate(
-        { year: currentYear },
-        { $inc: { sequence: 1 } },
-        { new: true, upsert: true }
-      );
-      const sequenceStr = String(counter.sequence).padStart(6, '0');
-      // Using global INV-YYYY-SEQUENCE since restaurant codes are missing
-      bill.invoiceNumber = `INV-${currentYear}-${sequenceStr}`;
-    }
-
-    await bill.save();
+    // Execute domain settlement
+    const { bill: updatedBill, updatedOrders } = await this.settleSession(sessionId);
 
     if (payment) {
       payment.status = 'COMPLETED' as any;
@@ -371,51 +379,40 @@ export class BillingService {
       await payment.save();
     }
 
-    // Transition all BILLED and SERVED orders to PAID
-    const billedOrders = await OrderModel.find({
-      restaurantId,
-      sessionId,
-      status: { $in: [OrderStatus.BILLED, OrderStatus.SERVED] }
-    });
-
     const { socketService } = await import('../../sockets/socket.service');
     const { SocketEvent } = await import('../../constants/events');
 
-    for (const order of billedOrders) {
-      order.status = OrderStatus.PAID;
-      order.paymentStatus = 'PAID' as any;
-      await order.save();
-
+    for (const order of updatedOrders) {
       socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
       socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
     }
 
     // Emit bill.paid to restaurant and session
-    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.PAYMENT_CONFIRMED, { billId: bill._id, sessionId });
-    socketService.emitToSession(sessionId.toString(), 'payment.success', { billId: bill._id });
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.PAYMENT_CONFIRMED, { billId: updatedBill._id, sessionId });
+    socketService.emitToSession(sessionId.toString(), 'payment.success', { billId: updatedBill._id });
 
     // Send HTML Receipt Email
     if (bill.customerEmail && bill.wantsReceipt) {
       try {
         const restaurant = await RestaurantModel.findById(restaurantId).lean();
         const restaurantName = restaurant?.name || 'Our Restaurant';
-        const orderItems = billedOrders.flatMap(o => o.items);
+        const orderItems = updatedOrders.flatMap(o => o.items);
 
-        await sendReceiptEmail(bill.customerEmail, {
+        await sendReceiptEmail(updatedBill.customerEmail as string, {
           restaurantName,
-          invoiceNumber: bill.invoiceNumber || '',
-          customerName: bill.customerName || 'Guest',
-          customerPhone: bill.customerPhone || '',
+          invoiceNumber: updatedBill.invoiceNumber || '',
+          customerName: updatedBill.customerName || 'Guest',
+          customerPhone: updatedBill.customerPhone || '',
           orderItems,
-          subtotal: bill.subtotal,
-          taxAmount: bill.taxAmount + (bill.serviceCharge || 0),
-          totalAmount: bill.finalAmount,
-          paymentMethod: bill.paymentMethod || 'ONLINE',
-          paymentDate: bill.paidAt.toISOString().split('T')[0]
+          subtotal: updatedBill.subtotal,
+          taxAmount: updatedBill.taxAmount + (updatedBill.serviceCharge || 0),
+          totalAmount: updatedBill.finalAmount,
+          paymentMethod: updatedBill.paymentMethod || 'ONLINE',
+          paymentDate: updatedBill.paidAt ? updatedBill.paidAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
         });
 
-        bill.receiptEmailedAt = new Date();
-        await bill.save();
+        updatedBill.receiptEmailedAt = new Date();
+        await updatedBill.save();
       } catch (error) {
         logger.error('Failed to send receipt email', { error, billId: bill._id });
       }
@@ -428,7 +425,7 @@ export class BillingService {
         tableSessionId: new mongoose.Types.ObjectId(sessionId),
         recipientRole: UserRole.CUSTOMER,
         title: 'Payment Successful',
-        message: `Your payment of INR ${bill.finalAmount} was verified successfully.`,
+        message: `Your payment of INR ${updatedBill.finalAmount} was verified successfully.`,
         type: 'PAYMENT_SUCCESS',
         category: NotificationCategory.SYSTEM,
         priority: NotificationPriority.HIGH,
@@ -446,7 +443,7 @@ export class BillingService {
       logger.error(`Failed to close session ${sessionId} after payment:`, error);
     }
 
-    return bill;
+    return updatedBill;
   }
 
   static async getPaymentStatus(restaurantId: string, sessionId: string, paymentId: string) {

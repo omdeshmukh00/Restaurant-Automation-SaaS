@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { generateTableCode, getRecommendedItems } from '../utils/customer.utils';
 import { apiClient } from '../../../shared/services/apiClient';
 import { connectSocket, disconnectSocket, getSocket } from '../../../lib/socket';
+import { getCartHasItems } from './cartSnapshot';
 
 export type DiningSession = {
   sessionId: string;
@@ -49,6 +50,10 @@ export type TrackedOrder = {
   status: 'Placed' | 'Preparing' | 'Ready' | 'Served' | 'Completed';
   eta: string;
   date?: string;
+  createdAt?: string;
+  preparingStartedAt?: string;
+  readyAt?: string;
+  servedAt?: string;
 };
 
 export type CustomerNotification = {
@@ -97,16 +102,6 @@ export type NotificationPreferences = {
   push: boolean;
 };
 
-export const MENU_ITEMS: CustomerMenuItem[] = [
-  { id: 1, name: 'Hyderabadi Biryani', desc: 'Aromatic basmati rice cooked with spices', price: 249, rating: 4.6, reviews: 230, cat: 'Biryani', veg: false, img: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=400&q=80', badge: 'Bestseller' },
-  { id: 2, name: 'Butter Chicken', desc: 'Creamy tomato gravy with tender chicken', price: 229, rating: 4.5, reviews: 186, cat: 'Biryani', veg: false, img: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=400&q=80', badge: '' },
-  { id: 3, name: 'Veg Pizza', desc: 'Loaded with veggies & extra cheese', price: 199, rating: 4.4, reviews: 182, cat: 'Pizza', veg: true, img: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&q=80', badge: '' },
-  { id: 4, name: 'Smash Burger', desc: 'Double patty with cheese & crispy fries', price: 259, rating: 4.8, reviews: 95, cat: 'Burgers', veg: false, img: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&q=80', badge: 'Hot' },
-  { id: 5, name: 'Gulab Jamun', desc: 'Soft milk-solid dumplings in sugar syrup', price: 99, rating: 4.7, reviews: 148, cat: 'Desserts', veg: true, img: 'https://images.unsplash.com/photo-1542828183-4e0a0d95f83d?w=400&q=80', badge: '' },
-  { id: 6, name: 'Mango Lassi', desc: 'Chilled yogurt drink with fresh mango', price: 89, rating: 4.5, reviews: 112, cat: 'Drinks', veg: true, img: 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=400&q=80', badge: '' },
-  { id: 7, name: 'Paneer Tikka', desc: 'Grilled cottage cheese with mint chutney', price: 189, rating: 4.6, reviews: 204, cat: 'Biryani', veg: true, img: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=400&q=80', badge: 'Chef Special' },
-  { id: 8, name: 'Cold Coffee', desc: 'Blended iced coffee with cream', price: 129, rating: 4.3, reviews: 89, cat: 'Drinks', veg: true, img: 'https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=400&q=80', badge: '' },
-];
 
 export const MENU_CATEGORIES = [
   { label: 'All', icon: '🍽️' },
@@ -150,6 +145,7 @@ type CustomerStore = {
   // Dining Session State
   diningSession: DiningSession;
   lastActivity: number | null;
+  liveBill: any | null;
 
   // Profile Features State
   profile: CustomerProfile;
@@ -162,22 +158,17 @@ type CustomerStore = {
   setCategory: (category: string) => void;
   setSearch: (search: string) => void;
   toggleVegOnly: () => void;
-  addToCart: (id: number) => void;
-  removeFromCart: (id: number) => void;
-  clearCart: () => void;
+
   toggleFavourite: (id: number) => void;
-  placeOrder: (specialInstructions?: string) => Promise<any>;
+
   reorder: (order: TrackedOrder) => void;
   requestService: (request: ServiceRequestItem) => void;
-  getCartQuantity: (id: number) => number;
-  getTotalItems: () => number;
-  getTotalPrice: () => number;
-  getFilteredItems: () => CustomerMenuItem[];
-  getRecommendedItems: () => CustomerMenuItem[];
+
   assignRandomTable: () => void;
   setTableCode: (code: string) => void;
   addOrder: (order: TrackedOrder) => void;
   fetchOrders: () => Promise<void>;
+  fetchLiveBill: () => Promise<void>;
 
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
@@ -234,6 +225,7 @@ export const useCustomerStore = create<CustomerStore>()(
       serviceRequests: [],
       diningSession: null,
       lastActivity: null,
+      liveBill: null,
 
       // Initializing Profile Features State
       profile: {
@@ -256,67 +248,13 @@ export const useCustomerStore = create<CustomerStore>()(
       setCategory: (category) => set({ category }),
       setSearch: (search) => set({ search }),
       toggleVegOnly: () => set((state) => ({ vegOnly: !state.vegOnly })),
-      addToCart: (id) => {
-        get().recordActivity();
-        set((state) => {
-          const existing = state.cart.find((item) => item.id === id);
-          return {
-            cart: existing
-              ? state.cart.map((item) => item.id === id ? { ...item, qty: item.qty + 1 } : item)
-              : [...state.cart, { id, qty: 1 }],
-          };
-        });
-      },
-      removeFromCart: (id) => {
-        get().recordActivity();
-        set((state) => ({
-          cart: state.cart.map((item) => item.id === id ? { ...item, qty: Math.max(0, item.qty - 1) } : item).filter((item) => item.qty > 0),
-        }));
-      },
-      clearCart: () => {
-        get().recordActivity();
-        set({ cart: [] });
-      },
+
       toggleFavourite: (id) => set((state) => ({
         favourites: state.favourites.includes(id)
           ? state.favourites.filter((favouriteId) => favouriteId !== id)
           : [...state.favourites, id],
       })),
-      placeOrder: async (specialInstructions?: string) => {
-        get().recordActivity();
-        try {
-          const res = await apiClient.post('/customer/orders', { specialInstructions });
-          const order = res.data?.data?.order || res.data?.order;
-          
-          await get().fetchOrders();
-          
-          if (order) {
-            const total = order.finalAmount || order.totalAmount || 0;
-            const pointsEarned = Math.floor(total / 10);
-            
-            const updatedNotifications = [
-              {
-                id: `n-${Date.now()}`,
-                title: 'Order Placed! 🍽️',
-                message: `Your order was successfully placed. You earned ${pointsEarned} reward points!`,
-                timestamp: 'Just now',
-                read: false,
-                type: 'order' as const,
-              }
-            ];
 
-            set((state) => ({
-              cart: [],
-              loyaltyPoints: state.loyaltyPoints + pointsEarned,
-              notifications: [...updatedNotifications, ...state.notifications],
-            }));
-          }
-          return order;
-        } catch (err) {
-          console.error('Failed to place order via API', err);
-          throw err;
-        }
-      },
       fetchOrders: async () => {
         try {
           const res = await apiClient.get('/customer/orders');
@@ -331,12 +269,25 @@ export const useCustomerStore = create<CustomerStore>()(
                 status: mapBackendOrderStatusToFrontend(o.status),
                 eta: o.preparationTime ? `${o.preparationTime} min` : '15 min',
                 date: new Date(o.createdAt).toLocaleString('en-IN'),
+                createdAt: o.createdAt,
+                preparingStartedAt: o.preparingStartedAt,
+                readyAt: o.readyAt,
+                servedAt: o.servedAt,
               };
             });
             set({ orders: mapped });
           }
         } catch (err) {
           console.error('Failed to fetch customer orders', err);
+        }
+      },
+      fetchLiveBill: async () => {
+        try {
+          const { getLiveBill } = await import('../api/customer.api');
+          const data = await getLiveBill();
+          set({ liveBill: data });
+        } catch (err) {
+          console.error('Failed to fetch live bill', err);
         }
       },
       reorder: (order) => {
@@ -391,22 +342,7 @@ export const useCustomerStore = create<CustomerStore>()(
         get().recordActivity();
         set((state) => ({ serviceRequests: [{ ...request, id: `${request.id}-${Date.now()}` }, ...state.serviceRequests] }));
       },
-      getCartQuantity: (id) => get().cart.find((item) => item.id === id)?.qty ?? 0,
-      getTotalItems: () => get().cart.reduce((total, item) => total + item.qty, 0),
-      getTotalPrice: () => get().cart.reduce((total, cartItem) => {
-        const item = MENU_ITEMS.find((menuItem) => menuItem.id === cartItem.id);
-        return total + (item?.price ?? 0) * cartItem.qty;
-      }, 0),
-      getFilteredItems: () => {
-        const { category, search, vegOnly } = get();
-        return MENU_ITEMS.filter((item) => {
-          const matchesCategory = category === 'All' || item.cat === category;
-          const matchesSearch = !search.trim() || `${item.name} ${item.desc} ${item.cat}`.toLowerCase().includes(search.toLowerCase());
-          const matchesVeg = !vegOnly || item.veg;
-          return matchesCategory && matchesSearch && matchesVeg;
-        });
-      },
-      getRecommendedItems: () => getRecommendedItems(MENU_ITEMS, get().favourites, get().cart),
+
       assignRandomTable: () => set({ tableCode: generateTableCode() }),
       setTableCode: (tableCode) => set({ tableCode }),
       addOrder: (order) => set((state) => ({ orders: [order, ...state.orders] })),
@@ -426,9 +362,14 @@ export const useCustomerStore = create<CustomerStore>()(
           if (socket) {
             const handleOrderUpdate = () => {
               get().fetchOrders();
+              get().fetchLiveBill();
             };
             socket.on('order.updated', handleOrderUpdate);
             socket.on('order.new', handleOrderUpdate);
+            socket.on('payment.success', handleOrderUpdate);
+            socket.on('session.closed', () => {
+              get().clearDiningSession();
+            });
           }
         } else {
           localStorage.removeItem('x-session-token');
@@ -462,11 +403,19 @@ export const useCustomerStore = create<CustomerStore>()(
         }
       },
       checkSessionInactivity: async () => {
-        const { diningSession, lastActivity, clearDiningSession } = get();
+        const { diningSession, lastActivity, clearDiningSession, orders, liveBill } = get();
         if (diningSession && lastActivity) {
           const inactiveMs = Date.now() - lastActivity;
           if (inactiveMs > 20 * 60 * 1000) {
-            console.log('Inactivity timeout reached (20 minutes). Clearing session.');
+            const hasActiveOrders = orders.some(o => o.status !== 'Completed');
+            const isBillPending = liveBill && (liveBill.status === 'GENERATED' || liveBill.finalAmount > 0);
+            const isPaymentPending = diningSession.status === 'PAYMENT_PENDING';
+            const hasActiveCart = getCartHasItems();
+
+            if (hasActiveOrders || isBillPending || isPaymentPending || hasActiveCart) {
+              return; // Skip cycle without updating lastActivity
+            }
+
             try {
               await clearDiningSession();
             } catch (e) {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../services/apiClient";
+import { connectSocket, getSocket } from "../../lib/socket";
 
 export interface PlatformSettingsData {
   maintenanceMode: boolean;
@@ -13,7 +14,7 @@ export interface PlatformSettingsData {
   supportEmail?: string;
 }
 
-export function usePlatformSettingsGuard(pollIntervalMs: number = 3000) {
+export function usePlatformSettingsGuard() {
   const [settings, setSettings] = useState<PlatformSettingsData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,18 +48,44 @@ export function usePlatformSettingsGuard(pollIntervalMs: number = 3000) {
   useEffect(() => {
     fetchSettings();
 
-    // 3-second real-time polling to detect Maintenance Mode or Panel Disable changes live
-    const interval = setInterval(fetchSettings, pollIntervalMs);
+    // Ensure socket is connected to receive global broadcasts
+    connectSocket();
+    const socket = getSocket();
+
+    const handleSettingsUpdate = (data: any) => {
+      if (data) {
+        setSettings({
+          maintenanceMode: !!data.maintenanceMode,
+          disableCustomerPanel: !!data.disableCustomerPanel,
+          disableKitchenPanel: !!data.disableKitchenPanel,
+          disableStaffPanel: !!data.disableStaffPanel,
+          disableCleaningPanel: !!data.disableCleaningPanel,
+          disableAdminPanel: !!data.disableAdminPanel,
+          enablePartnerRegistration:
+            data.enablePartnerRegistration !== undefined
+              ? !!data.enablePartnerRegistration
+              : true,
+          platformName: data.platformName,
+          supportEmail: data.supportEmail,
+        });
+      }
+    };
+
+    if (socket) {
+      socket.on("platform.settings.updated", handleSettingsUpdate);
+    }
 
     // Re-check instantly when window gains focus
     const handleFocus = () => fetchSettings();
     window.addEventListener("focus", handleFocus);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
+      if (socket) {
+        socket.off("platform.settings.updated", handleSettingsUpdate);
+      }
     };
-  }, [fetchSettings, pollIntervalMs]);
+  }, [fetchSettings]);
 
   return { settings, loading, refetch: fetchSettings };
 }

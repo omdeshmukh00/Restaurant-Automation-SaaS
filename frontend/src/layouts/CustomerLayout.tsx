@@ -68,6 +68,24 @@ export default function CustomerLayout() {
     return () => clearInterval(interval);
   }, [checkSessionInactivity]);
 
+  // Lightweight Safety Net for user activity
+  useEffect(() => {
+    const handleActivity = () => {
+      const store = useCustomerStore.getState();
+      if (store.diningSession && (Date.now() - (store.lastActivity || 0) > 60000)) {
+        store.recordActivity();
+      }
+    };
+
+    window.addEventListener('click', handleActivity, { passive: true });
+    window.addEventListener('touchstart', handleActivity, { passive: true });
+
+    return () => {
+      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+    };
+  }, []);
+
   // Connect socket and listen to real-time events for customer session
   useEffect(() => {
     if (diningSession) {
