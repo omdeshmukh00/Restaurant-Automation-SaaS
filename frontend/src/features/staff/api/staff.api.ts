@@ -66,7 +66,7 @@ export type TableStatus =
   | 'needs_cleaning';
 
 export interface Table {
-  id: number;
+  id: string;
   tableNumber: string;
   status: TableStatus;
   section: string;
@@ -76,14 +76,14 @@ export interface Table {
 // ── Requests & Alerts ──
 
 export interface CustomerRequest {
-  id: number;
+  id: string;
   tableNumber: string;
   type: 'call_waiter' | 'water_refill' | 'extra_cutlery' | 'cleaning';
   time: string;
 }
 
 export interface FoodAlert {
-  id: number;
+  id: string;
   tableNumber: string;
   items: string[];
   readyAt: string;
@@ -92,7 +92,7 @@ export interface FoodAlert {
 // ── Staff ──
 
 export interface StaffMember {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: 'Manager' | 'Server' | 'Chef' | 'Bartender';
@@ -154,7 +154,7 @@ export interface RolesData {
 }
 
 export interface QueueItem {
-  id: number;
+  id: string;
   tableNumber: string;
   partySize?: number;
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -163,7 +163,7 @@ export interface QueueItem {
 }
 
 export interface Reservation {
-  id: number;
+  id: string;
   tableNumber: string;
   guestName: string;
   partySize: number;
@@ -172,7 +172,7 @@ export interface Reservation {
 }
 
 export interface OrderItem {
-  id: number;
+  id: string;
   tableNumber: string;
   status: 'ready' | 'picked' | 'served' | 'completed';
   items: string[];
@@ -180,7 +180,7 @@ export interface OrderItem {
 }
 
 export interface EscalationPayload {
-  tableId: number;
+  tableId: string;
   issue: string;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
 }
@@ -228,7 +228,7 @@ function buildStaffProfile(user: Partial<StaffMember> & { mobile?: string; role?
     .join('') || 'ST';
 
   return {
-    id: typeof user.id === 'string' ? Number(user.id) || 0 : user.id ?? 0,
+    id: String(user.id || ''),
     name,
     email: user.email ?? '',
     role: mapBackendRoleToStaffRole(user.role),
@@ -265,7 +265,7 @@ export const tableAPI = {
   },
 
   /** GET /staff/tables/:id — fetch a single table by id */
-  getTable: async (id: number): Promise<ApiResponse<Table>> => {
+  getTable: async (id: string): Promise<ApiResponse<Table>> => {
     const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}`);
     return {
       success: res.success,
@@ -275,7 +275,7 @@ export const tableAPI = {
   },
 
   /** PATCH /staff/tables/:id/assign — assign a table */
-  assign: async (id: number): Promise<ApiResponse<Table>> => {
+  assign: async (id: string): Promise<ApiResponse<Table>> => {
     const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/assign`, { method: 'PATCH' });
     return {
       success: res.success,
@@ -285,7 +285,7 @@ export const tableAPI = {
   },
 
   /** PATCH /staff/tables/:id/reserve — mark a table reserved */
-  reserve: async (id: number): Promise<ApiResponse<Table>> => {
+  reserve: async (id: string): Promise<ApiResponse<Table>> => {
     const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/reserve`, { method: 'PATCH' });
     return {
       success: res.success,
@@ -295,7 +295,7 @@ export const tableAPI = {
   },
 
   /** PATCH /staff/tables/:id/occupy — mark a table occupied */
-  occupy: async (id: number): Promise<ApiResponse<Table>> => {
+  occupy: async (id: string): Promise<ApiResponse<Table>> => {
     const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/occupy`, { method: 'PATCH' });
     return {
       success: res.success,
@@ -305,8 +305,30 @@ export const tableAPI = {
   },
 
   /** Generic fallback for table status changes. Use documented transitions when available. */
-  updateStatus: async (_id: number, _status: TableStatus): Promise<ApiResponse<Table>> => {
-    return Promise.resolve({ success: true, data: {} as Table });
+  updateStatus: async (id: string, status: string): Promise<ApiResponse<Table>> => {
+    let backendStatus = 'AVAILABLE';
+    const statusUpper = status.toUpperCase();
+    if (statusUpper === 'NEEDS_CLEANING' || statusUpper === 'DIRTY' || statusUpper === 'CLEANING') {
+      backendStatus = 'AVAILABLE';
+    } else if (statusUpper === 'CLEANING_IN_PROGRESS') {
+      backendStatus = 'CLEANING_IN_PROGRESS';
+    } else if (statusUpper === 'OCCUPIED') {
+      backendStatus = 'OCCUPIED';
+    } else if (statusUpper === 'RESERVED') {
+      backendStatus = 'RESERVED';
+    } else if (statusUpper === 'AVAILABLE') {
+      backendStatus = 'AVAILABLE';
+    }
+
+    const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: backendStatus }),
+    });
+    return {
+      success: res.success,
+      data: res.data?.table,
+      error: res.error,
+    };
   },
 };
 
@@ -324,17 +346,17 @@ export const requestsAPI = {
   },
 
   /** PATCH /staff/requests/:id/accept — accept a staff request */
-  accept: (id: number): Promise<ApiResponse<void>> => {
+  accept: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/requests/${id}/accept`, { method: 'PATCH' });
   },
 
   /** PATCH /staff/requests/:id/complete — complete a staff request */
-  complete: (id: number): Promise<ApiResponse<void>> => {
+  complete: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/requests/${id}/complete`, { method: 'PATCH' });
   },
 
   /** Alias for request completion in the current UI */
-  resolve: (id: number): Promise<ApiResponse<void>> => {
+  resolve: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/requests/${id}/complete`, { method: 'PATCH' });
   },
 };
@@ -380,7 +402,29 @@ export const reservationsAPI = {
     };
   },
 
-  getReservation: async (id: number): Promise<ApiResponse<Reservation>> => {
+  createReservation: async (payload: {
+    customerName: string;
+    customerEmail?: string;
+    mobile: string;
+    guests: number;
+    date: string;
+    slot: string;
+    tableNumber?: string;
+    notes?: string;
+    occasion?: string;
+  }): Promise<ApiResponse<Reservation>> => {
+    const res = await fetchAPI<{ reservation: Reservation }>('/staff/reservations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return {
+      success: res.success,
+      data: res.data?.reservation,
+      error: res.error,
+    };
+  },
+
+  getReservation: async (id: string): Promise<ApiResponse<Reservation>> => {
     const res = await fetchAPI<{ reservation: Reservation }>(`/staff/reservations/${id}`);
     return {
       success: res.success,
@@ -389,7 +433,7 @@ export const reservationsAPI = {
     };
   },
 
-  checkIn: async (id: number): Promise<ApiResponse<Reservation>> => {
+  checkIn: async (id: string): Promise<ApiResponse<Reservation>> => {
     const res = await fetchAPI<{ reservation: Reservation }>(`/staff/reservations/${id}/check-in`, {
       method: 'PATCH',
     });
@@ -413,12 +457,16 @@ export const ordersAPI = {
     };
   },
 
-  pickOrder: (id: number): Promise<ApiResponse<void>> => {
+  pickOrder: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/orders/${id}/pick`, { method: 'PATCH' });
   },
 
-  serveOrder: (id: number): Promise<ApiResponse<void>> => {
+  serveOrder: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/orders/${id}/serve`, { method: 'PATCH' });
+  },
+
+  completeOrder: (id: string): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/staff/orders/${id}/complete`, { method: 'PATCH' });
   },
 };
 
@@ -436,21 +484,92 @@ export const issuesAPI = {
 // ── Food Alerts ──
 
 export const foodAlertsAPI = {
-  /** GET /food-alerts?status=active */
+  /** GET /notifications */
   getActive: async (): Promise<ApiResponse<FoodAlert[]>> => {
-    const res = await fetchAPI<{ alerts: FoodAlert[] }>('/food-alerts?status=active');
+    const res = await fetchAPI<{ notifications: any[] }>('/notifications');
+    const mapped = (res.data?.notifications || []).map((n: any) => ({
+      id: String(n._id || n.id),
+      tableNumber: n.metadata?.tableNumber || 'Table 1',
+      items: Array.isArray(n.metadata?.items) ? n.metadata.items : [n.message || n.title],
+      readyAt: new Date(n.createdAt).toLocaleTimeString(),
+    }));
     return {
       success: res.success,
-      data: res.data?.alerts,
+      data: mapped,
       error: res.error,
     };
   },
 
-  /** POST /food-alerts/:id/action  body: { action: 'picked_up' | 'served' } */
-  action: (id: number, action: 'picked_up' | 'served'): Promise<ApiResponse<void>> => {
-    return fetchAPI<void>(`/food-alerts/${id}/action`, {
+  /** PATCH /notifications/:id/read */
+  action: (id: string, _action: 'picked_up' | 'served'): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/notifications/${id}/read`, { method: 'PATCH' });
+  },
+};
+
+export const notificationsAPI = {
+  /** GET /notifications */
+  getAll: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ notifications: any[] }>('/notifications');
+    return {
+      success: res.success,
+      data: res.data?.notifications,
+      error: res.error,
+    };
+  },
+
+  /** PATCH /notifications/:id/read */
+  markAsRead: (id: string): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/notifications/${id}/read`, { method: 'PATCH' });
+  },
+
+  /** PATCH /notifications/read-all */
+  markAllAsRead: (): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>('/notifications/read-all', { method: 'PATCH' });
+  },
+};
+
+// ── Menu ──
+
+export const menuAPI = {
+  getItems: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ items: any[]; meta?: unknown }>('/admin/menu/items');
+    return {
+      success: res.success,
+      data: res.data?.items,
+      error: res.error,
+    };
+  },
+
+  /** GET /admin/menu/categories */
+  getCategories: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ categories: any[] }>('/admin/menu/categories');
+    return {
+      success: res.success,
+      data: res.data?.categories,
+      error: res.error,
+    };
+  },
+
+  /** PATCH /admin/menu/items/:id/availability */
+  toggleAvailability: async (id: string, isAvailable: boolean): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/admin/menu/items/${id}/availability`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isAvailable }),
+    });
+  },
+
+  /** POST /admin/menu/items */
+  createItem: async (item: any): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>('/admin/menu/items', {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify(item),
+    });
+  },
+
+  /** DELETE /admin/menu/items/:id */
+  deleteItem: async (id: string): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/admin/menu/items/${id}`, {
+      method: 'DELETE',
     });
   },
 };
@@ -479,7 +598,7 @@ export const staffAPI = {
   },
 
   /** PATCH /admin/staff/:id */
-  update: (id: number, updates: Partial<StaffMember>): Promise<ApiResponse<StaffMember>> => {
+  update: (id: string, updates: Partial<StaffMember>): Promise<ApiResponse<StaffMember>> => {
     return fetchAPI<StaffMember>(`/admin/staff/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
@@ -487,7 +606,7 @@ export const staffAPI = {
   },
 
   /** DELETE /admin/staff/:id */
-  delete: (id: number): Promise<ApiResponse<void>> => {
+  delete: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/admin/staff/${id}`, { method: 'DELETE' });
   },
 };
@@ -540,10 +659,15 @@ export const userAPI = {
   },
 
   /** PATCH /users/me — update profile */
-  updateProfile: async (updates: Partial<StaffMember>): Promise<ApiResponse<StaffMember>> => {
+  updateProfile: async (updates: Partial<StaffMember> & { mobile?: string }): Promise<ApiResponse<StaffMember>> => {
+    const payload: any = { ...updates };
+    if (updates.phone) {
+      payload.mobile = updates.phone;
+      delete payload.phone;
+    }
     const res = await fetchAPI<{ user: Partial<StaffMember> & { mobile?: string; role?: string; restaurantName?: string; id?: string } }>('/users/me', {
       method: 'PATCH',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(payload),
     });
     return {
       success: res.success,

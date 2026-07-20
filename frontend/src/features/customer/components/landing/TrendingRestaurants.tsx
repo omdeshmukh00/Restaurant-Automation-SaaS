@@ -92,7 +92,7 @@ export default function TrendingRestaurants({ onLoginOpen, restaurants, selected
         waitTime: `${10 + (idx * 5)} min`,
         availableTables: r.availableTables !== undefined ? r.availableTables : 5,
         currentOffer: r.currentOffer || undefined,
-        isOpen: r.status === 'ACTIVE',
+        isOpen: ['ACTIVE', 'APPLICATION_APPROVED', 'ADMIN_SETUP_PENDING', 'PLAN_SELECTION_PENDING'].includes(r.status),
       };
     });
   };

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { apiClient } from '../../../shared/services/apiClient';
 
 interface ReportMetric {
   date: string;
@@ -12,6 +13,21 @@ interface ReportMetric {
 export default function StaffReportsPage() {
   const { query } = useStaffSearch();
   const { orders } = useStaffDashboard();
+  const [dbPerformance, setDbPerformance] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPerf = async () => {
+      try {
+        const res = await apiClient.get('/admin/staff/performance');
+        if (res.data?.success && Array.isArray(res.data.data?.performance)) {
+          setDbPerformance(res.data.data.performance);
+        }
+      } catch (err) {
+        console.error('Failed to load performance metrics', err);
+      }
+    };
+    void fetchPerf();
+  }, []);
 
   const getPastDateString = (daysAgo: number) => {
     const d = new Date();
@@ -19,9 +35,10 @@ export default function StaffReportsPage() {
     return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
   };
 
-  // Dynamic calculations for Today based on store's completed orders
+  // Dynamic calculations for Today based on store's completed orders + DB performance metrics
   const completedToday = orders.filter(o => o.status === 'Completed');
-  const todayServedCount = 15 + completedToday.length;
+  const dbServedCount = dbPerformance.reduce((acc, p) => acc + (p.completedServiceOrders || 0), 0);
+  const todayServedCount = Math.max(15, dbServedCount) + completedToday.length;
   const todayTipsAmount = 1200 + completedToday.reduce((sum, o) => sum + Math.round(o.total * 0.1), 0);
   
   const todayRatingsSum = completedToday.reduce((sum, o) => sum + (o.rating || 4.8), 0);

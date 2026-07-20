@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { cleaningStore, type StaffProfile } from '../store/cleaning.store';
 import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleaning.api';
 import { connectSocket, getSocket } from '../../../lib/socket';
+import { apiClient } from '../../../shared/services/apiClient';
 
 // Hum yahan temporary interface bana rahe hain taaki TypeScript error na de
 interface ProcessedTask extends UrgentTask {
@@ -27,6 +28,25 @@ export function useCleaning() {
       setProfile(cleaningStore.profile);
       setStaffMembers(cleaningStore.staffMembers);
     });
+
+    const fetchUser = async () => {
+      try {
+        const { profileAPI } = await import('../api/profile.api');
+        const res = await profileAPI.getProfile();
+        if (res.success && res.data) {
+          cleaningStore.updateProfile({
+            name: res.data.name || cleaningStore.profile.name,
+            email: res.data.email || cleaningStore.profile.email,
+            phone: res.data.phone || cleaningStore.profile.phone,
+            role: res.data.role || cleaningStore.profile.role,
+          });
+        }
+      } catch (e) {
+        console.warn('Profile fetch failed', e);
+      }
+    };
+    void fetchUser();
+
     return () => {
       unsubscribe();
     };
@@ -118,6 +138,21 @@ export function useCleaning() {
       if (res.success && res.data?.tasks) {
         cleaningStore.syncTasks(res.data.tasks);
       }
+
+      const staffRes = await apiClient.get<{ success: boolean; data: any[] }>('/admin/staff');
+      if (staffRes.data?.success && Array.isArray(staffRes.data.data)) {
+        const apiMembers = staffRes.data.data.map((m: any) => ({
+          id: String(m._id || m.id),
+          name: m.name || 'Cleaning Staff',
+          role: m.role || 'Cleaning Staff',
+          area: m.assignedArea || 'Dining Area A',
+          phone: m.phone || '+91 98000 00000',
+          avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
+        }));
+        if (apiMembers.length > 0) {
+          cleaningStore.setStaffMembers(apiMembers);
+        }
+      }
     } catch (err) {
       console.warn('[CleanServe Hook] Sync operational.', err);
     } finally {
@@ -173,8 +208,27 @@ export function useCleaning() {
     kitchenWashrooms: [],
     urgentTasks,
     staffMembers,
-    addStaffMember: (member: any) => cleaningStore.addStaffMember(member),
-    removeStaffMember: (id: string) => cleaningStore.removeStaffMember(id),
+    addStaffMember: async (member: any) => {
+      cleaningStore.addStaffMember(member);
+      try {
+        await apiClient.post('/admin/staff', {
+          name: member.name,
+          phone: member.phone,
+          role: member.role || 'service-staff',
+          assignedArea: member.area,
+        });
+      } catch (e) {
+        console.warn('Failed to post staff member to backend', e);
+      }
+    },
+    removeStaffMember: async (id: string) => {
+      cleaningStore.removeStaffMember(id);
+      try {
+        await apiClient.delete(`/admin/staff/${id}`);
+      } catch (e) {
+        console.warn('Failed to delete staff member from backend', e);
+      }
+    },
     activeJobs: [],
     recentActivity: [],
     weeklyRequests: [],
@@ -182,7 +236,18 @@ export function useCleaning() {
     loading,
     error,
     profile,
-    updateProfile: (updated: Partial<StaffProfile>) => cleaningStore.updateProfile(updated),
+    updateProfile: async (updated: Partial<StaffProfile>) => {
+      cleaningStore.updateProfile(updated);
+      try {
+        const { profileAPI } = await import('../api/profile.api');
+        await profileAPI.updateProfile({
+          name: updated.name,
+          phone: updated.phone,
+        } as any);
+      } catch (e) {
+        console.error('Failed to sync profile changes with backend', e);
+      }
+    },
     assignTask: async (taskId: string) => {
       await cleaningAPI.startTask(taskId);
       await loadDashboard();

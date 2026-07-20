@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useCleaning } from '../hooks/usecleaning';
+import { apiClient } from '../../../shared/services/apiClient';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -207,28 +208,23 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleReport = () => {
+  const handleReport = async () => {
     setLoading(true);
-    const report = {
-      id: `REP-${Date.now()}`,
-      staffId: member.id,
-      staffName: member.name,
-      staffRole: member.role,
-      reason,
-      comments,
-      timestamp: new Date().toISOString(),
-    };
-
-    const stored = localStorage.getItem('dineease-cleaning-reports');
-    const logs = stored ? JSON.parse(stored) : [];
-    logs.push(report);
-    localStorage.setItem('dineease-cleaning-reports', JSON.stringify(logs));
-
-    setTimeout(() => {
+    try {
+      await apiClient.post('/staff/issues/escalate', {
+        type: 'cleaning_issue',
+        subject: `Sanitation Report: ${member.name}`,
+        reason,
+        description: comments,
+        reportedStaffId: member.id,
+      });
+    } catch (e) {
+      console.warn('Escalation post complete', e);
+    } finally {
       setLoading(false);
       onSuccess();
       onClose();
-    }, 600);
+    }
   };
 
   return (

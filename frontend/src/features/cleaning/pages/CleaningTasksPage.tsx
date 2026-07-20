@@ -39,6 +39,7 @@ interface TableTask {
 export default function CleaningTasksPage() {
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
+  const { startTask, completeTask } = useCleaning();
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [priorityFilter, setPriorityFilter] = useState('All Priority');
   const [areaFilter, setAreaFilter] = useState('All Area');
@@ -172,12 +173,15 @@ export default function CleaningTasksPage() {
     setSelectedTask(row);
   };
 
-  const handleActionClick = (row: CleanTask, action: 'start' | 'complete' | 'delete') => {
+  const handleActionClick = async (row: CleanTask, action: 'start' | 'complete' | 'delete') => {
+    const taskId = row.rawId || row.id;
     if (action === 'start') {
       cleaningStore.updateChoreStatus(row.id, 'In Progress');
+      await startTask(taskId);
       showToast('Task is now In Progress.', 'success');
     } else if (action === 'complete') {
       cleaningStore.updateChoreStatus(row.id, 'Completed');
+      await completeTask(taskId);
       showToast('Task completed successfully!', 'success');
     } else if (action === 'delete') {
       cleaningStore.deleteChore(row.id);

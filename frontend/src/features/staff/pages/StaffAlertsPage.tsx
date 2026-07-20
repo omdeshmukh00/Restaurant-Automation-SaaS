@@ -7,14 +7,28 @@ type Alert = AlertItem;
 
 export default function StaffAlertsPage() {
   const { query } = useStaffSearch();
-  const { alerts, setAlerts } = useStaffDashboard();
+  const { alerts, setAlerts, refreshDashboard } = useStaffDashboard();
 
-  const dismissAlert = (id: number) => {
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  const dismissAlert = async (id: string) => {
+    try {
+      const { notificationsAPI } = await import('../api/staff.api');
+      await notificationsAPI.markAsRead(id);
+      setAlerts(prev => prev.filter(a => a.id !== id));
+      await refreshDashboard();
+    } catch (err) {
+      console.error('Failed to dismiss alert', err);
+    }
   };
 
-  const clearAll = () => {
-    setAlerts([]);
+  const clearAll = async () => {
+    try {
+      const { notificationsAPI } = await import('../api/staff.api');
+      await notificationsAPI.markAllAsRead();
+      setAlerts([]);
+      await refreshDashboard();
+    } catch (err) {
+      console.error('Failed to clear alerts', err);
+    }
   };
 
   const filteredAlerts = alerts.filter(a =>
