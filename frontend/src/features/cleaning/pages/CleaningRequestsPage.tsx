@@ -220,15 +220,19 @@ export default function CleaningRequestsPage() {
   };
 
   // CleaningRequestsPage.tsx
-  const handleActionClick = (row: CleaningRequest, action: 'start' | 'complete' | 'verify') => {
-    const id = row.id; // Request ka unique ID
+  const handleActionClick = async (row: CleaningRequest, action: 'start' | 'complete' | 'verify') => {
+    const id = row.id;
+    const rawId = row.rawId || row.id;
 
     if (action === 'start') {
       cleaningStore.updateRequestStatus(id, 'In Progress');
+      await startTask(rawId);
     } else if (action === 'complete') {
       cleaningStore.updateRequestStatus(id, 'Completed');
+      await completeTask(rawId);
     } else if (action === 'verify') {
       cleaningStore.verifyRequest(id);
+      await verifyTask(rawId);
     }
     setOpenMenuId(null);
   };

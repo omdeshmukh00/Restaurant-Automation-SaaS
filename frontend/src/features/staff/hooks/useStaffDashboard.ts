@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { menuAPI, ordersAPI, requestsAPI, reservationsAPI, tableAPI, notificationsAPI } from '../api/staff.api';
 import { staffStore, type Order, type ReadyItem, type RequestItem, type AlertItem, type StaffTable, type StaffReservation, type MenuItem } from '../store/staff.store';
+import { connectSocket, getSocket } from '../../../lib/socket';
 
 function toDisplayTime(value?: string | Date | null) {
   if (!value) return 'Just now';
@@ -165,6 +166,9 @@ function mapAlert(n: any): AlertItem {
   };
 }
 
+let isFetchingStaffDashboard = false;
+let lastStaffFetchTime = 0;
+
 export function useStaffDashboard() {
   const [orders, setOrdersState] = useState(() => staffStore.orders);
   const [readyItems, setReadyItemsState] = useState(() => staffStore.readyItems);
@@ -192,15 +196,20 @@ export function useStaffDashboard() {
   }, []);
 
   const refreshDashboard = async () => {
+    const now = Date.now();
+    if (isFetchingStaffDashboard || now - lastStaffFetchTime < 1000) {
+      return;
+    }
+    isFetchingStaffDashboard = true;
+    lastStaffFetchTime = now;
     setLoading(true);
     setError(null);
 
     try {
-      const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, ordersRes, menuRes, alertsRes] = await Promise.all([
+      const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, menuRes, alertsRes] = await Promise.all([
         tableAPI.getTables(),
         requestsAPI.getPending(),
         reservationsAPI.getReservations(),
-        ordersAPI.getReadyOrders(),
         ordersAPI.getReadyOrders(),
         menuAPI.getItems(),
         notificationsAPI.getAll(),
@@ -220,10 +229,7 @@ export function useStaffDashboard() {
 
       if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
         staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
-      }
-
-      if (ordersRes.success && Array.isArray(ordersRes.data)) {
-        staffStore.setOrders(ordersRes.data.map(mapOrder));
+        staffStore.setOrders(readyOrdersRes.data.map(mapOrder));
       }
 
       if (menuRes.success && Array.isArray(menuRes.data)) {
@@ -237,12 +243,34 @@ export function useStaffDashboard() {
       const message = err instanceof Error ? err.message : 'Unable to refresh staff data';
       setError(message);
     } finally {
+      isFetchingStaffDashboard = false;
       setLoading(false);
     }
   };
 
   useEffect(() => {
     void refreshDashboard();
+
+    connectSocket();
+    const socket = getSocket();
+    if (socket) {
+      const handleSync = () => {
+        void refreshDashboard();
+      };
+      socket.on('table.status.changed', handleSync);
+      socket.on('table.cleaned', handleSync);
+      socket.on('cleaning.completed', handleSync);
+      socket.on('cleaning.started', handleSync);
+      socket.on('cleaning.task.created', handleSync);
+
+      return () => {
+        socket.off('table.status.changed', handleSync);
+        socket.off('table.cleaned', handleSync);
+        socket.off('cleaning.completed', handleSync);
+        socket.off('cleaning.started', handleSync);
+        socket.off('cleaning.task.created', handleSync);
+      };
+    }
   }, []);
 
   return {
