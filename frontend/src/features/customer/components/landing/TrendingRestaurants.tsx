@@ -81,10 +81,15 @@ export default function TrendingRestaurants({ onLoginOpen, restaurants, selected
       const imgIndex = (idx % 4) + 1;
       return {
         id: r._id || r.id,
+        _id: r._id || r.id,
         name: r.name,
         cuisine: r.cuisine || 'Multi-Cuisine',
-        location: `${r.city || 'Mumbai'}`,
-        image: `/images/landing/restaurant-${imgIndex}.png`,
+        location: `${r.address || r.city || 'Mumbai'}`,
+        address: r.address || `${r.city || 'Mumbai'}`,
+        googleMapsUrl: r.googleMapsUrl || r.googleMapUrl || r.mapsUrl,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        image: r.coverImage || r.image || `/images/landing/restaurant-${imgIndex}.png`,
         rating: r.rating || 4.5,
         reviewCount: Math.floor(100 + (r.name.length * 15)),
         priceLevel: r.plan === 'STARTER' ? '₹' : r.plan === 'PRO' ? '₹₹' : '₹₹₹',
@@ -92,7 +97,7 @@ export default function TrendingRestaurants({ onLoginOpen, restaurants, selected
         waitTime: `${10 + (idx * 5)} min`,
         availableTables: r.availableTables !== undefined ? r.availableTables : 5,
         currentOffer: r.currentOffer || undefined,
-        isOpen: r.status === 'ACTIVE',
+        isOpen: ['ACTIVE', 'APPLICATION_APPROVED', 'ADMIN_SETUP_PENDING', 'PLAN_SELECTION_PENDING'].includes(r.status),
       };
     });
   };

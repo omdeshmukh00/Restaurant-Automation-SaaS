@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import {
-  ArrowLeft,
   Camera,
   Save,
   Shield,
@@ -167,6 +166,154 @@ function EditPersonalInfoModal({
   );
 }
 
+interface VerifyOtpModalProps {
+  isOpen: boolean;
+  darkMode: boolean;
+  title: string;
+  email: string;
+  isLoading: boolean;
+  error?: string;
+  onClose: () => void;
+  onVerify: (otp: string) => void;
+  onResendOtp: () => void;
+}
+
+function VerifyOtpModal({
+  isOpen,
+  darkMode,
+  title,
+  email,
+  isLoading,
+  error,
+  onClose,
+  onVerify,
+  onResendOtp,
+}: VerifyOtpModalProps) {
+  const [otp, setOtp] = useState("");
+  const [timer, setTimer] = useState(60);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setOtp("");
+    setTimer(60);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || timer <= 0) return;
+    const interval = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen, timer]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.trim()) {
+      onVerify(otp.trim());
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div
+        className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 transition-all ${
+          darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold">{title}</h3>
+            <p className={`text-xs mt-0.5 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+              Enter the OTP sent to <span className="font-semibold text-orange-400">{email}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-200 transition-colors ${
+              darkMode ? "hover:bg-slate-800" : "hover:bg-slate-100"
+            }`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <input
+              ref={inputRef}
+              type="text"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="Enter 6-digit OTP"
+              className={`w-full h-12 px-4 rounded-xl text-center text-lg font-bold tracking-[0.3em] outline-none border transition-all duration-200 ${
+                darkMode
+                  ? "bg-slate-950 border-slate-800 text-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 placeholder:text-slate-600 placeholder:tracking-normal placeholder:font-normal placeholder:text-sm"
+                  : "bg-slate-50 border-slate-200 text-slate-900 focus:border-orange-500 focus:bg-white focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400 placeholder:tracking-normal placeholder:font-normal placeholder:text-sm"
+              }`}
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+              <AlertCircle size={14} className="shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-xs">
+            <span className={darkMode ? "text-slate-400" : "text-slate-500"}>
+              Didn't receive OTP?
+            </span>
+            {timer > 0 ? (
+              <span className="text-orange-400 font-medium font-mono">Resend in {timer}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setTimer(60);
+                  onResendOtp();
+                }}
+                className="text-orange-500 hover:underline font-semibold"
+              >
+                Resend OTP
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`px-4 py-2.5 rounded-xl text-xs font-semibold border transition-colors ${
+                darkMode
+                  ? "border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !otp}
+              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white transition-colors shadow-md shadow-orange-500/20 flex items-center gap-2"
+            >
+              {isLoading ? "Verifying..." : "Verify & Save"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function EditProfile() {
   const { darkMode } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
@@ -181,18 +328,19 @@ export default function EditProfile() {
     platformName: "",
     supportEmail: "",
   });
+  const [hasInitializedSettings, setHasInitializedSettings] = useState(false);
 
   useEffect(() => {
-    if (settings) {
+    if (settings && !hasInitializedSettings) {
       setPlatformIdentity({
         platformName: settings.platformName || "HQ Terminal",
         supportEmail: settings.supportEmail || "support@hqterminal.io",
       });
+      setHasInitializedSettings(true);
     }
-  }, [settings]);
+  }, [settings, hasInitializedSettings]);
 
-  const updatePlatformIdentity = async (field: "platformName" | "supportEmail", value: string) => {
-    setPlatformIdentity((prev) => ({ ...prev, [field]: value }));
+  const savePlatformIdentityField = async (field: "platformName" | "supportEmail", value: string) => {
     try {
       await apiClient.patch("/superadmin/platform-settings", { [field]: value });
       refetchSettings();
@@ -230,6 +378,134 @@ export default function EditProfile() {
 
   const [saved, setSaved] = useState(false);
   const [pwError, setPwError] = useState("");
+
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpActionType, setOtpActionType] = useState<"contact" | "password">("contact");
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
+  const [contactSuccessMessage, setContactSuccessMessage] = useState("");
+  const [contactError, setContactError] = useState("");
+
+  const handleInitiateContactUpdate = async () => {
+    try {
+      setContactError("");
+      setContactSuccessMessage("");
+      setOtpError("");
+      setOtpActionType("contact");
+
+      await apiClient.post("/users/me/request-otp");
+      setOtpModalOpen(true);
+    } catch (err: any) {
+      console.error("Failed to request OTP for contact update", err);
+      setContactError(
+        err.response?.data?.error?.message ||
+          err.response?.data?.message ||
+          "Failed to send OTP to registered email."
+      );
+    }
+  };
+
+  const handleInitiatePasswordUpdate = async () => {
+    setPwError("");
+    if (!passwords.current) {
+      setPwError("Enter your current password.");
+      return;
+    }
+    if (passwords.next.length < 8) {
+      setPwError("New password must be at least 8 characters.");
+      return;
+    }
+    if (passwords.next !== passwords.confirm) {
+      setPwError("Passwords don't match.");
+      return;
+    }
+
+    try {
+      setOtpError("");
+      setOtpActionType("password");
+
+      await apiClient.post("/users/me/request-otp");
+      setOtpModalOpen(true);
+    } catch (err: any) {
+      console.error("Failed to request OTP for password update", err);
+      setPwError(
+        err.response?.data?.error?.message ||
+          err.response?.data?.message ||
+          "Failed to send OTP to registered email."
+      );
+    }
+  };
+
+  const handleResendOtp = async () => {
+    try {
+      setOtpError("");
+      await apiClient.post("/users/me/request-otp");
+    } catch (err: any) {
+      setOtpError("Failed to resend OTP. Please try again.");
+    }
+  };
+
+  const handleVerifyOtpSubmit = async (otpCode: string) => {
+    setOtpLoading(true);
+    setOtpError("");
+
+    try {
+      if (otpActionType === "contact") {
+        const payload = {
+          email: form.email,
+          mobile: form.phone,
+          location: form.location,
+          otp: otpCode,
+        };
+
+        const response = await apiClient.patch("/users/me", payload);
+
+        if (response.data?.success || response.data) {
+          const updatedUser = response.data.data?.user || response.data.user;
+          const nextUser = {
+            id: updatedUser._id || updatedUser.id,
+            name: updatedUser.name,
+            role: user?.role || "super-admin",
+            panel: "superadmin" as const,
+            email: updatedUser.email,
+            mobile: updatedUser.mobile,
+            avatar: updatedUser.avatar,
+            location: updatedUser.location,
+            bio: updatedUser.bio,
+            restaurantName: user?.restaurantName || "Graphura Cloud",
+          };
+
+          setStoredUser("superadmin", nextUser);
+          if (setUser) {
+            setUser(nextUser);
+          }
+
+          setContactSuccessMessage("Contact information updated successfully!");
+          setOtpModalOpen(false);
+          setTimeout(() => setContactSuccessMessage(""), 3000);
+        }
+      } else if (otpActionType === "password") {
+        await apiClient.patch("/users/me/password", {
+          currentPassword: passwords.current,
+          newPassword: passwords.next,
+          otp: otpCode,
+        });
+
+        setOtpModalOpen(false);
+        signOut();
+        navigate("/auth/superadmin");
+      }
+    } catch (err: any) {
+      console.error("Failed to verify OTP", err);
+      setOtpError(
+        err.response?.data?.error?.message ||
+          err.response?.data?.message ||
+          "Invalid or expired OTP. Please check and try again."
+      );
+    } finally {
+      setOtpLoading(false);
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -358,33 +634,19 @@ export default function EditProfile() {
     >
       <form
         onSubmit={(e) => e.preventDefault()}
-        className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 max-w-4xl mx-auto"
+        className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6"
       >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-              darkMode
-                ? "bg-slate-900 text-slate-400 hover:text-slate-100 hover:bg-slate-800 border border-slate-800"
-                : "bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 shadow-sm"
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Profile
+          </h1>
+          <p
+            className={`text-xs sm:text-sm mt-1 font-medium ${
+              darkMode ? "text-slate-400" : "text-slate-600"
             }`}
-            aria-label="Go back"
           >
-            <ArrowLeft size={16} />
-          </button>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              Edit Profile
-            </h1>
-            <p
-              className={`text-xs sm:text-sm mt-1 font-medium ${
-                darkMode ? "text-slate-400" : "text-slate-600"
-              }`}
-            >
-              Manage your personal information and account settings
-            </p>
-          </div>
+            Manage your personal information and account settings
+          </p>
         </div>
 
         <div className={card}>
@@ -487,7 +749,8 @@ export default function EditProfile() {
             <Input
               darkMode={darkMode}
               value={platformIdentity.platformName}
-              onChange={(e) => updatePlatformIdentity("platformName", e.target.value)}
+              onChange={(e) => setPlatformIdentity((prev) => ({ ...prev, platformName: e.target.value }))}
+              onBlur={() => savePlatformIdentityField("platformName", platformIdentity.platformName)}
               placeholder="e.g. HQ Terminal"
             />
           </Field>
@@ -501,7 +764,8 @@ export default function EditProfile() {
               darkMode={darkMode}
               type="email"
               value={platformIdentity.supportEmail}
-              onChange={(e) => updatePlatformIdentity("supportEmail", e.target.value)}
+              onChange={(e) => setPlatformIdentity((prev) => ({ ...prev, supportEmail: e.target.value }))}
+              onBlur={() => savePlatformIdentityField("supportEmail", platformIdentity.supportEmail)}
               placeholder="support@yourplatform.io"
             />
           </Field>
@@ -522,7 +786,6 @@ export default function EditProfile() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              onBlur={() => saveField({ email: form.email })}
               placeholder="you@example.com"
             />
           </Field>
@@ -533,7 +796,6 @@ export default function EditProfile() {
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                onBlur={() => saveField({ phone: form.phone })}
                 placeholder="+91 XXXXX XXXXX"
               />
             </Field>
@@ -542,10 +804,30 @@ export default function EditProfile() {
                 darkMode={darkMode}
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
-                onBlur={() => saveField({ location: form.location })}
                 placeholder="City, State"
               />
             </Field>
+          </div>
+          {contactSuccessMessage && (
+            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Check size={14} className="shrink-0" />
+              {contactSuccessMessage}
+            </div>
+          )}
+          {contactError && (
+            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+              <AlertCircle size={13} className="shrink-0" />
+              {contactError}
+            </div>
+          )}
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={handleInitiateContactUpdate}
+              className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-md shadow-orange-500/10"
+            >
+              Update Contact Info
+            </button>
           </div>
         </div>
 
@@ -679,9 +961,7 @@ export default function EditProfile() {
                 className={`text-[10px] font-medium ${
                   passwords.next.length >= 12
                     ? "text-emerald-500"
-                    : passwords.next.length >= 8
-                    ? "text-amber-500"
-                    : "text-red-400"
+                    : "text-amber-500"
                 }`}
               >
                 {passwords.next.length >= 12
@@ -701,7 +981,7 @@ export default function EditProfile() {
           <div className="flex justify-end pt-2">
             <button
               type="button"
-              onClick={handlePasswordUpdate}
+              onClick={handleInitiatePasswordUpdate}
               className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors shadow-md shadow-orange-500/10"
             >
               Update Password
@@ -721,17 +1001,7 @@ export default function EditProfile() {
               </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className={`px-5 py-2.5 rounded-xl text-xs font-semibold transition-colors border ${
-              darkMode
-                ? "bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-slate-800"
-                : "bg-slate-100 text-slate-500 hover:text-slate-700 hover:bg-slate-200 border-slate-200"
-            }`}
-          >
-            Back to Dashboard
-          </button>
+
         </div>
       </form>
       <ImageCropperModal
@@ -756,6 +1026,17 @@ export default function EditProfile() {
           }}
         />
       )}
+      <VerifyOtpModal
+        isOpen={otpModalOpen}
+        darkMode={darkMode}
+        title={otpActionType === "contact" ? "Verify Contact Information Update" : "Verify Password Update"}
+        email={user?.email || form.email}
+        isLoading={otpLoading}
+        error={otpError}
+        onClose={() => setOtpModalOpen(false)}
+        onVerify={handleVerifyOtpSubmit}
+        onResendOtp={handleResendOtp}
+      />
     </div>
   );
 }

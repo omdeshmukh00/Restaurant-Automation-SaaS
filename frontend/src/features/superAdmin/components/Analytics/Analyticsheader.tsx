@@ -1,6 +1,6 @@
 // src/features/superAdmin/components/Analytics/Analyticsheader.tsx
 import React from "react";
-import { RefreshCw, Download, PlusCircle, Activity } from "lucide-react";
+import { RefreshCw, Download, PlusCircle } from "lucide-react";
 
 interface AnalyticsHeaderProps {
   darkMode: boolean;
@@ -27,28 +27,17 @@ export default function AnalyticsHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between pb-1">
       {/* Left: title + subtitle */}
-      <div className="flex items-start gap-3 min-w-0">
-        <div
-          className={`mt-0.5 flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
-            darkMode
-              ? "bg-orange-500/10 text-orange-400"
-              : "bg-orange-50 text-orange-600"
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
+          Analytics
+        </h1>
+        <p
+          className={`text-xs sm:text-sm mt-1 font-medium ${
+            darkMode ? "text-slate-400" : "text-slate-600"
           }`}
         >
-          <Activity size={18} />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
-            Analytics
-          </h1>
-          <p
-            className={`text-xs sm:text-sm mt-1 font-medium ${
-              darkMode ? "text-slate-400" : "text-slate-600"
-            }`}
-          >
-            Platform metrics, order telemetry, and cluster state logs.
-          </p>
-        </div>
+          Platform metrics, order telemetry, and cluster state logs.
+        </p>
       </div>
 
       {/* Right: action buttons */}

@@ -42,6 +42,7 @@ const initialFormData: FormData = {
 };
 
 interface PlatformSettings {
+  platformName: string;
   applicationFeeEnabled: boolean;
   applicationFeeAmount: number;
   currency: string;
@@ -49,7 +50,11 @@ interface PlatformSettings {
   enablePartnerRegistration?: boolean;
 }
 
-export default function PartnerForm() {
+interface PartnerFormProps {
+  platformName?: string;
+}
+
+export default function PartnerForm({ platformName: propPlatformName }: PartnerFormProps = {}) {
   const [formData, setFormData] = useState<FormData>(() => {
     const saved = sessionStorage.getItem('partner_form_data');
     return saved ? JSON.parse(saved) : initialFormData;
@@ -67,6 +72,7 @@ export default function PartnerForm() {
   });
 
   const [settings, setSettings] = useState<PlatformSettings>({
+    platformName: propPlatformName || 'RestoHub',
     applicationFeeEnabled: false,
     applicationFeeAmount: 0,
     currency: 'INR',
@@ -81,6 +87,7 @@ export default function PartnerForm() {
         const data = res.data?.data || res.data;
         if (data) {
           setSettings({
+            platformName: data.platformName || propPlatformName || 'RestoHub',
             applicationFeeEnabled: !!data.applicationFeeEnabled,
             applicationFeeAmount: data.applicationFeeAmount !== undefined ? Number(data.applicationFeeAmount) : 0,
             currency: data.currency || 'INR',
@@ -91,7 +98,7 @@ export default function PartnerForm() {
       })
       .catch((err) => console.error('Failed to load platform settings', err))
       .finally(() => setSettingsLoading(false));
-  }, []);
+  }, [propPlatformName]);
 
   React.useEffect(() => {
     sessionStorage.setItem('partner_form_data', JSON.stringify(formData));
@@ -337,8 +344,8 @@ export default function PartnerForm() {
         </div>
         <div className="space-y-2">
           <h3 className="text-2xl font-bold text-slate-800">Application Received!</h3>
-          <p className="text-sm text-slate-500">
-            Thank you for applying to partner with RestoHub. We have sent a confirmation email to <span className="text-orange-500 font-semibold">{formData.email}</span>.
+          <p className="text-sm text-slate-500 font-sans">
+            Thank you for applying to partner with {settings.platformName || propPlatformName || 'RestoHub'}. We have sent a confirmation email to <span className="text-orange-500 font-semibold">{formData.email}</span>.
           </p>
         </div>
         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 text-left space-y-3">
@@ -392,8 +399,8 @@ export default function PartnerForm() {
               <Building2 className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-800">Restaurant & Owner Information</h3>
-              <p className="text-[11px] text-slate-500">Provide your details to submit your partner verification application.</p>
+              <h3 className="text-sm font-extrabold text-slate-800 font-sans">Restaurant &amp; Owner Information</h3>
+              <p className="text-[11px] text-slate-500 font-sans">Provide your details to submit your partner verification application.</p>
             </div>
           </div>
 
@@ -719,8 +726,8 @@ export default function PartnerForm() {
       <div className="space-y-6">
         <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
           <div className="border-b border-slate-100 pb-4">
-            <h3 className="text-sm font-extrabold text-slate-800">Application Summary</h3>
-            <p className="text-[11px] text-slate-400">Review onboarding stages and settings</p>
+            <h3 className="text-sm font-extrabold text-slate-800 font-sans">Application Summary</h3>
+            <p className="text-[11px] text-slate-400 font-sans">Review onboarding stages and settings</p>
           </div>
 
           <div className="space-y-4">
@@ -773,7 +780,7 @@ export default function PartnerForm() {
             <div className="border-t border-slate-100 pt-4">
               <div className="bg-slate-50 rounded-2xl p-4 text-[11px] text-slate-500 leading-relaxed space-y-2">
                 <p className="font-semibold text-slate-700">Please Note:</p>
-                <p>Subscription plans (Monthly/Yearly) and pricing details will be selected and purchased directly from your RestoHub Admin Panel after your account is approved.</p>
+                <p>Subscription plans (Monthly/Yearly) and pricing details will be selected and purchased directly from your {settings.platformName || propPlatformName || 'RestoHub'} Admin Panel after your account is approved.</p>
               </div>
             </div>
           </div>

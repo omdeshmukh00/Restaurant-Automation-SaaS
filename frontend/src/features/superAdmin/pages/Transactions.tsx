@@ -118,7 +118,7 @@ export default function Transactions() {
 
   return (
     // px-4 on mobile → px-6 on desktop, slightly tighter top padding on mobile
-    <div className={`min-h-screen px-4 sm:px-6 py-5 sm:py-8 transition-colors duration-300 ${
+    <div className={`min-h-screen px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 transition-colors duration-300 ${
       darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-800"
     }`}>
       {/* Page Header */}

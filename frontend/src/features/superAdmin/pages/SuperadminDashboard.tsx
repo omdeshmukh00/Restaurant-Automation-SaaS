@@ -7,7 +7,7 @@ import RevenueChart from "../components/dashboard/RevenueChart";
 import RestaurantStatusPie from "../components/dashboard/Restaurantstatuspie";
 import TopRestaurantsTable from "../components/dashboard/TopRestaurantsTable";
 import {
-  Activity,
+
   Building2,
   Check,
   Mail,
@@ -120,18 +120,7 @@ export default function SuperAdminDashboard() {
         {/* ── PAGE HEADER ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                  darkMode
-                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                    : "text-emerald-600 bg-emerald-50 border-emerald-200"
-                }`}
-              >
-                <Activity size={9} className="animate-pulse" />
-                Live
-              </span>
-            </div>
+
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Dashboard Overview
             </h1>

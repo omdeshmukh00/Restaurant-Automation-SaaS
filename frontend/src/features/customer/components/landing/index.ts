@@ -11,4 +11,5 @@ export { default as DigitalDiningJourney } from './DigitalDiningJourney';
 export { default as WhyChooseSection } from './WhyChooseSection';
 export { default as BlogSection } from './BlogSection';
 export { default as TestimonialsSection } from './TestimonialsSection';
+export { default as ViewMenuModal } from './ViewMenuModal';
 export { default as LandingFooter } from './LandingFooter';

@@ -87,8 +87,10 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
 
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
       try {
-        // @ts-ignore
-        detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+        const BarcodeDetectorClass = (window as any).BarcodeDetector;
+        if (BarcodeDetectorClass) {
+          detector = new BarcodeDetectorClass({ formats: ['qr_code'] });
+        }
       } catch (e) {
         console.warn('BarcodeDetector error:', e);
       }

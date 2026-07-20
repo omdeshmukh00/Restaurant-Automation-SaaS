@@ -23,6 +23,11 @@ export function UsageMeter({ planName, quotas }: UsageMeterProps) {
     return "bg-emerald-500";
   };
 
+  const formattedPlanName = (planName || "Basic")
+    .replace(/\s*plan\s*$/i, "")
+    .trim()
+    .toUpperCase();
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
       <div className="flex items-center justify-between">
@@ -36,7 +41,7 @@ export function UsageMeter({ planName, quotas }: UsageMeterProps) {
           </div>
         </div>
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-orange-500/10 text-orange-500 uppercase">
-          {planName} Plan
+          {formattedPlanName} PLAN
         </span>
       </div>
 

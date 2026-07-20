@@ -7,7 +7,7 @@ import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSe
 import './landing.css';
 
 interface LandingNavbarProps {
-  onLoginOpen: () => void;
+  onLoginOpen: (targetPath?: string) => void;
 }
 
 interface NavLink {
@@ -61,8 +61,8 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
 
   const handleNavClick = (e: React.MouseEvent, link: NavLink) => {
     e.preventDefault();
-    if (link.requiresAuth) {
-      onLoginOpen();
+    if (link.requiresAuth && !isCustomerAuth) {
+      onLoginOpen(link.href);
     } else {
       navigate(link.href);
     }
@@ -262,7 +262,7 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
             </div>
 
             <button
-              onClick={onLoginOpen}
+              onClick={() => onLoginOpen()}
               className="hidden sm:flex items-center gap-2 px-5 h-[42px] text-[14px] font-semibold text-white transition-all duration-150 landing-btn-premium landing-focus-ring"
               style={{
                 background: 'linear-gradient(135deg, #FF6B1A 0%, #E65A0A 100%)',

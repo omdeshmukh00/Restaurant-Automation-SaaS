@@ -5,13 +5,14 @@ import { useStaffDashboard } from '../hooks/useStaffDashboard';
 
 export default function StaffFoodReadyPage() {
   const { query } = useStaffSearch();
-  const { readyItems: items, setReadyItems: setItems } = useStaffDashboard();
+  const { readyItems: items, setReadyItems: setItems, refreshDashboard } = useStaffDashboard();
 
   const markServed = async (id: any) => {
     try {
       const { ordersAPI } = await import('../api/staff.api');
       await ordersAPI.serveOrder(id);
       setItems(prev => prev.filter(item => item.id !== id));
+      await refreshDashboard();
     } catch (err) {
       console.error('Failed to mark order served', err);
     }
@@ -22,6 +23,7 @@ export default function StaffFoodReadyPage() {
       const { ordersAPI } = await import('../api/staff.api');
       await Promise.all(items.map(item => ordersAPI.serveOrder(item.id as any)));
       setItems([]);
+      await refreshDashboard();
     } catch (err) {
       console.error('Failed to mark all served', err);
     }

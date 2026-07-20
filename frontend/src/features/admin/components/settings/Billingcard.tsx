@@ -1,28 +1,11 @@
-import React from 'react';
-import { CreditCard } from 'lucide-react';
+import React, { useState } from 'react';
+import { CreditCard, Sparkles } from 'lucide-react';
 import { useSettingsStore } from '../../store/settings.store';
-
-const PLAN_OPTIONS = ['Free', 'Standard', 'Premium', 'Enterprise'];
+import { AdminSubscriptionCheckoutModal } from './AdminSubscriptionCheckoutModal';
 
 export function BillingCard(): JSX.Element {
-  const { billing, changePlan } = useSettingsStore();
-  const [plan, setPlan] = React.useState(billing.plan);
-  const [saving, setSaving] = React.useState(false);
-
-  React.useEffect(() => {
-    setPlan(billing.plan);
-  }, [billing.plan]);
-
-  async function handleChangePlan(e: React.FormEvent) {
-    e.preventDefault();
-    if (plan === billing.plan) return;
-    setSaving(true);
-    try {
-      await changePlan(plan);
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { billing, fetchSettings } = useSettingsStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 sm:p-6">
@@ -56,36 +39,30 @@ export function BillingCard(): JSX.Element {
             </div>
           </Field>
 
-          {/* Change plan */}
-          <div className="sm:col-span-2 mt-1">
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Change Plan</p>
-            <form onSubmit={handleChangePlan} className="flex items-end gap-2">
-              <select
-                value={plan}
-                onChange={(e) => setPlan(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                {PLAN_OPTIONS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                disabled={saving || plan === billing.plan}
-                className="px-4 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors disabled:opacity-60"
-              >
-                {saving ? 'Saving…' : 'Update Plan'}
-              </button>
-            </form>
+          {/* Change plan button */}
+          <div className="sm:col-span-2 mt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <div>
+              <p className="text-xs font-bold text-gray-700 dark:text-gray-300">Upgrade or Switch Plan</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">View all available subscription tiers and feature quotas.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="px-6 py-2.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 rounded-full transition-all shadow-md shadow-purple-500/20 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <Sparkles size={14} className="shrink-0" />
+              <span>Update Plan</span>
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 flex justify-end">
-        <button className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors">
-          Manage Billing
-        </button>
-      </div>
+      <AdminSubscriptionCheckoutModal
+        isOpen={isModalOpen}
+        currentPlanName={billing.plan}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => fetchSettings()}
+      />
     </div>
   );
 }

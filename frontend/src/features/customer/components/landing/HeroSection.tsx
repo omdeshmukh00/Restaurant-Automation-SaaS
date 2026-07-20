@@ -91,7 +91,7 @@ export default function HeroSection({ onLoginOpen, restaurants = [] }: HeroSecti
       });
       setBookingSuccess(true);
       setTimeout(() => {
-        navigate(`/auth/customer?mobile=${phoneNumber}`);
+        navigate(`/auth/customer?mobile=${phoneNumber}`, { state: { from: { pathname: '/customer/reservations' } } });
       }, 2000);
     } catch (err: any) {
       setBookingError(err.response?.data?.message || 'Failed to book table. Please try again.');
@@ -119,13 +119,13 @@ export default function HeroSection({ onLoginOpen, restaurants = [] }: HeroSecti
           {/* Left Content */}
           <div className="flex-1 max-w-[640px]">
             <h1
-              className="text-[36px] sm:text-[48px] lg:text-[60px] xl:text-[64px] leading-[1.1] tracking-tight text-white"
-              style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400 }}
+              className="font-instrument-serif landing-font-instrument-serif text-[48px] sm:text-[64px] lg:text-[76px] xl:text-[84px] leading-[1.05] tracking-tight text-white font-normal"
+              style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400 }}
             >
               Find the best{' '}
               <br className="hidden sm:block" />
               restaurants{' '}
-              <span className="italic" style={{ color: '#FF6B1A' }}>near you</span>
+              <span className="italic font-instrument-serif landing-font-instrument-serif" style={{ color: '#E57A10', fontFamily: "'Instrument Serif', Georgia, serif" }}>near you</span>
             </h1>
 
             <p

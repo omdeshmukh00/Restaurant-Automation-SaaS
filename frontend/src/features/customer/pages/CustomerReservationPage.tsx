@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useCustomerStore } from '../store/customer.store';
 import { apiClient } from '../../../shared/services/apiClient';
 
@@ -76,6 +77,10 @@ const formatDateReadable = (dateStr: string) => {
 };
 
 export default function CustomerReservationPage() {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const navRestaurantId = location.state?.restaurantId || searchParams.get('restaurantId');
+
   const { profile, diningSession, addNotification } = useCustomerStore();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -83,7 +88,9 @@ export default function CustomerReservationPage() {
   const [tomorrowStr] = useState(getTomorrowStr);
 
   const [restaurantsList, setRestaurantsList] = useState<any[]>([]);
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState('');
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(navRestaurantId || '');
+  const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
 
   const [guests, setGuests] = useState('2 Guests');
   const [date, setDate] = useState(todayStr);
@@ -106,11 +113,12 @@ export default function CustomerReservationPage() {
     try {
       const response = await apiClient.get('/public/landing/data');
       if ((response.data?.success || response.data?.status === 'success') && response.data?.data?.restaurants) {
-        setRestaurantsList(response.data.data.restaurants);
-        if (diningSession?.restaurantId) {
-          setSelectedRestaurantId(diningSession.restaurantId);
-        } else if (response.data.data.restaurants.length > 0) {
-          setSelectedRestaurantId(response.data.data.restaurants[0]._id);
+        const list = response.data.data.restaurants;
+        setRestaurantsList(list);
+
+        const targetId = navRestaurantId || diningSession?.restaurantId || (list.length > 0 ? (list[0]._id || list[0].id) : '');
+        if (targetId) {
+          setSelectedRestaurantId(targetId);
         }
       }
     } catch (err) {
@@ -317,25 +325,48 @@ export default function CustomerReservationPage() {
               {modifyingId ? 'Modify Your Booking' : 'Book Your Table'}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Restaurant Dropdown Selector */}
+              {/* Restaurant Selector & Modal Trigger */}
               <div className="space-y-1.5 md:col-span-2">
-                <label htmlFor="restaurant-select" className="text-xs font-bold text-slate-700 font-sans">Restaurant</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">storefront</span>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="restaurant-select" className="text-xs font-bold text-slate-700 font-sans">
+                    Restaurant
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsSelectModalOpen(true)}
+                    className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 cursor-pointer font-sans"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">search</span>
+                    <span>Browse &amp; Search All</span>
+                  </button>
+                </div>
+
+                <div className="relative flex items-center">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px] pointer-events-none">
+                    storefront
+                  </span>
                   <select
                     id="restaurant-select"
-                    className="w-full h-12 pl-10 pr-4 bg-white text-slate-800 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 appearance-none text-sm font-sans shadow-sm"
+                    className="w-full h-12 pl-10 pr-24 bg-white text-slate-800 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 appearance-none text-sm font-sans shadow-sm cursor-pointer"
                     value={selectedRestaurantId}
                     onChange={(e) => setSelectedRestaurantId(e.target.value)}
-                    disabled={!!diningSession || !!modifyingId}
+                    disabled={!!modifyingId}
                   >
                     {restaurantsList.map((r) => (
                       <option key={r._id || r.id} value={r._id || r.id}>
-                        {r.name} ({r.city || 'Mumbai'})
+                        {r.name} ({r.city || r.address || 'Mumbai'})
                       </option>
                     ))}
                   </select>
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-slate-400 text-[18px]">expand_more</span>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsSelectModalOpen(true)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer font-sans"
+                  >
+                    <span>Search</span>
+                    <span className="material-symbols-outlined text-[16px]">search</span>
+                  </button>
                 </div>
               </div>
 
@@ -614,6 +645,144 @@ export default function CustomerReservationPage() {
           </section>
         </div>
       </div>
+
+      {/* Select Restaurant Modal with Real-time Search */}
+      {isSelectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-sans">
+          <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-3xl bg-white dark:bg-[#121214] border border-gray-200 dark:border-neutral-800 shadow-2xl overflow-hidden text-gray-900 dark:text-gray-100">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 font-sans">
+                  <span className="material-symbols-outlined text-orange-500">storefront</span>
+                  Select Restaurant
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Browse and search available restaurants to reserve your table.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSelectModalOpen(false)}
+                className="p-2 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Search Input Bar */}
+            <div className="p-4 bg-gray-50 dark:bg-[#18181b] border-b border-gray-100 dark:border-neutral-800">
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-gray-400 material-symbols-outlined text-[20px] pointer-events-none">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={modalSearchQuery}
+                  onChange={(e) => setModalSearchQuery(e.target.value)}
+                  placeholder="Search restaurant by name, city, address, or cuisine..."
+                  className="w-full h-11 pl-11 pr-16 bg-white dark:bg-neutral-900 text-gray-900 dark:text-white rounded-xl border border-gray-200 dark:border-neutral-700 focus:border-orange-500 focus:outline-none text-xs sm:text-sm font-sans"
+                />
+                {modalSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setModalSearchQuery('')}
+                    className="absolute right-3.5 text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Restaurant List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 sd-custom-scrollbar">
+              {restaurantsList.filter((r) => {
+                if (!modalSearchQuery) return true;
+                const q = modalSearchQuery.toLowerCase();
+                return (
+                  r.name?.toLowerCase().includes(q) ||
+                  r.city?.toLowerCase().includes(q) ||
+                  r.address?.toLowerCase().includes(q) ||
+                  r.cuisine?.toLowerCase().includes(q)
+                );
+              }).length === 0 ? (
+                <div className="py-12 text-center text-gray-400 text-xs font-semibold">
+                  No restaurants found matching &ldquo;{modalSearchQuery}&rdquo;
+                </div>
+              ) : (
+                restaurantsList
+                  .filter((r) => {
+                    if (!modalSearchQuery) return true;
+                    const q = modalSearchQuery.toLowerCase();
+                    return (
+                      r.name?.toLowerCase().includes(q) ||
+                      r.city?.toLowerCase().includes(q) ||
+                      r.address?.toLowerCase().includes(q) ||
+                      r.cuisine?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((r, idx) => {
+                    const rId = String(r._id || r.id);
+                    const isSelected = String(selectedRestaurantId) === rId;
+                    const imgIndex = (idx % 4) + 1;
+                    const bgImg = r.coverImage || r.image || `/images/landing/restaurant-${imgIndex}.png`;
+
+                    return (
+                      <div
+                        key={rId}
+                        className={`flex items-center gap-4 p-3.5 rounded-2xl border transition-all ${
+                          isSelected
+                            ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/10 ring-1 ring-orange-500/30'
+                            : 'border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#18181b] hover:border-orange-500/30'
+                        }`}
+                      >
+                        <img
+                          src={bgImg}
+                          alt={r.name}
+                          className="w-16 h-16 rounded-xl object-cover shrink-0 bg-neutral-800"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate font-sans">
+                              {r.name}
+                            </h4>
+                            {r.rating && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-bold flex items-center gap-0.5">
+                                ⭐ {r.rating}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                            {r.cuisine || 'Multi-Cuisine'} • {r.address || r.city || 'Mumbai'}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRestaurantId(rId);
+                            setIsSelectModalOpen(false);
+                            showToast(`Selected ${r.name}`, 'info');
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'bg-orange-500 hover:bg-orange-600 text-white shadow-sm shadow-orange-500/20'
+                          }`}
+                        >
+                          {isSelected ? '✓ Selected' : 'Select'}
+                        </button>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

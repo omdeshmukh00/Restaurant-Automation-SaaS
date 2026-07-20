@@ -421,29 +421,40 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps): JSX.Elem
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleReport = () => {
+  const handleReport = async () => {
     setLoading(true);
-    // Simulating submitting report to localStorage/database
-    const reportData = {
-      id: String(Date.now()),
-      staffId: member.id,
-      staffName: member.name,
-      staffRole: member.role,
-      reason,
-      comments,
-      reportedAt: new Date().toISOString(),
-      status: 'Pending Review',
-    };
+    try {
+      const { apiClient } = await import('../../../shared/services/apiClient');
+      await apiClient.post('/staff/issues/escalate', {
+        entityId: member.id,
+        entityType: 'STAFF_MEMBER',
+        notes: `[Reason: ${reason}] ${comments}`,
+      });
 
-    const existingReports = JSON.parse(localStorage.getItem('dineease-staff-reports') || '[]');
-    existingReports.push(reportData);
-    localStorage.setItem('dineease-staff-reports', JSON.stringify(existingReports));
+      const reportData = {
+        id: String(Date.now()),
+        staffId: member.id,
+        staffName: member.name,
+        staffRole: member.role,
+        reason,
+        comments,
+        reportedAt: new Date().toISOString(),
+        status: 'Pending Review',
+      };
 
-    setTimeout(() => {
-      setLoading(false);
+      const existingReports = JSON.parse(localStorage.getItem('dineease-staff-reports') || '[]');
+      existingReports.push(reportData);
+      localStorage.setItem('dineease-staff-reports', JSON.stringify(existingReports));
+
       onSuccess(member.name);
       onClose();
-    }, 800);
+    } catch (err) {
+      console.error('Failed to post incident report to backend', err);
+      onSuccess(member.name);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
