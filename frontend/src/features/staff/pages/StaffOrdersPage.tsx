@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
 import type { Order } from '../store/staff.store';
+import { ordersAPI } from '../api/staff.api';
 
 export default function StaffOrdersPage() {
   const { query } = useStaffSearch();
@@ -13,7 +14,17 @@ export default function StaffOrdersPage() {
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [selectedItemQty, setSelectedItemQty] = useState<number>(1);
 
-  const updateOrderStatus = (id: string, newStatus: Order['status']) => {
+  const updateOrderStatus = async (id: string, newStatus: Order['status']) => {
+    try {
+      if (newStatus === 'Served') {
+        await ordersAPI.serveOrder(Number(id) || id as any);
+      } else if (newStatus === 'Completed') {
+        await ordersAPI.completeOrder(Number(id) || id as any);
+      }
+    } catch (err) {
+      console.error('Failed to sync order status update with backend', err);
+    }
+
     setOrders(orders.map(o => {
       if (o.id === id) {
         return {

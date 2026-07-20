@@ -7,7 +7,7 @@ type Request = RequestItem;
 
 export default function StaffRequestsPage() {
   const { query } = useStaffSearch();
-  const { requests, setRequests } = useStaffDashboard();
+  const { requests, setRequests, refreshDashboard } = useStaffDashboard();
 
   const updateRequestStatus = async (id: any, status: Request['status']) => {
     try {
@@ -18,6 +18,7 @@ export default function StaffRequestsPage() {
         await requestsAPI.complete(id);
       }
       setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+      await refreshDashboard();
     } catch (err) {
       console.error('Failed to update request status', err);
     }

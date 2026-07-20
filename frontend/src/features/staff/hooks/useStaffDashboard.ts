@@ -1,7 +1,169 @@
 // src/features/staff/hooks/useStaffDashboard.ts
 
 import { useState, useEffect } from 'react';
+import { menuAPI, ordersAPI, requestsAPI, reservationsAPI, tableAPI, notificationsAPI } from '../api/staff.api';
 import { staffStore, type Order, type ReadyItem, type RequestItem, type AlertItem, type StaffTable, type StaffReservation, type MenuItem } from '../store/staff.store';
+
+function toDisplayTime(value?: string | Date | null) {
+  if (!value) return 'Just now';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+}
+
+function toRelativeTime(value?: string | Date | null) {
+  if (!value) return 'Just now';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  const diffMinutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
+  if (diffMinutes < 60) return `${diffMinutes} mins ago`;
+  const hours = Math.round(diffMinutes / 60);
+  return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+}
+
+function mapTableStatus(status?: string): StaffTable['status'] {
+  switch (status?.toUpperCase()) {
+    case 'AVAILABLE':
+      return 'Available';
+    case 'RESERVED':
+      return 'Reserved';
+    case 'BILL_PENDING':
+    case 'PAYMENT_PENDING':
+      return 'Bill Requested';
+    case 'PAID':
+      return 'Food Served';
+    case 'DIRTY':
+    case 'NEEDS_CLEANING':
+    case 'CLEANING_IN_PROGRESS':
+      return 'Cleaning';
+    case 'OCCUPIED':
+    case 'ORDERING':
+    default:
+      return 'Occupied';
+  }
+}
+
+function mapTable(table: any): StaffTable {
+  const section = typeof table?.section === 'string' && table.section.trim()
+    ? table.section
+    : table?.floor && Number(table.floor) > 1
+      ? `Floor ${table.floor}`
+      : 'Zone A';
+
+  return {
+    id: String(table?._id || table?.id || 0),
+    name: `Table ${table?.tableNumber ?? table?.name ?? table?._id ?? 1}`,
+    section: section === 'Outdoor' ? 'Outdoor' : section === 'Zone B' ? 'Zone B' : 'Zone A',
+    capacity: Number(table?.capacity ?? 4),
+    guests: table?.currentSessionId ? Math.max(1, Number(table?.capacity ?? 1) - 1) : 0,
+    status: mapTableStatus(table?.status),
+    currentBill: 0,
+    elapsed: 'Live',
+    action: mapTableStatus(table?.status) === 'Available' ? 'Order' : undefined,
+  };
+}
+
+function mapRequest(request: any): RequestItem {
+  const priority = request?.priority?.toUpperCase?.() ?? 'NORMAL';
+  const status = request?.status?.toUpperCase?.() ?? 'PENDING';
+  const type = request?.type?.toUpperCase?.() ?? 'WAITER';
+  const typeLabel = type === 'WATER' ? 'Water Bottle' : type === 'CUTLERY' ? 'Extra Napkins' : type === 'CLEANING' ? 'Clean Table' : 'Call Waiter';
+  const createdAt = request?.createdAt || request?.updatedAt;
+
+  return {
+    id: String(request?._id || request?.id || 0),
+    table: request?.tableId?.tableNumber ? `Table ${request.tableId.tableNumber}` : 'Table 1',
+    type: typeLabel,
+    time: toRelativeTime(createdAt),
+    elapsedMinutes: Math.max(1, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000)),
+    status: status === 'ACCEPTED' ? 'InProgress' : status === 'COMPLETED' ? 'Resolved' : 'Pending',
+    severity: priority === 'HIGH' || priority === 'URGENT' ? 'high' : priority === 'NORMAL' ? 'medium' : 'low',
+  };
+}
+
+function mapReservation(reservation: any): StaffReservation {
+  const status = reservation?.status?.toUpperCase?.() ?? 'CONFIRMED';
+  return {
+    id: String(reservation?._id || reservation?.id || 0),
+    name: reservation?.customerName || reservation?.name || 'Guest',
+    pax: Number(reservation?.guests ?? reservation?.pax ?? 2),
+    time: reservation?.slot || reservation?.time || 'Scheduled',
+    phone: reservation?.mobile || reservation?.phone || '',
+    status: status === 'CHECKED_IN' ? 'Seated' : status === 'CANCELLED' ? 'Cancelled' : 'Confirmed',
+    type: reservation?.tableId ? 'Reservation' : 'Walk-in',
+    assignedTable: reservation?.tableId?.tableNumber ? `Table ${reservation.tableId.tableNumber}` : undefined,
+  };
+}
+
+function mapOrder(order: any): Order {
+  const status = (order?.status ?? '').toUpperCase();
+  const items = Array.isArray(order?.items) ? order.items : [];
+
+  return {
+    id: order?.orderNumber || order?._id || order?.id || 'ORDER',
+    table: order?.tableId?.tableNumber ? `Table ${order.tableId.tableNumber}` : 'Table 1',
+    items: items.map((item: any) => ({
+      name: item?.name || 'Item',
+      qty: Number(item?.quantity ?? 1),
+      price: Number(item?.price ?? item?.totalPrice ?? 0),
+    })),
+    status: status === 'READY' ? 'Ready' : status === 'SERVED' ? 'Served' : status === 'COMPLETED' ? 'Completed' : status === 'CANCELLED' ? 'Cancelled' : status === 'PREPARING' ? 'Preparing' : 'Pending',
+    time: toRelativeTime(order?.createdAt || order?.updatedAt),
+    total: Number(order?.finalAmount ?? order?.totalAmount ?? 0),
+  };
+}
+
+function mapReadyItem(order: any): ReadyItem {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const totalQty = items.reduce((sum: number, item: any) => sum + Number(item?.quantity ?? 1), 0);
+  const itemNames = items.map((item: any) => item?.name).filter(Boolean).join(', ');
+
+  return {
+    id: String(order?._id || order?.id || 0),
+    table: order?.tableId?.tableNumber ? `Table ${order.tableId.tableNumber}` : 'Table 1',
+    item: itemNames || 'Ready food',
+    qty: totalQty || 1,
+    station: 'Main Kitchen',
+    readySince: toRelativeTime(order?.updatedAt || order?.readyAt || order?.createdAt),
+    elapsedSec: Math.max(30, Math.round((Date.now() - new Date(order?.updatedAt || order?.readyAt || order?.createdAt).getTime()) / 1000)),
+  };
+}
+
+function mapMenuItem(item: any): MenuItem {
+  const categoryName = item?.categoryId?.name || item?.category || 'Mains';
+  return {
+    id: String(item?._id || item?.id || 0),
+    name: item?.name || 'Menu Item',
+    category: categoryName === 'Desserts' ? 'Desserts' : categoryName === 'Beverages' ? 'Beverages' : categoryName === 'Starters' ? 'Starters' : 'Mains',
+    price: Number(item?.price ?? 0),
+    available: item?.isAvailable !== false,
+    veg: item?.isVeg ?? true,
+    description: item?.description || 'Freshly prepared item',
+  };
+}
+
+function mapAlert(n: any): AlertItem {
+  let severity: AlertItem['severity'] = 'Info';
+  const priorityUpper = (n.priority || '').toUpperCase();
+  if (priorityUpper === 'HIGH') severity = 'Warning';
+  else if (priorityUpper === 'CRITICAL' || priorityUpper === 'URGENT') severity = 'Critical';
+
+  let type: AlertItem['type'] = 'System';
+  const categoryUpper = (n.category || '').toUpperCase();
+  const typeUpper = (n.type || '').toUpperCase();
+  if (categoryUpper === 'KITCHEN') type = 'Kitchen';
+  else if (categoryUpper === 'CLEANING') type = 'Cleaning';
+  else if (typeUpper === 'DELAYED') type = 'Delayed';
+  else if (typeUpper === 'REASSIGNED') type = 'Reassigned';
+
+  return {
+    id: String(n._id || n.id),
+    message: n.message || n.title || 'System Notification',
+    type,
+    severity,
+    time: toRelativeTime(n.createdAt),
+  };
+}
 
 export function useStaffDashboard() {
   const [orders, setOrdersState] = useState(() => staffStore.orders);
@@ -11,6 +173,8 @@ export function useStaffDashboard() {
   const [tables, setTablesState] = useState(() => staffStore.tables);
   const [reservations, setReservationsState] = useState(() => staffStore.reservations);
   const [menuItems, setMenuItemsState] = useState(() => staffStore.menuItems);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = staffStore.subscribe(() => {
@@ -27,6 +191,60 @@ export function useStaffDashboard() {
     };
   }, []);
 
+  const refreshDashboard = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, ordersRes, menuRes, alertsRes] = await Promise.all([
+        tableAPI.getTables(),
+        requestsAPI.getPending(),
+        reservationsAPI.getReservations(),
+        ordersAPI.getReadyOrders(),
+        ordersAPI.getReadyOrders(),
+        menuAPI.getItems(),
+        notificationsAPI.getAll(),
+      ]);
+
+      if (tablesRes.success && Array.isArray(tablesRes.data)) {
+        staffStore.setTables(tablesRes.data.map(mapTable));
+      }
+
+      if (requestsRes.success && Array.isArray(requestsRes.data)) {
+        staffStore.setRequests(requestsRes.data.map(mapRequest));
+      }
+
+      if (reservationsRes.success && Array.isArray(reservationsRes.data)) {
+        staffStore.setReservations(reservationsRes.data.map(mapReservation));
+      }
+
+      if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
+        staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
+      }
+
+      if (ordersRes.success && Array.isArray(ordersRes.data)) {
+        staffStore.setOrders(ordersRes.data.map(mapOrder));
+      }
+
+      if (menuRes.success && Array.isArray(menuRes.data)) {
+        staffStore.setMenuItems(menuRes.data.map(mapMenuItem));
+      }
+
+      if (alertsRes.success && Array.isArray(alertsRes.data)) {
+        staffStore.setAlerts(alertsRes.data.map(mapAlert));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to refresh staff data';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshDashboard();
+  }, []);
+
   return {
     orders,
     readyItems,
@@ -35,6 +253,9 @@ export function useStaffDashboard() {
     tables,
     reservations,
     menuItems,
+    loading,
+    error,
+    refreshDashboard,
     setOrders: (newOrders: Order[] | ((prev: Order[]) => Order[])) => staffStore.setOrders(newOrders),
     setReadyItems: (newReadyItems: ReadyItem[] | ((prev: ReadyItem[]) => ReadyItem[])) => staffStore.setReadyItems(newReadyItems),
     setRequests: (newRequests: RequestItem[] | ((prev: RequestItem[]) => RequestItem[])) => staffStore.setRequests(newRequests),

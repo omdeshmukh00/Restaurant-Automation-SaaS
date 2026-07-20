@@ -102,35 +102,35 @@ const cache = new CacheManager();
 // ═══════════════════════════════════════════════════════════════
 
 const PH_TABLES: Table[] = [
-  { id: 1,  tableNumber: 'T01', status: 'available',      section: 'Indoor'                 },
-  { id: 2,  tableNumber: 'T02', status: 'occupied',       section: 'Indoor',  guestCount: 4 },
-  { id: 3,  tableNumber: 'T03', status: 'food_ready',     section: 'Outdoor', guestCount: 2 },
-  { id: 4,  tableNumber: 'T04', status: 'needs_cleaning', section: 'Indoor'                 },
-  { id: 5,  tableNumber: 'T05', status: 'order_placed',   section: 'Indoor',  guestCount: 3 },
-  { id: 6,  tableNumber: 'T07', status: 'served',         section: 'Outdoor', guestCount: 5 },
-  { id: 7,  tableNumber: 'T07', status: 'available',      section: 'Indoor'                 },
-  { id: 8,  tableNumber: 'T08', status: 'occupied',       section: 'Indoor',  guestCount: 2 },
-  { id: 9,  tableNumber: 'T09', status: 'order_placed',   section: 'Outdoor', guestCount: 6 },
-  { id: 10, tableNumber: 'T10', status: 'available',      section: 'Indoor'                 },
+  { id: '1',  tableNumber: 'T01', status: 'available',      section: 'Indoor'                 },
+  { id: '2',  tableNumber: 'T02', status: 'occupied',       section: 'Indoor',  guestCount: 4 },
+  { id: '3',  tableNumber: 'T03', status: 'food_ready',     section: 'Outdoor', guestCount: 2 },
+  { id: '4',  tableNumber: 'T04', status: 'needs_cleaning', section: 'Indoor'                 },
+  { id: '5',  tableNumber: 'T05', status: 'order_placed',   section: 'Indoor',  guestCount: 3 },
+  { id: '6',  tableNumber: 'T07', status: 'served',         section: 'Outdoor', guestCount: 5 },
+  { id: '7',  tableNumber: 'T07', status: 'available',      section: 'Indoor'                 },
+  { id: '8',  tableNumber: 'T08', status: 'occupied',       section: 'Indoor',  guestCount: 2 },
+  { id: '9',  tableNumber: 'T09', status: 'order_placed',   section: 'Outdoor', guestCount: 6 },
+  { id: '10', tableNumber: 'T10', status: 'available',      section: 'Indoor'                 },
 ];
 
 const PH_REQUESTS: CustomerRequest[] = [
-  { id: 1, tableNumber: 'T03', type: 'water_refill',  time: '2 mins ago' },
-  { id: 2, tableNumber: 'T05', type: 'call_waiter',   time: '5 mins ago' },
-  { id: 3, tableNumber: 'T02', type: 'extra_cutlery', time: '1 min ago'  },
+  { id: '1', tableNumber: 'T03', type: 'water_refill',  time: '2 mins ago' },
+  { id: '2', tableNumber: 'T05', type: 'call_waiter',   time: '5 mins ago' },
+  { id: '3', tableNumber: 'T02', type: 'extra_cutlery', time: '1 min ago'  },
 ];
 
 const PH_FOOD_ALERTS: FoodAlert[] = [
-  { id: 1, tableNumber: 'T03', items: ['Paneer Butter Masala', 'Naan x2'], readyAt: '3 mins ago' },
-  { id: 2, tableNumber: 'T07', items: ['Dal Tadka', 'Jeera Rice'],         readyAt: '1 min ago'  },
+  { id: '1', tableNumber: 'T03', items: ['Paneer Butter Masala', 'Naan x2'], readyAt: '3 mins ago' },
+  { id: '2', tableNumber: 'T07', items: ['Dal Tadka', 'Jeera Rice'],         readyAt: '1 min ago'  },
 ];
 
 const PH_STAFF: StaffMember[] = [
-  { id: 1, name: 'John Smith',    email: 'john.smith@email.com', role: 'Manager',   department: 'Management', phone: '+1 (555) 123-4567', status: 'active',   hireDate: 'Jan 15, 2023', initials: 'JS', avatarColor: '#f97316' },
-  { id: 2, name: 'Sarah Johnson', email: 'sarah.j@email.com',    role: 'Server',    department: 'Service',    phone: '+1 (555) 234-5678', status: 'active',   hireDate: 'Feb 10, 2023', initials: 'SJ', avatarColor: '#22c55e' },
-  { id: 3, name: 'Michael Brown', email: 'michael.b@email.com',  role: 'Chef',      department: 'Kitchen',    phone: '+1 (555) 345-6789', status: 'active',   hireDate: 'Mar 5, 2023',  initials: 'MB', avatarColor: '#3b82f6' },
-  { id: 4, name: 'Emily Davis',   email: 'emily.d@email.com',    role: 'Bartender', department: 'Bar',        phone: '+1 (555) 456-7890', status: 'active',   hireDate: 'Mar 20, 2023', initials: 'ED', avatarColor: '#8b5cf6' },
-  { id: 5, name: 'David Wilson',  email: 'david.w@email.com',    role: 'Server',    department: 'Service',    phone: '+1 (555) 567-8901', status: 'on_leave', hireDate: 'Apr 8, 2023',  initials: 'DW', avatarColor: '#f59e0b' },
+  { id: '1', name: 'John Smith',    email: 'john.smith@email.com', role: 'Manager',   department: 'Management', phone: '+1 (555) 123-4567', status: 'active',   hireDate: 'Jan 15, 2023', initials: 'JS', avatarColor: '#f97316' },
+  { id: '2', name: 'Sarah Johnson', email: 'sarah.j@email.com',    role: 'Server',    department: 'Service',    phone: '+1 (555) 234-5678', status: 'active',   hireDate: 'Feb 10, 2023', initials: 'SJ', avatarColor: '#22c55e' },
+  { id: '3', name: 'Michael Brown', email: 'michael.b@email.com',  role: 'Chef',      department: 'Kitchen',    phone: '+1 (555) 345-6789', status: 'active',   hireDate: 'Mar 5, 2023',  initials: 'MB', avatarColor: '#3b82f6' },
+  { id: '4', name: 'Emily Davis',   email: 'emily.d@email.com',    role: 'Bartender', department: 'Bar',        phone: '+1 (555) 456-7890', status: 'active',   hireDate: 'Mar 20, 2023', initials: 'ED', avatarColor: '#8b5cf6' },
+  { id: '5', name: 'David Wilson',  email: 'david.w@email.com',    role: 'Server',    department: 'Service',    phone: '+1 (555) 567-8901', status: 'on_leave', hireDate: 'Apr 8, 2023',  initials: 'DW', avatarColor: '#f59e0b' },
 ];
 
 const PH_STAFF_STATS: StaffStats = {
@@ -268,21 +268,21 @@ export function useStaff() {
   // If the API fails it only console.errors (via staff.api.ts fetchAPI helper).
   // No rollback for now — add if Om requires it.
 
-  const handleStatusChange = useCallback(async (id: number, newStatus: TableStatus) => {
+  const handleStatusChange = useCallback(async (id: string, newStatus: TableStatus) => {
     // Optimistic update first
     setTables(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
     cache.clear('tables');
     await tableAPI.updateStatus(id, newStatus);
   }, []);
 
-  const handleResolveRequest = useCallback(async (id: number) => {
+  const handleResolveRequest = useCallback(async (id: string) => {
     setRequests(prev => prev.filter(r => r.id !== id));
     cache.clear('requests');
     await requestsAPI.resolve(id);
   }, []);
 
   const handleFoodAction = useCallback(async (
-    id: number,
+    id: string,
     action: 'picked_up' | 'served' = 'served'
   ) => {
     setFoodAlerts(prev => prev.filter(a => a.id !== id));
@@ -297,7 +297,7 @@ export function useStaff() {
   const handleAddStaff = useCallback(async (staff: Omit<StaffMember, 'id'>) => {
     const newStaff: StaffMember = {
       ...staff,
-      id: Date.now(),
+      id: String(Date.now()),
     };
 
     setStaffList(prev => [newStaff, ...prev]);
@@ -321,13 +321,13 @@ export function useStaff() {
     });
   }, []);
 
-  const handleUpdateStaff = useCallback(async (id: number, updates: Partial<StaffMember>) => {
+  const handleUpdateStaff = useCallback(async (id: string, updates: Partial<StaffMember>) => {
     setStaffList(prev => prev.map(staff => staff.id === id ? { ...staff, ...updates } : staff));
     cache.clear('staff');
     await staffAPI.update(id, updates);
   }, []);
 
-  const handleDeleteStaff = useCallback(async (id: number) => {
+  const handleDeleteStaff = useCallback(async (id: string) => {
     setStaffList(prev => {
       const removed = prev.find(item => item.id === id);
       if (removed) {

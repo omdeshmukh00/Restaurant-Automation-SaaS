@@ -116,7 +116,16 @@ publicRouter.get('/menu', async (req, res, next) => {
 // Returns active restaurants, dishes, offers, and live stats for the landing page
 publicRouter.get('/landing/data', async (req, res, next) => {
   try {
-    const restaurants = await RestaurantModel.find({ status: RestaurantStatus.ACTIVE }).lean();
+    const restaurants = await RestaurantModel.find({
+      status: {
+        $in: [
+          RestaurantStatus.ACTIVE,
+          RestaurantStatus.APPLICATION_APPROVED,
+          RestaurantStatus.ADMIN_SETUP_PENDING,
+          RestaurantStatus.PLAN_SELECTION_PENDING,
+        ],
+      },
+    }).lean();
     const offers = await OfferModel.find({ active: true }).lean();
     const dishes = await MenuItem.find().limit(12).lean();
 

@@ -21,9 +21,7 @@ const FOOTER_LINKS = {
   forRestaurants: [
     { label: 'Partner With Us', href: '/partner' },
     { label: 'Restaurant Login', href: '/auth/restaurant' },
-    { label: 'Business Solutions', href: '#solutions' },
     { label: 'Pricing', href: '/pricing' },
-    { label: 'Resources', href: '#resources' },
   ],
 };
 

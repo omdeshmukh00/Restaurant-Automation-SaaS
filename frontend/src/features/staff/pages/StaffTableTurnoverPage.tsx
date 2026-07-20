@@ -16,7 +16,12 @@ export default function StaffTableTurnoverPage() {
   // Dynamically map tables to turnover data
   const turnoverData: TurnoverStat[] = tables.map(t => {
     // Parse elapsed minutes if available, otherwise generate a realistic average based on table ID
-    let avgTime = 40 + (t.id * 4) % 25;
+    let hash = 0;
+    const idStr = String(t.id);
+    for (let i = 0; i < idStr.length; i++) {
+      hash += idStr.charCodeAt(i);
+    }
+    let avgTime = 40 + (hash * 4) % 25;
     if (t.elapsed && t.elapsed.includes('min')) {
       const parsed = parseInt(t.elapsed, 10);
       if (!isNaN(parsed)) avgTime = parsed;
