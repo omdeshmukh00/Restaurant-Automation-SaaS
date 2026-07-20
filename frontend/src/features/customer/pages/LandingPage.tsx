@@ -29,8 +29,12 @@ export default function LandingPage() {
   }>({});
   const [selectedCuisine, setSelectedCuisine] = useState<string>('All');
 
-  const openLogin = () => {
-    navigate('/auth/customer');
+  const openLogin = (targetPath?: string) => {
+    if (targetPath) {
+      navigate('/auth/customer', { state: { from: { pathname: targetPath } } });
+    } else {
+      navigate('/auth/customer');
+    }
   };
 
   // Draggable states and references for desktop QR button

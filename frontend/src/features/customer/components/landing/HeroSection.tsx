@@ -91,7 +91,7 @@ export default function HeroSection({ onLoginOpen, restaurants = [] }: HeroSecti
       });
       setBookingSuccess(true);
       setTimeout(() => {
-        navigate(`/auth/customer?mobile=${phoneNumber}`);
+        navigate(`/auth/customer?mobile=${phoneNumber}`, { state: { from: { pathname: '/customer/reservations' } } });
       }, 2000);
     } catch (err: any) {
       setBookingError(err.response?.data?.message || 'Failed to book table. Please try again.');

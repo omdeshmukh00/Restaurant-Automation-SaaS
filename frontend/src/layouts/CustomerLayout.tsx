@@ -262,31 +262,7 @@ export default function CustomerLayout() {
     setTimeout(() => setToastMsg(''), 3000);
   };
 
-  const isReservationsPage = location.pathname === '/customer/reservations';
-  const navigate = useNavigate();
 
-  if (isReservationsPage) {
-    const openLogin = () => {
-      navigate('/auth/customer');
-    };
-
-    return (
-      <div className="landing-page-container min-h-screen relative overflow-x-hidden flex flex-col justify-between" style={{ backgroundColor: '#FFF8F3' }}>
-        <LandingNavbar onLoginOpen={openLogin} />
-        
-        {/* Spacer for Navbar */}
-        <div className="h-[72px] shrink-0" />
-        
-        <main className="flex-1 py-8 relative overflow-hidden">
-          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 relative z-10">
-            <Outlet />
-          </div>
-        </main>
-
-        <LandingFooter />
-      </div>
-    );
-  }
 
   return (
     <CartProvider>

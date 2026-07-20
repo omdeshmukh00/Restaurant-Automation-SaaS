@@ -29,7 +29,7 @@ export interface Order {
 }
 
 export interface ReadyItem {
-  id: number;
+  id: string;
   table: string;
   item: string;
   qty: number;
@@ -39,7 +39,7 @@ export interface ReadyItem {
 }
 
 export interface RequestItem {
-  id: number;
+  id: string;
   table: string;
   type: 'Call Waiter' | 'Water Bottle' | 'Extra Napkins' | 'Clean Table' | 'Cutlery';
   time: string;
@@ -49,7 +49,7 @@ export interface RequestItem {
 }
 
 export interface AlertItem {
-  id: number;
+  id: string;
   message: string;
   type: 'Delayed' | 'Cleaning' | 'Reassigned' | 'Kitchen' | 'System';
   severity: 'Critical' | 'Warning' | 'Info';
@@ -57,7 +57,7 @@ export interface AlertItem {
 }
 
 export interface StaffTable {
-  id: number;
+  id: string;
   name: string;
   section: 'Zone A' | 'Zone B' | 'Outdoor';
   capacity: number;
@@ -71,7 +71,7 @@ export interface StaffTable {
 }
 
 export interface StaffReservation {
-  id: number;
+  id: string;
   name: string;
   pax: number;
   time: string;
@@ -83,7 +83,7 @@ export interface StaffReservation {
 }
 
 export interface MenuItem {
-  id: number;
+  id: string;
   name: string;
   category: 'Starters' | 'Mains' | 'Desserts' | 'Beverages';
   price: number;
@@ -229,10 +229,10 @@ class StaffStore {
 
   private loadReadyItems(): ReadyItem[] {
     const defaults: ReadyItem[] = [
-      { id: 1, table: 'Table 3', item: 'Paneer Tikka Masala', qty: 1, station: 'Main Kitchen', readySince: '2 mins ago', elapsedSec: 120 },
-      { id: 2, table: 'Table 1', item: 'Butter Naan', qty: 3, station: 'Main Kitchen', readySince: '1 min ago', elapsedSec: 60 },
-      { id: 3, table: 'Table 2', item: 'Virgin Mojito', qty: 2, station: 'Bar', readySince: '4 mins ago', elapsedSec: 240 },
-      { id: 4, table: 'Table 5', item: 'Chocolate Lava Cake', qty: 1, station: 'Dessert Station', readySince: '5 mins ago', elapsedSec: 300 },
+      { id: '1', table: 'Table 3', item: 'Paneer Tikka Masala', qty: 1, station: 'Main Kitchen', readySince: '2 mins ago', elapsedSec: 120 },
+      { id: '2', table: 'Table 1', item: 'Butter Naan', qty: 3, station: 'Main Kitchen', readySince: '1 min ago', elapsedSec: 60 },
+      { id: '3', table: 'Table 2', item: 'Virgin Mojito', qty: 2, station: 'Bar', readySince: '4 mins ago', elapsedSec: 240 },
+      { id: '4', table: 'Table 5', item: 'Chocolate Lava Cake', qty: 1, station: 'Dessert Station', readySince: '5 mins ago', elapsedSec: 300 },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-ready');
@@ -245,11 +245,11 @@ class StaffStore {
 
   private loadRequests(): RequestItem[] {
     const defaults: RequestItem[] = [
-      { id: 1, table: 'Table 2', type: 'Call Waiter', time: '2 mins ago', elapsedMinutes: 2, status: 'Pending', severity: 'high' },
-      { id: 2, table: 'Table 1', type: 'Extra Napkins', time: '5 mins ago', elapsedMinutes: 5, status: 'Pending', severity: 'low' },
-      { id: 3, table: 'Table 3', type: 'Water Bottle', time: '8 mins ago', elapsedMinutes: 8, status: 'InProgress', severity: 'low' },
-      { id: 4, table: 'Table 4', type: 'Clean Table', time: '12 mins ago', elapsedMinutes: 12, status: 'Pending', severity: 'medium' },
-      { id: 5, table: 'Table 5', type: 'Cutlery', time: '15 mins ago', elapsedMinutes: 15, status: 'Resolved', severity: 'low' },
+      { id: '1', table: 'Table 2', type: 'Call Waiter', time: '2 mins ago', elapsedMinutes: 2, status: 'Pending', severity: 'high' },
+      { id: '2', table: 'Table 1', type: 'Extra Napkins', time: '5 mins ago', elapsedMinutes: 5, status: 'Pending', severity: 'low' },
+      { id: '3', table: 'Table 3', type: 'Water Bottle', time: '8 mins ago', elapsedMinutes: 8, status: 'InProgress', severity: 'low' },
+      { id: '4', table: 'Table 4', type: 'Clean Table', time: '12 mins ago', elapsedMinutes: 12, status: 'Pending', severity: 'medium' },
+      { id: '5', table: 'Table 5', type: 'Cutlery', time: '15 mins ago', elapsedMinutes: 15, status: 'Resolved', severity: 'low' },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-requests');
@@ -262,11 +262,11 @@ class StaffStore {
 
   private loadAlerts(): AlertItem[] {
     const defaults: AlertItem[] = [
-      { id: 1, message: 'Serving Delayed: Order ORD-8271 at Table 1 is 10 mins over target prep time.', type: 'Delayed', severity: 'Critical', time: '2 mins ago' },
-      { id: 2, message: 'Cleaning Pending: Table 4 needs sanitization before next walk-in seating.', type: 'Cleaning', severity: 'Warning', time: '6 mins ago' },
-      { id: 3, message: 'Table Reassigned: Table 8 has been added to Zone A for this shift.', type: 'Reassigned', severity: 'Info', time: '15 mins ago' },
-      { id: 4, message: 'Kitchen Alert: Dessert station is reporting out of stock for Mango Pannacotta.', type: 'Kitchen', severity: 'Warning', time: '25 mins ago' },
-      { id: 5, message: 'System Update: Sync active. Shift log reports generated.', type: 'System', severity: 'Info', time: '1 hour ago' },
+      { id: '1', message: 'Serving Delayed: Order ORD-8271 at Table 1 is 10 mins over target prep time.', type: 'Delayed', severity: 'Critical', time: '2 mins ago' },
+      { id: '2', message: 'Cleaning Pending: Table 4 needs sanitization before next walk-in seating.', type: 'Cleaning', severity: 'Warning', time: '6 mins ago' },
+      { id: '3', message: 'Table Reassigned: Table 8 has been added to Zone A for this shift.', type: 'Reassigned', severity: 'Info', time: '15 mins ago' },
+      { id: '4', message: 'Kitchen Alert: Dessert station is reporting out of stock for Mango Pannacotta.', type: 'Kitchen', severity: 'Warning', time: '25 mins ago' },
+      { id: '5', message: 'System Update: Sync active. Shift log reports generated.', type: 'System', severity: 'Info', time: '1 hour ago' },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-alerts');
@@ -279,16 +279,16 @@ class StaffStore {
 
   private loadTables(): StaffTable[] {
     const defaults: StaffTable[] = [
-      { id: 1, name: 'Table 1', section: 'Zone A', capacity: 2, guests: 2, status: 'Occupied', currentBill: 1240, elapsed: '45 mins', action: 'Order', assignedGuest: 'Rajesh Kumar', turns: 6 },
-      { id: 2, name: 'Table 2', section: 'Zone A', capacity: 4, guests: 4, status: 'Bill Requested', currentBill: 3450, elapsed: '1h 15m', action: 'Pay', assignedGuest: 'Priya Sharma', turns: 4 },
-      { id: 3, name: 'Table 3', section: 'Zone A', capacity: 4, guests: 3, status: 'Food Served', currentBill: 2100, elapsed: '30 mins', action: 'Service', assignedGuest: 'Amit Patel', turns: 5 },
-      { id: 4, name: 'Table 4', section: 'Zone A', capacity: 2, guests: 0, status: 'Cleaning', currentBill: 0, elapsed: '5 mins', action: 'Clean', turns: 3 },
-      { id: 5, name: 'Table 5', section: 'Zone B', capacity: 6, guests: 5, status: 'Occupied', currentBill: 4800, elapsed: '2 hours', assignedGuest: 'Neha Gupta', turns: 3 },
-      { id: 6, name: 'Table 6', section: 'Zone B', capacity: 4, guests: 0, status: 'Reserved', elapsed: '10 mins', turns: 5 },
-      { id: 7, name: 'Table 7', section: 'Zone B', capacity: 2, guests: 0, status: 'Available', turns: 7 },
-      { id: 8, name: 'Table 8', section: 'Zone B', capacity: 4, guests: 0, status: 'Available', turns: 2 },
-      { id: 9, name: 'Table 9', section: 'Outdoor', capacity: 4, guests: 4, status: 'Occupied', currentBill: 1950, elapsed: '50 mins', assignedGuest: 'Sanjay Dutt', turns: 4 },
-      { id: 10, name: 'Table 10', section: 'Outdoor', capacity: 2, guests: 0, status: 'Available', turns: 1 },
+      { id: '1', name: 'Table 1', section: 'Zone A', capacity: 2, guests: 2, status: 'Occupied', currentBill: 1240, elapsed: '45 mins', action: 'Order', assignedGuest: 'Rajesh Kumar', turns: 6 },
+      { id: '2', name: 'Table 2', section: 'Zone A', capacity: 4, guests: 4, status: 'Bill Requested', currentBill: 3450, elapsed: '1h 15m', action: 'Pay', assignedGuest: 'Priya Sharma', turns: 4 },
+      { id: '3', name: 'Table 3', section: 'Zone A', capacity: 4, guests: 3, status: 'Food Served', currentBill: 2100, elapsed: '30 mins', action: 'Service', assignedGuest: 'Amit Patel', turns: 5 },
+      { id: '4', name: 'Table 4', section: 'Zone A', capacity: 2, guests: 0, status: 'Cleaning', currentBill: 0, elapsed: '5 mins', action: 'Clean', turns: 3 },
+      { id: '5', name: 'Table 5', section: 'Zone B', capacity: 6, guests: 5, status: 'Occupied', currentBill: 4800, elapsed: '2 hours', assignedGuest: 'Neha Gupta', turns: 3 },
+      { id: '6', name: 'Table 6', section: 'Zone B', capacity: 4, guests: 0, status: 'Reserved', elapsed: '10 mins', turns: 5 },
+      { id: '7', name: 'Table 7', section: 'Zone B', capacity: 2, guests: 0, status: 'Available', turns: 7 },
+      { id: '8', name: 'Table 8', section: 'Zone B', capacity: 4, guests: 0, status: 'Available', turns: 2 },
+      { id: '9', name: 'Table 9', section: 'Outdoor', capacity: 4, guests: 4, status: 'Occupied', currentBill: 1950, elapsed: '50 mins', assignedGuest: 'Sanjay Dutt', turns: 4 },
+      { id: '10', name: 'Table 10', section: 'Outdoor', capacity: 2, guests: 0, status: 'Available', turns: 1 },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-tables');
@@ -341,11 +341,11 @@ class StaffStore {
 
   private loadReservations(): StaffReservation[] {
     const defaults: StaffReservation[] = [
-      { id: 1, name: 'Ananya Roy', pax: 4, time: '07:30 PM', phone: '+91 98765 43210', status: 'Confirmed', type: 'Reservation' },
-      { id: 2, name: 'Vikram Singh', pax: 2, time: '08:00 PM', phone: '+91 87654 32109', status: 'Confirmed', type: 'Reservation' },
-      { id: 3, name: 'Siddharth Sen', pax: 5, time: '15 mins wait', phone: '+91 76543 21098', status: 'Confirmed', type: 'Walk-in', queueNo: 1 },
-      { id: 4, name: 'Megha Gupta', pax: 3, time: '25 mins wait', phone: '+91 65432 10987', status: 'Confirmed', type: 'Walk-in', queueNo: 2 },
-      { id: 5, name: 'Kabir Mehta', pax: 6, time: '09:00 PM', phone: '+91 54321 09876', status: 'Confirmed', type: 'Reservation' },
+      { id: '1', name: 'Ananya Roy', pax: 4, time: '07:30 PM', phone: '+91 98765 43210', status: 'Confirmed', type: 'Reservation' },
+      { id: '2', name: 'Vikram Singh', pax: 2, time: '08:00 PM', phone: '+91 87654 32109', status: 'Confirmed', type: 'Reservation' },
+      { id: '3', name: 'Siddharth Sen', pax: 5, time: '15 mins wait', phone: '+91 76543 21098', status: 'Confirmed', type: 'Walk-in', queueNo: 1 },
+      { id: '4', name: 'Megha Gupta', pax: 3, time: '25 mins wait', phone: '+91 65432 10987', status: 'Confirmed', type: 'Walk-in', queueNo: 2 },
+      { id: '5', name: 'Kabir Mehta', pax: 6, time: '09:00 PM', phone: '+91 54321 09876', status: 'Confirmed', type: 'Reservation' },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-reservations');
@@ -366,14 +366,14 @@ class StaffStore {
 
   private loadMenuItems(): MenuItem[] {
     const defaults: MenuItem[] = [
-      { id: 1, name: 'Paneer Tikka Masala', category: 'Mains', price: 340, available: true, spicy: true, veg: true, description: 'Clay-oven roasted cottage cheese cubes cooked in spicy rich tomato-based gravy.' },
-      { id: 2, name: 'Butter Naan', category: 'Mains', price: 60, available: true, veg: true, description: 'Leavened flatbread made of white flour, baked in tandoor and brushed with butter.' },
-      { id: 3, name: 'Virgin Mojito', category: 'Beverages', price: 160, available: true, veg: true, description: 'Refreshing cocktail containing lime juice, mint leaves, sugar syrup, and soda.' },
-      { id: 4, name: 'Chocolate Lava Cake', category: 'Desserts', price: 190, available: true, veg: true, description: 'Rich chocolate cake with a molten chocolate core, served with vanilla ice cream.' },
-      { id: 5, name: 'Spring Rolls', category: 'Starters', price: 180, available: true, veg: true, description: 'Crispy fried rolled pastry filled with seasoned vegetables.' },
-      { id: 6, name: 'Chicken Biryani', category: 'Mains', price: 420, available: true, spicy: true, veg: false, description: 'Slow-cooked aromatic basmati rice layered with marinated chicken, saffron, and spices.' },
-      { id: 7, name: 'Dal Makhani', category: 'Mains', price: 280, available: false, veg: true, description: 'Creamy black lentils slow-cooked overnight with spices, butter, and cream.' },
-      { id: 8, name: 'French Fries', category: 'Starters', price: 120, available: true, veg: true, description: 'Golden, crispy, lightly salted deep-fried potato strips.' },
+      { id: '1', name: 'Paneer Tikka Masala', category: 'Mains', price: 340, available: true, spicy: true, veg: true, description: 'Clay-oven roasted cottage cheese cubes cooked in spicy rich tomato-based gravy.' },
+      { id: '2', name: 'Butter Naan', category: 'Mains', price: 60, available: true, veg: true, description: 'Leavened flatbread made of white flour, baked in tandoor and brushed with butter.' },
+      { id: '3', name: 'Virgin Mojito', category: 'Beverages', price: 160, available: true, veg: true, description: 'Refreshing cocktail containing lime juice, mint leaves, sugar syrup, and soda.' },
+      { id: '4', name: 'Chocolate Lava Cake', category: 'Desserts', price: 190, available: true, veg: true, description: 'Rich chocolate cake with a molten chocolate core, served with vanilla ice cream.' },
+      { id: '5', name: 'Spring Rolls', category: 'Starters', price: 180, available: true, veg: true, description: 'Crispy fried rolled pastry filled with seasoned vegetables.' },
+      { id: '6', name: 'Chicken Biryani', category: 'Mains', price: 420, available: true, spicy: true, veg: false, description: 'Slow-cooked aromatic basmati rice layered with marinated chicken, saffron, and spices.' },
+      { id: '7', name: 'Dal Makhani', category: 'Mains', price: 280, available: false, veg: true, description: 'Creamy black lentils slow-cooked overnight with spices, butter, and cream.' },
+      { id: '8', name: 'French Fries', category: 'Starters', price: 120, available: true, veg: true, description: 'Golden, crispy, lightly salted deep-fried potato strips.' },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-menu');

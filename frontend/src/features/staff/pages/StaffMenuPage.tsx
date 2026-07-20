@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { menuAPI } from '../api/staff.api';
 
 interface MenuItem {
-  id: number;
+  id: string;
   name: string;
   category: 'Starters' | 'Mains' | 'Desserts' | 'Beverages';
   price: number;
@@ -17,6 +18,7 @@ export default function StaffMenuPage() {
   const { query } = useStaffSearch();
   const [selectedCategory, setSelectedCategory] = useState<'All' | 'Starters' | 'Mains' | 'Desserts' | 'Beverages'>('All');
   const { menuItems, setMenuItems } = useStaffDashboard();
+  const [categories, setCategories] = useState<any[]>([]);
 
   // Modal addition states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -27,38 +29,91 @@ export default function StaffMenuPage() {
   const [newItemVeg, setNewItemVeg] = useState(true);
   const [newItemSpicy, setNewItemSpicy] = useState(false);
 
-  const toggleAvailability = (id: number) => {
-    setMenuItems(prev => prev.map(item => item.id === id ? { ...item, available: !item.available } : item));
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await menuAPI.getCategories();
+        if (res.success && Array.isArray(res.data)) {
+          setCategories(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load categories', err);
+      }
+    };
+    void fetchCategories();
+  }, []);
+
+  const toggleAvailability = async (id: string) => {
+    try {
+      const item = menuItems.find(i => i.id === id);
+      if (item) {
+        await menuAPI.toggleAvailability(id, !item.available);
+        setMenuItems(prev => prev.map(i => i.id === id ? { ...i, available: !item.available } : i));
+      }
+    } catch (err) {
+      console.error('Failed to toggle availability', err);
+    }
   };
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemName || !newItemPrice) return;
 
-    const addedItem: MenuItem = {
-      id: Date.now(),
-      name: newItemName,
-      description: newItemDesc,
-      price: parseFloat(newItemPrice),
-      category: newItemCategory,
-      veg: newItemVeg,
-      spicy: newItemSpicy,
-      available: true
-    };
+    try {
+      let categoryId = categories.find(c => c.name.toLowerCase() === newItemCategory.toLowerCase())?._id;
+      if (!categoryId && categories.length > 0) {
+        categoryId = categories[0]._id;
+      }
+      
+      if (!categoryId) {
+        alert('Please create menu categories in the Admin panel first.');
+        return;
+      }
 
-    setMenuItems([addedItem, ...menuItems]);
-    setNewItemName('');
-    setNewItemDesc('');
-    setNewItemPrice('');
-    setNewItemCategory('Starters');
-    setNewItemVeg(true);
-    setNewItemSpicy(false);
-    setShowAddModal(false);
+      const res = await menuAPI.createItem({
+        categoryId,
+        name: newItemName,
+        description: newItemDesc,
+        price: parseFloat(newItemPrice),
+        isVeg: newItemVeg,
+        isAvailable: true,
+      });
+
+      if (res.success && res.data) {
+        const item = res.data;
+        const categoryName = item.categoryId?.name || item.category || newItemCategory;
+        const addedItem: MenuItem = {
+          id: String(item._id || item.id),
+          name: item.name || newItemName,
+          description: item.description || newItemDesc,
+          price: Number(item.price ?? newItemPrice),
+          category: categoryName === 'Desserts' ? 'Desserts' : categoryName === 'Beverages' ? 'Beverages' : categoryName === 'Starters' ? 'Starters' : 'Mains',
+          veg: item.isVeg ?? newItemVeg,
+          available: item.isAvailable !== false,
+        };
+
+        setMenuItems([addedItem, ...menuItems]);
+        setNewItemName('');
+        setNewItemDesc('');
+        setNewItemPrice('');
+        setNewItemCategory('Starters');
+        setNewItemVeg(true);
+        setNewItemSpicy(false);
+        setShowAddModal(false);
+      }
+    } catch (err) {
+      console.error('Failed to add item to menu', err);
+    }
   };
 
-  const deleteItem = (id: number) => {
+  const deleteItem = async (id: string) => {
     if (confirm("Are you sure you want to delete this menu item?")) {
-      setMenuItems(prev => prev.filter(item => item.id !== id));
+      try {
+        await menuAPI.deleteItem(id);
+        setMenuItems(prev => prev.filter(item => item.id !== id));
+      } catch (err) {
+        console.error('Failed to delete menu item', err);
+      }
     }
   };
 

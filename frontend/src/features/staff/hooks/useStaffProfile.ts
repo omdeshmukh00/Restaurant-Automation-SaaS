@@ -1,6 +1,7 @@
 // src/features/staff/hooks/useStaffProfile.ts
 
 import { useState, useEffect } from 'react';
+import { userAPI } from '../api/staff.api';
 import { staffStore, type WaiterProfile } from '../store/staff.store';
 
 export function useStaffProfile() {
@@ -10,6 +11,23 @@ export function useStaffProfile() {
     const unsubscribe = staffStore.subscribe(() => {
       setProfile(staffStore.profile);
     });
+
+    void (async () => {
+      try {
+        const result = await userAPI.getProfile();
+        if (result.success && result.data) {
+          staffStore.updateProfile({
+            name: result.data.name,
+            role: result.data.role,
+            email: result.data.email,
+            phone: result.data.phone,
+          });
+        }
+      } catch (error) {
+        console.warn('Unable to refresh staff profile', error);
+      }
+    })();
+
     return () => {
       unsubscribe();
     };
@@ -17,6 +35,16 @@ export function useStaffProfile() {
 
   return {
     profile,
-    updateProfile: (updated: Partial<WaiterProfile>) => staffStore.updateProfile(updated)
+    updateProfile: async (updated: Partial<WaiterProfile>) => {
+      staffStore.updateProfile(updated);
+      try {
+        await userAPI.updateProfile({
+          name: updated.name,
+          phone: updated.phone,
+        } as any);
+      } catch (error) {
+        console.error('Failed to sync profile change with backend', error);
+      }
+    }
   };
 }
