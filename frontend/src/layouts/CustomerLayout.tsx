@@ -13,7 +13,7 @@ import { apiClient } from '../shared/services/apiClient';
 import { connectSocket, getSocket } from '../lib/socket';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
-import { LandingNavbar, LandingFooter } from '../features/customer/components/landing';
+
 
 export default function CustomerLayout() {
   const { settings } = usePlatformSettingsGuard();
@@ -22,6 +22,7 @@ export default function CustomerLayout() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const qrToken = searchParams.get('qr_token');
   const { diningSession, setDiningSession, checkSessionInactivity, tableCode, setTableCode } = useCustomerStore();
@@ -305,31 +306,7 @@ export default function CustomerLayout() {
     }
   };
 
-  const isReservationsPage = location.pathname === '/customer/reservations';
-  const navigate = useNavigate();
 
-  if (isReservationsPage) {
-    const openLogin = () => {
-      navigate('/auth/customer');
-    };
-
-    return (
-      <div className="landing-page-container min-h-screen relative overflow-x-hidden flex flex-col justify-between" style={{ backgroundColor: '#FFF8F3' }}>
-        <LandingNavbar onLoginOpen={openLogin} />
-        
-        {/* Spacer for Navbar */}
-        <div className="h-[72px] shrink-0" />
-        
-        <main className="flex-1 py-8 relative overflow-hidden">
-          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 relative z-10">
-            <Outlet />
-          </div>
-        </main>
-
-        <LandingFooter />
-      </div>
-    );
-  }
 
   return (
     <CartProvider>
