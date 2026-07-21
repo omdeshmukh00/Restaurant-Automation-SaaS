@@ -10,6 +10,7 @@ import { comparePassword, compareToken, generateSecureToken, hashPassword, hashT
 import { parseExpiry } from '../../utils/date';
 import { UserModel, type IUser } from '../users/users.model';
 import * as userService from '../users/users.service';
+import { socketService } from '../../sockets/socket.service';
 import type { LoginInput, RegisterInput } from './auth.schema';
 
 function getInternalRole(user: IUser): string | undefined {
@@ -49,6 +50,9 @@ export async function register(input: RegisterInput, _requester?: unknown) {
   }
 
   const user = await userService.createUser(input);
+  if (user.role === UserRole.CUSTOMER) {
+    socketService.broadcast('customer:created', { id: user._id.toString() });
+  }
   const payload = buildPayload(user);
   const tokens = generateTokenPair(payload);
 

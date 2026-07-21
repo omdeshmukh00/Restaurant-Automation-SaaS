@@ -10,9 +10,10 @@ const imageReferenceSchema = z
   .string()
   .trim()
   .min(1, 'Image reference is required')
-  .refine((value) => value.startsWith('/') || /^https?:\/\//i.test(value), {
-    message: 'Image must be an absolute URL or upload path',
-  });
+  .refine(
+    (value) => value.startsWith('/') || value.startsWith('data:') || /^https?:\/\//i.test(value),
+    { message: 'Image must be a URL, upload path, or base64 data URL' }
+  );
 
 // Generic query schemas
 export const paginationQuerySchema = z.object({
@@ -77,8 +78,8 @@ export const createItemSchema = z.object({
   shortDescription: z.string().max(200).optional(),
   price: z.number().min(0, 'Price must be a positive number'),
   discountPrice: z.number().min(0).optional(),
-  image: z.string().url('Invalid image URL').optional().or(z.literal('')),
-  images: z.array(z.string().url()).max(10).optional(),
+  image: imageReferenceSchema.optional().or(z.literal('')),
+  images: z.array(imageReferenceSchema).max(10).optional(),
   isVeg: z.boolean(),
   isAvailable: z.boolean().optional().default(true),
   isHidden: z.boolean().optional().default(false),

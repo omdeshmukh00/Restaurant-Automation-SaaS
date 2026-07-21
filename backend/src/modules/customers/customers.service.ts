@@ -114,19 +114,6 @@ function matchesFilters(
   return true;
 }
 
-function buildProfileMap(): Promise<Map<string, any>> {
-  return CustomerProfileModel.find({})
-    .lean()
-    .exec()
-    .then((profiles) => {
-      const map = new Map<string, any>();
-      for (const p of profiles) {
-        map.set(digitsOnly(p.mobile), p);
-      }
-      return map;
-    });
-}
-
 interface GetCustomersResult {
   customers: CustomerDto[];
   total: number;
@@ -157,8 +144,19 @@ export const CustomersService = {
     restaurantId: string,
     filters: { status?: string; tier?: string; q?: string; page?: number; perPage?: number },
   ): Promise<GetCustomersResult> {
-    const users = await UserModel.find({ role: UserRole.CUSTOMER }).lean().exec();
-    const profileByMobile = await buildProfileMap();
+    // NOTE: The global tenantPlugin injects `tenantId: <currentTenant>` into every
+    // Mongoose query. Landing-page signups (and OTP signups) are created WITHOUT a
+    // tenantId, so tenant-scoping would hide them. We intentionally BYPASS tenant
+    // scoping here so the admin sees ALL their customers, including the signups.
+    const users = await UserModel.find({ role: UserRole.CUSTOMER }).setOptions({ bypassTenant: true }).lean().exec();
+    const profiles = await CustomerProfileModel.find({}).setOptions({ bypassTenant: true }).lean().exec();
+
+    // Index loyalty profiles by mobile so we can (a) join analytics onto users
+    // and (b) surface profiles that have no matching login identity at all.
+    const profileByMobile = new Map<string, any>();
+    for (const p of profiles) {
+      profileByMobile.set(digitsOnly(p.mobile), p);
+    }
 
     let totalSpentSum = 0;
     let totalVisitsSum = 0;
@@ -171,8 +169,14 @@ export const CustomersService = {
     const newCutoff = Date.now() - NEW_CUSTOMER_DAYS * 24 * 60 * 60 * 1000;
     let newCount = 0;
 
-    const shaped: CustomerDto[] = users.map((u: any) => {
-      const profile = profileByMobile.get(digitsOnly(u.mobile)) || null;
+    const items: { dto: CustomerDto; date: number }[] = [];
+    const seenMobiles = new Set<string>();
+
+    // 1) Every customer login identity (users with role CUSTOMER).
+    for (const u of users) {
+      const key = digitsOnly(u.mobile);
+      seenMobiles.add(key);
+      const profile = profileByMobile.get(key) || null;
       const dto = shapeFromUser(u, profile);
       totalSpentSum += profile?.totalSpent || 0;
       totalVisitsSum += profile?.totalVisits || 0;
@@ -183,10 +187,43 @@ export const CustomersService = {
       if (dto.status === 'Active') active += 1;
       else inactive += 1;
       const first = profile?.firstVisitAt ? new Date(profile.firstVisitAt) : new Date(u.createdAt);
-      if (!isNaN(first.getTime()) && first.getTime() >= newCutoff) newCount += 1;
-      return dto;
-    });
+      const ts = !isNaN(first.getTime()) ? first.getTime() : Date.now();
+      if (ts >= newCutoff) newCount += 1;
+      items.push({ dto, date: ts });
+    }
 
+    // 2) Loyalty/reservation profiles that have no matching user login — e.g.
+    //    customers who booked or ordered but never did an OTP/email signup.
+    //    Without this, the admin only ever sees customers who signed up.
+    for (const p of profiles) {
+      const key = digitsOnly(p.mobile);
+      if (seenMobiles.has(key)) continue;
+      seenMobiles.add(key);
+      const synthUser = {
+        _id: p._id,
+        name: p.name || p.mobile,
+        email: p.email || '',
+        mobile: p.mobile,
+        avatar: undefined,
+      };
+      const dto = shapeFromUser(synthUser, p);
+      totalSpentSum += p.totalSpent || 0;
+      totalVisitsSum += p.totalVisits || 0;
+      if (dto.loyaltyTier === 'Gold') gold += 1;
+      else if (dto.loyaltyTier === 'Silver') silver += 1;
+      else bronze += 1;
+      if (dto.loyaltyTier !== 'Bronze') loyal += 1;
+      if (dto.status === 'Active') active += 1;
+      else inactive += 1;
+      const first = p?.firstVisitAt ? new Date(p.firstVisitAt) : new Date();
+      const ts = !isNaN(first.getTime()) ? first.getTime() : Date.now();
+      if (ts >= newCutoff) newCount += 1;
+      items.push({ dto, date: ts });
+    }
+
+    // Newest first so freshly registered / created customers appear at the top
+    // of the admin list (and stay visible after a live re-fetch).
+    const shaped = items.sort((a, b) => b.date - a.date).map((i) => i.dto);
     const total = shaped.length;
     const filtered = shaped.filter((c) => matchesFilters(c, filters));
     const perPage = filters.perPage && filters.perPage > 0 ? filters.perPage : 8;
@@ -245,15 +282,28 @@ export const CustomersService = {
       _id: new Types.ObjectId(id),
       role: UserRole.CUSTOMER,
     })
+      .setOptions({ bypassTenant: true })
       .lean()
       .exec();
-    if (!user) {
+    if (user) {
+      const profile = await CustomerProfileModel.findOne({ mobile: digitsOnly(user.mobile) })
+        .setOptions({ bypassTenant: true })
+        .lean()
+        .exec();
+      return shapeFromUser(user, profile);
+    }
+    // Fallback: this id may be a standalone loyalty/reservation profile.
+    const profile = await CustomerProfileModel.findById(new Types.ObjectId(id))
+      .setOptions({ bypassTenant: true })
+      .lean()
+      .exec();
+    if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
-    const profile = await CustomerProfileModel.findOne({ mobile: digitsOnly(user.mobile) })
-      .lean()
-      .exec();
-    return shapeFromUser(user, profile);
+    return shapeFromUser(
+      { _id: profile._id, name: profile.name || profile.mobile, email: profile.email || '', mobile: profile.mobile, avatar: undefined },
+      profile,
+    );
   },
 
   async createCustomer(
@@ -275,6 +325,7 @@ export const CustomersService = {
         { mobile: `91${mobile}` },
       ],
     })
+      .setOptions({ bypassTenant: true })
       .lean()
       .exec();
     if (existing) {
@@ -304,7 +355,10 @@ export const CustomersService = {
     // Mirror into the analytics profile (no auth) so this customer shows spend/visits
     // consistently alongside OTP/reservation-created customers. Never overwrite an
     // existing profile's accumulated analytics.
-    const profile = await CustomerProfileModel.findOne({ mobile }).lean().exec();
+    const profile = await CustomerProfileModel.findOne({ mobile })
+      .setOptions({ bypassTenant: true })
+      .lean()
+      .exec();
     if (!profile) {
       try {
         await CustomerProfileModel.create({
@@ -332,10 +386,15 @@ export const CustomersService = {
           $addToSet: { restaurantsVisited: rid },
           ...(data.tags && data.tags.length ? { tags: data.tags } : {}),
         },
-      ).exec();
+      )
+        .setOptions({ bypassTenant: true })
+        .exec();
     }
 
-    const created = await UserModel.findById(user._id).lean().exec();
+    const created = await UserModel.findById(user._id)
+      .setOptions({ bypassTenant: true })
+      .lean()
+      .exec();
     return shapeFromUser(created, profile || null);
   },
 
@@ -353,25 +412,50 @@ export const CustomersService = {
       { $set: set },
       { new: true },
     )
+      .setOptions({ bypassTenant: true })
       .lean()
       .exec();
-    if (!user) {
+    if (user) {
+      // Tags live on the analytics profile (the User model has no tags field).
+      if (updates.tags !== undefined) {
+        await CustomerProfileModel.updateOne(
+          { mobile: digitsOnly(user.mobile) },
+          { $set: { tags: updates.tags } },
+          { upsert: false },
+        )
+          .setOptions({ bypassTenant: true })
+          .exec();
+      }
+      const profile = await CustomerProfileModel.findOne({ mobile: digitsOnly(user.mobile) })
+        .setOptions({ bypassTenant: true })
+        .lean()
+        .exec();
+      return shapeFromUser(user, profile);
+    }
+
+    // Fallback: standalone loyalty/reservation profile (no login identity).
+    const profile = await CustomerProfileModel.findById(new Types.ObjectId(id))
+      .setOptions({ bypassTenant: true })
+      .lean()
+      .exec();
+    if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
-
-    // Tags live on the analytics profile (the User model has no tags field).
-    if (updates.tags !== undefined) {
-      await CustomerProfileModel.updateOne(
-        { mobile: digitsOnly(user.mobile) },
-        { $set: { tags: updates.tags } },
-        { upsert: false },
-      ).exec();
-    }
-
-    const profile = await CustomerProfileModel.findOne({ mobile: digitsOnly(user.mobile) })
+    const profileSet: Record<string, unknown> = {};
+    if (updates.name !== undefined) profileSet.name = updates.name;
+    if (updates.email !== undefined) profileSet.email = updates.email || undefined;
+    if (updates.tags !== undefined) profileSet.tags = updates.tags;
+    await CustomerProfileModel.updateOne({ _id: profile._id }, { $set: profileSet })
+      .setOptions({ bypassTenant: true })
+      .exec();
+    const updated = await CustomerProfileModel.findById(profile._id)
+      .setOptions({ bypassTenant: true })
       .lean()
       .exec();
-    return shapeFromUser(user, profile);
+    return shapeFromUser(
+      { _id: profile._id, name: profile.name || profile.mobile, email: profile.email || '', mobile: profile.mobile, avatar: undefined },
+      updated || profile,
+    );
   },
 
   async deleteCustomer(restaurantId: string, id: string): Promise<void> {
@@ -379,14 +463,30 @@ export const CustomersService = {
       _id: new Types.ObjectId(id),
       role: UserRole.CUSTOMER,
     })
+      .setOptions({ bypassTenant: true })
       .lean()
       .exec();
-    if (!user) {
+    if (user) {
+      // Remove the login identity AND its analytics profile so the customer fully
+      // disappears from the admin view.
+      await UserModel.deleteOne({ _id: user._id })
+        .setOptions({ bypassTenant: true })
+        .exec();
+      await CustomerProfileModel.deleteOne({ mobile: digitsOnly(user.mobile) })
+        .setOptions({ bypassTenant: true })
+        .exec();
+      return;
+    }
+    // Fallback: standalone loyalty/reservation profile (no login identity).
+    const profile = await CustomerProfileModel.findById(new Types.ObjectId(id))
+      .setOptions({ bypassTenant: true })
+      .lean()
+      .exec();
+    if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
-    // Remove the login identity AND its analytics profile so the customer fully
-    // disappears from the admin view (the list is sourced from users).
-    await UserModel.deleteOne({ _id: user._id }).exec();
-    await CustomerProfileModel.deleteOne({ mobile: digitsOnly(user.mobile) }).exec();
+    await CustomerProfileModel.deleteOne({ _id: profile._id })
+      .setOptions({ bypassTenant: true })
+      .exec();
   },
 };

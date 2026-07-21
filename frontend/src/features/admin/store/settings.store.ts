@@ -26,8 +26,8 @@ export interface BillingData {
   cycle: string;
   nextBillingDate: string;
   amount: string;
+  status?: string;
   paymentMethod: string;
-  cardLast4: string;
 }
 
 export interface TeamData {
@@ -127,8 +127,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     cycle: '—',
     nextBillingDate: 'Not available',
     amount: '—',
-    paymentMethod: 'Not connected',
-    cardLast4: '—',
+    status: 'free',
+    paymentMethod: 'Free',
   },
   team: { totalMembers: 0, managers: 0, kitchenStaff: 0, serviceStaff: 0 },
   notifications: [
@@ -239,8 +239,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           cycle: billingSummary?.cycle ?? '—',
           nextBillingDate: billingSummary?.nextBillingDate ?? 'Not available',
           amount: billingSummary?.amount ?? '—',
-          paymentMethod: 'Not connected',
-          cardLast4: '—',
+          status: billingSummary?.status ?? 'free',
+          paymentMethod: billingSummary?.paymentMethod ?? 'Free',
         },
         team: {
           totalMembers: members.length,

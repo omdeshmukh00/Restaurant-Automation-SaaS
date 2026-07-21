@@ -24,8 +24,9 @@ export interface Order {
   assignedStaff: string;
   staffAvatar: string;
   time: string;
+  timeClock: string; // e.g. "7:02 PM"
   timeRaw: number; // creation timestamp (epoch ms) — used for sort & relative time
-  date: string;    // e.g. "2025-05-20"
+  date: string;    // e.g. "20/05/2025"
   notes?: string;
 }
 
@@ -93,6 +94,24 @@ export function formatCurrency(value: number) {
   return `₹${value.toLocaleString('en-IN')}`;
 }
 
+export function formatClockTime(epoch: number): string {
+  const d = new Date(epoch);
+  let h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+export function formatOrderDate(epoch: number): string {
+  const d = new Date(epoch);
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export function formatTimeAgo(epoch: number): string {
   const diffMs = Date.now() - epoch;
   const sec = Math.floor(diffMs / 1000);
@@ -149,8 +168,9 @@ export function mapBackendOrder(order: any): Order {
     assignedStaff,
     staffAvatar: getInitials(assignedStaff),
     time: minuteDiff <= 1 ? 'just now' : `${minuteDiff} mins ago`,
+    timeClock: formatClockTime(created.getTime()),
     timeRaw: created.getTime(),
-    date: created.toISOString().split('T')[0],
+    date: formatOrderDate(created.getTime()),
     notes: order.specialInstructions || '',
   };
 }

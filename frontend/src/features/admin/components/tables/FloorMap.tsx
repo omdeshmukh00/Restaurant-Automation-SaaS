@@ -74,7 +74,7 @@ const legend: { status: TableStatus; dot: string }[] = [
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export function FloorMap(): JSX.Element {
-  const { tables, selectedTableId, selectedFloor, selectTable, updateTable, floors } = useTablesStore();
+  const { tables, selectedTableId, selectedFloor, selectTable, updateTable, floors, setFloor } = useTablesStore();
 
   const [isDark, setIsDark] = React.useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
@@ -239,6 +239,23 @@ export function FloorMap(): JSX.Element {
         </span>
       </div>
 
+      {/* Floor switcher */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-800 overflow-x-auto">
+        {floors.map((floor) => (
+          <button
+            key={floor.number}
+            onClick={() => setFloor(floor.number)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+              selectedFloor === floor.number
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {floor.name}
+          </button>
+        ))}
+      </div>
+
       {/* Map area */}
       <div className="relative w-full" style={{ paddingBottom: '56%', minHeight: 280 }}>
         <div className="absolute inset-0 p-3 sm:p-4">
@@ -251,6 +268,17 @@ export function FloorMap(): JSX.Element {
             className="relative w-full h-full"
             style={{ cursor: draggingId ? 'grabbing' : 'default' }}
           >
+            {floorTables.length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+                <p className="text-sm text-gray-400 dark:text-gray-500 font-semibold">
+                  No tables on {floors.find(f => f.number === selectedFloor)?.name || `Floor ${selectedFloor}`}
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Add a table and assign it to this floor to see it here.
+                </p>
+              </div>
+            )}
+
             {floorTables.map((table) => {
               const w  = table.shape === 'Rectangle' ? 88 : table.shape === 'Square' ? 64 : 56;
               const h  = table.shape === 'Rectangle' ? 52 : table.shape === 'Square' ? 64 : 56;

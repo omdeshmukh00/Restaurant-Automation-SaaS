@@ -103,8 +103,14 @@ export const getRestaurantSettingsController = asyncHandler(async (req: Request,
 async function buildBillingSummary(
   restaurantId: string,
   fallbackPlan: string,
-): Promise<{ plan: string; cycle: string; nextBillingDate: string; amount: string; currency: string } | null> {
-  let subscription: { plan: string; billingCycle: string; nextBillingDate?: Date | null; status: string } | null = null;
+): Promise<{ plan: string; status: string; cycle: string; nextBillingDate: string; amount: string; currency: string; paymentMethod: string } | null> {
+  let subscription: {
+    plan: string;
+    billingCycle: string;
+    nextBillingDate?: Date | null;
+    status: string;
+    paymentProvider?: string;
+  } | null = null;
   try {
     subscription = (await SubscriptionService.getCurrentSubscription(restaurantId)) as any;
   } catch {
@@ -113,6 +119,17 @@ async function buildBillingSummary(
 
   const plan = subscription?.plan ?? fallbackPlan ?? 'Free';
   const cycle = subscription?.billingCycle ?? 'monthly';
+  const status = subscription?.status ?? (subscription ? 'active' : 'free');
+
+  const providerLabels: Record<string, string> = {
+    razorpay: 'Razorpay',
+    stripe: 'Stripe',
+    manual: 'Manual',
+    mock: 'Super Admin',
+  };
+  const paymentMethod = subscription?.paymentProvider
+    ? providerLabels[subscription.paymentProvider] ?? subscription.paymentProvider
+    : 'Free';
 
   let amount = '—';
   let currency = 'INR';
@@ -137,7 +154,7 @@ async function buildBillingSummary(
       })
     : 'Not available';
 
-  return { plan, cycle, nextBillingDate, amount, currency };
+  return { plan, status, cycle, nextBillingDate, amount, currency, paymentMethod };
 }
 
 export const updateRestaurantSettingsController = asyncHandler(async (req: Request, res: Response): Promise<void> => {

@@ -290,6 +290,7 @@ export class PaymentsService {
           restaurantId: toObjectId(restaurantId),
           tableId: sessionDoc.tableId,
           sessionId: toObjectId(sessionId),
+          customerName: sessionDoc.customerName,
           orderNumber,
           items: orderItems,
           totalAmount: cart.subtotal,

@@ -132,17 +132,35 @@ function weekdayLabel(period: string): string {
 }
 
 function buildRevenueData(revenue: { period: string; totalRevenue: number }[]): RevenuePoint[] {
-  const window = revenue.slice(-14);
-  const weekLen = 7;
-  const thisWeekRaw = window.slice(-weekLen);
-  const lastWeekRaw = window.slice(0, Math.max(0, window.length - weekLen));
+  // The analytics API only returns days that have at least one paid bill,
+  // so the series is sparse. Build a fixed 14-day window (last 7 = "this
+  // week", prior 7 = "last week") ending today and backfill zero-revenue
+  // days. This keeps the chart a proper 7-vs-7 line that grows as more
+  // payments come in instead of collapsing to a single flat point.
+  const byPeriod = new Map<string, number>();
+  for (const r of revenue) {
+    byPeriod.set(r.period, Math.round(r.totalRevenue ?? 0));
+  }
 
-  return thisWeekRaw.map((tw, i) => {
-    const lw = lastWeekRaw[i];
+  const utcDay = (d: Date) => d.toISOString().slice(0, 10);
+  const today = new Date();
+  const days: { day: string; key: string; bucket: 'this' | 'last' }[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = utcDay(d);
+    days.push({ day: weekdayLabel(key), key, bucket: i < 7 ? 'this' : 'last' });
+  }
+
+  const thisWeek = days.filter((d) => d.bucket === 'this');
+  const lastWeek = days.filter((d) => d.bucket === 'last');
+
+  return thisWeek.map((tw, i) => {
+    const lw = lastWeek[i];
     return {
-      day: weekdayLabel(tw.period),
-      thisWeek: Math.round(tw.totalRevenue ?? 0),
-      lastWeek: lw ? Math.round(lw.totalRevenue ?? 0) : 0,
+      day: tw.day,
+      thisWeek: byPeriod.get(tw.key) ?? 0,
+      lastWeek: lw ? byPeriod.get(lw.key) ?? 0 : 0,
     };
   });
 }
@@ -346,7 +364,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       const summary = revData?.summary || { totalRevenue: 0, billCount: 0, averageBillValue: 0, totalTax: 0, totalDiscount: 0 };
       const backendOrders = Array.isArray(ordData?.orders) ? ordData!.orders : [];
       const orders: Order[] = backendOrders.map(mapBackendOrder);
-      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
       const ordersToday = orders.filter((o) => o.date === today).length;
       const activeCount = orders.filter(
         (o) => o.status === 'Pending' || o.status === 'Preparing' || o.status === 'Served'
