@@ -8,7 +8,7 @@ import {
   distributionSeries,
   PlatformOrder,
 } from "../store/Analytics";
-import { exportOrdersAsCSV } from "../utils/Analyticsutils";
+import { exportOrdersAsCSV, exportOrdersAsPDF } from "../utils/Analyticsutils";
 import { useRestaurantRequestsStore } from "../store/RestaurantRequests";
 import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
 import { useSuperAdminDashboardStore } from "../store/Superadmindashboard";
@@ -194,8 +194,9 @@ export default function Analytics() {
     }
   };
 
-  const handleExport  = () => exportOrdersAsCSV(filteredOrders);
-  const handleOnboard = () =>
+  const handleExportCSV = () => exportOrdersAsCSV(filteredOrders);
+  const handleExportPDF = () => exportOrdersAsPDF(filteredOrders);
+  const handleOnboard   = () =>
     alert("System Diagnostics: All Server Clusters Operational.");
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -214,7 +215,8 @@ export default function Analytics() {
           darkMode={darkMode}
           isRefreshing={isRefreshing}
           onSync={handleSync}
-          onExport={handleExport}
+          onExportCSV={handleExportCSV}
+          onExportPDF={handleExportPDF}
           onOnboard={handleOnboard}
         />
 

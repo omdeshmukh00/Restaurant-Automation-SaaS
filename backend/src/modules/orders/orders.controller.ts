@@ -6,7 +6,7 @@ import { OrdersService } from './orders.service';
 import { ok } from '../../utils/responses';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
-import { logAudit, logAuditRaw } from '../auditLogs/auditLogs.helper';
+import { logAudit, logAuditRaw, extractRealIp } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import * as LoyaltyService from '../loyalty/loyalty.service';
 import { AdminOrderCreateInput, AdminOrderUpdateInput } from './orders.schema';
@@ -49,21 +49,24 @@ export class OrdersController {
       );
 
       void logAuditRaw({
-      actorId:      session._id.toString(),
-      actorRole:    'CUSTOMER',
-      restaurantId: session.restaurantId.toString(),
-      entityType:   AuditEntity.ORDER,
-      entityId:     order._id.toString(),
-      action:       AuditAction.ORDER_PLACED,
-      metadata: {
-        tableId:     session.tableId,
-        customerName: session.customerName,
-        itemCount:   order.items?.length ?? 0,
-        totalAmount: order.totalAmount,
-      },
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+        actorId:      session._id.toString(),
+        actorRole:    'CUSTOMER',
+        restaurantId: session.restaurantId.toString(),
+        entityType:   AuditEntity.ORDER,
+        entityId:     order._id.toString(),
+        action:       AuditAction.ORDER_PLACED,
+        metadata: {
+          tableId:       session.tableId,
+          customerName:  session.customerName || (order as any).customerName,
+          customerPhone: (session as any).customerPhone || (order as any).customerPhone || (req.body as any).customerPhone,
+          customerEmail: (session as any).customerEmail || (order as any).customerEmail || (req.body as any).customerEmail,
+          orderNumber:   (order as any).orderNumber,
+          itemCount:     order.items?.length ?? 0,
+          totalAmount:   order.totalAmount,
+        },
+        ipAddress: extractRealIp(req),
+        userAgent: req.headers['user-agent'],
+      });
 
       ok(res, { order }, 201);
     } catch (error) {

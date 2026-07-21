@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
 import { StatusFilter, SortField, SortOrder, DateRange, Transaction } from "../components/Transactions/Transactiontypes";
-import { filterByDateRange, computeMetrics, exportToCSV } from "../utils/transactionUtils";
+import { filterByDateRange, computeMetrics, exportToCSV, exportToPDF } from "../utils/transactionUtils";
 import TransactionMetrics from "../components/Transactions/Transactionmetrics";
 import TransactionControls from "../components/Transactions/Transactioncontrols";
 import TransactionTable from "../components/Transactions/Transactiontable";
@@ -114,7 +114,8 @@ export default function Transactions() {
   }, [filteredTransactions, sortField, sortOrder]);
 
   const metrics = useMemo(() => computeMetrics(filteredTransactions), [filteredTransactions]);
-  const handleExport = () => exportToCSV(sortedTransactions, "transactions-export.csv");
+  const handleExportCSV = () => exportToCSV(sortedTransactions, "transactions-export.csv");
+  const handleExportPDF = () => exportToPDF(sortedTransactions);
 
   return (
     // px-4 on mobile → px-6 on desktop, slightly tighter top padding on mobile
@@ -144,7 +145,8 @@ export default function Transactions() {
         onStatusChange={setStatusFilter}
         onPaymentChange={setPaymentFilter}
         onDateRangeChange={setDateRange}
-        onExport={handleExport}
+        onExportCSV={handleExportCSV}
+        onExportPDF={handleExportPDF}
         onResetAll={handleResetAll}
       />
       <div className={`rounded-2xl border overflow-hidden shadow-sm my-4 ${

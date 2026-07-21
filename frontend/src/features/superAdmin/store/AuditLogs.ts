@@ -9,6 +9,15 @@ export interface LogItem {
   details: string;
   ipAddress: string;
   timestamp: string;
+  restaurantName?: string;
+  restaurantId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  entityType?: string;
+  entityId?: string;
+  metadata?: Record<string, any>;
+  rawLog?: any;
 }
 
 export const initialLogs: LogItem[] = [

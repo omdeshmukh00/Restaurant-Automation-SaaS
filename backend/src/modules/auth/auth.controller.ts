@@ -14,7 +14,7 @@ import { sendSuccess } from '../../utils/response';
 import * as authService from './auth.service';
 import { getMe } from '../users/users.controller';
 import { UserModel } from '../users/users.model';
-import { logAudit, logAuditRaw } from '../auditLogs/auditLogs.helper';
+import { logAudit, logAuditRaw, extractRealIp } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import { generateSecureToken } from '../../utils/crypto';
 import logger from '../../config/logger';
@@ -115,19 +115,26 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   void logAuditRaw({
     actorId: result.user._id.toString(),
     actorRole: result.user.role,
+    restaurantId: (result.user as any).restaurantId?.toString(),
     entityType: AuditEntity.USER,
     entityId: result.user._id.toString(),
     action: AuditAction.AUTH_REGISTER,
-    metadata: { email: result.user.email },
-    ipAddress: req.ip,
+    metadata: {
+      email: result.user.email,
+      userName: result.user.name,
+      userPhone: (result.user as any).phone,
+      panel,
+    },
+    ipAddress: extractRealIp(req),
     userAgent: req.headers['user-agent'],
   });
 });
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
+  const realIp = extractRealIp(req);
   const result = await authService.login(req.body, {
     userAgent: req.headers['user-agent'],
-    ip: req.ip,
+    ip: realIp,
   });
 
   const panel = USER_ROLE_TO_PANEL[(result.user as any).role as UserRole] ?? undefined;
@@ -149,11 +156,17 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   void logAuditRaw({
     actorId: result.user._id.toString(),
     actorRole: result.user.role,
+    restaurantId: userDoc.restaurantId?.toString(),
     entityType: AuditEntity.USER,
     entityId: result.user._id.toString(),
     action: AuditAction.AUTH_LOGIN,
-    metadata: { email: result.user.email, panel },
-    ipAddress: req.ip,
+    metadata: {
+      email: result.user.email,
+      userName: result.user.name,
+      userPhone: userDoc.mobile || userDoc.phone,
+      panel,
+    },
+    ipAddress: realIp,
     userAgent: req.headers['user-agent'],
   });
 });
@@ -199,11 +212,17 @@ export const refresh = asyncHandler(async (req: Request, res: Response) => {
   });
 
   if (req.user) {
+    const userObj = req.user as any;
     void logAudit(req, {
       entityType: AuditEntity.USER,
       entityId: req.user._id.toString(),
       action: AuditAction.AUTH_REFRESH,
-      metadata: { panel },
+      metadata: {
+        email: userObj.email,
+        userName: userObj.name,
+        userPhone: userObj.mobile || userObj.phone,
+        panel,
+      },
     });
   }
 });
@@ -232,11 +251,17 @@ export const logout = asyncHandler(async (req: Request, res: Response) => {
   sendSuccess(res, { message: 'Logged out successfully' });
 
   if (req.user) {
+    const userObj = req.user as any;
     void logAudit(req, {
       entityType: AuditEntity.USER,
       entityId: req.user._id.toString(),
       action: AuditAction.AUTH_LOGOUT,
-      metadata: { panel },
+      metadata: {
+        email: userObj.email,
+        userName: userObj.name,
+        userPhone: userObj.mobile || userObj.phone,
+        panel,
+      },
     });
   }
 });
