@@ -406,14 +406,19 @@ export function AuthProvider({ children }: PropsWithChildren): JSX.Element {
     return nextUser;
   }, []);
 
-  const signInWithOtp = useCallback(async (mobile: string, otp: string, name?: string): Promise<AuthUser> => {
-    const response = await apiClient.post<VerifyOtpResponse>('/auth/verify-otp', { mobile, otp, name });
+  const signInWithOtp = useCallback(async (identifier: string, otp: string, name?: string): Promise<AuthUser> => {
+    const isEmail = identifier.includes('@');
+    const payloadBody = isEmail
+      ? { email: identifier.trim(), identifier: identifier.trim(), otp, name }
+      : { mobile: identifier.trim(), identifier: identifier.trim(), otp, name };
+
+    const response = await apiClient.post<VerifyOtpResponse>('/auth/verify-otp', payloadBody);
     const payload = response.data.data;
-    const panel = 'customer';
+    const panel = payload.panel || 'customer';
     const nextUser = toAuthUser({ ...payload.user, panel }, panel);
 
     // Store panel-scoped credentials
-    setStoredRole(panel, 'customer');
+    setStoredRole(panel, nextUser.role);
     setStoredUser(panel, { ...payload.user, panel });
     setAccessToken(panel, payload.accessToken);
 

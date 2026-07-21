@@ -1,12 +1,13 @@
 // src/features/superAdmin/components/Analytics/Analyticsheader.tsx
-import React from "react";
-import { RefreshCw, Download, PlusCircle } from "lucide-react";
+import React, { useState } from "react";
+import { RefreshCw, Download, PlusCircle, ChevronDown, FileSpreadsheet, FileText } from "lucide-react";
 
 interface AnalyticsHeaderProps {
   darkMode: boolean;
   isRefreshing: boolean;
   onSync: () => void;
-  onExport: () => void;
+  onExportCSV: () => void;
+  onExportPDF: () => void;
   onOnboard: () => void;
 }
 
@@ -14,9 +15,12 @@ export default function AnalyticsHeader({
   darkMode,
   isRefreshing,
   onSync,
-  onExport,
+  onExportCSV,
+  onExportPDF,
   onOnboard,
 }: AnalyticsHeaderProps) {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   const ghostBtn = [
     "inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500",
     darkMode
@@ -57,10 +61,53 @@ export default function AnalyticsHeader({
           </span>
         </button>
 
-        <button onClick={onExport} type="button" className={ghostBtn}>
-          <Download size={13} className="text-blue-500" />
-          <span>Export</span>
-        </button>
+        {/* Export Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            type="button"
+            className={ghostBtn}
+          >
+            <Download size={13} className="text-blue-500" />
+            <span>Export</span>
+            <ChevronDown size={12} />
+          </button>
+
+          {dropdownOpen && (
+            <div
+              className={`absolute right-0 mt-1.5 w-44 rounded-xl border shadow-xl py-1 z-30 ${
+                darkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  onExportCSV();
+                }}
+                className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
+                  darkMode ? "hover:bg-slate-800 text-emerald-400" : "hover:bg-slate-50 text-emerald-600"
+                }`}
+              >
+                <FileSpreadsheet size={13} />
+                Download CSV (.csv)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDropdownOpen(false);
+                  onExportPDF();
+                }}
+                className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
+                  darkMode ? "hover:bg-slate-800 text-blue-400" : "hover:bg-slate-50 text-blue-600"
+                }`}
+              >
+                <FileText size={13} />
+                Download PDF (.pdf)
+              </button>
+            </div>
+          )}
+        </div>
 
         <button
           onClick={onOnboard}

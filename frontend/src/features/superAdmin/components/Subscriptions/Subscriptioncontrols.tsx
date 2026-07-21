@@ -1,6 +1,7 @@
 // components/SubscriptionControls.tsx
 
-import { Search, X, RefreshCcw, Download, Plus, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { useState } from "react";
+import { Search, X, RefreshCcw, Download, Plus, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import type { StatusFilter, TierFilter, SortField, SortOrder } from "./Subcriptiontypes";
 
 interface SubscriptionControlsProps {
@@ -15,7 +16,8 @@ interface SubscriptionControlsProps {
   onSearchChange: (v: string) => void;
   onStatusChange: (v: StatusFilter) => void;
   onSortChange: (field: SortField) => void;
-  onExport: () => void;
+  onExportCSV: () => void;
+  onExportPDF: () => void;
   onResetAll: () => void;
   onAddClick: () => void;
 }
@@ -58,49 +60,55 @@ export default function SubscriptionControls({
   onSearchChange,
   onStatusChange,
   onSortChange,
-  onExport,
+  onExportCSV,
+  onExportPDF,
   onResetAll,
   onAddClick,
 }: SubscriptionControlsProps) {
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
   const hasActiveFilter =
     searchQuery !== "" || statusFilter !== "All" || tierFilter !== "All";
 
-  const statusOptions: StatusFilter[] = ["All", "Active", "Trial", "Inactive"];
+  const statusOptions: StatusFilter[] = [
+    "All", "Active", "Trial", "Inactive"
+  ];
 
   return (
-    <div className={`rounded-2xl border mb-5 overflow-hidden ${
-      darkMode ? "bg-slate-900/30 border-slate-800/80" : "bg-white border-slate-200/60 shadow-sm"
+    <div className={`rounded-2xl border mb-6 ${
+      darkMode ? "bg-slate-900/40 border-slate-800" : "bg-white border-slate-200/80 shadow-sm"
     }`}>
-      {/* Row 1 — search + action buttons */}
-      <div className={`flex flex-col sm:flex-row items-center gap-3 p-4 border-b ${
-        darkMode ? "border-slate-800/80" : "border-slate-100"
-      }`}>
-        <div className="relative flex-1 w-full">
-          <Search
-            size={15}
-            className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${darkMode ? "text-slate-500" : "text-slate-400"}`}
-          />
+      {/* Row 1 — Search + Actions */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-b border-inherit">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-80">
+          <Search size={15} className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${
+            darkMode ? "text-slate-500" : "text-slate-400"
+          }`} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search by name, owner, ID, or location..."
-            className={`w-full h-10 pl-10 pr-9 rounded-xl text-sm border outline-none transition-all focus:ring-2 focus:ring-orange-500/20 ${
+            placeholder="Search restaurant, owner, city, email..."
+            className={`w-full h-10 pl-10 pr-9 text-xs rounded-xl border outline-none transition-all ${
               darkMode
-                ? "bg-slate-950/50 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-orange-500/60"
-                : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-orange-500/60"
+                ? "bg-slate-950/60 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-orange-500/50"
+                : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-orange-500/50"
             }`}
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange("")}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className={`absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full ${
+                darkMode ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-200 text-slate-600"
+              }`}
             >
-              <X size={13} />
+              <X size={12} />
             </button>
           )}
         </div>
 
+        {/* Action Buttons */}
         <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
           {hasActiveFilter && (
             <button
@@ -117,17 +125,52 @@ export default function SubscriptionControls({
             </button>
           )}
 
-          <button
-            onClick={onExport}
-            className={`flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-xs font-semibold border transition-colors ${
-              darkMode
-                ? "bg-slate-900/50 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
-                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Download size={14} />
-            <span>Export</span>
-          </button>
+          {/* Export Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              className={`flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-xs font-semibold border transition-colors ${
+                darkMode
+                  ? "bg-slate-900/50 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Download size={14} />
+              <span>Export</span>
+              <ChevronDown size={12} />
+            </button>
+
+            {exportMenuOpen && (
+              <div
+                className={`absolute right-0 mt-1.5 w-40 rounded-xl border shadow-xl py-1 z-30 ${
+                  darkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              >
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    onExportCSV();
+                  }}
+                  className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
+                    darkMode ? "hover:bg-slate-800 text-emerald-400" : "hover:bg-slate-50 text-emerald-600"
+                  }`}
+                >
+                  Download CSV (.csv)
+                </button>
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    onExportPDF();
+                  }}
+                  className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
+                    darkMode ? "hover:bg-slate-800 text-blue-400" : "hover:bg-slate-50 text-blue-600"
+                  }`}
+                >
+                  Download PDF (.pdf)
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={onAddClick}

@@ -1,6 +1,6 @@
 // components/Header.tsx
 import React from 'react';
-import { Bell, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { cx } from '../../utils/Alertutils';
 
 interface HeaderProps {
@@ -41,11 +41,6 @@ export default function Header({ darkMode, toggleTheme, newCount }: HeaderProps)
           )}
         >
           {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
-        <button className="flex items-center gap-2 bg-[#ff5a1f] hover:bg-[#e04d1a] shadow-lg shadow-orange-500/20 text-white px-5 py-2.5 rounded-full text-sm font-semibold transition-all hover:-translate-y-0.5 active:translate-y-0">
-          <Bell className="w-4 h-4" />
-          Configure Alerts
         </button>
       </div>
     </div>

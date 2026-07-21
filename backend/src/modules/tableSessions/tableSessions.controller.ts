@@ -5,7 +5,7 @@ import { ok } from '../../utils/responses';
 import * as tablesService from '../tables/tables.service';
 import type { StartSessionInput } from './tableSessions.schema';
 import * as sessionService from './tableSessions.service';
-import { logAuditRaw } from '../auditLogs/auditLogs.helper';
+import { logAuditRaw, extractRealIp } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import { UserModel } from '../users/users.model';
 import { TableSessionModel } from './tableSessions.model';
@@ -14,7 +14,7 @@ export async function startSession(req: Request, res: Response, next: NextFuncti
   try {
     const input = req.body as StartSessionInput;
     const meta = {
-      ipAddress: req.ip || req.socket.remoteAddress,
+      ipAddress: extractRealIp(req),
       userAgent: req.headers['user-agent'],
     };
 
@@ -45,11 +45,13 @@ export async function startSession(req: Request, res: Response, next: NextFuncti
       entityId:     session._id.toString(),
       action:       AuditAction.SESSION_CREATED,
       metadata: {
-        tableId:      session.tableId,
-        customerName: session.customerName,
-        expiresAt:    session.expiresAt,
+        tableId:       session.tableId,
+        customerName:  session.customerName,
+        customerPhone: (input as any).customerPhone || (input as any).phone,
+        customerEmail: (input as any).customerEmail || (input as any).email,
+        expiresAt:     session.expiresAt,
       },
-      ipAddress: req.ip,
+      ipAddress: extractRealIp(req),
       userAgent: req.headers['user-agent'],
     });
   } catch (error) {

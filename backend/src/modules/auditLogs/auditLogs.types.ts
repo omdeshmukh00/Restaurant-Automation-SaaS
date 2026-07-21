@@ -110,9 +110,9 @@ export enum AuditAction {
 
 // ── Payload passed to the log helper ─────────────────────────────────
 export interface CreateAuditLogInput {
-  actorId:      string;
+  actorId?:     string | null;
   actorRole:    string;
-  restaurantId?: string;
+  restaurantId?: string | null;
   entityType:   AuditEntity;
   entityId:     string;
   action:       AuditAction;

@@ -9,6 +9,7 @@ import {
   IndianRupee,
   Bell,
   FileText,
+  Users,
   Settings,
   ChevronDown,
   ChevronUp,
@@ -48,6 +49,7 @@ export default function Sidebar({
     { path: "/superadmin/transactions", label: "Transactions", icon: IndianRupee },
     { path: "/superadmin/alerts", label: "Alerts", icon: Bell },
     { path: "/superadmin/audit-logs", label: "Audit Logs", icon: FileText },
+    { path: "/superadmin/users", label: "Users", icon: Users },
     { path: "/superadmin/edit-profile", label: "Profile", icon: User },
     { path: "/superadmin/settings", label: "Settings", icon: Settings },
   ];

@@ -17,7 +17,8 @@ interface TransactionControlsProps {
   onStatusChange: (v: StatusFilter) => void;
   onPaymentChange: (v: string) => void;
   onDateRangeChange: (v: DateRange) => void;
-  onExport: () => void;
+  onExportCSV: () => void;
+  onExportPDF: () => void;
   onResetAll: () => void;
 }
 
@@ -33,10 +34,12 @@ export default function TransactionControls({
   onStatusChange,
   onPaymentChange,
   onDateRangeChange,
-  onExport,
+  onExportCSV,
+  onExportPDF,
   onResetAll,
 }: TransactionControlsProps) {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const isFiltered =
     statusFilter !== "All" || paymentFilter !== "All" || dateRange !== "all" || searchTerm !== "";
@@ -128,18 +131,52 @@ export default function TransactionControls({
             </button>
           )}
 
-          {/* Export — icon-only on xs, labeled on sm+ */}
-          <button
-            onClick={onExport}
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-              darkMode
-                ? "bg-slate-900/50 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
-                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Download size={14} />
-            <span className="hidden sm:inline">Export CSV</span>
-          </button>
+          {/* Export Menu — dropdown with CSV & PDF */}
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                darkMode
+                  ? "bg-slate-900/50 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Download size={14} />
+              <span>Export</span>
+              <ChevronDown size={12} />
+            </button>
+
+            {exportMenuOpen && (
+              <div
+                className={`absolute right-0 mt-1.5 w-40 rounded-xl border shadow-xl py-1 z-30 ${
+                  darkMode ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
+                }`}
+              >
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    onExportCSV();
+                  }}
+                  className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
+                    darkMode ? "hover:bg-slate-800 text-emerald-400" : "hover:bg-slate-50 text-emerald-600"
+                  }`}
+                >
+                  Download CSV (.csv)
+                </button>
+                <button
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    onExportPDF();
+                  }}
+                  className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors flex items-center gap-2 ${
+                    darkMode ? "hover:bg-slate-800 text-blue-400" : "hover:bg-slate-50 text-blue-600"
+                  }`}
+                >
+                  Download PDF (.pdf)
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Mobile filter toggle — only shows below lg */}
           <button

@@ -331,7 +331,11 @@ superAdminRouter.get('/audit-logs', async (req, res, next) => {
       }
     }
 
-    const auditLogs = await AuditLogModel.find(query).sort({ createdAt: -1 });
+    const auditLogs = await AuditLogModel.find(query)
+      .populate('restaurantId', 'name city slug logo')
+      .populate('actorId', 'name email phone role')
+      .sort({ createdAt: -1 })
+      .lean();
     ok(res, { auditLogs });
   } catch (error) {
     next(error);
@@ -641,10 +645,11 @@ superAdminRouter.get('/restaurants/:id/live-activity', async (req, res, next) =>
       tables: {
         total: totalTables,
         breakdown: tables,
-        occupied: (tables['OCCUPIED'] || 0) + (tables['ORDERING'] || 0) + (tables['BILL_PENDING'] || 0) + (tables['PAYMENT_PENDING'] || 0),
-        available: tables['AVAILABLE'] || 0,
-        cleaning: (tables['NEEDS_CLEANING'] || 0) + (tables['CLEANING_IN_PROGRESS'] || 0),
-        maintenance: tables['MAINTENANCE'] || 0,
+        occupied: (tables['OCCUPIED'] || 0) + (tables['ORDERING'] || 0) + (tables['BILL_PENDING'] || 0) + (tables['PAYMENT_PENDING'] || 0) + (tables['Occupied'] || 0),
+        reserved: (tables['RESERVED'] || 0) + (tables['Reserved'] || 0),
+        available: (tables['AVAILABLE'] || 0) + (tables['Available'] || 0),
+        cleaning: (tables['NEEDS_CLEANING'] || 0) + (tables['CLEANING_IN_PROGRESS'] || 0) + (tables['CLEANING'] || 0) + (tables['Cleaning'] || 0),
+        maintenance: (tables['MAINTENANCE'] || 0) + (tables['BLOCKED'] || 0) + (tables['Blocked'] || 0) + (tables['Maintenance'] || 0),
       },
       sessions: {
         active: activeSessions,
@@ -669,6 +674,48 @@ superAdminRouter.get('/restaurants/:id/live-activity', async (req, res, next) =>
         todayCount: todayReservations,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /super-admin/users - List all database users with SuperAdmin as first card
+superAdminRouter.get('/users', async (_req, res, next) => {
+  try {
+    const rawUsers = await UserModel.find({ isDeleted: { $ne: true } })
+      .populate('restaurantId', 'name city slug logo')
+      .setOptions({ bypassTenant: true })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Sort: SUPER_ADMIN role comes FIRST always
+    const superAdminUsers = rawUsers.filter((u: any) => u.role === 'SUPER_ADMIN');
+    const otherUsers = rawUsers.filter((u: any) => u.role !== 'SUPER_ADMIN');
+
+    const sortedUsers = [...superAdminUsers, ...otherUsers];
+
+    const users = sortedUsers.map((u: any) => {
+      const restName = u.restaurantId?.name || 'Platform Level / System';
+      return {
+        id: u._id.toString(),
+        name: u.name,
+        email: u.email,
+        mobile: u.mobile || u.phone || 'N/A',
+        role: u.role,
+        subRole: u.kitchen_role || u.staff_role || u.cleaning_role || undefined,
+        status: u.status || 'ACTIVE',
+        restaurantName: restName,
+        restaurantId: u.restaurantId?._id?.toString() || u.restaurantId?.toString(),
+        isEmailVerified: !!u.isEmailVerified,
+        isMobileVerified: !!u.isMobileVerified,
+        createdAt: u.createdAt ? new Date(u.createdAt).toLocaleString() : 'N/A',
+        lastActive: u.updatedAt ? new Date(u.updatedAt).toLocaleString() : 'N/A',
+        avatar: u.avatar || undefined,
+        rawUser: u,
+      };
+    });
+
+    ok(res, { users });
   } catch (error) {
     next(error);
   }
