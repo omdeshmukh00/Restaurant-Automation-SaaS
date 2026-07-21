@@ -384,15 +384,28 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const requestOtp = asyncHandler(async (req: Request, res: Response) => {
-  const { mobile } = req.body;
+  const identifier = String(req.body.identifier || req.body.email || req.body.mobile || '').trim();
+  if (!identifier) {
+    throw new AppError('Email or Mobile number is required', 400, ErrorCode.INVALID_REQUEST);
+  }
 
-  const { expiresAt, otp } = await otpService.createOTP(mobile, 'mobile');
+  const isEmail = identifier.includes('@');
+  const type = isEmail ? 'email' : 'mobile';
 
-  const userExists = await UserModel.exists({ mobile });
-  
+  const { expiresAt, otp } = await otpService.createOTP(identifier, type);
+
+  const query = isEmail ? { email: identifier.toLowerCase() } : { mobile: identifier };
+  const user = await UserModel.findOne(query);
+
+  if (isEmail) {
+    sendOTPEmail(identifier.toLowerCase(), otp).catch((err) => {
+      logger.error('Failed to send OTP email asynchronously', err);
+    });
+  }
+
   const responseData: any = {
     otpSent: true,
-    exists: !!userExists,
+    exists: !!user,
     otpExpiresAt: expiresAt,
     otpExpiresIn: 120,
   };
@@ -405,33 +418,40 @@ export const requestOtp = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
-  const { mobile, otp, name } = req.body;
+  const identifier = String(req.body.identifier || req.body.email || req.body.mobile || '').trim();
+  const { otp, name } = req.body;
 
-  await otpService.verifyOTP(mobile, 'mobile', otp);
+  if (!identifier || !otp) {
+    throw new AppError('Identifier and OTP are required', 400, ErrorCode.INVALID_REQUEST);
+  }
 
-  let user = await UserModel.findOne({ mobile });
+  const isEmail = identifier.includes('@');
+  const type = isEmail ? 'email' : 'mobile';
+
+  await otpService.verifyOTP(identifier, type, otp);
+
+  const query = isEmail ? { email: identifier.toLowerCase() } : { mobile: identifier };
+  let user = await UserModel.findOne(query);
 
   if (!user) {
     if (!name || !name.trim()) {
-      throw new AppError('Name is required for registration', 400, ErrorCode.INVALID_REQUEST);
+      throw new AppError('No registered user account found with this ID', 404, ErrorCode.INVALID_REQUEST);
     }
     user = await UserModel.create({
       name: name.trim(),
-      mobile,
+      mobile: isEmail ? undefined : identifier,
+      email: isEmail ? identifier.toLowerCase() : undefined,
       role: UserRole.CUSTOMER,
-      isMobileVerified: true,
+      isMobileVerified: !isEmail,
+      isEmailVerified: isEmail,
     });
 
-    logger.info(`Customer registered dynamically via OTP: ${mobile}`);
+    logger.info(`Customer registered dynamically via OTP: ${identifier}`);
   } else {
-    if (user.role !== UserRole.CUSTOMER) {
-      throw new AppError('OTP login is only available for customer accounts', 403, ErrorCode.FORBIDDEN);
-    }
-
-    user.isMobileVerified = true;
-    user.mobile = mobile;
-    if (name) {
-      user.name = name.trim();
+    if (isEmail) {
+      user.isEmailVerified = true;
+    } else {
+      user.isMobileVerified = true;
     }
     await user.save();
   }
@@ -446,6 +466,8 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
   const tokens = generateTokenPair(payload);
   const tokenHash = await hashToken(tokens.refreshToken);
 
+  const panel = USER_ROLE_TO_PANEL[user.role as UserRole] ?? 'customer';
+
   await UserModel.findByIdAndUpdate(user._id, {
     $push: {
       refreshTokens: {
@@ -455,8 +477,8 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     },
   });
 
-  setRefreshCookie(res, tokens.refreshToken, 'customer');
-  setAccessCookie(res, tokens.accessToken, 'customer');
+  setRefreshCookie(res, tokens.refreshToken, panel);
+  setAccessCookie(res, tokens.accessToken, panel);
 
   void logAuditRaw({
     actorId: user._id.toString(),
@@ -465,7 +487,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     entityType: AuditEntity.USER,
     entityId: user._id.toString(),
     action: AuditAction.AUTH_LOGIN,
-    metadata: { mobile, mode: 'otp' },
+    metadata: { identifier, mode: 'otp', userEmail: user.email, userPhone: user.mobile, userName: user.name },
     ipAddress: req.ip,
     userAgent: req.headers['user-agent'],
   });
@@ -475,13 +497,14 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     user: {
       id: user._id.toString(),
       name: user.name,
+      email: user.email,
       mobile: user.mobile,
       role: user.role,
       restaurantId: user.restaurantId?.toString(),
     },
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
-    panel: 'customer',
+    panel,
   });
 });
 
