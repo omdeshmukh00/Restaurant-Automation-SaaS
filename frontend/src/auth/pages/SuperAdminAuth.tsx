@@ -214,7 +214,7 @@ const SuperAdminAuth: React.FC = () => {
   const handleSendOtpLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!adminId.trim()) {
-      setError('Please enter your Admin Email or Mobile ID');
+      setError('Please enter your Admin Email address');
       return;
     }
     setLoading(true);
@@ -235,7 +235,7 @@ const SuperAdminAuth: React.FC = () => {
         setCountdown(120);
       }
       if (data?.devOtp) {
-        setSuccessMessage(`OTP sent: ${data.devOtp} (Development Mode)`);
+        setSuccessMessage(`OTP sent to your registered mail address`);
       }
       setOtpStep('verify');
     } catch (err: any) {
@@ -438,13 +438,13 @@ const SuperAdminAuth: React.FC = () => {
                 <form onSubmit={handleSendOtpLogin} className="space-y-5">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
-                      Admin ID (Email or Mobile)
+                      Admin Email Address
                     </label>
                     <div className="flex items-center border border-slate-200 dark:border-zinc-700 rounded-2xl px-4 py-3 focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all duration-200">
-                      <User className="w-5 h-5 text-slate-400 dark:text-zinc-500 mr-3" />
+                      <Mail className="w-5 h-5 text-slate-400 dark:text-zinc-500 mr-3" />
                       <input
-                        type="text"
-                        placeholder="Enter registered email or phone"
+                        type="email"
+                        placeholder="Enter registered email address"
                         value={adminId}
                         onChange={(e) => setAdminId(e.target.value)}
                         className="flex-1 w-full bg-transparent border-0 outline-none text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-600 focus:ring-0 text-sm"
