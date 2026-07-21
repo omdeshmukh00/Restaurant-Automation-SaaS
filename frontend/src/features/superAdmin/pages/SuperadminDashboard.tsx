@@ -7,7 +7,7 @@ import RevenueChart from "../components/dashboard/RevenueChart";
 import RestaurantStatusPie from "../components/dashboard/Restaurantstatuspie";
 import TopRestaurantsTable from "../components/dashboard/TopRestaurantsTable";
 import {
-  Activity,
+
   Building2,
   Check,
   Mail,
@@ -20,6 +20,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useRestaurantRequestsStore, type RestaurantRequest } from "../store/RestaurantRequests";
+import { useSuperAdminDashboardStore } from "../store/Superadmindashboard";
 import { getSocket, connectSocket } from "../../../lib/socket";
 
 interface OutletContext {
@@ -49,8 +50,11 @@ export default function SuperAdminDashboard() {
   const [shouldRefund, setShouldRefund] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const fetchOverview = useSuperAdminDashboardStore((state) => state.fetchOverview);
+  
   useEffect(() => {
     fetchRequests();
+    fetchOverview();
 
     connectSocket();
     const socket = getSocket();
@@ -88,7 +92,7 @@ export default function SuperAdminDashboard() {
         socket.off('restaurant_request_rejected');
       }
     };
-  }, [fetchRequests]);
+  }, [fetchRequests, fetchOverview]);
 
   const closeRequests = () => {
     setSearchParams({});
@@ -116,24 +120,13 @@ export default function SuperAdminDashboard() {
         {/* ── PAGE HEADER ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                  darkMode
-                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
-                    : "text-emerald-600 bg-emerald-50 border-emerald-200"
-                }`}
-              >
-                <Activity size={9} className="animate-pulse" />
-                Live
-              </span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
               Dashboard Overview
-            </h2>
+            </h1>
             <p
-              className={`mt-1 text-xs sm:text-sm ${
-                darkMode ? "text-slate-400" : "text-slate-500"
+              className={`mt-1 text-xs sm:text-sm font-medium ${
+                darkMode ? "text-slate-400" : "text-slate-600"
               }`}
             >
               {dateString} · Last synced at {timeString}
@@ -159,7 +152,10 @@ export default function SuperAdminDashboard() {
             </button>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                fetchRequests();
+                fetchOverview();
+              }}
               className={`self-start sm:self-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
                 darkMode
                   ? "border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 hover:bg-slate-800/40"

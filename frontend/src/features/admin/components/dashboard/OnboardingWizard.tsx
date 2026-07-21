@@ -173,9 +173,12 @@ export default function OnboardingWizard({ restaurant: initialRestaurant, onComp
             }
           },
           prefill: {
-            name: profileData.ownerName,
-            email: restaurant.email,
-            contact: profileData.phone,
+            name: profileData.ownerName || restaurant.ownerName || '',
+            email: restaurant.email || '',
+            contact: (profileData.phone || restaurant.phone || '').replace(/[^\d+]/g, ''),
+          },
+          readonly: {
+            contact: true,
           },
           theme: {
             color: '#FF6B1A',
@@ -510,8 +513,8 @@ export default function OnboardingWizard({ restaurant: initialRestaurant, onComp
                       onClick={() => setSelectedPlan(planDoc.name)}
                       className={`relative rounded-3xl border p-6 cursor-pointer flex flex-col justify-between transition-all select-none ${
                         isSelected
-                          ? 'border-orange-500 ring-1 ring-orange-500/25 bg-orange-50/10 dark:bg-orange-950/5'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-350 dark:hover:border-slate-700'
+                          ? 'border-orange-500 ring-1 ring-orange-500/25 bg-orange-50/10 dark:bg-orange-500/10'
+                          : 'border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#18181b] hover:border-gray-300 dark:hover:border-neutral-700'
                       }`}
                     >
                       {isSelected && (

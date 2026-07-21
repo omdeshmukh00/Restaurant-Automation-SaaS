@@ -4,10 +4,11 @@
 import { useState, useEffect } from "react";
 import {
   Eye, Edit2, MoreVertical, Mail, Phone, MapPin,
-  Search, CheckCircle2, AlertCircle, X, Trash2
+  Search, CheckCircle2, AlertCircle, X, Trash2, Clock, Activity, SlidersHorizontal
 } from "lucide-react";
 import type { RestaurantsRow } from "./Restauranttypes";
 import RestaurantCard from "./RestaurantCard";
+import { apiClient } from "../../../../shared/services/apiClient";
 
 interface RestaurantTableProps {
   restaurants: RestaurantsRow[];
@@ -15,9 +16,11 @@ interface RestaurantTableProps {
   searchQuery: string;
   statusFilter: string;
   onView: (row: RestaurantsRow) => void;
-  onUpdateStatus: (id: string, status: "Active" | "Trial" | "Inactive") => void;
-  onUpdatePlan: (id: string, plan: "Premium" | "Standard" | "Basic") => void;
+  onLiveActivity: (row: RestaurantsRow) => void;
+  onUpdateStatus: (id: string, status: "Active" | "Trial" | "Inactive", blockReason?: string) => void;
+  onUpdatePlan: (id: string, plan: string) => void;
   onDelete: (id: string) => void;
+  plans: any[];
   onResetFilters: () => void;
 }
 
@@ -57,14 +60,47 @@ export default function RestaurantTable({
   searchQuery,
   statusFilter,
   onView,
+  onLiveActivity,
   onUpdateStatus,
   onUpdatePlan,
   onDelete,
+  plans,
   onResetFilters,
 }: RestaurantTableProps) {
   const [activeActionRow, setActiveActionRow] = useState<string | null>(null);
   const [activeMoreRow, setActiveMoreRow] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+
+  const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const initial: Record<string, number> = {};
+    restaurants.forEach((r) => {
+      if (r.cooldownRemaining && r.cooldownRemaining > 0) {
+        initial[r.id] = r.cooldownRemaining;
+      }
+    });
+    setCooldowns(initial);
+  }, [restaurants]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCooldowns((prev) => {
+        const next: Record<string, number> = {};
+        let changed = false;
+        Object.entries(prev).forEach(([id, val]) => {
+          if (val > 1) {
+            next[id] = val - 1;
+            changed = true;
+          } else {
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Detect screen size changes
   useEffect(() => {
@@ -78,12 +114,20 @@ export default function RestaurantTable({
   }, []);
 
   const handleUpdateStatus = (id: string, status: "Active" | "Trial" | "Inactive") => {
-    onUpdateStatus(id, status);
+    if (status === "Inactive") {
+      const blockReason = window.prompt("Type the reason for inactivating/blocking this restaurant account:");
+      if (blockReason === null) {
+        return; // cancelled
+      }
+      onUpdateStatus(id, status, blockReason);
+    } else {
+      onUpdateStatus(id, status);
+    }
     setActiveActionRow(null);
     setActiveMoreRow(null);
   };
 
-  const handleUpdatePlan = (id: string, plan: "Premium" | "Standard" | "Basic") => {
+  const handleUpdatePlan = (id: string, plan: string) => {
     onUpdatePlan(id, plan);
     setActiveActionRow(null);
     setActiveMoreRow(null);
@@ -109,9 +153,12 @@ export default function RestaurantTable({
                 restaurant={restaurant}
                 darkMode={darkMode}
                 onView={onView}
+                onLiveActivity={onLiveActivity}
                 onUpdateStatus={handleUpdateStatus}
                 onUpdatePlan={handleUpdatePlan}
                 onDelete={handleDelete}
+                plans={plans}
+                cooldown={cooldowns[restaurant.id] || 0}
               />
             ))}
           </div>
@@ -132,7 +179,7 @@ export default function RestaurantTable({
     <div className={`rounded-2xl border transition-all ${
       darkMode ? "bg-slate-900/40 border-slate-800/80" : "bg-white border-slate-200/70 shadow-sm"
     }`}>
-      <div className="overflow-x-auto w-full rounded-2xl">
+      <div className="overflow-x-auto w-full rounded-2xl min-h-[340px]">
         {restaurants.length > 0 ? (
           <table className="w-full text-left border-collapse">
             <thead>
@@ -152,9 +199,11 @@ export default function RestaurantTable({
               </tr>
             </thead>
             <tbody className={`divide-y text-sm ${darkMode ? "divide-slate-900" : "divide-slate-100"}`}>
-              {restaurants.map((row) => (
-                <tr
-                  key={row.id}
+              {restaurants.map((row, index) => {
+                const openUpward = restaurants.length > 2 && index >= restaurants.length - 2;
+                return (
+                  <tr
+                    key={row.id}
                   className={`transition-colors ${darkMode ? "hover:bg-slate-900/20" : "hover:bg-slate-50/40"}`}
                 >
                   {/* Name & ID */}
@@ -229,6 +278,15 @@ export default function RestaurantTable({
                   {/* Actions */}
                   <td className="py-4 px-6 whitespace-nowrap text-center">
                     <div className={`flex items-center justify-center gap-3 ${darkMode ? "text-slate-500 hover:text-slate-400" : "text-slate-400 hover:text-slate-505"}`}>
+                      {/* Live Activity */}
+                      <button
+                        onClick={() => onLiveActivity(row)}
+                        className="p-1 hover:text-orange-500 rounded-md hover:bg-slate-500/5 transition-all"
+                        title="Live Activity"
+                      >
+                        <Activity size={15} />
+                      </button>
+
                       {/* View */}
                       <button
                         onClick={() => onView(row)}
@@ -239,50 +297,70 @@ export default function RestaurantTable({
                       </button>
 
                       {/* Edit Dropdown */}
-                      <div className="relative inline-block text-left">
+                      <div
+                        className="relative inline-block text-left"
+                        onMouseEnter={() => { setActiveMoreRow(null); setActiveActionRow(row.id); }}
+                        onMouseLeave={() => setActiveActionRow(null)}
+                      >
                         <button
                           onClick={() => {
                             setActiveMoreRow(null);
                             setActiveActionRow(activeActionRow === row.id ? null : row.id);
                           }}
-                          className={`p-1 rounded-md hover:bg-slate-500/5 transition-all ${
-                            activeActionRow === row.id ? "text-orange-500 bg-orange-500/5" : "hover:text-orange-500"
+                          className={`p-1 rounded-md transition-all flex items-center gap-1 ${
+                            activeActionRow === row.id ? "text-orange-500 bg-orange-500/5" : "hover:text-orange-500 hover:bg-slate-500/5"
                           }`}
                           title="Edit Node Parameters"
                           aria-expanded={activeActionRow === row.id}
                         >
                           <Edit2 size={14} />
+                          {(cooldowns[row.id] || 0) > 0 && (
+                            <span className="text-[10px] font-bold text-red-500 px-1 py-0.5 rounded bg-red-500/10 animate-pulse flex items-center gap-0.5">
+                              <Clock size={9} />
+                              {cooldowns[row.id]}s
+                            </span>
+                          )}
                         </button>
 
                         {activeActionRow === row.id && (
-                          <>
-                            <button 
-                              type="button" 
-                              className="fixed inset-0 z-30 cursor-default bg-transparent w-full h-full" 
-                              onClick={() => setActiveActionRow(null)} 
-                              aria-label="Close dropdown" 
-                            />
-                            <div className={`absolute right-0 mt-2 w-48 rounded-xl border p-2 shadow-xl z-40 text-left ${
+                          <div className={`absolute right-0 z-40 text-left ${openUpward ? "bottom-full pb-2" : "top-full pt-2"}`}>
+                            <div className={`w-48 rounded-xl border p-2 shadow-xl ${
                               darkMode ? "bg-slate-950 border-slate-800 shadow-black/40" : "bg-white border-slate-200 shadow-slate-200"
                             }`}>
+                              {(cooldowns[row.id] || 0) > 0 && (
+                                <div className="mb-2 p-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-bold text-center flex items-center justify-center gap-1 animate-pulse">
+                                  <Clock size={11} />
+                                  Cooldown Active: {cooldowns[row.id]}s
+                                </div>
+                              )}
+
                               <p className={`text-[10px] font-bold uppercase px-2.5 py-1 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
                                 Set Status
                               </p>
                               <button 
+                                disabled={(cooldowns[row.id] || 0) > 0}
                                 onClick={() => handleUpdateStatus(row.id, "Active")} 
-                                className="w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-slate-500/5 text-emerald-500 flex items-center gap-1.5"
+                                className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg text-emerald-500 flex items-center gap-1.5 ${
+                                  (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+                                }`}
                               >
                                 <CheckCircle2 size={12} /> Active
                               </button>
                               <button 
+                                disabled={(cooldowns[row.id] || 0) > 0}
                                 onClick={() => handleUpdateStatus(row.id, "Trial")} 
-                                className="w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-slate-500/5 text-orange-400 flex items-center gap-1.5"
+                                className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg text-orange-400 flex items-center gap-1.5 ${
+                                  (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+                                }`}
                               >
                                 <AlertCircle size={12} /> Trial
                               </button>
                               <button 
+                                disabled={(cooldowns[row.id] || 0) > 0}
                                 onClick={() => handleUpdateStatus(row.id, "Inactive")} 
-                                className="w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:bg-slate-500/5 text-slate-400 flex items-center gap-1.5"
+                                className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg text-slate-400 flex items-center gap-1.5 ${
+                                  (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+                                }`}
                               >
                                 <X size={12} /> Inactive
                               </button>
@@ -292,31 +370,63 @@ export default function RestaurantTable({
                               <p className={`text-[10px] font-bold uppercase px-2.5 py-1 ${darkMode ? "text-slate-500" : "text-slate-400"}`}>
                                 Change Tier Plan
                               </p>
-                              <button 
-                                onClick={() => handleUpdatePlan(row.id, "Premium")} 
-                                className={`w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-lg hover:bg-slate-500/5 ${darkMode ? "text-slate-300 hover:text-slate-100" : "text-slate-700 hover:text-slate-900"}`}
-                              >
-                                Premium Tier
-                              </button>
-                              <button 
-                                onClick={() => handleUpdatePlan(row.id, "Standard")} 
-                                className={`w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-lg hover:bg-slate-500/5 ${darkMode ? "text-slate-300 hover:text-slate-100" : "text-slate-700 hover:text-slate-900"}`}
-                              >
-                                Standard Tier
-                              </button>
-                              <button 
-                                onClick={() => handleUpdatePlan(row.id, "Basic")} 
-                                className={`w-full text-left px-2.5 py-1.5 text-xs font-medium rounded-lg hover:bg-slate-500/5 ${darkMode ? "text-slate-300 hover:text-slate-100" : "text-slate-700 hover:text-slate-900"}`}
-                              >
-                                Basic Tier
-                              </button>
+                              {plans && plans.length > 0 ? (
+                                plans.map((p) => (
+                                  <button
+                                    key={p._id || p.id}
+                                    disabled={(cooldowns[row.id] || 0) > 0}
+                                    onClick={() => handleUpdatePlan(row.id, p._id || p.id)}
+                                    className={`w-full text-left px-2.5 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-2 ${
+                                      (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : "hover:bg-slate-500/5"
+                                    } ${
+                                      darkMode ? "text-slate-300 hover:text-slate-100" : "text-slate-700 hover:text-slate-900"
+                                    }`}
+                                  >
+                                    {p.name}
+                                  </button>
+                                ))
+                              ) : (
+                                <>
+                                  <button 
+                                    disabled={(cooldowns[row.id] || 0) > 0}
+                                    onClick={() => handleUpdatePlan(row.id, "Premium")} 
+                                    className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-orange-500 flex items-center gap-2 transition-colors ${
+                                      (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : ""
+                                    }`}
+                                  >
+                                    ⭐ Premium
+                                  </button>
+                                  <button 
+                                    disabled={(cooldowns[row.id] || 0) > 0}
+                                    onClick={() => handleUpdatePlan(row.id, "Standard")} 
+                                    className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-amber-500 flex items-center gap-2 transition-colors ${
+                                      (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : ""
+                                    }`}
+                                  >
+                                    ⭐⭐ Standard
+                                  </button>
+                                  <button 
+                                    disabled={(cooldowns[row.id] || 0) > 0}
+                                    onClick={() => handleUpdatePlan(row.id, "Basic")} 
+                                    className={`w-full text-left px-4 py-1.5 text-xs font-medium hover:bg-slate-500/5 text-blue-500 flex items-center gap-2 transition-colors ${
+                                      (cooldowns[row.id] || 0) > 0 ? "opacity-40 cursor-not-allowed" : ""
+                                    }`}
+                                  >
+                                    ⭐ Basic
+                                  </button>
+                                </>
+                              )}
                             </div>
-                          </>
+                          </div>
                         )}
                       </div>
 
                       {/* More Dropdown */}
-                      <div className="relative inline-block text-left">
+                      <div
+                        className="relative inline-block text-left"
+                        onMouseEnter={() => { setActiveActionRow(null); setActiveMoreRow(row.id); }}
+                        onMouseLeave={() => setActiveMoreRow(null)}
+                      >
                         <button
                           onClick={() => {
                             setActiveActionRow(null);
@@ -332,14 +442,8 @@ export default function RestaurantTable({
                         </button>
 
                         {activeMoreRow === row.id && (
-                          <>
-                            <button 
-                              type="button" 
-                              className="fixed inset-0 z-30 cursor-default bg-transparent w-full h-full" 
-                              onClick={() => setActiveMoreRow(null)} 
-                              aria-label="Close dropdown" 
-                            />
-                            <div className={`absolute right-0 mt-2 w-44 rounded-xl border p-1.5 shadow-xl z-40 text-left ${
+                          <div className={`absolute right-0 z-40 text-left ${openUpward ? "bottom-full pb-2" : "top-full pt-2"}`}>
+                            <div className={`w-44 rounded-xl border p-1.5 shadow-xl ${
                               darkMode ? "bg-slate-950 border-slate-800 shadow-black/40" : "bg-white border-slate-200 shadow-slate-200"
                             }`}>
                               <button
@@ -354,6 +458,27 @@ export default function RestaurantTable({
                               >
                                 <Edit2 size={13} /> Adjust Tiers
                               </button>
+                              <button
+                                onClick={async () => {
+                                  setActiveMoreRow(null);
+                                  const currentRate = (row as any).customCommissionRate !== undefined && (row as any).customCommissionRate !== null ? (row as any).customCommissionRate : 8;
+                                  const input = window.prompt(`Enter custom commission rate % for ${row.name}:`, String(currentRate));
+                                  if (input !== null && !isNaN(Number(input))) {
+                                    const rate = Math.min(100, Math.max(0, Number(input)));
+                                    try {
+                                      await apiClient.patch(`/superadmin/restaurants/${row.id}/commission`, { customCommissionRate: rate });
+                                      window.alert(`Custom commission set to ${rate}% for ${row.name}`);
+                                      window.location.reload();
+                                    } catch (err) {
+                                      console.error("Failed to update custom commission rate", err);
+                                      window.alert("Failed to set custom commission rate.");
+                                    }
+                                  }
+                                }}
+                                className={`w-full text-left px-2.5 py-2 text-xs font-medium rounded-lg hover:bg-slate-500/5 flex items-center gap-2 ${darkMode ? "text-slate-300 hover:text-white" : "text-slate-700 hover:text-slate-900"}`}
+                              >
+                                <SlidersHorizontal size={13} className="text-orange-500" /> Set Custom Commission
+                              </button>
 
                               <div className="h-px my-1 bg-slate-200 dark:bg-slate-800" />
 
@@ -364,13 +489,14 @@ export default function RestaurantTable({
                                 <Trash2 size={13} /> Delete Account
                               </button>
                             </div>
-                          </>
+                          </div>
                         )}
                       </div>
                     </div>
                   </td>
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         ) : (

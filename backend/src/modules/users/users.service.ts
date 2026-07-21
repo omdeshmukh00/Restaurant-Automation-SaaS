@@ -98,7 +98,10 @@ export function isAccountLocked(user: IUser): boolean {
 /**
  * Increment failed login attempts and lock if threshold reached.
  */
-export async function incrementFailedAttempts(userId: string): Promise<void> {
+export async function incrementFailedAttempts(
+  userId: string,
+  meta?: { ip?: string; userAgent?: string }
+): Promise<void> {
   const user = await UserModel.findById(userId);
   if (!user) return;
 
@@ -106,6 +109,22 @@ export async function incrementFailedAttempts(userId: string): Promise<void> {
 
   if (user.failedLoginAttempts >= 5) {
     user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
+
+    // Trigger email notification
+    try {
+      const { sendAccountLockedEmail } = await import('../../services/mail.service');
+      if (user.email) {
+        await sendAccountLockedEmail(
+          user.email,
+          user.name,
+          meta?.ip,
+          meta?.userAgent
+        );
+      }
+    } catch (err) {
+      const logger = (await import('../../config/logger')).default;
+      logger.error('Failed to trigger account locked email', err);
+    }
   }
 
   await user.save();

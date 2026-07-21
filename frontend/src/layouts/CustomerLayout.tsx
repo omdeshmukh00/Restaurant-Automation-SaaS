@@ -11,14 +11,18 @@ import { useCustomerStore } from '../features/customer/store/customer.store';
 import { useAuth } from '../auth/AuthProvider';
 import { apiClient } from '../shared/services/apiClient';
 import { connectSocket, getSocket } from '../lib/socket';
-import { LandingNavbar, LandingFooter } from '../features/customer/components/landing';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
+
 
 export default function CustomerLayout() {
+  const { settings } = usePlatformSettingsGuard();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const qrToken = searchParams.get('qr_token');
   const { diningSession, setDiningSession, checkSessionInactivity, tableCode, setTableCode } = useCustomerStore();
@@ -53,8 +57,8 @@ export default function CustomerLayout() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    document.title = 'Smart-Dining';
-  }, []);
+    document.title = settings?.platformName || 'RestoHub';
+  }, [settings?.platformName]);
 
   // Inactivity check
   useEffect(() => {
@@ -210,8 +214,6 @@ export default function CustomerLayout() {
     }
   }, [qrToken, setDiningSession, signInAs, searchParams, setSearchParams]);
 
-  const [prevPath, setPrevPath] = useState(location.pathname);
-
   // Show cart panel only on home/menu pages
   const showCartPanel = ['/customer/home', '/customer/menu', '/customer'].some((p) =>
     location.pathname === p || location.pathname.startsWith(p + '/')
@@ -224,24 +226,82 @@ export default function CustomerLayout() {
     !location.pathname.includes('/feedback') &&
     !location.pathname.includes('/profile');
 
-  if (location.pathname !== prevPath) {
-    setPrevPath(location.pathname);
+  useEffect(() => {
     if (!cartVisible) {
       setCartOpen(false);
     }
-  }
+  }, [location.pathname, cartVisible]);
 
   const requiresSession = ['/customer/home', '/customer/menu'].some((p) =>
     location.pathname === p || location.pathname.startsWith(p + '/')
   ) || location.pathname === '/customer' || location.pathname === '/customer/';
 
-  const handleScanSuccess = (tableId: string) => {
-    setScannerOpen(false);
-    setToastMsg(`✅ Connected to Table ${tableId}!`);
-    setTimeout(() => setToastMsg(''), 3000);
+  const extractQrToken = (scannedText: string): string => {
+    if (!scannedText) return '';
+    const text = scannedText.trim();
+    if (text.includes('qr_token=')) {
+      const match = text.match(/qr_token=([^&/#]+)/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    }
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      try {
+        const url = new URL(text);
+        const token = url.searchParams.get('qr_token');
+        if (token) return token;
+      } catch (e) {
+        // ignore
+      }
+    }
+    return text;
   };
 
+  const handleScanSuccess = async (scannedData: string) => {
+    setScannerOpen(false);
+    const token = extractQrToken(scannedData);
 
+    if (!token) {
+      setToastMsg('❌ Invalid QR code scanned');
+      setTimeout(() => setToastMsg(''), 3000);
+      return;
+    }
+
+    setLoadingSession(true);
+    setToastMsg('⏳ Verifying QR token & starting session...');
+
+    try {
+      const res = await apiClient.post('/public/table-session/init', { token });
+      const data = res.data?.data || res.data;
+
+      if (data && data.sessionToken) {
+        setDiningSession({
+          sessionId: data.session?.session_id || '',
+          restaurantId: data.session?.restaurant?.id || '',
+          restaurantName: data.session?.restaurant?.name || 'Restaurant',
+          tableId: data.session?.table?.id || '',
+          tableNumber: data.session?.table?.table_no || 'Unknown Table',
+          customerName: 'Guest',
+          sessionToken: data.sessionToken,
+          expiresAt: data.session?.expires_at || '',
+          status: 'ACTIVE',
+        });
+
+        signInAs('customer');
+        setToastMsg(`✅ Connected to Table ${data.session?.table?.table_no || ''}!`);
+        navigate('/customer/menu');
+      } else {
+        setToastMsg('❌ Invalid or expired QR token');
+      }
+    } catch (err: any) {
+      console.error('Failed to initialize session from QR scan:', err);
+      const errMsg = err.response?.data?.message || 'Invalid or expired QR token';
+      setToastMsg(`❌ ${errMsg}`);
+    } finally {
+      setLoadingSession(false);
+      setTimeout(() => setToastMsg(''), 4000);
+    }
+  };
 
   return (
     <CartProvider>
@@ -272,7 +332,7 @@ export default function CustomerLayout() {
                       <div className="absolute left-0 right-0 h-0.5 bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,1)] animate-[scan_2s_ease-in-out_infinite]" />
                     </div>
 
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-zinc-100 mb-2 font-display">Scan Table QR</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-zinc-100 mb-2 font-sans">Scan Table QR</h2>
                     <p className="text-sm text-slate-500 dark:text-zinc-400 mb-6 font-sans">
                       Please scan the QR code located on your table to initialize your dining session. This will allow you to browse our menu, place orders directly, and request table service.
                     </p>
@@ -348,6 +408,14 @@ export default function CustomerLayout() {
             onClose={() => setScannerOpen(false)}
             onScanSuccess={handleScanSuccess}
           />
+
+          {/* Maintenance Alert Modal overlay */}
+          <MaintenanceAlertModal
+            isOpen={!!settings?.disableCustomerPanel}
+            title="Customer Ordering Disabled"
+            message="Due to temporary platform maintenance, online menu and customer ordering services are currently disabled."
+          />
+
           {toastMsg && (
             <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-sd-inverse-surface text-white px-6 py-3 rounded-2xl shadow-xl z-[100] animate-fadeIn font-sans text-sm font-semibold">
               {toastMsg}

@@ -1,33 +1,71 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
-import { stats } from "../../store/Superadmindashboard";
-import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
-
-interface StatItem {
-  title: string;
-  value: string | number;
-  growth: string;
-  subtitle?: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  lightColor: string;
-  darkColor: string;
-}
+import { TrendingUp, TrendingDown, Utensils, IndianRupee, ShoppingBag, Percent } from "lucide-react";
+import { useSuperAdminDashboardStore } from "../../store/Superadmindashboard";
 
 interface StatsGridProps {
   darkMode: boolean;
 }
 
 export default function StatsGrid({ darkMode }: StatsGridProps) {
-  const restaurantCount = useRestaurantRequestsStore(
-    (state) => state.restaurants.length
-  );
+  const { data, loading } = useSuperAdminDashboardStore();
+
+  if (loading || !data) {
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className={`rounded-xl p-4 sm:p-5 border animate-pulse ${
+              darkMode ? "bg-slate-900/40 border-slate-800/80" : "bg-white border-slate-200/60"
+            }`}
+          >
+            <div className="h-4 bg-slate-300 dark:bg-slate-800 w-24 rounded mb-2" />
+            <div className="h-6 bg-slate-300 dark:bg-slate-800 w-16 rounded" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const statItems = [
+    {
+      title: "Total Restaurants",
+      value: data.stats.totalRestaurants,
+      growth: data.stats.restaurantGrowth,
+      icon: Utensils,
+      lightColor: "text-emerald-600 bg-emerald-500/10",
+      darkColor: "text-emerald-400 bg-emerald-500/10",
+    },
+    {
+      title: "Monthly Revenue",
+      value: `₹${data.stats.monthlyRevenue.toLocaleString()}`,
+      growth: data.stats.revenueGrowth,
+      icon: IndianRupee,
+      lightColor: "text-amber-600 bg-amber-500/10",
+      darkColor: "text-amber-400 bg-amber-500/10",
+    },
+    {
+      title: "Total Orders",
+      value: data.stats.totalOrders.toLocaleString(),
+      growth: data.stats.ordersGrowth,
+      icon: ShoppingBag,
+      lightColor: "text-blue-600 bg-blue-500/10",
+      darkColor: "text-blue-400 bg-blue-500/10",
+    },
+    {
+      title: "Commission Earned",
+      value: `₹${data.stats.commissionEarned.toLocaleString()}`,
+      growth: data.stats.commissionGrowth,
+      icon: Percent,
+      lightColor: "text-indigo-600 bg-indigo-500/10",
+      darkColor: "text-indigo-400 bg-indigo-500/10",
+    },
+  ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-6">
-      {(stats as StatItem[]).map((stat) => {
+      {statItems.map((stat) => {
         const Icon = stat.icon;
         const isPositive = !stat.growth.startsWith("-");
-        const value =
-          stat.title === "Total Restaurants" ? restaurantCount : stat.value;
 
         return (
           <div
@@ -48,7 +86,7 @@ export default function StatsGrid({ darkMode }: StatsGridProps) {
                   {stat.title}
                 </p>
                 <h3 className="text-xl sm:text-2xl font-bold tracking-tight leading-none">
-                  {value}
+                  {stat.value}
                 </h3>
                 <div
                   className={`flex items-center gap-1 text-xs font-semibold pt-1 ${

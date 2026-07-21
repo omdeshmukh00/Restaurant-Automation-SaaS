@@ -1,5 +1,5 @@
 <div style="font-family: Arial, sans-serif; padding: 20px;">
-  <h2>Welcome to RestoHub!</h2>
+  <h2>Welcome to {{platformName}}!</h2>
   <p>Hello {{ownerName}},</p>
   <p>Congratulations! Your restaurant has been approved.</p>
   <p><strong>Restaurant Name:</strong> {{restaurantName}}</p>
@@ -8,5 +8,10 @@
   <p>Please log in and reset your password immediately using the link below:</p>
   <a href="{{loginUrl}}" style="display: inline-block; padding: 12px 24px; background: #FF6B1A; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In & Reset Password</a>
   <p style="margin-top: 16px; color: #dc3545; font-weight: bold;">Security Note: This temporary password is valid only for the first login. You must change it immediately upon logging in.</p>
-  <p style="color: #666;">If you have any questions or need support, contact our team at hello@restohub.in.</p>
+  <p style="color: #666;">If you have any questions or need support, contact our team at {{supportEmail}}.</p>
+</div>
+
+<div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px; text-align: center; font-size: 13px; color: #888;">
+  <p style="margin: 0;">© {{year}} {{platformName}}. All rights reserved.</p>
+  <p style="margin-top: 8px; font-size: 13px; color: #aaa;">This is an auto generated email. Please do not reply.</p>
 </div>

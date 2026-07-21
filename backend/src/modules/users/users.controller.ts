@@ -11,6 +11,9 @@ import { comparePassword, hashPassword } from '../../utils/crypto';
 import { sendPasswordChangedAlertEmail } from '../../services/mail.service';
 import logger from '../../config/logger';
 
+import * as otpService from '../../services/otp.service';
+import { sendOTPEmail } from '../../services/mail.service';
+
 /**
  * GET /auth/me — Get current authenticated user's profile.
  */
@@ -25,10 +28,48 @@ export const getMe = asyncHandler(async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /users/me/request-otp — Send OTP to registered email address for profile/password updates.
+ */
+export const requestProfileOtp = asyncHandler(async (req: Request, res: Response) => {
+  const email = req.user?.email;
+  if (!email) {
+    throw new AppError('No registered email found for this account', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const { otp, expiresAt } = await otpService.createOTP(email, 'email');
+  sendOTPEmail(email, otp).catch((err) => {
+    logger.error('Failed to send profile OTP email asynchronously', err);
+  });
+
+  const responseData: any = {
+    otpSent: true,
+    otpExpiresAt: expiresAt,
+    otpExpiresIn: 120,
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    responseData.devOtp = otp;
+  }
+
+  sendSuccess(res, responseData);
+});
+
+/**
  * PATCH /users/me — Update current user's profile.
  */
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
-  const user = await userService.updateProfile(req.user!._id, req.body);
+  const { otp, ...updates } = req.body;
+
+  // If OTP is provided, verify it against the registered email
+  if (otp) {
+    const userEmail = req.user?.email;
+    if (!userEmail) {
+      throw new AppError('No registered email found to verify OTP', 400, ErrorCode.INVALID_REQUEST);
+    }
+    await otpService.verifyOTP(userEmail, 'email', otp);
+  }
+
+  const user = await userService.updateProfile(req.user!._id, updates);
 
   if (!user) {
     throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
@@ -47,7 +88,11 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
     throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
   }
 
-  const { currentPassword, newPassword } = req.body;
+  const { currentPassword, newPassword, otp } = req.body;
+
+  if (otp) {
+    await otpService.verifyOTP(user.email, 'email', otp);
+  }
 
   const isMatch = await comparePassword(currentPassword, user.password);
   if (!isMatch) {
@@ -154,4 +199,4 @@ export const updateMyReservation = asyncHandler(async (req: Request, res: Respon
   }
 
   sendSuccess(res, { reservation });
-});
+});

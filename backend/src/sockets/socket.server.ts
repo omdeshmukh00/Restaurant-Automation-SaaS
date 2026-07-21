@@ -17,7 +17,20 @@ export function createSocketServer(server: HttpServer): Server {
 
   io = new Server(server, {
     cors: {
-      origin: env.corsOrigins,
+      origin: (origin, callback) => {
+        if (!origin || env.corsOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        if (env.isDevelopment) {
+          const isLocalNetwork = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+          if (isLocalNetwork) {
+            callback(null, true);
+            return;
+          }
+        }
+        callback(new Error('CORS origin denied'), false);
+      },
       credentials: true,
     },
   });

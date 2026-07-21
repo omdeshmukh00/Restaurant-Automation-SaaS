@@ -14,6 +14,7 @@ import {
   analyticsQuerySchema,
   superAdminAuditLogQuerySchema,
   createRestaurantSchema,
+  registerRestaurantSchema,
 } from './superAdmin.schema';
 import {
   getPlatformOverview,
@@ -38,6 +39,14 @@ import {
   rejectRestaurantRequest,
   getPlatformSettingsController,
   updatePlatformSettingsController,
+  updateRestaurantStatusController,
+  updateRestaurantPlanController,
+  registerRestaurantController,
+  getReservationQueueAnalyticsController,
+  getAnalyticsChartsController,
+  getPlatformAlertsController,
+  updatePlatformAlertController,
+  deletePlatformAlertController,
 } from './superAdmin.controller';
 
 const router = Router();
@@ -90,6 +99,13 @@ router.post(
   createRestaurantController,
 );
 
+// POST /super-admin/restaurants/register
+router.post(
+  '/restaurants/register',
+  validate({ body: registerRestaurantSchema }),
+  registerRestaurantController,
+);
+
 // GET /super-admin/restaurants/:id
 router.get(
   '/restaurants/:id',
@@ -109,6 +125,20 @@ router.patch(
   '/restaurants/:id/suspend',
   validate({ params: restaurantIdParamSchema }),
   suspendRestaurant,
+);
+
+// PATCH /super-admin/restaurants/:id/status
+router.patch(
+  '/restaurants/:id/status',
+  validate({ params: restaurantIdParamSchema }),
+  updateRestaurantStatusController,
+);
+
+// PATCH /super-admin/restaurants/:id/plan
+router.patch(
+  '/restaurants/:id/plan',
+  validate({ params: restaurantIdParamSchema }),
+  updateRestaurantPlanController,
 );
 
 // DELETE /super-admin/restaurants/:id
@@ -193,6 +223,12 @@ router.get(
 // GET /super-admin/system/monitoring
 router.get('/system/monitoring', getSystemMonitoring);
 
+// GET /super-admin/analytics/reservation-queue
+router.get('/analytics/reservation-queue', getReservationQueueAnalyticsController);
+
+// GET /super-admin/analytics/charts
+router.get('/analytics/charts', getAnalyticsChartsController);
+
 /*
 |--------------------------------------------------------------------------
 | AUDIT LOGS (platform-wide)
@@ -205,5 +241,20 @@ router.get(
   validate({ query: superAdminAuditLogQuerySchema }),
   getPlatformAuditLogs,
 );
+
+/*
+|--------------------------------------------------------------------------
+| PLATFORM SYSTEM ALERTS
+|--------------------------------------------------------------------------
+*/
+
+// GET /super-admin/alerts
+router.get('/alerts', getPlatformAlertsController);
+
+// PATCH /super-admin/alerts/:id
+router.patch('/alerts/:id', updatePlatformAlertController);
+
+// DELETE /super-admin/alerts/:id
+router.delete('/alerts/:id', deletePlatformAlertController);
 
 export default router;

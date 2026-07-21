@@ -79,7 +79,8 @@ router.patch(
   roleGuard(...adminRoles),
   validate({ body: updateRestaurantProfileSchema }),
   updateRestaurantProfileController,
-  );
+);
+
 // Floor management — dedicated create + delete paths backed by MongoDB
 router.post(
   '/admin/restaurant/floors',

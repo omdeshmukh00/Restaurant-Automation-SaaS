@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { StatCard } from '../components/dashboard/StatCard';
 import { RecentOrdersTable } from '../components/dashboard/RecentOrdersTable';
@@ -9,9 +9,28 @@ import { TopMenuItems } from '../components/dashboard/TopMenuItems';
 import { connectSocket, getSocket } from '../../../lib/socket';
 import { useTablesStore } from '../store/tables.store';
 import { useDashboardStore } from '../store/dashboard.store';
+import { apiClient } from '../../../shared/services/apiClient';
+import { UsageMeter } from '../components/dashboard/UsageMeter';
+import { UpgradePrompt } from '../components/dashboard/UpgradePrompt';
 
 const AdminDashboard = () => {
   const { restaurant, fetchOverview } = useOutletContext<{ restaurant: any; fetchOverview: () => Promise<void> }>();
+  const [usageData, setUsageData] = useState<any>(null);
+
+  const fetchUsageData = async () => {
+    try {
+      const res = await apiClient.get('/subscriptions/usage-dashboard');
+      if (res.data) {
+        setUsageData(res.data.data || res.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch usage data', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsageData();
+  }, []);
 
   const statTiles = useDashboardStore((s) => s.statTiles);
 
@@ -25,10 +44,7 @@ const AdminDashboard = () => {
     bootstrap();
 
     const interval = setInterval(() => {
-      const socket = getSocket();
-      if (!socket || !socket.connected) {
-        useTablesStore.getState().fetchTables();
-      }
+      useTablesStore.getState().fetchTables();
     }, 15000);
     const dashInterval = setInterval(() => {
       useDashboardStore.getState().fetchDashboard();
@@ -98,12 +114,17 @@ const AdminDashboard = () => {
     };
   }, [restaurant]);
 
+  // We don't render OnboardingWizard inline anymore as it is managed as a full-screen overlay in AdminLayout.tsx
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{`Welcome back, ${restaurant?.ownerName || 'Admin'}! Here's what's happening today.`}</p>
       </div>
+
+      {usageData && (
+        <UpgradePrompt status={usageData.status} quotas={usageData.quotas} />
+      )}
 
       {/* Stat cards — 2 cols on mobile, 4 on lg */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -120,6 +141,10 @@ const AdminDashboard = () => {
           />
         ))}
       </div>
+
+      {usageData && (
+        <UsageMeter planName={usageData.planName} quotas={usageData.quotas} />
+      )}
 
       {/* Revenue chart + Activity feed */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4">

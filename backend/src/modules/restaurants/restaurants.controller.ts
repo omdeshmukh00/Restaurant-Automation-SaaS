@@ -253,6 +253,7 @@ export const updateRestaurantProfileController = asyncHandler(async (req: Reques
     },
   });
 });
+
 // ── Floor management ──────────────────────────────────────────────────
 
 export const addFloorController = asyncHandler(async (req: Request, res: Response): Promise<void> => {

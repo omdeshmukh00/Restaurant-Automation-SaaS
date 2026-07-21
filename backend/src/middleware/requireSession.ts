@@ -30,9 +30,15 @@ export async function requireSession(req: Request, _res: Response, next: NextFun
         ErrorCode.SESSION_INVALID
       );
     }
-    
+    const isClosedAllowed =
+      req.method === 'GET' ||
+      req.path.includes('/feedback') ||
+      req.path.includes('/reorder') ||
+      req.path.includes('/session/end') ||
+      req.path.includes('/payments');
+
     // Validate session (checks ACTIVE, hard expiry, idle timeout)
-    const session = await sessionService.validateSession(token);
+    const session = await sessionService.validateSession(token, isClosedAllowed);
 
     // Touch activity timestamp
     await sessionService.touchActivity(session._id.toString());

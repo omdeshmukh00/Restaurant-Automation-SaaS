@@ -112,6 +112,42 @@ export async function initializeCollections(): Promise<void> {
     } catch (migError) {
       logger.error('Failed to run tenantId synchronization migration:', migError);
     }
+
+    // Migration: Set commissionRate and commission for legacy payments
+    try {
+      const col = db.collection('payments');
+      const { getPlatformSettings } = await import('../modules/superAdmin/platformSettings.model');
+      
+      const legacyPayments = await col.find({
+        $or: [
+          { commissionRate: { $exists: false } },
+          { commissionRate: null }
+        ]
+      }).toArray();
+
+      if (legacyPayments.length > 0) {
+        const settings = await getPlatformSettings();
+        const defaultRate = settings?.platformCommissionRate ?? 10;
+        
+        let updatedCount = 0;
+        for (const payment of legacyPayments) {
+          const calculatedCommission = Math.round((payment.amount || 0) * (defaultRate / 100) * 100) / 100;
+          await col.updateOne(
+            { _id: payment._id },
+            {
+              $set: {
+                commissionRate: defaultRate,
+                commission: calculatedCommission
+              }
+            }
+          );
+          updatedCount++;
+        }
+        logger.info(`🧹 Migrated ${updatedCount} legacy payments to have commissionRate: ${defaultRate}% using raw collection`);
+      }
+    } catch (migError) {
+      logger.error('Failed to run payment commission migration:', migError);
+    }
   } catch (error) {
     logger.error('Failed to initialize collections:', { error });
     // Non-fatal — app can still run without pre-created collections

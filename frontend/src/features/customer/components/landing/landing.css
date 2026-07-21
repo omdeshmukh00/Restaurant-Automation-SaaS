@@ -30,6 +30,12 @@
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
 
+.landing-page-container h1.font-instrument-serif,
+.landing-font-instrument-serif,
+.font-instrument-serif {
+  font-family: 'Instrument Serif', Georgia, serif !important;
+}
+
 /* ─── Shiny Shimmer Hover Effect ──────────────────────────── */
 @keyframes landing-shiny-move {
   0%   { transform: translateX(-100%) rotate(25deg); }

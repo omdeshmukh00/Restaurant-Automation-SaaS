@@ -7,8 +7,11 @@ import LiveAlertsBar from '../features/kitchen/components/dashboard/LiveAlertsBa
 import KitchenProfilePanel from '../features/kitchen/components/dashboard/KitchenProfilePanel';
 import { useKitchenStore } from '../features/kitchen/store/kitchen.store';
 import { getKitchenRolePermissions } from '../features/kitchen/utils/kitchenRoleAccess';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
 export default function KitchenLayout(): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
   const { profile } = useKitchenStore();
   const location = useLocation();
 
@@ -101,6 +104,13 @@ export default function KitchenLayout(): JSX.Element {
 
         {/* Profile Panel Drawer */}
         <KitchenProfilePanel isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+
+        {/* Maintenance Alert Modal overlay */}
+        <MaintenanceAlertModal
+          isOpen={!!settings?.disableKitchenPanel}
+          title="Kitchen Panel Disabled"
+          message="Due to temporary platform maintenance, the Kitchen Panel is currently disabled."
+        />
       </div>
     </KitchenSearchProvider>
   );

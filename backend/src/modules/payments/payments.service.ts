@@ -123,6 +123,18 @@ export class PaymentsService {
       providerPaymentId = rzpOrder.id;
     }
 
+    // Get active platform settings for commission
+    let commissionRate = 10;
+    let commission = 0;
+    try {
+      const { getPlatformSettings } = await import('../superAdmin/platformSettings.model');
+      const settings = await getPlatformSettings();
+      commissionRate = settings?.platformCommissionRate ?? 10;
+      commission = Math.round(amount * (commissionRate / 100) * 100) / 100;
+    } catch (e) {
+      commission = Math.round(amount * 0.1 * 100) / 100;
+    }
+
     // Create the PaymentModel record
     const payment = await PaymentModel.create({
       restaurantId: toObjectId(restaurantId),
@@ -134,6 +146,8 @@ export class PaymentsService {
       providerPaymentId,
       razorpayOrderId,
       status: PaymentStatus.PENDING as any,
+      commissionRate,
+      commission,
       metadata: {
         isCartCheckout,
         source: 'customer_payment_create',
@@ -761,6 +775,21 @@ export class PaymentsService {
       payment.status = PaymentStatus.FAILED as any;
       payment.failureReason = entity.error_description ?? 'Payment failed';
       await payment.save();
+
+      // Create platform system alert for Super Admin
+      try {
+        const { createSystemAlert } = await import('../superAdmin/superAdmin.service');
+        await createSystemAlert({
+          title: `Payment Failed: ${entity.id || 'Transaction'}`,
+          description: `Gateway transaction failed. Reason: ${payment.failureReason}`,
+          type: 'critical',
+          entityType: 'payment',
+          entityId: payment._id,
+          tags: ['payment_failed', 'razorpay'],
+        });
+      } catch (e) {
+        // Ignore
+      }
     }
 
     return { received: true, event: eventType };

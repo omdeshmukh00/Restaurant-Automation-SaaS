@@ -41,7 +41,9 @@ function KPICard({ darkMode, label, value, icon, iconBg, colSpan = '' }: KPICard
 export default function AuditLogsKPICards({ darkMode, logs }: AuditLogsKPICardsProps) {
   const adminCount = logs.filter((l) => l.type === 'Admin').length;
   const restaurantCount = logs.filter((l) => l.type === 'Restaurant').length;
+  const transactionCount = logs.filter((l) => l.type === 'Transaction').length;
   const subscriptionCount = logs.filter((l) => l.type === 'Subscription').length;
+  const systemCount = logs.filter((l) => l.type === 'System').length;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -70,13 +72,13 @@ export default function AuditLogsKPICards({ darkMode, logs }: AuditLogsKPICardsP
       <KPICard
         darkMode={darkMode}
         label="Transactions"
-        value={4}
+        value={transactionCount}
         iconBg={
           darkMode
             ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/40'
             : 'bg-emerald-50 text-emerald-600 border-emerald-100'
         }
-        icon={<span className="font-bold text-base sm:text-lg">$</span>}
+        icon={<span className="font-bold text-base sm:text-lg">₹</span>}
       />
       <KPICard
         darkMode={darkMode}
@@ -92,7 +94,7 @@ export default function AuditLogsKPICards({ darkMode, logs }: AuditLogsKPICardsP
       <KPICard
         darkMode={darkMode}
         label="System"
-        value={2}
+        value={systemCount}
         iconBg={
           darkMode
             ? 'bg-orange-950/50 text-orange-400 border-orange-900/40'

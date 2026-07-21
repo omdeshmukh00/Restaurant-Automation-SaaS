@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Bell, Menu, X, ChevronRight } from 'lucide-react';
 import { useCustomerStore } from '../../store/customer.store';
 import { useAuth } from '../../../../auth/AuthProvider';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 import './landing.css';
 
 interface LandingNavbarProps {
@@ -23,6 +24,8 @@ const NAV_LINKS: NavLink[] = [
 ];
 
 export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "RestoHub";
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -88,7 +91,7 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
               <span className="material-symbols-outlined text-[18px] font-bold text-white block">restaurant</span>
             </div>
             <span className="font-bold text-[20px] tracking-tight text-white">
-              Resto<span style={{ color: '#FF6B1A' }}>Hub</span>
+              {platformName}
             </span>
           </a>
 

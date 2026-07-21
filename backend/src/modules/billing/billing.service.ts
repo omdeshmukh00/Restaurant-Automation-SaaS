@@ -245,6 +245,18 @@ export class BillingService {
     bill.paymentStatus = PaymentStatus.PENDING;
     await bill.save();
 
+    // Get active platform settings for commission
+    let commissionRate = 10;
+    let commission = 0;
+    try {
+      const { getPlatformSettings } = await import('../superAdmin/platformSettings.model');
+      const settings = await getPlatformSettings();
+      commissionRate = settings?.platformCommissionRate ?? 10;
+      commission = Math.round(bill.finalAmount * (commissionRate / 100) * 100) / 100;
+    } catch (e) {
+      commission = Math.round(bill.finalAmount * 0.1 * 100) / 100;
+    }
+
     // v2.1 Requirement: Write transaction details to PaymentModel
     await PaymentModel.create({
       restaurantId: bill.restaurantId,
@@ -257,6 +269,8 @@ export class BillingService {
       provider: 'mock',
       providerPaymentId: intentId,
       status: PaymentStatus.PENDING as any,
+      commissionRate,
+      commission,
       metadata: {
         source: 'billing_create_payment',
       },

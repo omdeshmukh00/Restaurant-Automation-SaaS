@@ -4,8 +4,11 @@ import { useStaffSearch } from './StaffSearchContext';
 import { useStaffProfile } from '../../hooks/useStaffProfile';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useStaffDashboard } from '../../hooks/useStaffDashboard';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 export default function StaffTopBar({ onNotificationClick }: { onNotificationClick?: () => void }) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "DineEase";
   const { query, setQuery } = useStaffSearch();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const { profile, updateProfile } = useStaffProfile();
@@ -92,7 +95,7 @@ export default function StaffTopBar({ onNotificationClick }: { onNotificationCli
         <div className="bg-dine-light-orange p-1.5 rounded-lg">
           <span className="material-symbols-outlined text-dine-orange text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
         </div>
-        <span className="font-bold text-sm text-slate-800 dark:text-slate-200 font-sans">DineEase</span>
+        <span className="font-bold text-sm text-slate-800 dark:text-slate-200 font-sans">{platformName}</span>
       </div>
 
       {/* Right side: Search input, notifications, and profile avatar */}

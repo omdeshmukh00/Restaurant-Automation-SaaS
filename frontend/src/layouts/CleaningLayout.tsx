@@ -6,8 +6,11 @@ import CleaningTopBar from '../features/cleaning/components/dashboard/CleaningTo
 import { ToastProvider } from '../features/cleaning/components/dashboard/Toast';
 import { useCleaning } from '../features/cleaning/hooks/usecleaning';
 import { getCleaningRolePermissions } from '../features/cleaning/utils/cleaningRoleAccess';
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
 export default function CleaningLayout(): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
   const { profile } = useCleaning();
   const location = useLocation();
 
@@ -103,6 +106,13 @@ export default function CleaningLayout(): JSX.Element {
             <Outlet />
           </main>
         </div>
+
+        {/* Maintenance Alert Modal overlay */}
+        <MaintenanceAlertModal
+          isOpen={!!settings?.disableCleaningPanel}
+          title="Cleaning Panel Disabled"
+          message="Due to temporary platform maintenance, the Cleaning Panel is currently disabled."
+        />
       </div>
     </CleaningSearchProvider>
     </ToastProvider>

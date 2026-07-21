@@ -4,12 +4,15 @@ import { useCart } from './CartContext';
 import { useSearch } from './SearchContext';
 import { useCustomerStore } from '../../store/customer.store';
 import { useAuth } from '../../../../auth/AuthProvider';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 interface Props {
   onToggleCart: () => void;
 }
 
 export default function CustomerTopBar({ onToggleCart }: Props) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "Smart Dining";
   const { itemCount } = useCart();
   const { query, setQuery } = useSearch();
   const navigate = useNavigate();
@@ -89,7 +92,7 @@ export default function CustomerTopBar({ onToggleCart }: Props) {
                 restaurant
               </span>
             </div>
-            <span className="text-sm font-bold text-sd-primary font-sans whitespace-nowrap">Smart Dining</span>
+            <span className="text-sm font-bold text-sd-primary font-sans whitespace-nowrap">{platformName}</span>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-sd-on-surface-variant font-sans mt-0.5">
             <span className="flex items-center gap-0.5">
