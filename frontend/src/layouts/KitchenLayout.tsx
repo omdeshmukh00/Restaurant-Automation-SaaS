@@ -61,6 +61,9 @@ export default function KitchenLayout(): JSX.Element {
       socket.on('order.created', scheduleRefresh);
       socket.on('order.updated', scheduleRefresh);
       socket.on('order.ready', scheduleRefresh);
+      socket.on('order.served', scheduleRefresh);
+      socket.on('order.cancelled', scheduleRefresh);
+      socket.on('order.deleted', scheduleRefresh);
       socket.on('kitchen:batch-updated', scheduleRefresh);
     }
 
@@ -70,6 +73,9 @@ export default function KitchenLayout(): JSX.Element {
         socket.off('order.created', scheduleRefresh);
         socket.off('order.updated', scheduleRefresh);
         socket.off('order.ready', scheduleRefresh);
+        socket.off('order.served', scheduleRefresh);
+        socket.off('order.cancelled', scheduleRefresh);
+        socket.off('order.deleted', scheduleRefresh);
         socket.off('kitchen:batch-updated', scheduleRefresh);
       }
     };

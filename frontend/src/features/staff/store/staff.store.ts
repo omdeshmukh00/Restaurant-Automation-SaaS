@@ -20,6 +20,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  orderNumber?: string;
   table: string;
   items: OrderItem[];
   status: 'Pending' | 'Preparing' | 'Ready' | 'Served' | 'Completed' | 'Cancelled';

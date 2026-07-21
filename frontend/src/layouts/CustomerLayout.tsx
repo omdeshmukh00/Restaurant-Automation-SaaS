@@ -169,6 +169,22 @@ export default function CustomerLayout() {
           );
         });
 
+        socket.on('staff.request.accepted', (data: any) => {
+          useCustomerStore.getState().addNotification(
+            'Waiter Assisted 🙋‍♂️',
+            `Staff has accepted your request and is on the way!`,
+            'info'
+          );
+        });
+
+        socket.on('staff.request.completed', (data: any) => {
+          useCustomerStore.getState().addNotification(
+            'Request Completed ✅',
+            `Your service request has been fulfilled by staff.`,
+            'info'
+          );
+        });
+
         socket.on('table.session.expired', () => {
           useCustomerStore.getState().addNotification(
             'Session Expired ⏰',
@@ -192,6 +208,8 @@ export default function CustomerLayout() {
           socket.off('order.served');
           socket.off('order.completed');
           socket.off('order.rejected');
+          socket.off('staff.request.accepted');
+          socket.off('staff.request.completed');
           socket.off('table.session.expired');
           socket.off('table.session.closed');
         };

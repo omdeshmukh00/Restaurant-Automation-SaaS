@@ -107,7 +107,8 @@ function mapOrder(order: any): Order {
   const items = Array.isArray(order?.items) ? order.items : [];
 
   return {
-    id: order?.orderNumber || order?._id || order?.id || 'ORDER',
+    id: order?._id || order?.id || 'ORDER',
+    orderNumber: order?.orderNumber || order?._id || order?.id || 'ORDER',
     table: order?.tableId?.tableNumber ? `Table ${order.tableId.tableNumber}` : 'Table 1',
     items: items.map((item: any) => ({
       name: item?.name || 'Item',
@@ -194,11 +195,12 @@ export const refreshDashboard = async () => {
   queuedRefresh = false;
   
   try {
-    const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, menuRes, alertsRes] = await Promise.all([
+    const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, allOrdersRes, menuRes, alertsRes] = await Promise.all([
       tableAPI.getTables(),
       requestsAPI.getPending(),
       reservationsAPI.getReservations(),
       ordersAPI.getReadyOrders(),
+      ordersAPI.getAllOrders(),
       menuAPI.getItems(),
       notificationsAPI.getAll(),
     ]);
@@ -217,6 +219,11 @@ export const refreshDashboard = async () => {
 
     if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
       staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
+    }
+
+    if (allOrdersRes.success && Array.isArray(allOrdersRes.data)) {
+      staffStore.setOrders(allOrdersRes.data.map(mapOrder));
+    } else if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
       staffStore.setOrders(readyOrdersRes.data.map(mapOrder));
     }
 
@@ -279,6 +286,15 @@ export function useStaffDashboard() {
       socket.on('staff.table.waiter_assigned', handleSync);
       socket.on('queue.notified', handleSync);
       socket.on('staff.ticket.created', handleSync);
+      socket.on('order.created', handleSync);
+      socket.on('order.updated', handleSync);
+      socket.on('order.ready', handleSync);
+      socket.on('order.served', handleSync);
+      socket.on('staff:request-new', handleSync);
+      socket.on('staff:request-updated', handleSync);
+      socket.on('bill.requested', handleSync);
+      socket.on('bill.paid', handleSync);
+      socket.on('notification:new', handleSync);
 
       return () => {
         socket.off('table.status.changed', handleSync);
@@ -289,6 +305,15 @@ export function useStaffDashboard() {
         socket.off('staff.table.waiter_assigned', handleSync);
         socket.off('queue.notified', handleSync);
         socket.off('staff.ticket.created', handleSync);
+        socket.off('order.created', handleSync);
+        socket.off('order.updated', handleSync);
+        socket.off('order.ready', handleSync);
+        socket.off('order.served', handleSync);
+        socket.off('staff:request-new', handleSync);
+        socket.off('staff:request-updated', handleSync);
+        socket.off('bill.requested', handleSync);
+        socket.off('bill.paid', handleSync);
+        socket.off('notification:new', handleSync);
       };
     }
   }, []);

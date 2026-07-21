@@ -4,9 +4,10 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { StaffSearchProvider } from '../features/staff/components/dashboard/StaffSearchContext';
 import StaffSidebar from '../features/staff/components/dashboard/StaffSidebar';
 import StaffTopBar from '../features/staff/components/dashboard/StaffTopBar';
+import StaffBottomNav from '../features/staff/components/dashboard/StaffBottomNav';
 import { NotificationWindow } from '../features/staff/components/NotificationWindow';
+import { getRolePermissions, isPathAllowed } from '../features/staff/utils/roleAccess';
 import { useStaffProfile } from '../features/staff/hooks/useStaffProfile';
-import { getRolePermissions } from '../features/staff/utils/roleAccess';
 import { connectSocket, getSocket } from '../lib/socket';
 import { staffStore } from '../features/staff/store/staff.store';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
@@ -19,9 +20,7 @@ export default function StaffLayout(): JSX.Element {
   const location = useLocation();
 
   const allowedPaths = getRolePermissions(profile.role);
-  const currentPath = location.pathname.replace(/\/$/, '');
-
-  const isAllowed = allowedPaths.includes(currentPath);
+  const isAllowed = isPathAllowed(profile.role, location.pathname);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -32,6 +31,16 @@ export default function StaffLayout(): JSX.Element {
   });
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  useEffect(() => {
+    const handleToggle = () => {
+      setSidebarCollapsed(prev => !prev);
+    };
+    window.addEventListener('toggle-staff-sidebar', handleToggle);
+    return () => {
+      window.removeEventListener('toggle-staff-sidebar', handleToggle);
+    };
+  }, []);
   useEffect(() => {
     // 1. Establish Socket Connection
     connectSocket();
@@ -158,17 +167,20 @@ export default function StaffLayout(): JSX.Element {
 
         {/* Main Area */}
         <div
-          className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
+          className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ml-0 ${
+            sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64'
           }`}
         >
           <StaffTopBar onNotificationClick={() => setIsNotificationOpen(true)} />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-20 lg:pb-8">
             <Outlet />
           </main>
         </div>
+
+        {/* Mobile Bottom Nav */}
+        <StaffBottomNav />
       </div>
 
       <NotificationWindow

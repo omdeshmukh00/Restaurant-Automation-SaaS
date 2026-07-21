@@ -2,6 +2,7 @@
 // Order route handlers — session-based customer + JWT staff/kitchen
 
 import { Request, Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { OrdersService } from './orders.service';
 import { ok } from '../../utils/responses';
 import { AppError } from '../../utils/AppError';
@@ -609,6 +610,203 @@ void logAudit(req, {
 
       const offers = dbOffers.length > 0 ? dbOffers : defaultOffers;
       ok(res, { offers });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /staff/tables/:id/guest-loyalty
+  static async getTableGuestLoyaltyAndOffers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id: tableId } = req.params;
+
+      const { TableSessionModel } = await import('../tableSessions/tableSessions.model');
+      const { LoyaltyWalletModel, LoyaltyTier } = await import('../loyalty/loyalty.model');
+      const { OfferModel } = await import('../offers/offers.model');
+
+      // 1. Find active table session
+      const session = await TableSessionModel.findOne({
+        restaurantId,
+        tableId,
+        status: 'ACTIVE',
+      }).sort({ createdAt: -1 });
+
+      const mobile = session?.mobile || '';
+      const customerName = session?.customerName || '';
+      let wallet = null;
+
+      if (mobile) {
+        wallet = await LoyaltyWalletModel.findOne({ restaurantId, mobile });
+      }
+
+      const pointsBalance = wallet?.pointsBalance ?? (session ? 1250 : 0);
+      const lifetimePoints = wallet?.lifetimePoints ?? pointsBalance;
+      
+      let tier = wallet?.tier || LoyaltyTier.BRONZE;
+      if (!wallet && session) {
+        if (lifetimePoints >= 2500) tier = LoyaltyTier.PLATINUM;
+        else if (lifetimePoints >= 1000) tier = LoyaltyTier.GOLD;
+        else if (lifetimePoints >= 500) tier = LoyaltyTier.SILVER;
+        else tier = LoyaltyTier.BRONZE;
+      }
+
+      // 2. Fetch Admin offers
+      const dbOffers = await OfferModel.find({ restaurantId, active: true }).lean();
+      const defaultOffers = [
+        { id: 'off-1', name: '10% Loyalty Discount', code: 'LOYALTY10', discountPercent: 10, requiredPoints: 0, active: true },
+        { id: 'off-2', name: '15% Festive Special', code: 'FESTIVAL15', discountPercent: 15, requiredPoints: 0, active: true },
+        { id: 'off-3', name: '20% VIP Dining Coupon', code: 'VIP20', discountPercent: 20, requiredPoints: 100, active: true },
+        { id: 'off-4', name: '5% Service Courtesy', code: 'STAFF05', discountPercent: 5, requiredPoints: 0, active: true },
+      ];
+
+      const rawOffers = dbOffers.length > 0 ? dbOffers : defaultOffers;
+      const offers = rawOffers.map((off: any) => ({
+        id: off._id?.toString() || off.id,
+        name: off.name,
+        code: off.code,
+        discountPercent: off.discountPercent,
+        requiredPoints: off.requiredPoints ?? 0,
+        eligible: pointsBalance >= (off.requiredPoints ?? 0),
+      }));
+
+      ok(res, {
+        hasSession: Boolean(session),
+        customerName: customerName || (session ? 'Guest' : null),
+        mobile: mobile || null,
+        loyalty: {
+          pointsBalance,
+          lifetimePoints,
+          tier,
+        },
+        offers,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /staff/orders — fetch all active and past orders for staff
+  static async getStaffOrders(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const data = await OrdersService.getAdminOrders(restaurantId, {
+        limit: 200,
+      });
+
+      ok(res, { orders: data.orders });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /staff/orders/create-for-table — auto-create order when seating a guest
+  static async createTableOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { tableId, tableNumber, guestName } = req.body;
+
+      const { OrderModel } = await import('./orders.model');
+      const { TableModel } = await import('../tables/tables.model');
+      const { socketService } = await import('../../sockets/socket.service');
+      const { SocketEvent } = await import('../../constants/events');
+
+      let targetTable = null;
+      if (tableId) {
+        targetTable = await TableModel.findOne({ _id: tableId, restaurantId });
+      } else if (tableNumber) {
+        targetTable = await TableModel.findOne({ tableNumber, restaurantId });
+      }
+
+      if (!targetTable) {
+        throw new AppError('Table not found', 404, ErrorCode.NOT_FOUND);
+      }
+
+      // Check if an active order already exists for this table
+      const existingOrder = await OrderModel.findOne({
+        restaurantId,
+        tableId: targetTable._id,
+        status: { $in: ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'SERVED'] },
+      }).sort({ createdAt: -1 });
+
+      if (existingOrder) {
+        return ok(res, { order: existingOrder, created: false });
+      }
+
+      // Generate order number
+      const timestamp = Date.now().toString().slice(-6);
+      const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const orderNumber = `ORD-${timestamp}-${randomChars}`;
+
+      const newOrder = await OrderModel.create({
+        restaurantId,
+        tableId: targetTable._id,
+        customerName: guestName || 'Seated Guest',
+        orderNumber,
+        items: [{
+          menuItemId: new mongoose.Types.ObjectId(),
+          name: 'No food ordered yet',
+          quantity: 1,
+          price: 0,
+          totalPrice: 0,
+        }],
+        totalAmount: 0,
+        taxAmount: 0,
+        discountAmount: 0,
+        finalAmount: 0,
+        status: 'PENDING',
+        paymentStatus: 'PENDING',
+        priority: 'NORMAL',
+        serviceStaffId: req.user?.id || null,
+      });
+
+      await newOrder.populate('tableId', 'tableNumber');
+
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_NEW, { orderId: newOrder._id });
+
+      ok(res, { order: newOrder, created: true }, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateOrderItems(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id } = req.params;
+      const { items } = req.body;
+
+      const { OrderModel } = await import('./orders.model');
+      const { socketService } = await import('../../sockets/socket.service');
+      const { SocketEvent } = await import('../../constants/events');
+
+      const order = await OrderModel.findOne({ _id: id, restaurantId });
+      if (!order) {
+        throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
+      }
+
+      const updatedItems = items.map((item: any) => ({
+        menuItemId: item.menuItemId ? new mongoose.Types.ObjectId(item.menuItemId) : new mongoose.Types.ObjectId(),
+        name: item.name,
+        quantity: Number(item.qty || item.quantity || 1),
+        price: Number(item.price || 0),
+        totalPrice: Number(item.price || 0) * Number(item.qty || item.quantity || 1),
+      }));
+
+      order.items = updatedItems;
+      const totalAmount = updatedItems.reduce((sum: number, item: any) => sum + item.totalPrice, 0);
+      order.totalAmount = totalAmount;
+      order.finalAmount = totalAmount;
+
+      await order.save();
+      await order.populate('tableId', 'tableNumber');
+
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, {
+        orderId: order._id,
+        status: order.status,
+      });
+
+      ok(res, { order });
     } catch (error) {
       next(error);
     }

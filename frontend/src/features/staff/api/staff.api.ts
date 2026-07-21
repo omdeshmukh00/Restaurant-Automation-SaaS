@@ -343,6 +343,45 @@ export const tableAPI = {
       error: res.error,
     };
   },
+
+  /** GET /staff/tables/:id/guest-loyalty — fetch guest loyalty points, tier status & offers */
+  getGuestLoyaltyAndOffers: async (id: string): Promise<ApiResponse<{
+    hasSession: boolean;
+    customerName: string | null;
+    mobile: string | null;
+    loyalty: {
+      pointsBalance: number;
+      lifetimePoints: number;
+      tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+    };
+    offers: Array<{
+      id: string;
+      name: string;
+      code: string;
+      discountPercent: number;
+      requiredPoints: number;
+      eligible: boolean;
+    }>;
+  }>> => {
+    return fetchAPI(`/staff/tables/${id}/guest-loyalty`);
+  },
+
+  create: async (payload: {
+    tableNumber: string;
+    capacity: number;
+    section: string;
+    floor?: number;
+  }): Promise<ApiResponse<Table>> => {
+    const res = await fetchAPI<{ table: Table }>('/staff/tables', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return {
+      success: res.success,
+      data: res.data?.table,
+      error: res.error,
+    };
+  },
 };
 
 // ── Customer Requests ──
@@ -467,6 +506,15 @@ export const reservationsAPI = {
 // ── Orders ──
 
 export const ordersAPI = {
+  getAllOrders: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ orders: any[] }>('/staff/orders');
+    return {
+      success: res.success,
+      data: res.data?.orders,
+      error: res.error,
+    };
+  },
+
   getReadyOrders: async (): Promise<ApiResponse<OrderItem[]>> => {
     const res = await fetchAPI<{ orders: OrderItem[]; meta?: unknown }>('/staff/orders/ready');
     return {
@@ -474,6 +522,13 @@ export const ordersAPI = {
       data: res.data?.orders,
       error: res.error,
     };
+  },
+
+  createTableOrder: async (tableId?: string, tableNumber?: string, guestName?: string): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>('/staff/orders/create-for-table', {
+      method: 'POST',
+      body: JSON.stringify({ tableId, tableNumber, guestName }),
+    });
   },
 
   pickOrder: (id: string): Promise<ApiResponse<void>> => {
@@ -494,6 +549,13 @@ export const ordersAPI = {
       body: JSON.stringify({ offerCode, offerId }),
     });
   },
+
+  updateItems: (id: string, items: any[]): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>(`/staff/orders/${id}/items`, {
+      method: 'PATCH',
+      body: JSON.stringify({ items }),
+    });
+  },
 };
 
 // ── Offers ──
@@ -506,6 +568,15 @@ export const offersAPI = {
       data: res.data?.offers,
       error: res.error,
     };
+  },
+};
+
+export const profileAPI = {
+  sendPhoneOTP: (phone: string): Promise<ApiResponse<{ otp: string }>> => {
+    return fetchAPI<{ otp: string }>('/staff/send-phone-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
   },
 };
 

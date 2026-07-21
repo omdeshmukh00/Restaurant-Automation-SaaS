@@ -94,14 +94,44 @@ export function AdminNotificationsProvider({ children }: PropsWithChildren) {
       });
     };
 
+    const onStaffTicket = (payload: any) => {
+      handle({
+        message: `Escalation Ticket: ${payload?.subject || payload?.notes || 'Staff issue escalated'}`,
+        time: 'just now',
+        icon: '🚨',
+      });
+    };
+
+    const onMaintenanceIssue = (payload: any) => {
+      handle({
+        message: `Maintenance Issue: Table set to under maintenance`,
+        time: 'just now',
+        icon: '🛠️',
+      });
+    };
+
+    const onBillRequested = (payload: any) => {
+      handle({
+        message: `Bill Requested for Table ${payload?.tableNumber || ''}`,
+        time: 'just now',
+        icon: '🧾',
+      });
+    };
+
     socket.on('notification:new', onNotificationNew);
     socket.on('order.created', onOrderCreated);
     socket.on('staff:request-new', onStaffRequest);
+    socket.on('staff.ticket.created', onStaffTicket);
+    socket.on('cleaning.issue.reported', onMaintenanceIssue);
+    socket.on('bill.requested', onBillRequested);
 
     return () => {
       socket.off('notification:new', onNotificationNew);
       socket.off('order.created', onOrderCreated);
       socket.off('staff:request-new', onStaffRequest);
+      socket.off('staff.ticket.created', onStaffTicket);
+      socket.off('cleaning.issue.reported', onMaintenanceIssue);
+      socket.off('bill.requested', onBillRequested);
     };
   }, []);
 

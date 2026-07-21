@@ -269,6 +269,20 @@ staffRouter.patch(
       'Staff request not found',
     ) as any;
 
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff.request.accepted', {
+        requestId: request._id,
+        tableId: request.tableId,
+        sessionId: request.sessionId,
+        type: request.type,
+        acceptedBy: request.acceptedBy,
+      });
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff:request-updated', {
+        requestId: request._id,
+        status: RequestStatus.ACCEPTED,
+      });
+    }
+
     ok(res, { request, acceptedBy: req.body?.staffId ?? req.user?.id ?? null });
   } catch (error) {
     next(error);
@@ -294,6 +308,20 @@ staffRouter.patch(
       ),
       'Staff request not found',
     ) as any;
+
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff.request.completed', {
+        requestId: request._id,
+        tableId: request.tableId,
+        sessionId: request.sessionId,
+        type: request.type,
+        completedBy: request.completedBy,
+      });
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff:request-updated', {
+        requestId: request._id,
+        status: RequestStatus.COMPLETED,
+      });
+    }
     
     ok(res, { request });
   } catch (error) {
@@ -369,4 +397,42 @@ staffRouter.post('/tickets', async (req, res, next) => {
 });
 
 staffRouter.post('/orders/:id/apply-offer', OrdersController.applyWaiterOffer);
+staffRouter.post('/send-phone-otp', async (req, res, next) => {
+  try {
+    const { phone } = req.body || {};
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`
+================================================================================
+ 📲 [STAFF PHONE VERIFICATION OTP]
+ Staff User: ${req.user?.email || req.user?.id || 'Staff Member'}
+ Target Mobile: ${phone || 'Unknown Phone'}
+ Terminal OTP Code:  >>> ${otp} <<<
+ Timestamp: ${new Date().toLocaleTimeString()}
+================================================================================
+    `);
+    ok(res, { success: true, otp, message: 'OTP sent to backend terminal console' });
+  } catch (error) {
+    next(error);
+  }
+});
+staffRouter.post('/tables', async (req, res, next) => {
+  try {
+    const restaurantId = req.user?.restaurantId;
+    if (!restaurantId) {
+      throw new AppError('Restaurant context required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+    const { tableNumber, capacity, section, floor } = req.body || {};
+    const table = await tablesService.createTable({
+      restaurantId: restaurantId.toString(),
+      tableNumber: String(tableNumber),
+      capacity: Number(capacity || 4),
+      section: section || 'Zone A',
+      floor: Number(floor || 1),
+    });
+    ok(res, { table }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
 staffRouter.get('/offers', OrdersController.getActiveOffers);
+staffRouter.get('/tables/:id/guest-loyalty', OrdersController.getTableGuestLoyaltyAndOffers);

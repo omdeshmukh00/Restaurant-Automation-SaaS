@@ -71,7 +71,7 @@ export const reorderCategoriesSchema = z.object({
 */
 
 export const createItemSchema = z.object({
-  categoryId: objectIdSchema,
+  categoryId: objectIdSchema.optional(),
   name: z.string().min(1, 'Name is required').max(150),
   description: z.string().max(1000).optional(),
   shortDescription: z.string().max(200).optional(),

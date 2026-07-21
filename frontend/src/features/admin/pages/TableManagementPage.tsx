@@ -49,12 +49,20 @@ export function TableManagementPage(): JSX.Element {
     socket.on('order.new', handleUpdate);
     socket.on('order.updated', handleUpdate);
     socket.on('menu.updated', handleUpdate);
+    socket.on('staff.table.waiter_assigned', handleUpdate);
+    socket.on('cleaning.completed', handleUpdate);
+    socket.on('cleaning.started', handleUpdate);
+    socket.on('bill.requested', handleUpdate);
 
     return () => {
       socket.off('table.status.changed', handleUpdate);
       socket.off('order.new', handleUpdate);
       socket.off('order.updated', handleUpdate);
       socket.off('menu.updated', handleUpdate);
+      socket.off('staff.table.waiter_assigned', handleUpdate);
+      socket.off('cleaning.completed', handleUpdate);
+      socket.off('cleaning.started', handleUpdate);
+      socket.off('bill.requested', handleUpdate);
     };
   }, [fetchTables]);
 

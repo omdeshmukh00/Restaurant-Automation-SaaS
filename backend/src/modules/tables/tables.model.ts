@@ -35,14 +35,14 @@ export const TABLE_TRANSITIONS: Record<TableStatus, TableStatus[]> = {
   [TableStatus.RESERVED]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
   [TableStatus.WAITING_ASSIGNED]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED, TableStatus.RESERVED],
   [TableStatus.OCCUPIED]: [TableStatus.AVAILABLE, TableStatus.ORDERING, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY, TableStatus.RESERVED, TableStatus.UNDER_MAINTENANCE],
-  [TableStatus.ORDERING]: [TableStatus.AVAILABLE, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY],
-  [TableStatus.BILL_PENDING]: [TableStatus.PAID, TableStatus.DIRTY],
-  [TableStatus.PAYMENT_PENDING]: [TableStatus.PAID, TableStatus.DIRTY],
-  [TableStatus.PAID]: [TableStatus.DIRTY],
-  [TableStatus.DIRTY]: [TableStatus.CLEANING, TableStatus.AVAILABLE, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE],
-  [TableStatus.CLEANING]: [TableStatus.DIRTY, TableStatus.AVAILABLE, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE],
-  [TableStatus.MAINTENANCE]: [],
-  [TableStatus.UNDER_MAINTENANCE]: [],
+  [TableStatus.ORDERING]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY],
+  [TableStatus.BILL_PENDING]: [TableStatus.PAID, TableStatus.DIRTY, TableStatus.OCCUPIED, TableStatus.AVAILABLE],
+  [TableStatus.PAYMENT_PENDING]: [TableStatus.PAID, TableStatus.DIRTY, TableStatus.OCCUPIED, TableStatus.AVAILABLE],
+  [TableStatus.PAID]: [TableStatus.DIRTY, TableStatus.OCCUPIED, TableStatus.AVAILABLE],
+  [TableStatus.DIRTY]: [TableStatus.CLEANING, TableStatus.AVAILABLE, TableStatus.OCCUPIED, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE],
+  [TableStatus.CLEANING]: [TableStatus.DIRTY, TableStatus.AVAILABLE, TableStatus.OCCUPIED, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE],
+  [TableStatus.MAINTENANCE]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
+  [TableStatus.UNDER_MAINTENANCE]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
 };
 
 const tableSchema = new Schema<ITable>(

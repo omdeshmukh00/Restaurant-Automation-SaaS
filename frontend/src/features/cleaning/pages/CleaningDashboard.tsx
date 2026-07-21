@@ -577,24 +577,7 @@ export default function CleaningDashboard() {
             </div>
           </div>
 
-          {/* Branding Card */}
-          <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-6 rounded-2xl relative overflow-hidden text-white shadow-md shadow-orange-500/10">
-            <div className="absolute -right-4 -bottom-4 opacity-15 transform rotate-12 shrink-0">
-              <span className="material-symbols-outlined text-[100px]">cleaning_services</span>
-            </div>
-            <h3 className="text-sm font-extrabold mb-1 font-sans">Keep It Clean, Keep It Safe</h3>
-            <p className="text-[11px] opacity-90 mb-4 relative z-10 font-sans leading-relaxed">
-              Your efforts make our space better for everyone. Thank you for your dedication!
-            </p>
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full border border-white/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[16px] text-white">verified</span>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider font-sans">
-                Daily Hygiene Champion
-              </span>
-            </div>
-          </div>
+
         </div>
       </div>
 
