@@ -1,18 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
-import QRScannerModal from './QRScannerModal';
 import { useCustomerStore } from '../../store/customer.store';
 
-export default function CustomerBottomNav() {
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [toastMsg, setToastMsg] = useState('');
-  const { diningSession } = useCustomerStore();
+interface Props {
+  onOpenScanner: () => void;
+}
 
-  const handleScanSuccess = (tableId: string) => {
-    setScannerOpen(false);
-    setToastMsg(`✅ Connected to Table ${tableId}!`);
-    setTimeout(() => setToastMsg(''), 3000);
-  };
+export default function CustomerBottomNav({ onOpenScanner }: Props) {
+  const { diningSession } = useCustomerStore();
 
   const leftNav = [
     { to: '/customer/home', icon: 'home', label: 'Home' },
@@ -62,7 +57,7 @@ export default function CustomerBottomNav() {
         {!diningSession && (
           <div className="flex-1 flex flex-col items-center justify-center relative -top-3.5 z-50">
             <button
-              onClick={() => setScannerOpen(true)}
+              onClick={onOpenScanner}
               className="w-14 h-14 bg-sd-primary-container text-white rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(255,92,0,0.35)] hover:scale-105 active:scale-95 transition-all border-[4px] border-white dark:border-sd-surface shrink-0"
               title="Scan QR"
             >
@@ -104,19 +99,6 @@ export default function CustomerBottomNav() {
         ))}
       </nav>
 
-      {/* QR Scanner Modal Overlay */}
-      <QRScannerModal
-        isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScanSuccess={handleScanSuccess}
-      />
-
-      {/* Local Toast Notification */}
-      {toastMsg && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-sd-inverse-surface text-white px-6 py-3 rounded-2xl shadow-xl z-[100] animate-fadeIn font-sans text-sm font-semibold">
-          {toastMsg}
-        </div>
-      )}
     </>
   );
 }

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { tableAPI } from '../api/staff.api';
 
 interface Table {
-  id: number;
+  id: string;
   name: string;
   section: 'Zone A' | 'Zone B' | 'Outdoor';
   capacity: number;
@@ -18,7 +19,7 @@ const generateOrderId = () => `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 export default function StaffTablesPage() {
   const { query } = useStaffSearch();
   const [selectedSection, setSelectedSection] = useState<'All' | 'Zone A' | 'Zone B' | 'Outdoor'>('All');
-  const { tables, setTables, orders, setOrders } = useStaffDashboard();
+  const { tables, setTables, orders, setOrders, refreshDashboard } = useStaffDashboard();
 
   // Add Table states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -30,7 +31,7 @@ export default function StaffTablesPage() {
     e.preventDefault();
     if (!newTableName) return;
 
-    const nextId = tables.length > 0 ? Math.max(...tables.map(t => t.id)) + 1 : 1;
+    const nextId = `temp-${Date.now()}`;
     const newTable = {
       id: nextId,
       name: newTableName,
@@ -48,8 +49,19 @@ export default function StaffTablesPage() {
     setShowAddModal(false);
   };
 
-  const updateTableStatus = (id: number, status: typeof tables[0]['status']) => {
-    // If table transitions to Occupied, create an order automatically if none exists
+  const updateTableStatus = async (id: string, status: typeof tables[0]['status']) => {
+    try {
+      if (status === 'Occupied') {
+        await tableAPI.occupy(id);
+      } else if (status === 'Reserved') {
+        await tableAPI.reserve(id);
+      } else if (status === 'Available') {
+        await tableAPI.updateStatus(id, 'available');
+      }
+    } catch (err) {
+      console.error('Failed to update table status', err);
+    }
+
     if (status === 'Occupied') {
       const tableObj = tables.find(t => t.id === id);
       if (tableObj) {
@@ -80,6 +92,8 @@ export default function StaffTablesPage() {
       }
       return t;
     }));
+
+    await refreshDashboard();
   };
 
   const filteredBySection = tables.filter(t => 
@@ -202,7 +216,7 @@ export default function StaffTablesPage() {
               <div className="border-t border-slate-100 pt-3 flex gap-2">
                 {table.status === 'Available' && (
                   <button
-                    onClick={() => updateTableStatus(table.id, 'Occupied')}
+                    onClick={() => void updateTableStatus(table.id, 'Occupied')}
                     className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] py-1.5 px-2 rounded-lg transition-all"
                   >
                     Seat Guests
@@ -210,7 +224,7 @@ export default function StaffTablesPage() {
                 )}
                 {table.status === 'Cleaning' && (
                   <button
-                    onClick={() => updateTableStatus(table.id, 'Available')}
+                    onClick={() => void updateTableStatus(table.id, 'Available')}
                     className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold text-[10px] py-1.5 px-2 rounded-lg transition-all"
                   >
                     Available
@@ -226,7 +240,7 @@ export default function StaffTablesPage() {
                 )}
                 {table.status === 'Reserved' && (
                   <button
-                    onClick={() => updateTableStatus(table.id, 'Occupied')}
+                    onClick={() => void updateTableStatus(table.id, 'Occupied')}
                     className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold text-[10px] py-1.5 px-2 rounded-lg transition-all"
                   >
                     Arrived
@@ -236,7 +250,7 @@ export default function StaffTablesPage() {
                   onClick={() => {
                     const statuses: Table['status'][] = ['Available', 'Reserved', 'Occupied', 'Food Served', 'Bill Requested', 'Cleaning'];
                     const nextIndex = (statuses.indexOf(table.status) + 1) % statuses.length;
-                    updateTableStatus(table.id, statuses[nextIndex]);
+                    void updateTableStatus(table.id, statuses[nextIndex]);
                   }}
                   className="border border-slate-100 text-slate-400 hover:text-slate-600 p-1.5 rounded-lg transition-all flex items-center justify-center"
                   title="Cycle Status"

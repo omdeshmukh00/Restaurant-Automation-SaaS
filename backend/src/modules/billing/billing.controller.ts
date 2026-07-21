@@ -159,34 +159,7 @@ export class BillingController {
     }
   }
 
-  static async createPayment(req: Request, res: Response, next: NextFunction) {
-    try {
-      const session = req.tableSession;
-      if (!session) throw new AppError("Session required", 401, ErrorCode.UNAUTHORIZED);
 
-      const paymentMethod = req.body.paymentMethod || req.body.method;
-      if (!paymentMethod) throw new AppError("Payment method is required", 400, ErrorCode.VALIDATION_ERROR);
-
-      let customerEmail = req.body.customerEmail as string | undefined;
-      if (customerEmail) {
-        customerEmail = customerEmail.trim().toLowerCase();
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(customerEmail)) {
-          throw new AppError("Invalid email format", 400, ErrorCode.VALIDATION_ERROR);
-        }
-      }
-
-      const data = await BillingService.createPayment(session.restaurantId.toString(), session._id.toString(), paymentMethod, customerEmail);
-
-      return res.status(201).json({
-        success: true,
-        message: "Payment created successfully",
-        data,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
 
   static async verifyPayment(req: Request, res: Response, next: NextFunction) {
     try {

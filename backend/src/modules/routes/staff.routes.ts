@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import mongoose from 'mongoose';
+import { z } from 'zod';
 import { TableModel } from '../tables/tables.model';
 import queueRouter from '../queue/queue.routes';
 import { ReservationModel } from '../reservations/reservations.model';
@@ -165,6 +166,28 @@ staffRouter.patch(
     next(error);
   }
 });
+
+staffRouter.patch(
+  '/tables/:id/status',
+  validate({
+    params: entityIdParamsSchema,
+    body: z.object({
+      status: z.nativeEnum(TableStatus),
+    }),
+  }),
+  async (req, res, next) => {
+    try {
+      const table = await tablesService.updateTableStatus(
+        req.params.id,
+        req.body.status,
+        req.user!.restaurantId!
+      );
+      ok(res, { table });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 staffRouter.use('/queue', queueRouter);
 

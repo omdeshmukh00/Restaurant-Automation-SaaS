@@ -10,7 +10,7 @@ import { ok } from '../../utils/responses';
 import { logAuditRaw } from '../auditLogs/auditLogs.helper';
 import { AuditEntity, AuditAction } from '../auditLogs/auditLogs.types';
 import { socketService } from '../../sockets/socket.service';
-import { sendRestaurantSubmissionEmail } from '../../services/mail.service';
+import { sendRestaurantSubmissionEmail, sendPaymentFailedEmail } from '../../services/mail.service';
 import { getPlatformSettings } from './platformSettings.model';
 import { logger } from '../../config/logger';
 
@@ -275,6 +275,21 @@ export async function verifyPartnerRequestPayment(req: Request, res: Response, n
     });
 
     if (!isValid) {
+      const failedReq = await RestaurantRequestModel.findOne({ orderId: razorpay_order_id }).setOptions({ bypassTenant: true });
+      if (failedReq) {
+        failedReq.paymentStatus = 'FAILED';
+        await failedReq.save();
+        void sendPaymentFailedEmail(
+          failedReq.email,
+          failedReq.ownerName,
+          failedReq.paymentAmount || 0,
+          failedReq.paymentCurrency || 'INR',
+          razorpay_order_id,
+          'Payment signature verification failed',
+          '/partner',
+          'Partner Onboarding Processing Fee'
+        );
+      }
       throw new AppError('Razorpay payment signature verification failed', 400, ErrorCode.INVALID_REQUEST);
     }
 
@@ -428,6 +443,38 @@ export async function recoverPartnerRequest(req: Request, res: Response, next: N
       message: 'Application successfully recovered and submitted.',
       request,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function notifyPartnerPaymentFailureController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { orderId, failureReason } = req.body;
+    if (!orderId) {
+      throw new AppError('orderId is required', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    const request = await RestaurantRequestModel.findOne({ orderId }).setOptions({ bypassTenant: true });
+    if (!request) {
+      throw new AppError('Application request not found for this order', 404, ErrorCode.NOT_FOUND);
+    }
+
+    request.paymentStatus = 'FAILED';
+    await request.save();
+
+    void sendPaymentFailedEmail(
+      request.email,
+      request.ownerName,
+      request.paymentAmount || 0,
+      request.paymentCurrency || 'INR',
+      orderId,
+      failureReason || 'Payment dismissed or failed during checkout',
+      '/partner',
+      'Partner Onboarding Processing Fee'
+    );
+
+    return ok(res, { message: 'Payment failure recorded and notification email sent.' });
   } catch (error) {
     next(error);
   }

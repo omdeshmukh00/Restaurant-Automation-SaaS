@@ -83,17 +83,32 @@ export async function login(input: LoginInput, meta?: { userAgent?: string; ip?:
   }
 
   if (userService.isAccountLocked(user)) {
-    throw new AppError('Account is temporarily locked. Please try again later.', 423, ErrorCode.ACCOUNT_LOCKED);
+    throw new AppError('Account is locked for 15 mins. Please try again after 15 mins.', 423, ErrorCode.ACCOUNT_LOCKED);
   }
 
   if (user.status !== 'ACTIVE') {
     throw new AppError('Account is not active', 403, ErrorCode.FORBIDDEN);
   }
 
+  // Enforce restaurant suspension check (for non-superadmins)
+  if (user.role !== UserRole.SUPER_ADMIN && user.restaurantId) {
+    const { RestaurantModel } = await import('../restaurants/restaurants.model');
+    const restaurant = await RestaurantModel.findById(user.restaurantId);
+    if (!restaurant || restaurant.isDeleted) {
+      throw new AppError('Your restaurant account has been deleted by Team Restohub.', 403, ErrorCode.FORBIDDEN);
+    }
+    if (restaurant.status === 'SUSPENDED') {
+      const reasonMsg = restaurant.blockReason
+        ? `Your restaurant has been inactivated/blocked by Restohub. Reason: ${restaurant.blockReason}`
+        : 'Your restaurant has been inactivated/blocked by Restohub.';
+      throw new AppError(reasonMsg, 403, ErrorCode.FORBIDDEN);
+    }
+  }
+
   const isValid = await comparePassword(input.password, user.password);
 
   if (!isValid) {
-    await userService.incrementFailedAttempts(user._id.toString());
+    await userService.incrementFailedAttempts(user._id.toString(), meta);
     throw new AppError('Invalid credentials', 401, ErrorCode.UNAUTHORIZED);
   }
 

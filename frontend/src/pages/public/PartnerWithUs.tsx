@@ -1,10 +1,33 @@
-import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 import PartnerForm from '../../components/partner/PartnerForm';
+import { apiClient } from '../../shared/services/apiClient';
 
 export default function PartnerWithUs() {
+  const [platformName, setPlatformName] = useState<string>('RestoHub');
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient
+      .get('/public/platform-settings')
+      .then((res) => {
+        if (!isMounted) return;
+        const data = res.data?.data || res.data;
+        if (data?.platformName) {
+          setPlatformName(data.platformName);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load platform settings', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans antialiased overflow-x-hidden relative flex flex-col justify-between">
+    <div className="partner-page min-h-screen bg-[#f8fafc] text-slate-900 font-sans antialiased overflow-x-hidden relative flex flex-col justify-between">
       
       {/* Header / Navbar */}
       <header className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 relative z-10">
@@ -21,13 +44,22 @@ export default function PartnerWithUs() {
 
       {/* Main Title & Subtitle Area */}
       <section className="max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-4 pb-6 text-center space-y-3 relative z-10">
-        <div className="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200/60 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-wider text-[#FF6B1A] uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B1A] animate-pulse" />
-          Partner With Us
+        <div
+          className="inline-flex items-center gap-2.5 px-4 py-1.5 mx-auto"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255,107,26,0.12), rgba(255,107,26,0.06))',
+            borderRadius: '999px',
+            border: '1px solid rgba(255,107,26,0.2)',
+          }}
+        >
+          <Sparkles className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
+          <span className="text-[13px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>
+            Partner With Us
+          </span>
         </div>
         
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-          Join <span className="text-[#FF6B1A]">RestoHub</span> as Our Partner
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight font-sans">
+          Join <span className="text-[#FF6B1A]">{platformName}</span> as Our Partner
         </h1>
         
         <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto leading-relaxed">
@@ -37,7 +69,7 @@ export default function PartnerWithUs() {
 
       {/* Form Container */}
       <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 relative z-10 flex-grow">
-        <PartnerForm />
+        <PartnerForm platformName={platformName} />
       </main>
 
       {/* Footer disclaimer */}
@@ -46,7 +78,7 @@ export default function PartnerWithUs() {
           No commitment. You can change your plan anytime later.
         </p>
         <p className="text-[9px] text-slate-400/50">
-          &copy; {new Date().getFullYear()} RestoHub Technologies Private Limited. All rights reserved.
+          &copy; {new Date().getFullYear()} {platformName} Technologies Private Limited. All rights reserved.
         </p>
       </footer>
     </div>

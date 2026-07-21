@@ -42,6 +42,26 @@ export async function connectToDatabase(): Promise<void> {
     host: connection.connection.host,
     database: connection.connection.name,
   });
+
+  // Drop non-sparse email index on users collection if it exists to allow mongoose to recreate it with sparse: true
+  try {
+    const db = mongoose.connection.db;
+    if (db) {
+      const collections = await db.listCollections({ name: 'users' }).toArray();
+      if (collections.length > 0) {
+        const indexes = await db.collection('users').indexes();
+        const hasNonSparseEmailIndex = indexes.some(
+          (idx: any) => idx.name === 'email_1' && !idx.sparse
+        );
+        if (hasNonSparseEmailIndex) {
+          logger.info('Dropping non-sparse email index on users collection to allow recreate');
+          await db.collection('users').dropIndex('email_1');
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.warn('Failed to drop non-sparse email index', { error: err.message });
+  }
 }
 
 export async function disconnectFromDatabase(): Promise<void> {

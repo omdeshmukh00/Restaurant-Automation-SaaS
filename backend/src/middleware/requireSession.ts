@@ -29,12 +29,21 @@ export async function requireSession(req: Request, _res: Response, next: NextFun
         ErrorCode.SESSION_INVALID
       );
     }
-    
-    // Validate session (checks ACTIVE, hard expiry, idle timeout)
-    const session = await sessionService.validateSession(token);
+    const isClosedAllowed =
+      req.method === 'GET' ||
+      req.path.includes('/feedback') ||
+      req.path.includes('/reorder') ||
+      req.path.includes('/session/end') ||
+      req.path.includes('/payments');
 
-    // Touch activity timestamp
-    await sessionService.touchActivity(session._id.toString());
+    // Validate session (checks ACTIVE, hard expiry, idle timeout)
+    const session = await sessionService.validateSession(token, isClosedAllowed);
+
+    // Touch activity timestamp ONLY for business actions
+    const ALLOWED_ACTIVITY_METHODS = ['POST', 'PATCH', 'PUT', 'DELETE'];
+    if (ALLOWED_ACTIVITY_METHODS.includes(req.method)) {
+      await sessionService.touchActivity(session._id.toString());
+    }
 
     const tenantId = (session as any).tenantId?.toString() || session.restaurantId.toString();
 

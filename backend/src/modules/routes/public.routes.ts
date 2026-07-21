@@ -16,7 +16,6 @@ import { RestaurantModel } from '../restaurants/restaurants.model';
 import { OfferModel } from '../offers/offers.model';
 import { TableModel } from '../tables/tables.model';
 import { ReservationModel } from '../reservations/reservations.model';
-import { QueueEntryModel } from '../queue/queue.model';
 import { RestaurantStatus, TableStatus, ReservationStatus } from '../../constants/statuses';
 import { ok } from '../../utils/responses';
 import { AppError } from '../../utils/AppError';
@@ -24,8 +23,6 @@ import { ErrorCode } from '../../constants/errors';
 import { z } from 'zod';
 
 import { attachUser } from '../../middleware/requireAuth';
-import { restaurantSlugParamSchema } from '../restaurants/restaurants.schema';
-import { QueueService } from '../queue/queue.service';
 
 export const publicRouter = Router();
 
@@ -116,9 +113,18 @@ publicRouter.get('/menu', async (req, res, next) => {
 // Returns active restaurants, dishes, offers, and live stats for the landing page
 publicRouter.get('/landing/data', async (req, res, next) => {
   try {
-    const restaurants = await RestaurantModel.find({ status: RestaurantStatus.ACTIVE }).lean();
+    const restaurants = await RestaurantModel.find({
+      status: {
+        $in: [
+          RestaurantStatus.ACTIVE,
+          RestaurantStatus.APPLICATION_APPROVED,
+          RestaurantStatus.ADMIN_SETUP_PENDING,
+          RestaurantStatus.PLAN_SELECTION_PENDING,
+        ],
+      },
+    }).lean();
     const offers = await OfferModel.find({ active: true }).lean();
-    const dishes = await MenuItem.find({ isHidden: false, isAvailable: true }).limit(12).lean();
+    const dishes = await MenuItem.find().limit(12).lean();
 
     const cuisinesSet = new Set<string>();
     restaurants.forEach((r) => {
@@ -162,17 +168,47 @@ publicRouter.get('/landing/data', async (req, res, next) => {
   }
 });
 
+// ── POST /api/v1/public/landing/reserve ────────────────────────────────
+// Public endpoint to book a reservation from the landing page
+publicRouter.post('/landing/reserve', async (req, res, next) => {
+  try {
+    const { ReservationsService } = await import('../reservations/reservations.service');
+    const { ReservationStatus } = await import('../../constants/statuses');
+
+    const { restaurantId, guests, date, slot, mobile, customerName } = req.body;
+    if (!restaurantId || !date || !slot || !mobile || !guests) {
+      throw new AppError('Missing required fields', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    const reservation = await ReservationsService.createReservation({
+      restaurantId,
+      customerName: customerName || 'Guest',
+      mobile,
+      guests: Number(guests),
+      date,
+      slot,
+      status: ReservationStatus.CONFIRMED,
+    });
+
+    ok(res, { reservation }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Onboarding / Partner Application Routes ──────────────────────────
 import {
   createRazorpayOrderForPlan,
   submitPartnerRequest,
   verifyPartnerRequestPayment,
   recoverPartnerRequest,
+  notifyPartnerPaymentFailureController,
 } from '../superAdmin/restaurantRequest.controller';
 
 publicRouter.post('/partner-request/create-order', createRazorpayOrderForPlan);
 publicRouter.post('/partner-request', submitPartnerRequest);
 publicRouter.post('/partner-request/verify-payment', verifyPartnerRequestPayment);
+publicRouter.post('/partner-request/payment-failed', notifyPartnerPaymentFailureController);
 publicRouter.post('/partner-request/recover', recoverPartnerRequest);
 
 import { getPlatformSettings } from '../superAdmin/platformSettings.model';

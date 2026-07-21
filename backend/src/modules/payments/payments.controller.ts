@@ -199,3 +199,27 @@ export async function refundPaymentController(req: Request, res: Response, next:
     next(error);
   }
 }
+
+export async function requestCashPaymentController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const session = requireTableSession(req);
+    const data = await PaymentsService.requestCashPayment(session.restaurantId.toString(), session._id.toString());
+    ok(res, data, 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function confirmCashPaymentController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = requireRestaurantUser(req);
+    const staffId = req.user?._id;
+    if (!staffId) throw new AppError('Staff context required', 403, ErrorCode.FORBIDDEN);
+
+    const { paymentId } = req.params;
+    const data = await PaymentsService.confirmCashPayment(restaurantId.toString(), paymentId, staffId.toString());
+    ok(res, data);
+  } catch (error) {
+    next(error);
+  }
+}

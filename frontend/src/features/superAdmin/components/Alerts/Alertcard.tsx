@@ -185,52 +185,55 @@ export default function AlertCard({ alert, darkMode, onDismiss, onAcknowledge, o
           </div>
 
           {/* Action buttons */}
-          {!isResolved && (
-            <div className="flex items-center gap-2">
-              {alert.status !== 'acknowledged' && (
+          <div className="flex items-center gap-2">
+            {!isResolved && !alert.id.startsWith('request-') && (
+              <>
+                {alert.status !== 'acknowledged' && (
+                  <button
+                    onClick={() => onAcknowledge(alert.id)}
+                    className={cx(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
+                      darkMode
+                        ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    )}
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Acknowledge
+                  </button>
+                )}
                 <button
-                  onClick={() => onAcknowledge(alert.id)}
+                  onClick={() => onResolve(alert.id)}
                   className={cx(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
                     darkMode
-                      ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
+                      : 'bg-green-50 text-green-600 hover:bg-green-100'
                   )}
                 >
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  Acknowledge
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Resolve
                 </button>
-              )}
+              </>
+            )}
+
+            {alert.actionLabel && (
               <button
-                onClick={() => onResolve(alert.id)}
+                onClick={() => {
+                  if (alert.actionHref) {
+                    navigate(alert.actionHref);
+                  }
+                }}
                 className={cx(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                  darkMode
-                    ? 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
-                    : 'bg-green-50 text-green-600 hover:bg-green-100'
+                  'bg-[#ff5a1f] hover:bg-[#e04d1a] text-white shadow-sm shadow-orange-500/20'
                 )}
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Resolve
+                <ExternalLink className="w-3.5 h-3.5" />
+                {alert.actionLabel}
               </button>
-              {alert.actionLabel && (
-                <button
-                  onClick={() => {
-                    if (alert.actionHref) {
-                      navigate(alert.actionHref);
-                    }
-                  }}
-                  className={cx(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all',
-                    'bg-[#ff5a1f] hover:bg-[#e04d1a] text-white shadow-sm shadow-orange-500/20'
-                  )}
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  {alert.actionLabel}
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Mobile badges row */}

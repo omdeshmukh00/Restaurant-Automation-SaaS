@@ -36,9 +36,11 @@ export const SocketEvent = {
   STAFF_REQUEST_NEW: 'staff:request-new',
 
   // ── Billing events ────────────────────────────────────────────────────
+  BILL_REQUESTED: 'bill.requested',
   BILLING_UPDATED: 'bill.requested',
 
   // ── Payment events ────────────────────────────────────────────────────
+  PAYMENT_REQUESTED: 'payment.requested',
   PAYMENT_CONFIRMED: 'bill.paid',
 
   // ── Cleaning events ───────────────────────────────────────────────────

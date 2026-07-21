@@ -123,6 +123,18 @@ export class PaymentsService {
       providerPaymentId = rzpOrder.id;
     }
 
+    // Get active platform settings for commission
+    let commissionRate = 10;
+    let commission = 0;
+    try {
+      const { getPlatformSettings } = await import('../superAdmin/platformSettings.model');
+      const settings = await getPlatformSettings();
+      commissionRate = settings?.platformCommissionRate ?? 10;
+      commission = Math.round(amount * (commissionRate / 100) * 100) / 100;
+    } catch (e) {
+      commission = Math.round(amount * 0.1 * 100) / 100;
+    }
+
     // Create the PaymentModel record
     const payment = await PaymentModel.create({
       restaurantId: toObjectId(restaurantId),
@@ -134,6 +146,8 @@ export class PaymentsService {
       providerPaymentId,
       razorpayOrderId,
       status: PaymentStatus.PENDING as any,
+      commissionRate,
+      commission,
       metadata: {
         isCartCheckout,
         source: 'customer_payment_create',
@@ -206,6 +220,18 @@ export class PaymentsService {
       throw new AppError('Payment processing failed.', 400, ErrorCode.PAYMENT_FAILED);
     }
 
+    const isCartCheckout = paymentRecord.metadata?.isCartCheckout === true;
+
+    // Ensure bill exists for dine-and-pay-later model before starting transaction
+    if (!isCartCheckout) {
+      const { BillingModel } = await import('../billing/billing.model');
+      const existingBill = await BillingModel.findOne({ sessionId: toObjectId(sessionId) });
+      if (!existingBill) {
+        const { BillingService } = await import('../billing/billing.service');
+        await BillingService.requestFinalBill(restaurantId, sessionId);
+      }
+    }
+
     // 4. Wrap the rest in transaction
     let dbSession: mongoose.ClientSession | null = null;
     try {
@@ -228,105 +254,19 @@ export class PaymentsService {
       }
       await paymentRecord.save(options);
 
-      const isCartCheckout = paymentRecord.metadata?.isCartCheckout === true;
-
       if (isCartCheckout) {
-        // Place the order from cart items inside transaction
-        const { Cart } = await import('../cart/cart.model');
-        const cart = await Cart.findOne({
-          restaurantId: toObjectId(restaurantId),
-          sessionId: toObjectId(sessionId)
-        }).session(session ? session : null as any);
-
-        if (!cart || !cart.items || cart.items.length === 0) {
-          throw new AppError('Cart empty or not found during payment verification', 400, ErrorCode.VALIDATION_ERROR);
-        }
-
-        // Map cart items to order items
-        const menuItemIds = cart.items.map(i => i.menuItem);
-        const menuItems = await mongoose.model('MenuItem').find({
-          _id: { $in: menuItemIds },
-          restaurantId: toObjectId(restaurantId)
-        }).populate('ingredients.inventoryItemId').session(session ? session : null as any);
-
-        const menuItemMap = new Map(menuItems.map(m => [m._id.toString(), m]));
-
-        const orderItems = cart.items.map((item: any) => {
-          const menuItemIdStr = item.menuItem.toString();
-          const fullMenuItem = menuItemMap.get(menuItemIdStr);
-          if (!fullMenuItem) {
-            throw new AppError('Invalid menu item in cart', 400, ErrorCode.VALIDATION_ERROR);
-          }
-          const ingredientsSnapshot = fullMenuItem.ingredients ? fullMenuItem.ingredients.map((ing: any) => ({
-            inventoryItemId: ing.inventoryItemId && ing.inventoryItemId._id ? ing.inventoryItemId._id : ing.inventoryItemId,
-            inventoryItemName: (ing.inventoryItemId && ing.inventoryItemId.name) || 'Unknown Item',
-            quantity: ing.quantity
-          })) : [];
-
-          return {
-            menuItemId: fullMenuItem._id,
-            name: fullMenuItem.name,
-            quantity: item.quantity,
-            price: item.unitPrice,
-            totalPrice: item.subtotal,
-            notes: item.notes || '',
-            ingredients: ingredientsSnapshot,
-          };
-        });
-
-        const timestamp = Date.now().toString().slice(-6);
-        const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const orderNumber = `ORD-${timestamp}-${randomChars}`;
-
-        const { OrderModel } = await import('../orders/orders.model');
-        const { OrderStatus } = await import('../../constants/statuses');
-        
-        const sessionDoc = await TableSessionModel.findById(sessionId).session(session ? session : null as any);
-        if (!sessionDoc) {
-          throw new AppError('Table session not found', 404, ErrorCode.NOT_FOUND);
-        }
-
-        const order = await OrderModel.create([{
-          restaurantId: toObjectId(restaurantId),
-          tableId: sessionDoc.tableId,
-          sessionId: toObjectId(sessionId),
-          customerName: sessionDoc.customerName,
-          orderNumber,
-          items: orderItems,
-          totalAmount: cart.subtotal,
-          taxAmount: cart.tax,
-          discountAmount: cart.discount,
-          finalAmount: cart.grandTotal,
-          status: OrderStatus.PENDING,
-          paymentStatus: 'PAID', // mark as paid since checkout completed
-          priority: 'NORMAL',
-          specialInstructions: '',
-        }], options);
-
-        const createdOrder = order[0];
+        // Delegate order creation inside transaction
+        const { OrdersService } = await import('../orders/orders.service');
+        const createdOrder = await OrdersService.createOrder(
+          restaurantId,
+          sessionId,
+          'PAID',
+          session
+        );
 
         // Link order and payment
         paymentRecord.orderId = createdOrder._id;
         await paymentRecord.save(options);
-
-        // Transition table status to ORDERING if it is currently OCCUPIED
-        const table = await TableModel.findById(createdOrder.tableId).session(session ? session : null as any);
-        if (table && table.status === TableStatus.OCCUPIED) {
-          table.status = TableStatus.ORDERING;
-          await table.save(options);
-        }
-
-        // Clear cart
-        cart.items = [] as any;
-        cart.subtotal = 0;
-        cart.tax = 0;
-        cart.discount = 0;
-        cart.grandTotal = 0;
-        await cart.save(options);
-
-        // Emit Socket.IO event for new paid order
-        socketService.emitToRestaurant(restaurantId, SocketEvent.ORDER_NEW, { orderId: createdOrder._id });
-        socketService.emitToSession(sessionId, 'order.new', { order: createdOrder });
 
         return {
           success: true,
@@ -335,16 +275,13 @@ export class PaymentsService {
         };
       } else {
         // Dine-and-pay-later model: verify final bill
-        const bill = await BillingService.verifyPayment(
-          restaurantId,
-          sessionId,
-          paymentId,
-          mapVerificationStatus(simulateStatus),
-        );
+        const { BillingService } = await import('../billing/billing.service');
+        const { bill, updatedOrders } = await BillingService.settleSession(sessionId, session || undefined);
 
         return {
           success: true,
           bill,
+          updatedOrders,
           payment: paymentRecord,
         };
       }
@@ -372,11 +309,222 @@ export class PaymentsService {
           dbSession.endSession();
         }
       }
+
+      // Emit Socket.IO event AFTER the transaction has been safely committed to the database.
+      // This prevents ghost orders appearing in the Kitchen POS if the transaction rolls back.
+      if (result?.order) {
+        socketService.emitToRestaurant(restaurantId, SocketEvent.ORDER_NEW, { orderId: result.order._id });
+        socketService.emitToSession(sessionId, 'order.new', { order: result.order });
+      }
+
+      // POST-PAID SIDE EFFECTS (only if bill exists, meaning it was a post-paid settlement)
+      if (result?.bill) {
+        await this.processPostPaidSideEffects(restaurantId, sessionId, result.bill, result.updatedOrders || []);
+      }
       return result;
     } catch (error) {
       logger.error('Failed to verify customer payment', { error });
       throw error;
     }
+  }
+
+  /**
+   * Processes all side effects after a successful post-paid settlement.
+   * Every side effect is wrapped in try/catch to prevent blocking.
+   */
+  static async processPostPaidSideEffects(restaurantId: string, sessionId: string, bill: any, updatedOrders: any[]) {
+    const { socketService } = await import('../../sockets/socket.service');
+    const { SocketEvent } = await import('../../constants/events');
+
+    // 1. Order Status Sockets
+    if (updatedOrders && updatedOrders.length > 0) {
+      try {
+        for (const order of updatedOrders) {
+          socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+          socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
+        }
+      } catch (e) { logger.error('Failed to emit order status updates', { error: e }); }
+    }
+
+    // 2. Payment Confirmed Socket
+    try {
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.PAYMENT_CONFIRMED, { billId: bill._id, sessionId });
+      socketService.emitToSession(sessionId.toString(), 'payment.success', { billId: bill._id });
+    } catch (e) { logger.error('Failed to emit payment confirmed', { error: e }); }
+
+    // 3. Receipt Email
+    if (bill.customerEmail && bill.wantsReceipt) {
+      try {
+        const { RestaurantModel } = await import('../restaurants/restaurants.model');
+        const { sendReceiptEmail } = await import('../../services/mail.service');
+        const restaurant = await RestaurantModel.findById(restaurantId).lean();
+        const restaurantName = restaurant?.name || 'Our Restaurant';
+        const orderItems = (updatedOrders || []).flatMap((o: any) => o.items);
+
+        await sendReceiptEmail(bill.customerEmail, {
+          restaurantName,
+          invoiceNumber: bill.invoiceNumber || '',
+          customerName: bill.customerName || 'Guest',
+          customerPhone: bill.customerPhone || '',
+          orderItems,
+          subtotal: bill.subtotal,
+          taxAmount: bill.taxAmount + (bill.serviceCharge || 0),
+          totalAmount: bill.finalAmount,
+          paymentMethod: bill.paymentMethod || 'ONLINE',
+          paymentDate: bill.paidAt.toISOString().split('T')[0]
+        });
+        bill.receiptEmailedAt = new Date();
+        await bill.save(); // Out-of-band save for receipt timestamp
+      } catch (e) { logger.error('Failed to send receipt email', { error: e }); }
+    }
+
+    // 4. Notifications
+    try {
+      const { NotificationsService } = await import('../notifications/notifications.service');
+      const { UserRole } = await import('../../constants/roles');
+      const { NotificationCategory, NotificationPriority } = await import('../notifications/notifications.schema');
+      await NotificationsService.createNotification({
+        restaurantId: new mongoose.Types.ObjectId(restaurantId),
+        tableSessionId: new mongoose.Types.ObjectId(sessionId),
+        recipientRole: UserRole.CUSTOMER as any,
+        title: 'Payment Successful',
+        message: `Your payment of INR ${bill.finalAmount} was verified successfully.`,
+        type: 'PAYMENT_SUCCESS',
+        category: NotificationCategory.SYSTEM,
+        priority: NotificationPriority.HIGH,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Expires in 24 hours
+      });
+    } catch (e) { logger.error('Failed to send notification', { error: e }); }
+
+    // 5. End Session
+    try {
+      const { endSession } = await import('../tableSessions/tableSessions.service');
+      await endSession(sessionId, restaurantId, 'Bill paid successfully');
+    } catch (e) { logger.error(`Failed to close session ${sessionId} after payment:`, e); }
+  }
+
+  static async requestCashPayment(restaurantId: string, sessionId: string) {
+    const { BillingService } = await import('../billing/billing.service');
+
+    // Validate session
+    const { TableSessionModel } = await import('../tableSessions/tableSessions.model');
+    const session = await TableSessionModel.findOne({ _id: toObjectId(sessionId), restaurantId: toObjectId(restaurantId) });
+    if (!session || session.status === 'CLOSED') {
+      throw new AppError('Session not found or already closed.', 404, ErrorCode.NOT_FOUND);
+    }
+
+    const liveBill = await BillingService.getLiveBill(restaurantId, sessionId);
+
+    if (liveBill.financialSummary.outstandingBalance <= 0) {
+      throw new AppError('No outstanding balance to pay.', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    // Reject if another PENDING cash payment already exists
+    const existingPending = await PaymentModel.findOne({
+      sessionId: toObjectId(sessionId),
+      status: PaymentStatus.PENDING,
+      method: PaymentMethod.CASH,
+    });
+
+    if (existingPending) {
+      throw new AppError('A cash payment is already pending confirmation from staff.', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    const { BillingModel } = await import('../billing/billing.model');
+    let bill = await BillingModel.findOne({ sessionId: toObjectId(sessionId) });
+    if (!bill) {
+      bill = await BillingService.requestFinalBill(restaurantId, sessionId);
+    }
+
+    // Create PaymentModel
+    const payment = await PaymentModel.create({
+      restaurantId: toObjectId(restaurantId),
+      sessionId: toObjectId(sessionId),
+      billId: bill._id,
+      amount: liveBill.financialSummary.outstandingBalance,
+      currency: 'INR',
+      method: PaymentMethod.CASH,
+      provider: 'cash',
+      status: PaymentStatus.PENDING as any,
+    });
+
+    // Fire socket for staff
+    const { socketService } = await import('../../sockets/socket.service');
+    const { SocketEvent } = await import('../../constants/events');
+    socketService.emitToRestaurant(restaurantId, SocketEvent.PAYMENT_REQUESTED, { paymentId: payment._id, method: 'CASH', amount: payment.amount });
+
+    return payment;
+  }
+
+  static async confirmCashPayment(restaurantId: string, paymentId: string, staffId: string) {
+    const payment = await PaymentModel.findOne({
+      _id: toObjectId(paymentId),
+      restaurantId: toObjectId(restaurantId),
+    });
+
+    if (!payment) {
+      throw new AppError('Payment not found.', 404, ErrorCode.NOT_FOUND);
+    }
+
+    if (payment.status === PaymentStatus.COMPLETED) {
+      throw new AppError('Payment is already completed.', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    if (payment.method !== PaymentMethod.CASH) {
+      throw new AppError('Only cash payments can be manually confirmed.', 400, ErrorCode.INVALID_REQUEST);
+    }
+
+    const { BillingModel } = await import('../billing/billing.model');
+    const existingBill = await BillingModel.findOne({ sessionId: payment.sessionId });
+    if (!existingBill) {
+      const { BillingService } = await import('../billing/billing.service');
+      await BillingService.requestFinalBill(restaurantId, payment.sessionId!.toString());
+    }
+
+    let dbSession: mongoose.ClientSession | null = null;
+    try {
+      dbSession = await mongoose.startSession();
+      dbSession.startTransaction();
+    } catch (e) {
+      dbSession = null;
+    }
+
+    let bill, updatedOrders;
+    try {
+      payment.status = PaymentStatus.COMPLETED as any;
+      payment.confirmedBy = toObjectId(staffId);
+      payment.verifiedAt = new Date();
+      await payment.save({ session: dbSession });
+
+      const { BillingService } = await import('../billing/billing.service');
+      const result = await BillingService.settleSession(payment.sessionId!.toString(), dbSession || undefined);
+      bill = result.bill;
+      updatedOrders = result.updatedOrders;
+
+      if (dbSession) {
+        await dbSession.commitTransaction();
+      }
+    } catch (err: any) {
+      if (dbSession) {
+        await dbSession.abortTransaction();
+      }
+      throw err;
+    } finally {
+      if (dbSession) {
+        dbSession.endSession();
+      }
+    }
+
+    // Side effects out of bounds
+    if (bill && payment.sessionId) {
+      await this.processPostPaidSideEffects(restaurantId, payment.sessionId.toString(), bill, updatedOrders || []);
+    }
+
+    return {
+      success: true,
+      payment,
+      bill,
+    };
   }
 
   static async getCustomerPaymentStatus(restaurantId: string, sessionId: string, paymentId: string) {
@@ -762,6 +910,21 @@ export class PaymentsService {
       payment.status = PaymentStatus.FAILED as any;
       payment.failureReason = entity.error_description ?? 'Payment failed';
       await payment.save();
+
+      // Create platform system alert for Super Admin
+      try {
+        const { createSystemAlert } = await import('../superAdmin/superAdmin.service');
+        await createSystemAlert({
+          title: `Payment Failed: ${entity.id || 'Transaction'}`,
+          description: `Gateway transaction failed. Reason: ${payment.failureReason}`,
+          type: 'critical',
+          entityType: 'payment',
+          entityId: payment._id,
+          tags: ['payment_failed', 'razorpay'],
+        });
+      } catch (e) {
+        // Ignore
+      }
     }
 
     return { received: true, event: eventType };

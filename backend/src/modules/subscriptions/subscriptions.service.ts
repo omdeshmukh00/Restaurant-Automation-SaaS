@@ -33,7 +33,13 @@ type PlanDetails = {
 };
 
 async function resolvePlanDetails(plan: string): Promise<PlanDetails> {
-  const planDoc = await PlatformPlanModel.findOne({ name: plan }).lean();
+  let planDoc = null;
+  if (mongoose.Types.ObjectId.isValid(plan)) {
+    planDoc = await PlatformPlanModel.findById(plan).lean();
+  }
+  if (!planDoc) {
+    planDoc = await PlatformPlanModel.findOne({ name: plan }).lean();
+  }
   if (!planDoc) {
     throw new AppError(`Subscription plan '${plan}' not found`, 400, ErrorCode.INVALID_REQUEST);
   }
@@ -50,9 +56,16 @@ function roundToTwoDecimals(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-async function syncRestaurantPlan(restaurantId: string | mongoose.Types.ObjectId, plan: string) {
+async function syncRestaurantPlan(restaurantId: string | mongoose.Types.ObjectId, plan: string, planId?: mongoose.Types.ObjectId) {
   try {
-    const result = RestaurantModel.findByIdAndUpdate(restaurantId, { plan }, { new: true });
+    const updateObj: any = { plan };
+    if (planId) {
+      updateObj.subscriptionPlan_id = planId;
+    } else {
+      const planDoc = await PlatformPlanModel.findOne({ name: plan });
+      if (planDoc) updateObj.subscriptionPlan_id = planDoc._id;
+    }
+    const result = RestaurantModel.findByIdAndUpdate(restaurantId, updateObj, { new: true });
     await Promise.resolve(result).catch(() => null);
   } catch {
     return null;
@@ -236,6 +249,7 @@ const existing = await SubscriptionModel.findOne({ restaurantId: input.restauran
     restaurantId: input.restaurantId as any,
     plan: planDoc.name,
     planId: planDoc._id,
+    priceMonthly: planDoc.priceMonthly || 0,
     status: SubscriptionStatus.ACTIVE,
     billingCycle,
     seats,
@@ -254,7 +268,7 @@ const existing = await SubscriptionModel.findOne({ restaurantId: input.restauran
   } as unknown as Partial<ISubscription>);
 
 
-await syncRestaurantPlan(input.restaurantId as any, planDoc.name);
+await syncRestaurantPlan(input.restaurantId as any, planDoc.name, planDoc._id);
   await logSubscriptionEvent(doc._id.toString(), input.restaurantId as any, SubscriptionEventType.CREATED, {
     plan: planDoc.name,
     planId: planDoc._id,
@@ -631,6 +645,23 @@ sub.status = SubscriptionStatus.EXPIRED;
     'SUBSCRIPTION_EXPIRED',
   );
 
+  try {
+    const { sendSubscriptionExpiredEmail } = await import('../../services/mail.service');
+    const restaurant = await RestaurantModel.findById(sub.restaurantId).lean();
+    if (restaurant?.email) {
+      const billingUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/admin/settings?tab=subscription`;
+      void sendSubscriptionExpiredEmail(
+        restaurant.email,
+        restaurant.ownerName || 'Owner',
+        restaurant.name,
+        sub.plan,
+        billingUrl
+      );
+    }
+  } catch (e) {
+    // Ignore
+  }
+
   await sub.save();
   return sub;
 }
@@ -868,6 +899,7 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
   if (existingSub) {
     existingSub.plan = planDoc.name;
     existingSub.planId = planDoc._id;
+    existingSub.priceMonthly = planDoc.priceMonthly || 0;
     existingSub.status = SubscriptionStatus.ACTIVE;
     existingSub.billingCycle = billingCycle as BillingCycle;
     existingSub.currentPeriodStart = new Date();
@@ -881,6 +913,7 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
       restaurantId: new mongoose.Types.ObjectId(restaurantId),
       plan: planDoc.name,
       planId: planDoc._id,
+      priceMonthly: planDoc.priceMonthly || 0,
       status: SubscriptionStatus.ACTIVE,
       billingCycle: billingCycle as BillingCycle,
       seats: 1,
@@ -914,6 +947,7 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
 
   restaurant.status = 'ACTIVE' as any;
   restaurant.plan = planDoc.name;
+  restaurant.subscriptionPlan_id = planDoc._id;
   restaurant.billingCycle = billingCycle as any;
   restaurant.subscriptionId = subscription._id;
   await restaurant.save();
@@ -958,5 +992,118 @@ export async function verifyPurchase(input: VerifyPurchaseInput) {
     success: true,
     subscription,
     restaurant,
+  };
+}
+
+export async function getSubscriptionUsageDashboard(restaurantId: string) {
+  const { TableModel } = await import('../tables/tables.model');
+  const { OrderModel } = await import('../orders/orders.model');
+  const { UserModel } = await import('../users/users.model');
+  const { InventoryItemModel } = await import('../inventory/inventory.model');
+  const { ReservationModel } = await import('../reservations/reservations.model');
+  const { QueueEntryModel } = await import('../queue/queue.model');
+  const { STAFF_ROLES } = await import('../../constants/roles');
+
+  const startOfDay = (date = new Date()) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const startOfMonth = (date = new Date()) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+  const sub = await SubscriptionModel.findOne({
+    restaurantId: new mongoose.Types.ObjectId(restaurantId),
+    status: SubscriptionStatus.ACTIVE,
+  }).lean();
+
+  let activeSub = sub;
+  if (!activeSub) {
+    activeSub = await SubscriptionModel.findOne({
+      restaurantId: new mongoose.Types.ObjectId(restaurantId),
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  const planName = activeSub?.plan || 'Basic';
+  const planDoc = activeSub?.planId
+    ? await PlatformPlanModel.findById(activeSub.planId).lean()
+    : await PlatformPlanModel.findOne({ name: planName }).lean();
+
+  const now = new Date();
+  const today = startOfDay(now);
+  const month = startOfMonth(now);
+
+  const [
+    dailyOrderCount,
+    monthlyOrderCount,
+    activeTables,
+    queueUsage,
+    reservationActivity,
+    inventoryCount,
+    staffCount,
+  ] = await Promise.all([
+    OrderModel.countDocuments({ restaurantId, createdAt: { $gte: today } }),
+    OrderModel.countDocuments({ restaurantId, createdAt: { $gte: month } }),
+    TableModel.countDocuments({ restaurantId }),
+    QueueEntryModel.countDocuments({ restaurantId }),
+    ReservationModel.countDocuments({ restaurantId }),
+    InventoryItemModel.countDocuments({ restaurantId, active: { $ne: false } }),
+    UserModel.countDocuments({ restaurantId, role: { $in: STAFF_ROLES } }),
+  ]);
+
+  const quotas = [
+    {
+      key: 'tables',
+      label: 'Tables',
+      used: activeTables,
+      limit: planDoc?.tableLimit ?? null,
+      percent: planDoc?.tableLimit ? Math.min(100, Math.round((activeTables / planDoc.tableLimit) * 1000) / 10) : 0,
+    },
+    {
+      key: 'dailyOrders',
+      label: 'Daily Orders',
+      used: dailyOrderCount,
+      limit: planDoc?.dailyOrderLimit ?? null,
+      percent: planDoc?.dailyOrderLimit ? Math.min(100, Math.round((dailyOrderCount / planDoc.dailyOrderLimit) * 1000) / 10) : 0,
+    },
+    {
+      key: 'monthlyOrders',
+      label: 'Monthly Orders',
+      used: monthlyOrderCount,
+      limit: planDoc?.monthlyOrderLimit ?? null,
+      percent: planDoc?.monthlyOrderLimit ? Math.min(100, Math.round((monthlyOrderCount / planDoc.monthlyOrderLimit) * 1000) / 10) : 0,
+    },
+    {
+      key: 'staff',
+      label: 'Staff Members',
+      used: staffCount,
+      limit: planDoc?.staffLimit ?? null,
+      percent: planDoc?.staffLimit ? Math.min(100, Math.round((staffCount / planDoc.staffLimit) * 1000) / 10) : 0,
+    },
+    {
+      key: 'inventory',
+      label: 'Inventory Items',
+      used: inventoryCount,
+      limit: planDoc?.inventoryLimit ?? null,
+      percent: planDoc?.inventoryLimit ? Math.min(100, Math.round((inventoryCount / planDoc.inventoryLimit) * 1000) / 10) : 0,
+    },
+    {
+      key: 'reservations',
+      label: 'Reservations',
+      used: reservationActivity,
+      limit: planDoc?.reservationLimit ?? null,
+      percent: planDoc?.reservationLimit ? Math.min(100, Math.round((reservationActivity / planDoc.reservationLimit) * 1000) / 10) : 0,
+    },
+    {
+      key: 'queue',
+      label: 'Queue Entries',
+      used: queueUsage,
+      limit: planDoc?.queueLimit ?? null,
+      percent: planDoc?.queueLimit ? Math.min(100, Math.round((queueUsage / planDoc.queueLimit) * 1000) / 10) : 0,
+    },
+  ];
+
+  return {
+    planName,
+    status: activeSub?.status || 'inactive',
+    currentPeriodEnd: activeSub?.currentPeriodEnd || null,
+    quotas,
   };
 }

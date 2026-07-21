@@ -366,6 +366,11 @@ class CleaningStore {
     return defaultStaff;
   }
 
+  public setStaffMembers(members: CleaningStaffMember[]) {
+    this.staffMembers = members;
+    this.notify();
+  }
+
   public addStaffMember(member: CleaningStaffMember) {
     this.staffMembers = [...this.staffMembers, member];
     if (typeof window !== 'undefined') {

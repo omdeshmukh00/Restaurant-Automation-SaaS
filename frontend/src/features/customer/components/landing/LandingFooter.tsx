@@ -20,10 +20,8 @@ const FOOTER_LINKS = {
   ],
   forRestaurants: [
     { label: 'Partner With Us', href: '/partner' },
-    { label: 'Restaurant Login', href: '/login' },
-    { label: 'Business Solutions', href: '#solutions' },
-    { label: 'Pricing', href: '#pricing' },
-    { label: 'Resources', href: '#resources' },
+    { label: 'Restaurant Login', href: '/auth/restaurant' },
+    { label: 'Pricing', href: '/pricing' },
   ],
 };
 
@@ -158,7 +156,7 @@ export default function LandingFooter(): JSX.Element {
 
       {/* Main Footer Grid */}
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-12 sm:py-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
 
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-5">
@@ -240,32 +238,7 @@ export default function LandingFooter(): JSX.Element {
             </ul>
           </div>
 
-          {/* Contact */}
-          <div>
-            <h4 className="text-[13px] font-semibold uppercase tracking-wider text-white mb-5">
-              Contact
-            </h4>
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3">
-                <Mail className="w-[15px] h-[15px] mt-0.5 shrink-0" style={{ color: '#FF6B1A' }} />
-                <span className="text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  hello@restohub.in
-                </span>
-              </li>
-              <li className="flex items-start gap-3">
-                <Phone className="w-[15px] h-[15px] mt-0.5 shrink-0" style={{ color: '#FF6B1A' }} />
-                <span className="text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  +91 98765 43210
-                </span>
-              </li>
-              <li className="flex items-start gap-3">
-                <MapPin className="w-[15px] h-[15px] mt-0.5 shrink-0" style={{ color: '#FF6B1A' }} />
-                <span className="text-[14px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  Bandra West, Mumbai, Maharashtra 400050
-                </span>
-              </li>
-            </ul>
-          </div>
+          {/* Contact details removed */}
         </div>
       </div>
 
@@ -273,7 +246,7 @@ export default function LandingFooter(): JSX.Element {
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            © 2025 RestoHub. All rights reserved.
+            © 2026 RestoHub. All rights reserved.
           </span>
           <div className="flex items-center gap-5 text-[13px]" style={{ color: 'rgba(255,255,255,0.35)' }}>
             <a

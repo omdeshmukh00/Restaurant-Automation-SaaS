@@ -60,14 +60,14 @@ export async function startSession(
 }
 
 // ── Validate an existing session token ───────────────────────────────
-export async function validateSession(token: string): Promise<ITableSession> {
+export async function validateSession(token: string, allowClosed = false): Promise<ITableSession> {
   const session = await TableSessionModel.findOne({ sessionToken: token }).select('+sessionToken').setOptions({ bypassTenant: true });
   if (!session) {
     throw new AppError('Invalid session token', 401, ErrorCode.SESSION_INVALID);
   }
 
   // Check status
-  if (session.status !== SessionStatus.ACTIVE) {
+  if (session.status !== SessionStatus.ACTIVE && !(allowClosed && session.status === SessionStatus.CLOSED)) {
     throw new AppError('Session is no longer active', 401, ErrorCode.SESSION_INVALID);
   }
 
@@ -133,7 +133,7 @@ export async function touchActivity(sessionId: string): Promise<void> {
 
 // ── Recover a session from a stored token ────────────────────────────
 export async function recoverSession(token: string): Promise<ITableSession> {
-  const session = await validateSession(token);
+  const session = await validateSession(token, true);
   return session;
 }
 

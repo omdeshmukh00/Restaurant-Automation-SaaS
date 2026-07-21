@@ -2,8 +2,12 @@
 
 export const ROLE_ACCESS: Record<string, string[]> = {
   'Waiter': [
+    '/staff',
+    '/staff/orders',
     '/staff/menu',
     '/staff/food-ready',
+    '/staff/requests',
+    '/staff/tables',
     '/staff/profile',
     '/staff/settings'
   ],

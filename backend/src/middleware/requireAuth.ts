@@ -71,10 +71,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   }
 
   if (!token) {
-    if (req.originalUrl.includes('/customer')) {
-      console.trace('[requireAuth Debug Trace]');
-    }
-    console.log(`[requireAuth Debug] No token for ${req.method} ${req.originalUrl}. Headers:`, JSON.stringify(req.headers));
+
     next(new AppError('Authentication required', 401, ErrorCode.UNAUTHORIZED));
     return;
   }

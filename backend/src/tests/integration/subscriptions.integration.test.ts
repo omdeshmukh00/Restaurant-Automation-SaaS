@@ -165,7 +165,8 @@ describe('Subscriptions Integration Tests', () => {
           mobile: '1231231234',
           guests: 2,
           date: '2026-10-10',
-          slot: '19:00'
+          slot: '19:00',
+          tableNumber: '1'
         });
       
       expect(res.status).toBe(403);
@@ -182,6 +183,45 @@ describe('Subscriptions Integration Tests', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.subscription.status).toBe(SubscriptionStatus.ACTIVE);
       expect(res.body.data.subscription.plan).toBe('Integration Plan');
+    });
+  });
+
+  describe('Super Admin Live Activity API', () => {
+    let superadminToken: string;
+
+    beforeEach(async () => {
+      const superadmin = await UserModel.create({
+        name: 'Super Admin User',
+        email: 'sa@test.com',
+        mobile: '1111111111',
+        password: 'password123',
+        role: UserRole.SUPER_ADMIN,
+      });
+      superadminToken = generateTokenPair({
+        _id: superadmin._id.toString(),
+        email: superadmin.email,
+        role: superadmin.role,
+      }).accessToken;
+    });
+
+    it('allows super-admin to fetch restaurant live activity', async () => {
+      const res = await request(app)
+        .get(`/api/v1/super-admin/restaurants/${restaurantId}/live-activity`)
+        .set('Authorization', `Bearer ${superadminToken}`);
+      
+      expect(res.status).toBe(200);
+      expect(res.body.data.restaurant.name).toBe('Active Rest');
+      expect(res.body.data.tables.total).toBe(0);
+      expect(res.body.data.sessions.active).toBe(0);
+      expect(res.body.data.orders.todayCount).toBe(0);
+    });
+
+    it('denies non-super-admin access to live activity', async () => {
+      const res = await request(app)
+        .get(`/api/v1/super-admin/restaurants/${restaurantId}/live-activity`)
+        .set('Authorization', `Bearer ${ownerToken}`);
+      
+      expect(res.status).toBe(403);
     });
   });
 });

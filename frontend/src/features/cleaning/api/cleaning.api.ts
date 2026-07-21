@@ -69,34 +69,34 @@ export interface CleaningMetric {
 }
 
 export interface FloorTable {
-  id: number;
+  id: string;
   label: string;
   status: string;
   tone: string;
 }
 
 export interface DiningTable {
-  id: number;
+  id: string;
   number: number;
   label: string;
   status: string;
 }
 
 export interface KitchenTable {
-  id: number;
+  id: string;
   number: number;
   label: string;
   status: string;
 }
 
 export interface Washroom {
-  id: number;
+  id: string;
   label: string;
   status: string;
 }
 
 export interface KitchenWashroom {
-  id: number;
+  id: string;
   label: string;
   status: string;
 }
@@ -117,7 +117,7 @@ export interface UrgentTask {
 }
 
 export interface CleaningStaffMember {
-  id: number;
+  id: string;
   initials: string;
   name: string;
   status: string;
@@ -130,7 +130,7 @@ export interface CleaningStaffMember {
 }
 
 export interface ActiveJob {
-  id: number;
+  id: string;
   title: string;
   detail: string;
   staff: string;
@@ -138,7 +138,7 @@ export interface ActiveJob {
 }
 
 export interface RecentActivity {
-  id: number;
+  id: string;
   label: string;
   time: string;
   actor: string;
@@ -241,7 +241,7 @@ export const cleaningAPI = {
     });
   },
 
-  updateJobStatus: async (_jobId: number, _status: string): Promise<ApiResponse<void>> => {
+  updateJobStatus: async (_jobId: string, _status: string): Promise<ApiResponse<void>> => {
     // This method is not part of the documented cleaning tasks API, but is retained for compatibility.
     return Promise.resolve({ success: true });
   },
@@ -250,7 +250,7 @@ export const cleaningAPI = {
     return Promise.resolve({ success: true });
   },
 
-  deleteDiningTable: async (_tableId: number): Promise<ApiResponse<void>> => {
+  deleteDiningTable: async (_tableId: string): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 
@@ -258,7 +258,7 @@ export const cleaningAPI = {
     return Promise.resolve({ success: true });
   },
 
-  deleteWashroom: async (_washroomId: number): Promise<ApiResponse<void>> => {
+  deleteWashroom: async (_washroomId: string): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 
@@ -266,7 +266,7 @@ export const cleaningAPI = {
     return Promise.resolve({ success: true });
   },
 
-  deleteKitchenTable: async (_tableId: number): Promise<ApiResponse<void>> => {
+  deleteKitchenTable: async (_tableId: string): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 
@@ -274,7 +274,7 @@ export const cleaningAPI = {
     return Promise.resolve({ success: true });
   },
 
-  deleteKitchenWashroom: async (_washroomId: number): Promise<ApiResponse<void>> => {
+  deleteKitchenWashroom: async (_washroomId: string): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 
@@ -282,11 +282,11 @@ export const cleaningAPI = {
     return Promise.resolve({ success: true });
   },
 
-  updateStaffMember: async (_memberId: number, _updates: Partial<CleaningStaffMember>): Promise<ApiResponse<void>> => {
+  updateStaffMember: async (_memberId: string, _updates: Partial<CleaningStaffMember>): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 
-  deleteStaffMember: async (_memberId: number): Promise<ApiResponse<void>> => {
+  deleteStaffMember: async (_memberId: string): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 };

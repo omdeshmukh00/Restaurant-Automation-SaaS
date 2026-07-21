@@ -22,6 +22,9 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useRestaurantRequestsStore } from "../../store/RestaurantRequests";
+import { useAlertsStore } from "../../store/AlertsStore";
+import { useSuperAdminDashboardStore } from "../../store/Superadmindashboard";
+import { usePlatformSettingsGuard } from "../../../../shared/hooks/usePlatformSettingsGuard";
 
 interface NavbarProps {
   darkMode: boolean;
@@ -41,18 +44,43 @@ interface ProfileCardProps {
 
 function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
+  const { data, fetchOverview } = useSuperAdminDashboardStore();
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "HQ Terminal";
+
+  useEffect(() => {
+    if (!data) {
+      fetchOverview();
+    }
+  }, [data, fetchOverview]);
+
+  const formatVal = (val: number | undefined) => {
+    if (val === undefined) return "0";
+    if (val >= 1000) {
+      return (val / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    }
+    return val.toString();
+  };
+
+  const formatRev = (val: number | undefined) => {
+    if (val === undefined) return "₹0";
+    if (val >= 1000) {
+      return "₹" + (val / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    }
+    return "₹" + val.toString();
+  };
 
   const stats = [
-    { label: "Orders", value: "1.4K" },
-    { label: "Revenue", value: "₹92K" },
-    { label: "Partners", value: "38" },
+    { label: "Orders", value: formatVal(data?.stats?.totalOrders) },
+    { label: "Revenue", value: formatRev(data?.stats?.monthlyRevenue) },
+    { label: "Partners", value: (data?.stats?.totalRestaurants ?? 0).toString() },
   ];
 
   const details = [
-    { icon: Mail, label: "souvik@hq.io" },
-    { icon: Phone, label: "+91 98765 43210" },
-    { icon: MapPin, label: "Kolkata, WB" },
+    { icon: Mail, label: user?.email || "souvik@hq.io" },
+    { icon: Phone, label: user?.mobile || "+91 98765 43210" },
+    { icon: MapPin, label: user?.location || "Kolkata, WB" },
   ];
 
   const handleEditProfile = () => {
@@ -91,11 +119,13 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
       <div className="relative px-4 pb-3">
         <div className="flex items-end justify-between -mt-8 mb-3">
           <div className="relative">
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"
-              alt="Mr. Souvik"
-              className="w-16 h-16 rounded-2xl object-cover border-4 border-white dark:border-slate-950 shadow-md"
-            />
+            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white dark:border-slate-950 shadow-md">
+              <img
+                src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"}
+                alt={user?.name || "Mr. Souvik"}
+                className="w-full h-full object-cover"
+              />
+            </div>
             <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white dark:border-slate-950" />
           </div>
 
@@ -115,9 +145,9 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
 
         {/* Name & role */}
         <div className="mb-3">
-          <h3 className="font-bold text-sm leading-tight">Mr. Souvik Dey</h3>
+          <h3 className="font-bold text-sm leading-tight">{user?.name || "Mr. Souvik Dey"}</h3>
           <p className="text-[11px] text-slate-400 mt-0.5 font-medium">
-            Super Administrator · HQ Terminal
+            Super Administrator · {platformName}
           </p>
         </div>
 
@@ -151,12 +181,12 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
         {/* Last active */}
         <div
           className={`flex items-center gap-2 text-[10px] rounded-lg px-2.5 py-2 mb-3 font-medium ${
-            darkMode ? "bg-slate-900 text-slate-500" : "bg-slate-50 text-slate-400"
+            darkMode ? "bg-slate-900 text-slate-400" : "bg-slate-50 text-slate-500"
           }`}
         >
           <Clock size={10} className="text-orange-400" />
-          Last active: Today, 09:42 AM IST
-          <Activity size={10} className="ml-auto text-emerald-400" />
+          Last active: Today, {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })} IST
+          <Activity size={10} className="ml-auto text-emerald-400 animate-pulse" />
         </div>
 
         {/* Divider */}
@@ -189,15 +219,66 @@ export default function Navbar({
   sidebarCollapsed,
 }: NavbarProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [systemMute, setSystemMute] = useState(false);
   const requests = useRestaurantRequestsStore((state) => state.requests);
-  const pendingCount = requests.filter(r => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT').length;
+  const alerts = useAlertsStore((state) => state.alerts);
+  const fetchAlerts = useAlertsStore((state) => state.fetchAlerts);
+  const setupSocketListener = useAlertsStore((state) => state.setupSocketListener);
+  const acknowledgeAlert = useAlertsStore((state) => state.acknowledgeAlert);
+  const dismissAlert = useAlertsStore((state) => state.dismissAlert);
+
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("superadmin_dismissed_notifications");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("superadmin_dismissed_notifications", JSON.stringify(dismissedIds));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [dismissedIds]);
+
+  const handleMarkAllRead = async () => {
+    const toAcknowledge = alerts.filter(a => a.status === 'new');
+    for (const a of toAcknowledge) {
+      await acknowledgeAlert(a.id);
+    }
+  };
+
+  const handleDismissAll = async () => {
+    const toDismiss = alerts.filter(a => !a.id.startsWith('request-'));
+    for (const a of toDismiss) {
+      await dismissAlert(a.id);
+    }
+    const reqIds = requests.map(r => `req-${r.id}`);
+    setDismissedIds(prev => [...prev, ...reqIds]);
+  };
+
+  const handleDismissItem = async (item: any) => {
+    setDismissedIds(prev => [...prev, item.id]);
+    if (item.alert) {
+      const alertId = item.id.replace('alert-', '');
+      await dismissAlert(alertId);
+    }
+  };
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchAlerts();
+    setupSocketListener();
+  }, [fetchAlerts, setupSocketListener]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -222,38 +303,36 @@ export default function Navbar({
     );
   };
 
-  const notifications = useMemo(
-    () => [
-      ...requests.map((request) => ({
-        id: request.id,
+  const notifications = useMemo(() => {
+    const activeRequests = requests
+      .filter((r) => r.status === 'APPLICATION_PENDING' || r.status === 'PENDING_PAYMENT')
+      .map((request) => ({
+        id: `req-${request.id}`,
         title: "New Restaurant Request",
         description: `${request.name} requested ${request.plan} onboarding.`,
-        time: request.requestedAt,
+        time: request.requestedAt ? new Date(request.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
         type: "info",
         unread: true,
         request: true,
-      })),
-    {
-      id: 2,
-      title: "Gateway Timeout Alert",
-      description: "Payment API experienced a 1.2s latent spike.",
-      time: "14 mins ago",
-      type: "warning",
-      unread: true,
-    },
-    {
-      id: 3,
-      title: "Payout Disbursed Successfully",
-      description: "Batch #4029 wired to 14 standard merchants.",
-      time: "2 hours ago",
-      type: "success",
-      unread: false,
-    },
-    ],
-    [requests]
-  );
+      }));
 
-  const unresolvedCount = pendingCount + 1;
+    const activeAlerts = alerts
+      .filter((alert) => alert.status === 'new')
+      .map((alert) => ({
+        id: `alert-${alert.id}`,
+        title: alert.title,
+        description: alert.description,
+        time: alert.timestamp ? new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+        type: alert.type === 'critical' ? 'warning' : 'info',
+        unread: true,
+        alert: true,
+      }));
+
+    return [...activeRequests, ...activeAlerts].filter(item => !dismissedIds.includes(item.id));
+  }, [requests, alerts, dismissedIds]);
+
+  const pendingCount = notifications.length;
+  const unresolvedCount = pendingCount;
 
   return (
     <>
@@ -287,22 +366,19 @@ export default function Navbar({
             </button>
 
             {/* Brand – mobile */}
-            <div className="flex items-center gap-2.5 lg:hidden">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center font-black text-white text-sm">
-                ⬢
+            <div className="flex items-center gap-2 lg:hidden min-w-0">
+              <div className="h-9 w-9 p-1 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-md ring-2 ring-white/30">
+                <img
+                  src="/Graphura logo.png"
+                  alt="Graphura Logo"
+                  className="w-full h-full object-contain rounded-full bg-white"
+                />
               </div>
-              <div className="leading-tight">
-                <h1 className="font-bold text-xs tracking-tight uppercase text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-500">
-                  Super Admin
-                </h1>
-                <p
-                  className={`text-[9px] font-semibold tracking-wider uppercase ${
-                    darkMode ? "text-slate-500" : "text-slate-400"
-                  }`}
-                >
-                  HQ Terminal
-                </p>
-              </div>
+              <img
+                src={darkMode ? "/Graphura-Dark-Mode.png" : "/Graphuara-Light-Mode.jpg"}
+                alt="Graphura"
+                className="h-7 max-w-[115px] object-contain shrink min-w-0"
+              />
             </div>
 
             {/* Brand – desktop (hidden to prevent clashing and redundancy with sidebar) */}
@@ -403,49 +479,95 @@ export default function Navbar({
                           {unresolvedCount} Action items unresolved
                         </p>
                       </div>
+
+                      <div className="flex items-center gap-3 select-none">
+                        {alerts.filter(a => !a.id.startsWith('request-')).length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDismissAll();
+                            }}
+                            className="text-[9px] font-bold text-slate-400 hover:text-red-500 transition-colors uppercase tracking-wider bg-transparent border-none p-0 cursor-pointer"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                        {pendingCount > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkAllRead();
+                            }}
+                            className="text-[9px] font-bold text-orange-500 hover:text-orange-600 transition-colors uppercase tracking-wider bg-transparent border-none p-0 cursor-pointer"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="max-h-64 overflow-y-auto divide-y dark:divide-slate-900">
-                      {notifications.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => {
-                            if ("request" in item && item.request) {
+                      {notifications.length > 0 ? (
+                        notifications.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
                               setNotificationsOpen(false);
-                              navigate("/superadmin?requests=new");
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
                               if ("request" in item && item.request) {
-                                setNotificationsOpen(false);
                                 navigate("/superadmin?requests=new");
+                              } else if ("alert" in item && item.alert) {
+                                navigate("/superadmin/alerts");
                               }
-                            }
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          className={`p-3.5 flex gap-3 cursor-pointer group relative ${
-                            item.unread
-                              ? darkMode
-                                ? "bg-slate-900/30"
-                                : "bg-orange-50/20"
-                              : ""
-                          }`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-xs truncate">
-                              {item.title}
-                            </p>
-                            <p className="text-[11px] mt-0.5 text-slate-400">
-                              {item.description}
-                            </p>
-                            <p className="text-[10px] mt-1 text-slate-500">
-                              {item.time}
-                            </p>
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setNotificationsOpen(false);
+                                if ("request" in item && item.request) {
+                                  navigate("/superadmin?requests=new");
+                                } else if ("alert" in item && item.alert) {
+                                  navigate("/superadmin/alerts");
+                                }
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            className={`p-3.5 flex gap-3 cursor-pointer group relative ${
+                              item.unread
+                                ? darkMode
+                                  ? "bg-slate-900/30"
+                                  : "bg-orange-50/20"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0 pr-6">
+                              <p className="font-semibold text-xs truncate">
+                                {item.title}
+                              </p>
+                              <p className="text-[11px] mt-0.5 text-slate-400">
+                                {item.description}
+                              </p>
+                              <p className="text-[10px] mt-1 text-slate-500">
+                                {item.time}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDismissItem(item);
+                              }}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 opacity-40 sm:opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-all z-10"
+                              title="Dismiss notification"
+                            >
+                              <X size={12} />
+                            </button>
                           </div>
+                        ))
+                      ) : (
+                        <div className="py-8 text-center text-xs text-slate-500">
+                          No active notifications
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 )}
@@ -519,12 +641,12 @@ export default function Navbar({
                 aria-label="Open profile menu"
               >
                 <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"
+                  src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"}
                   alt="profile"
-                  className="w-7 h-7 rounded-lg object-cover"
+                  className="w-7 h-7 rounded-full object-cover"
                 />
                 <div className="hidden lg:block text-left leading-none">
-                  <h4 className="font-semibold text-xs">Mr. Souvik</h4>
+                  <h4 className="font-semibold text-xs">{user?.name || "Mr. Souvik"}</h4>
                   <p className="text-[10px] text-slate-400">Global Admin</p>
                 </div>
                 <ChevronDown

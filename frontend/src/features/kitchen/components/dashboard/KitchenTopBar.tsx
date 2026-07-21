@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useKitchenSearch } from './KitchenSearchContext';
 import { useNavigate } from 'react-router-dom';
 import { useKitchenStore } from '../../store/kitchen.store';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 interface Props {
   onProfileClick?: () => void;
@@ -26,6 +27,8 @@ const DEFAULT_NOTIFICATIONS: KitchenNotification[] = [
 ];
 
 export default function KitchenTopBar({ onProfileClick }: Props) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "Flavoroast";
   const { profile, updateProfile } = useKitchenStore();
   const { query, setQuery } = useKitchenSearch();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -245,7 +248,7 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
         <div className="bg-orange-100 p-1.5 rounded-lg">
           <span className="material-symbols-outlined text-orange-600 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
         </div>
-        <span className="font-bold text-sm text-slate-800 font-sans">Flavoroast</span>
+        <span className="font-bold text-sm text-slate-800 font-sans">{platformName}</span>
       </div>
 
       {/* Right: Search, Notifications, Profile */}

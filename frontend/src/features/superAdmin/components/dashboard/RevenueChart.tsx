@@ -8,7 +8,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import { revenueData } from "../../store/Superadmindashboard";
+import { useSuperAdminDashboardStore } from "../../store/Superadmindashboard";
 
 interface RevenueDataPoint {
   month: string;
@@ -53,7 +53,7 @@ const CustomTooltip = ({
           </span>
           <span className="font-semibold">
             {entry.name.includes("Revenue")
-              ? `$${entry.value.toLocaleString()}`
+              ? `₹${entry.value.toLocaleString()}`
               : entry.value.toLocaleString()}
           </span>
         </div>
@@ -63,6 +63,9 @@ const CustomTooltip = ({
 };
 
 export default function RevenueChart({ darkMode }: RevenueChartProps) {
+  const { data } = useSuperAdminDashboardStore();
+  const revenueData = data?.revenueData || [];
+
   return (
     <div
       className={`lg:col-span-2 rounded-xl p-4 sm:p-5 border ${
@@ -137,7 +140,7 @@ export default function RevenueChart({ darkMode }: RevenueChartProps) {
             <Legend wrapperStyle={{ display: "none" }} />
             <Line
               type="monotone"
-              name="Revenue ($)"
+              name="Revenue (₹)"
               dataKey="revenue"
               stroke="#f97316"
               strokeWidth={2.5}

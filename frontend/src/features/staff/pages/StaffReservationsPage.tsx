@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { reservationsAPI, tableAPI } from '../api/staff.api';
 
 interface Reservation {
-  id: number;
+  id: string;
   name: string;
   pax: number;
   time: string;
@@ -14,13 +15,13 @@ interface Reservation {
   assignedTable?: string;
 }
 
-const generateReservationId = () => Math.random();
+const generateReservationId = () => `res-${Math.floor(Math.random() * 100000)}`;
 const generateOrderId = () => `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
-const generateAlertId = () => Date.now();
+const generateAlertId = () => `alert-${Date.now()}`;
 
 export default function StaffReservationsPage() {
   const { query } = useStaffSearch();
-  const { tables, setTables, setAlerts, reservations, setReservations, orders, setOrders } = useStaffDashboard();
+  const { tables, setTables, setAlerts, reservations, setReservations, orders, setOrders, refreshDashboard } = useStaffDashboard();
 
   // Toast feedback state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -40,63 +41,90 @@ export default function StaffReservationsPage() {
   const [bookingTime, setBookingTime] = useState('07:00 PM - 09:00 PM');
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const addEntry = (e: React.FormEvent) => {
+  const addEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName || !guestPhone) return;
 
-    if (entryType === 'Walk-in') {
-      const nextQueueNo = reservations.filter(r => r.type === 'Walk-in' && r.status === 'Confirmed').length + 1;
-      const newWalkin: Reservation = {
-        id: generateReservationId(),
-        name: guestName,
-        pax: parseInt(guestPax, 10),
-        time: 'Just added',
-        phone: guestPhone,
-        status: 'Confirmed',
-        type: 'Walk-in',
-        queueNo: nextQueueNo
-      };
-      setReservations([...reservations, newWalkin]);
-      setToast({ message: `Registered Walk-in: ${guestName} (Queue #${nextQueueNo})`, type: 'success' });
-    } else {
-      const pax = parseInt(guestPax, 10);
-      const tableToReserve = tables.find(t => t.status === 'Available' && t.capacity >= pax);
+    const pax = parseInt(guestPax, 10);
+    const slot = bookingTime.includes(' - ') ? bookingTime.split(' - ')[0] : bookingTime;
+    const normalizedSlot = slot.replace(/\s+/g, '').toUpperCase();
+    const payload = {
+      customerName: guestName,
+      customerEmail: '',
+      mobile: guestPhone,
+      guests: pax,
+      date: new Date().toISOString().slice(0, 10),
+      slot: normalizedSlot.includes('PM') || normalizedSlot.includes('AM')
+        ? normalizedSlot.replace(/PM|AM/g, '').replace(':', '')
+        : slot,
+      notes: entryType === 'Walk-in' ? 'Walk-in guest added from staff panel' : 'Reservation added from staff panel',
+    };
 
-      if (tableToReserve) {
-        // Automatically reserve table for guest name and time slot
-        setTables(prev => prev.map(t => t.id === tableToReserve.id ? {
-          ...t,
-          status: 'Reserved',
-          guests: pax,
-          assignedGuest: guestName,
-          elapsed: bookingTime
-        } : t));
-
-        const newReservation: Reservation = {
+    try {
+      if (entryType === 'Walk-in') {
+        const nextQueueNo = reservations.filter(r => r.type === 'Walk-in' && r.status === 'Confirmed').length + 1;
+        const newWalkin: Reservation = {
           id: generateReservationId(),
           name: guestName,
-          pax: pax,
-          time: bookingTime,
+          pax,
+          time: 'Just added',
           phone: guestPhone,
           status: 'Confirmed',
-          type: 'Reservation',
-          assignedTable: tableToReserve.name
+          type: 'Walk-in',
+          queueNo: nextQueueNo
         };
-        setReservations([...reservations, newReservation]);
-        setToast({ message: `Reserved Table ${tableToReserve.name} for ${guestName} during ${bookingTime}!`, type: 'success' });
+        await reservationsAPI.createReservation(payload);
+        setReservations([...reservations, newWalkin]);
+        setToast({ message: `Registered Walk-in: ${guestName} (Queue #${nextQueueNo})`, type: 'success' });
       } else {
-        const newReservation: Reservation = {
-          id: generateReservationId(),
-          name: guestName,
-          pax: pax,
-          time: bookingTime,
-          phone: guestPhone,
-          status: 'Confirmed',
-          type: 'Reservation'
-        };
-        setReservations([...reservations, newReservation]);
-        setToast({ message: `Reservation Registered: No available table of size ${pax} Pax for ${bookingTime}`, type: 'error' });
+        const tableToReserve = tables.find(t => t.status === 'Available' && t.capacity >= pax);
+
+        if (tableToReserve) {
+          setTables(prev => prev.map(t => t.id === tableToReserve.id ? {
+            ...t,
+            status: 'Reserved',
+            guests: pax,
+            assignedGuest: guestName,
+            elapsed: bookingTime
+          } : t));
+
+          await reservationsAPI.createReservation({
+            ...payload,
+            tableNumber: tableToReserve.name,
+          });
+
+          const newReservation: Reservation = {
+            id: generateReservationId(),
+            name: guestName,
+            pax,
+            time: bookingTime,
+            phone: guestPhone,
+            status: 'Confirmed',
+            type: 'Reservation',
+            assignedTable: tableToReserve.name
+          };
+          setReservations([...reservations, newReservation]);
+          setToast({ message: `Reserved Table ${tableToReserve.name} for ${guestName} during ${bookingTime}!`, type: 'success' });
+        } else {
+          await reservationsAPI.createReservation(payload);
+          const newReservation: Reservation = {
+            id: generateReservationId(),
+            name: guestName,
+            pax,
+            time: bookingTime,
+            phone: guestPhone,
+            status: 'Confirmed',
+            type: 'Reservation'
+          };
+          setReservations([...reservations, newReservation]);
+          setToast({ message: `Reservation Registered: No available table of size ${pax} Pax for ${bookingTime}`, type: 'error' });
+        }
       }
+
+      await refreshDashboard();
+    } catch (error) {
+      console.error('Failed to create reservation', error);
+      setToast({ message: 'Unable to sync reservation with the backend right now.', type: 'error' });
     }
 
     setGuestName('');
@@ -105,17 +133,24 @@ export default function StaffReservationsPage() {
     setShowAddForm(false);
   };
 
-  const updateStatus = (id: number, status: Reservation['status']) => {
+  const updateStatus = (id: string, status: Reservation['status']) => {
     setReservations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
   };
 
-  const seatGuest = (id: number, pax: number) => {
+  const seatGuest = async (id: string, pax: number) => {
     const guest = reservations.find(r => r.id === id);
     if (!guest) return;
 
     const tableToSeat = tables.find(t => t.status === 'Available' && t.capacity >= pax);
 
     if (tableToSeat) {
+      try {
+        await reservationsAPI.checkIn(id);
+        await tableAPI.occupy(tableToSeat.id);
+      } catch (err) {
+        console.error('Failed to sync guest seating with backend', err);
+      }
+
       // Seated on empty table successfully
       setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'Seated' } : r));
       setTables(prev => prev.map(t => t.id === tableToSeat.id ? { ...t, status: 'Occupied', guests: pax, currentBill: 0, assignedGuest: guest.name } : t));

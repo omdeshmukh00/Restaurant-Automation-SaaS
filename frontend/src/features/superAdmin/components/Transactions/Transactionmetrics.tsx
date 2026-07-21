@@ -41,11 +41,11 @@ function KpiCard({ label, value, sub, subPositive, icon, iconBg, darkMode, accen
       }`}
     >
       {/* Subtle background glow on hover */}
-      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${
+      <div className={`absolute inset-0 z-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none ${
         darkMode ? "bg-white/[0.02]" : "bg-slate-50/60"
       }`} />
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative z-10 flex items-start justify-between gap-3">
         <div className="space-y-1 flex-1 min-w-0">
           <p className={`text-[10px] sm:text-[11px] font-bold tracking-wider uppercase ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
             {label}
@@ -68,7 +68,7 @@ function KpiCard({ label, value, sub, subPositive, icon, iconBg, darkMode, accen
 
       {/* Optional thin progress bar at the bottom of the card */}
       {progress !== undefined && (
-        <div className={`mt-3.5 h-1 rounded-full overflow-hidden ${darkMode ? "bg-slate-800" : "bg-slate-100"}`}>
+        <div className={`relative z-10 mt-3.5 h-1 rounded-full overflow-hidden ${darkMode ? "bg-slate-800" : "bg-slate-100"}`}>
           <div
             className={`h-full rounded-full transition-all duration-700 ${progressColor ?? "bg-orange-500"}`}
             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}

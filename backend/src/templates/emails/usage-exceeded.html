@@ -1,0 +1,19 @@
+<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px;">
+  <h2 style="color: #e53e3e;">Plan Limit Exceeded</h2>
+  <p>Hello {{ownerName}},</p>
+  <p>Your restaurant <strong>{{restaurantName}}</strong> has exceeded its plan limit for <strong>{{label}}</strong> on the <strong>{{planName}}</strong> plan.</p>
+  <div style="background-color: #fff5f5; border-left: 4px solid #e53e3e; padding: 12px; margin: 20px 0; border-radius: 4px;">
+    <p style="margin: 0; font-weight: bold; color: #e53e3e;">Usage Limit Reached:</p>
+    <p style="margin: 4px 0 0 0;">Used: <strong>{{used}}</strong> / {{limit}} {{label}}</p>
+  </div>
+  <p style="font-weight: bold; color: #e53e3e;">Further operations requiring this resource have been temporarily blocked until you upgrade or renew your plan.</p>
+  <div style="margin-top: 24px; text-align: center;">
+    <a href="{{billingUrl}}" style="display: inline-block; padding: 12px 24px; background: #FF6B1A; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Upgrade Subscription</a>
+  </div>
+  <p style="color: #666; font-size: 12px; margin-top: 30px; border-top: 1px solid #edf2f7; padding-top: 15px;">If you have any questions or need support, contact our team at {{supportEmail}}.</p>
+</div>
+
+<div style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px; text-align: center; font-size: 13px; color: #888;">
+  <p style="margin: 0;">© {{year}} {{platformName}}. All rights reserved.</p>
+  <p style="margin-top: 8px; font-size: 13px; color: #aaa;">This is an auto generated email. Please do not reply.</p>
+</div>

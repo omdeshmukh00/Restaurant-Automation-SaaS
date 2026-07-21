@@ -67,11 +67,20 @@ export default function CleaningTablesPage() {
   };
   const [selectedTable, setSelectedTable] = useState<TableRow | null>(null);
 
-  const handleActionClick = (row: TableRow, action: 'start' | 'complete' | 'verify') => {
+  const handleActionClick = async (row: TableRow, action: 'start' | 'complete' | 'verify') => {
     const id = row.rawId;
-    if (action === 'start') cleaningStore.startCleaning(id);
-    if (action === 'complete') cleaningStore.completeInspection(id);
-    if (action === 'verify') cleaningStore.verifyInspection(id);
+    if (action === 'start') {
+      cleaningStore.startCleaning(id);
+      await startTask(id);
+    }
+    if (action === 'complete') {
+      cleaningStore.completeInspection(id);
+      await completeTask(id);
+    }
+    if (action === 'verify') {
+      cleaningStore.verifyInspection(id);
+      await verifyTask(id);
+    }
   };
 
   const [isStatusOpen, setIsStatusOpen] = useState(false);

@@ -166,8 +166,18 @@ async function storeLocal(storageKey: string, buffer: Buffer): Promise<void> {
   if (!target.startsWith(privateUploadRoot)) {
     throw new AppError('Invalid upload path', 400, ErrorCode.INVALID_REQUEST);
   }
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  await fs.writeFile(target, buffer, { flag: 'wx' });
+  try {
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, buffer, { flag: 'wx' });
+  } catch (err: any) {
+    if (err.code === 'EACCES' || err.code === 'EPERM') {
+      throw new AppError('Permission denied when writing file', 500, ErrorCode.INTERNAL_ERROR);
+    }
+    if (err.code === 'EEXIST') {
+      throw new AppError('File already exists', 409, ErrorCode.INVALID_REQUEST);
+    }
+    throw err;
+  }
 }
 
 async function deleteLocal(storageKey: string): Promise<void> {
@@ -181,7 +191,14 @@ async function readLocal(storageKey: string): Promise<Buffer> {
   if (!target.startsWith(privateUploadRoot)) {
     throw new AppError('Invalid upload path', 400, ErrorCode.INVALID_REQUEST);
   }
-  return fs.readFile(target);
+  try {
+    return await fs.readFile(target);
+  } catch (err: any) {
+    if (err.code === 'ENOENT') {
+      throw new AppError('File not found on disk', 404, ErrorCode.NOT_FOUND);
+    }
+    throw err;
+  }
 }
 
 async function storeFile(tenantId: string, input: FileInput): Promise<StoredFile> {

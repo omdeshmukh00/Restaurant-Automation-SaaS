@@ -111,6 +111,123 @@ function normalizeAdminOrderStatusFilter(status?: string): string | string[] | u
 }
 
 export class OrdersService {
+  /**
+   * Helper method to map cart items to the structure required by OrderModel.
+   * Resolves ingredients from MenuItem references.
+   */
+  private static async mapCartItemsToOrderItems(
+    restaurantId: string | Types.ObjectId,
+    cartItems: any[],
+    session?: mongoose.ClientSession | null
+  ) {
+    const menuItemIds = cartItems.map((i: any) => i.menuItem);
+    const menuItems = await mongoose.model('MenuItem').find({
+      _id: { $in: menuItemIds },
+      restaurantId: typeof restaurantId === 'string' ? new mongoose.Types.ObjectId(restaurantId) : restaurantId
+    }).populate('ingredients.inventoryItemId').session(session ? session : null as any);
+
+    const menuItemMap = new Map(menuItems.map(m => [m._id.toString(), m]));
+
+    return cartItems.map((item: any) => {
+      const menuItemIdStr = item.menuItem.toString();
+      const fullMenuItem = menuItemMap.get(menuItemIdStr);
+      if (!fullMenuItem) {
+        throw new AppError('Invalid menu item in cart', 400, ErrorCode.VALIDATION_ERROR);
+      }
+      const ingredientsSnapshot = fullMenuItem.ingredients ? fullMenuItem.ingredients.map((ing: any) => ({
+        inventoryItemId: ing.inventoryItemId && ing.inventoryItemId._id ? ing.inventoryItemId._id : ing.inventoryItemId,
+        inventoryItemName: (ing.inventoryItemId && ing.inventoryItemId.name) || 'Unknown Item',
+        quantity: ing.quantity
+      })) : [];
+
+      return {
+        menuItemId: fullMenuItem._id,
+        name: fullMenuItem.name,
+        quantity: item.quantity,
+        price: item.unitPrice,
+        totalPrice: item.subtotal,
+        notes: item.notes || '',
+        ingredients: ingredientsSnapshot,
+      };
+    });
+  }
+
+  /**
+   * Reusable order creation logic extracted from PaymentsService.
+   * Supports both Pre-Paid and Post-Paid workflows by accepting paymentStatus.
+   */
+  public static async createOrder(
+    restaurantId: string | Types.ObjectId,
+    sessionId: string | Types.ObjectId,
+    paymentStatus: PaymentStatus | 'PAID' | 'UNPAID',
+    session?: mongoose.ClientSession | null,
+    specialInstructions: string = ''
+  ) {
+    const options = session ? { session } : undefined;
+    const restId = typeof restaurantId === 'string' ? new mongoose.Types.ObjectId(restaurantId) : restaurantId;
+    const sessId = typeof sessionId === 'string' ? new mongoose.Types.ObjectId(sessionId) : sessionId;
+
+    // 1. Fetch Cart
+    const cart = await Cart.findOne({
+      restaurantId: restId,
+      sessionId: sessId
+    }).session(session ? session : null as any);
+
+    if (!cart || !cart.items || cart.items.length === 0) {
+      throw new AppError('Cart empty or not found during order creation', 400, ErrorCode.VALIDATION_ERROR);
+    }
+
+    // 2. Map Items & Resolve Ingredients
+    const orderItems = await this.mapCartItemsToOrderItems(restId, cart.items, session);
+
+    // 3. Generate Order Number
+    const timestamp = Date.now().toString().slice(-6);
+    const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const orderNumber = `ORD-${timestamp}-${randomChars}`;
+
+    // 4. Fetch Table Session
+    const sessionDoc = await TableSessionModel.findById(sessId).session(session ? session : null as any);
+    if (!sessionDoc) {
+      throw new AppError('Table session not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    // 5. Create Order
+    const order = await OrderModel.create([{
+      restaurantId: restId,
+      tableId: sessionDoc.tableId,
+      sessionId: sessId,
+      orderNumber,
+      items: orderItems,
+      totalAmount: cart.subtotal,
+      taxAmount: cart.tax,
+      discountAmount: cart.discount,
+      finalAmount: cart.grandTotal,
+      status: OrderStatus.PENDING,
+      paymentStatus,
+      priority: 'NORMAL',
+      specialInstructions,
+    }], options);
+
+    const createdOrder = order[0];
+
+    // 6. Transition table status to ORDERING if it is OCCUPIED
+    const table = await TableModel.findById(createdOrder.tableId).session(session ? session : null as any);
+    if (table && table.status === TableStatus.OCCUPIED) {
+      table.status = TableStatus.ORDERING;
+      await table.save(options);
+    }
+
+    // 7. Clear cart
+    cart.items = [] as any;
+    cart.subtotal = 0;
+    cart.tax = 0;
+    cart.discount = 0;
+    cart.grandTotal = 0;
+    await cart.save(options);
+
+    return createdOrder;
+  }
+
   static async getAdminOrders(
     restaurantId: string | Types.ObjectId,
     options: {
@@ -228,7 +345,7 @@ export class OrdersService {
   static async createAdminOrder(
     restaurantId: string | Types.ObjectId,
     payload: AdminOrderCreateInput,
-    actorId?: string | Types.ObjectId | null,
+    _actorId?: string | Types.ObjectId | null,
   ) {
     const table = await TableModel.findOne({ restaurantId, tableNumber: payload.table });
     if (!table) {
@@ -400,100 +517,45 @@ export class OrdersService {
       );
     }
 
+    let dbSession: mongoose.ClientSession | null = null;
     try {
-      // 2. Fetch Cart
-      const cart = await Cart.findOne({ restaurantId, sessionId });
+      dbSession = await mongoose.startSession();
+      dbSession.startTransaction();
+    } catch (e) {
+      dbSession = null;
+    }
 
-      if (!cart) {
-        throw new AppError('Cart not found', 404, ErrorCode.NOT_FOUND);
-      }
-
-      if (!cart.items || cart.items.length === 0) {
-        throw new AppError('Cannot place order with an empty cart', 400, ErrorCode.VALIDATION_ERROR);
-      }
-
-      // 2.5 Explicitly fetch MenuItems to bypass Mongoose populate caching issues
-      const menuItemIds = cart.items.map(i => i.menuItem);
-      const menuItems = await mongoose.model('MenuItem').find({
-        _id: { $in: menuItemIds },
-        restaurantId
-      }).populate('ingredients.inventoryItemId');
-      
-      const menuItemMap = new Map(menuItems.map(m => [m._id.toString(), m]));
-
-      // 3. Map CartItems to OrderItems
-      const orderItems = cart.items.map((item: any) => {
-        const menuItemIdStr = item.menuItem.toString();
-        const fullMenuItem = menuItemMap.get(menuItemIdStr);
-        
-        if (!fullMenuItem) {
-          throw new AppError('Invalid menu item in cart', 400, ErrorCode.VALIDATION_ERROR);
-        }
-
-        const ingredientsSnapshot = fullMenuItem.ingredients ? fullMenuItem.ingredients.map((ing: any) => ({
-          inventoryItemId: ing.inventoryItemId && ing.inventoryItemId._id ? ing.inventoryItemId._id : ing.inventoryItemId,
-          inventoryItemName: (ing.inventoryItemId && ing.inventoryItemId.name) || 'Unknown Item',
-          quantity: ing.quantity
-        })) : [];
-
-        return {
-          menuItemId: fullMenuItem._id,
-          name: fullMenuItem.name,
-          quantity: item.quantity,
-          price: item.unitPrice,
-          totalPrice: item.subtotal,
-          notes: item.notes || '',
-          ingredients: ingredientsSnapshot,
-        };
-      });
-
-      // 4. Generate Order Number
-      const timestamp = Date.now().toString().slice(-6);
-      const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const orderNumber = `ORD-${timestamp}-${randomChars}`;
-
-      // 5. Create Order
-      const order = await OrderModel.create({
+    try {
+      const order = await OrdersService.createOrder(
         restaurantId,
-        tableId,
         sessionId,
-        orderNumber,
-        items: orderItems,
-        totalAmount: cart.subtotal,
-        taxAmount: cart.tax,
-        discountAmount: cart.discount,
-        finalAmount: cart.grandTotal,
-        status: OrderStatus.PENDING,
-        paymentStatus: PaymentStatus.PENDING,
-        priority: Priority.NORMAL,
-        specialInstructions: data.specialInstructions || '',
-      });
+        PaymentStatus.PENDING,
+        dbSession,
+        data.specialInstructions
+      );
 
       await Promise.all([
         recordSubscriptionUsage(restaurantId, 'dailyOrderCount', orderUsage.dailyOrderCount),
         recordSubscriptionUsage(restaurantId, 'monthlyOrderCount', orderUsage.monthlyOrderCount),
       ]);
 
-      // Transition table status to ORDERING if it is currently OCCUPIED
-      const table = await TableModel.findById(tableId);
-      if (table && table.status === TableStatus.OCCUPIED) {
-        table.status = TableStatus.ORDERING;
-        await table.save();
+      if (dbSession) {
+        await dbSession.commitTransaction();
       }
-
-      // 6. Clear Cart
-      cart.items = [] as any;
-      cart.subtotal = 0;
-      cart.tax = 0;
-      cart.discount = 0;
-      cart.grandTotal = 0;
-      await cart.save();
 
       // 7. Emit Realtime Event for Kitchen
       socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_NEW, { orderId: order._id });
 
       return order;
+    } catch (error) {
+      if (dbSession) {
+        await dbSession.abortTransaction();
+      }
+      throw error;
     } finally {
+      if (dbSession) {
+        dbSession.endSession();
+      }
       // 8. Always release the lock
       await TableSessionModel.findByIdAndUpdate(sessionObjectId, {
         $set: { isOrdering: false },
@@ -897,5 +959,67 @@ export class OrdersService {
     socketService.emitToSession(order.sessionId!.toString(), 'order.completed', { order });
 
     return order;
+  }
+
+  /**
+   * Marks all unpaid/uncompleted orders in a session as PAID.
+   * This is exclusively called by BillingService during settlement.
+   * Modifies only the Orders domain. Does not emit sockets.
+   */
+  static async markOrdersPaid(
+    sessionId: string | Types.ObjectId,
+    dbSession?: mongoose.ClientSession,
+  ) {
+    const unpaidStatuses = [
+      OrderStatus.PENDING,
+      OrderStatus.CONFIRMED,
+      OrderStatus.PREPARING,
+      OrderStatus.DELAYED,
+      OrderStatus.READY,
+      OrderStatus.PICKED,
+      OrderStatus.SERVED,
+      OrderStatus.BILLED,
+    ];
+
+    const updatedOrders = await OrderModel.find(
+      { sessionId, status: { $in: unpaidStatuses } },
+      null,
+      { session: dbSession }
+    );
+
+    if (updatedOrders.length > 0) {
+      // 1. Mark ALL unpaid orders as paymentStatus = PAID universally
+      await OrderModel.updateMany(
+        { sessionId, status: { $in: unpaidStatuses } },
+        { 
+          $set: { 
+            paymentStatus: PaymentStatus.PAID,
+          }
+        },
+        { session: dbSession }
+      );
+
+      // 2. Only advance the kitchen status to PAID if it was already BILLED.
+      // This ensures kitchen workflows (PREPARING, READY, etc.) are strictly untouched.
+      await OrderModel.updateMany(
+        { sessionId, status: OrderStatus.BILLED },
+        { 
+          $set: { 
+            status: OrderStatus.PAID,
+          }
+        },
+        { session: dbSession }
+      );
+      
+      // Update in-memory objects to return correctly
+      updatedOrders.forEach(o => {
+        o.paymentStatus = PaymentStatus.PAID;
+        if (o.status === OrderStatus.BILLED) {
+          o.status = OrderStatus.PAID;
+        }
+      });
+    }
+
+    return updatedOrders;
   }
 }

@@ -142,7 +142,7 @@ const RestaurantAuth: React.FC = () => {
         setCountdown(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)));
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to resend OTP. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to resend OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -188,7 +188,7 @@ const RestaurantAuth: React.FC = () => {
       }
       setAuthMode('verify-otp');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -216,7 +216,7 @@ const RestaurantAuth: React.FC = () => {
       setOtpExpiresAt(null);
       localStorage.removeItem('otpExpiresAt');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid OTP code. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Invalid OTP code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -254,7 +254,7 @@ const RestaurantAuth: React.FC = () => {
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to reset password. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to reset password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -288,8 +288,9 @@ const RestaurantAuth: React.FC = () => {
     } catch (err: any) {
       // Friendly message pointing to the seeded credentials
       setError(
+        err.response?.data?.error?.message ||
         err.response?.data?.message ||
-        'Authentication failed. Please verify credentials or use demo bypass.'
+        'Authentication failed. Please verify credentials.'
       );
     } finally {
       setLoading(false);

@@ -24,6 +24,7 @@ import { requirePasswordChange } from '../middleware/requirePasswordChange';
 import menuRouter from './menu/menu.routes';
 import ordersRouter from './orders/orders.routes';
 import cartRouter from './cart/cart.routes';
+import notificationsRouter from './notifications/notifications.routes';
 import auditLogRoutes from '../modules/auditLogs/auditLogs.routes';
 import feedbackRouter from './feedback/feedback.routes';
 import loyaltyRouter from './loyalty/loyalty.routes';
@@ -38,10 +39,7 @@ export const apiRouter = Router();
 
 apiRouter.use(requirePasswordChange);
 
-apiRouter.get('/customer/session', (req, res, next) => {
-  console.log(`[apiRouter Debug] GET /customer/session matched. headers:`, JSON.stringify(req.headers));
-  next();
-});
+
 
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/users', usersRouter);
@@ -54,6 +52,7 @@ apiRouter.use(loyaltyRouter);
 apiRouter.use('/payments', paymentsRouter);
 apiRouter.use('/subscriptions', requireAuth, subscriptionRoutes);
 apiRouter.use('/uploads', uploadRouter);
+apiRouter.use('/notifications', requireAuth, notificationsRouter);
 apiRouter.use('/customer/cart', cartRouter);
 apiRouter.use('/customer/feedback', feedbackRouter);
 apiRouter.use('/customer', customerRouter);

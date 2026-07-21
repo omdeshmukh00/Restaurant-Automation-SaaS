@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { useTheme } from "../app/providers/ThemeProvider";
 import Navbar from "../features/superAdmin/components/dashboard/Navbar";
 import Sidebar from "../features/superAdmin/components/Sidebar";
 import { useRestaurantRequestsStore } from "../features/superAdmin/store/RestaurantRequests";
+import { apiClient } from "../shared/services/apiClient";
+import { getStoredUser, setStoredUser } from "../auth/tokenStore";
 
 export default function SuperAdminLayout() {
-  // Removed unused signOut variable
-  useAuth();
+  const { user, setUser } = useAuth();
 
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
 
@@ -16,7 +17,16 @@ export default function SuperAdminLayout() {
     fetchRequests();
   }, [fetchRequests]);
 
-  const { theme: themePreference, setTheme: setThemePreference } = useTheme();
+  const { theme: themePreference, setTheme: setThemePreference, syncThemeFromProfile } = useTheme();
+
+  const lastSyncedUserIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (user && user.id !== lastSyncedUserIdRef.current && user.themeMode) {
+      syncThemeFromProfile(user.themeMode);
+      lastSyncedUserIdRef.current = user.id;
+    }
+  }, [user, syncThemeFromProfile]);
 
   const [isSystemDark, setIsSystemDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -51,9 +61,12 @@ export default function SuperAdminLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("superadmin-sidebar-collapsed");
-      return saved !== null ? saved === "true" : true;
+      if (saved !== null) {
+        return saved === "true";
+      }
+      return window.innerWidth < 1024;
     }
-    return true;
+    return false;
   });
 
   const handleToggleSidebar = () => {
@@ -87,9 +100,27 @@ export default function SuperAdminLayout() {
   }, [mobileSidebarOpen]);
 
   // ── Theme toggle ─────────────────────────────────────────────────────────
+  const updateThemePreference = async (nextPref: "dark" | "light" | "system") => {
+    setThemePreference(nextPref);
+    if (user) {
+      setUser({ ...user, themeMode: nextPref });
+    }
+    try {
+      await apiClient.patch('/users/me', { themeMode: nextPref });
+      const panel = 'superadmin';
+      const stored = getStoredUser(panel);
+      if (stored) {
+        stored.themeMode = nextPref;
+        setStoredUser(panel, stored);
+      }
+    } catch (e) {
+      console.warn("Failed to persist theme preference to backend", e);
+    }
+  };
+
   const toggleTheme = () => {
     const nextPref = themePreference === "dark" ? "light" : "dark";
-    setThemePreference(nextPref);
+    updateThemePreference(nextPref);
   };
 
   return (
@@ -125,7 +156,7 @@ export default function SuperAdminLayout() {
 
         {/* ── PAGE CONTENT ──────────────────────────────────────────────── */}
         <div className="flex-1">
-          <Outlet context={{ darkMode, themePreference, setThemePreference }} />
+          <Outlet context={{ darkMode, themePreference, setThemePreference: updateThemePreference }} />
         </div>
       </main>
     </div>

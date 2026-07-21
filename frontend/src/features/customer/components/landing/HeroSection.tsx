@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, MapPin, Calendar, Clock, Users,
   CheckCircle, Shield, Smartphone, Gift, Headphones, TrendingUp
 } from 'lucide-react';
+import { apiClient } from '../../../../shared/services/apiClient';
 
 interface HeroSectionProps {
   onLoginOpen: () => void;
+  restaurants?: any[];
 }
 
 const TRENDING_SEARCHES = ['Pizza', 'Buffet', 'Cafe', 'Seafood', 'Fine Dining'];
@@ -19,9 +22,83 @@ const TRUST_BADGES = [
   { icon: Headphones, label: '24/7 Support' },
 ];
 
-export default function HeroSection({ onLoginOpen }: HeroSectionProps) {
+export default function HeroSection({ onLoginOpen, restaurants = [] }: HeroSectionProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<typeof SEARCH_TABS[number]>('Restaurants');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Booking states
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState('');
+  
+  // Date, Time, Guests arrays
+  const datesList = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const yyyyMmDd = d.toISOString().split('T')[0];
+    const formatted = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
+    return { value: yyyyMmDd, label: formatted };
+  });
+
+  const timeSlots = [
+    { value: '12:00', label: '12:00 PM' },
+    { value: '12:30', label: '12:30 PM' },
+    { value: '13:00', label: '01:00 PM' },
+    { value: '13:30', label: '01:30 PM' },
+    { value: '14:00', label: '02:00 PM' },
+    { value: '14:30', label: '02:30 PM' },
+    { value: '18:00', label: '06:00 PM' },
+    { value: '18:30', label: '06:30 PM' },
+    { value: '19:00', label: '07:00 PM' },
+    { value: '19:30', label: '07:30 PM' },
+    { value: '20:00', label: '08:00 PM' },
+    { value: '20:30', label: '08:30 PM' },
+    { value: '21:00', label: '09:00 PM' },
+    { value: '21:30', label: '09:30 PM' },
+    { value: '22:00', label: '10:00 PM' },
+  ];
+
+  const guestOptions = Array.from({ length: 10 }, (_, i) => ({ value: i + 1, label: `${i + 1} People` }));
+
+  const [selectedDate, setSelectedDate] = useState(datesList[0].value);
+  const [selectedTime, setSelectedTime] = useState('19:00');
+  const [selectedGuests, setSelectedGuests] = useState(2);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingSuccess, setBookingSuccess] = useState(false);
+
+  const handleBookTable = async () => {
+    if (!selectedRestaurantId) {
+      setBookingError('Please select a restaurant');
+      return;
+    }
+    if (phoneNumber.length !== 10) {
+      setBookingError('Please enter a 10-digit phone number');
+      return;
+    }
+
+    setBookingLoading(true);
+    setBookingError(null);
+    try {
+      await apiClient.post('/public/landing/reserve', {
+        restaurantId: selectedRestaurantId,
+        guests: Number(selectedGuests),
+        date: selectedDate,
+        slot: selectedTime,
+        mobile: phoneNumber,
+        customerName: 'Guest'
+      });
+      setBookingSuccess(true);
+      setTimeout(() => {
+        navigate(`/auth/customer?mobile=${phoneNumber}`, { state: { from: { pathname: '/customer/reservations' } } });
+      }, 2000);
+    } catch (err: any) {
+      setBookingError(err.response?.data?.message || 'Failed to book table. Please try again.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
 
   return (
     <section
@@ -42,12 +119,13 @@ export default function HeroSection({ onLoginOpen }: HeroSectionProps) {
           {/* Left Content */}
           <div className="flex-1 max-w-[640px]">
             <h1
-              className="text-[36px] sm:text-[48px] lg:text-[60px] xl:text-[64px] font-bold leading-[1.1] tracking-tight text-white landing-font-hero"
+              className="font-instrument-serif landing-font-instrument-serif text-[48px] sm:text-[64px] lg:text-[76px] xl:text-[84px] leading-[1.05] tracking-tight text-white font-normal"
+              style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontWeight: 400 }}
             >
               Find the best{' '}
               <br className="hidden sm:block" />
               restaurants{' '}
-              <span className="italic" style={{ color: '#FF6B1A' }}>near you</span>
+              <span className="italic font-instrument-serif landing-font-instrument-serif" style={{ color: '#E57A10', fontFamily: "'Instrument Serif', Georgia, serif" }}>near you</span>
             </h1>
 
             <p
@@ -173,72 +251,144 @@ export default function HeroSection({ onLoginOpen }: HeroSectionProps) {
                   <select
                     className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium appearance-none cursor-pointer"
                     style={{ color: '#222222' }}
-                    defaultValue=""
+                    value={selectedRestaurantId}
+                    onChange={(e) => setSelectedRestaurantId(e.target.value)}
                     aria-label="Select Restaurant"
                   >
                     <option value="" disabled>Select a restaurant</option>
-                    <optgroup label="📍 Bandra, Mumbai">
-                      <option>Café Mondegar — Bandra West</option>
-                      <option>The Table — Bandra West</option>
-                      <option>Bastian — Bandra West</option>
-                    </optgroup>
-                    <optgroup label="📍 Andheri, Mumbai">
-                      <option>Burma Burma — Andheri West</option>
-                      <option>The Brasserie — Andheri East</option>
-                      <option>Pa Pa Ya — Andheri West</option>
-                    </optgroup>
-                    <optgroup label="📍 Colaba, Mumbai">
-                      <option>Leopold Café — Colaba</option>
-                      <option>Indigo Deli — Colaba</option>
-                    </optgroup>
-                    <optgroup label="📍 Lower Parel">
-                      <option>Toit — Lower Parel</option>
-                      <option>Bayroute — Lower Parel</option>
-                    </optgroup>
+                    {restaurants.map((r: any) => (
+                      <option key={r._id || r.id} value={r._id || r.id}>
+                        {r.name} — {r.city || 'Mumbai'}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
+              {/* Date & Time Row */}
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  { icon: Calendar, label: 'Date', placeholder: 'Today' },
-                  { icon: Clock, label: 'Time', placeholder: '7:00 PM' },
-                  { icon: Users, label: 'Guests', placeholder: '2 People' },
-                  { icon: MapPin, label: 'Location', placeholder: 'Mumbai' },
-                ].map(({ icon: Icon, label, placeholder }) => (
-                  <div key={label}>
-                    <label className="text-[12px] font-medium mb-1 block" style={{ color: '#666666' }}>
-                      {label}
-                    </label>
-                    <div
-                      className="flex items-center gap-2 px-3 h-[48px] transition-colors duration-150"
-                      style={{
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '14px',
-                      }}
+                <div>
+                  <label className="text-[12px] font-medium mb-1 block" style={{ color: '#666666' }}>
+                    Date
+                  </label>
+                  <div
+                    className="flex items-center gap-2 px-3 h-[48px]"
+                    style={{ border: '1px solid #E5E7EB', borderRadius: '14px' }}
+                  >
+                    <Calendar className="w-[16px] h-[16px] shrink-0" style={{ color: '#FF6B1A' }} />
+                    <select
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium appearance-none cursor-pointer"
+                      style={{ color: '#222222' }}
+                      aria-label="Select Date"
                     >
-                      <Icon className="w-[16px] h-[16px] shrink-0" style={{ color: '#FF6B1A' }} />
-                      <input
-                        type="text"
-                        placeholder={placeholder}
-                        className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium placeholder:text-[#999999]"
-                        style={{ color: '#222222' }}
-                        aria-label={label}
-                      />
-                    </div>
+                      {datesList.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+                </div>
+
+                <div>
+                  <label className="text-[12px] font-medium mb-1 block" style={{ color: '#666666' }}>
+                    Time
+                  </label>
+                  <div
+                    className="flex items-center gap-2 px-3 h-[48px]"
+                    style={{ border: '1px solid #E5E7EB', borderRadius: '14px' }}
+                  >
+                    <Clock className="w-[16px] h-[16px] shrink-0" style={{ color: '#FF6B1A' }} />
+                    <select
+                      value={selectedTime}
+                      onChange={(e) => setSelectedTime(e.target.value)}
+                      className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium appearance-none cursor-pointer"
+                      style={{ color: '#222222' }}
+                      aria-label="Select Time"
+                    >
+                      {timeSlots.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Guests & Phone Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[12px] font-medium mb-1 block" style={{ color: '#666666' }}>
+                    Guests
+                  </label>
+                  <div
+                    className="flex items-center gap-2 px-3 h-[48px]"
+                    style={{ border: '1px solid #E5E7EB', borderRadius: '14px' }}
+                  >
+                    <Users className="w-[16px] h-[16px] shrink-0" style={{ color: '#FF6B1A' }} />
+                    <select
+                      value={selectedGuests}
+                      onChange={(e) => setSelectedGuests(Number(e.target.value))}
+                      className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium appearance-none cursor-pointer"
+                      style={{ color: '#222222' }}
+                      aria-label="Select Guests"
+                    >
+                      {guestOptions.map((g) => (
+                        <option key={g.value} value={g.value}>
+                          {g.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[12px] font-medium mb-1 block" style={{ color: '#666666' }}>
+                    Phone Number
+                  </label>
+                  <div
+                    className="flex items-center gap-2 px-3 h-[48px]"
+                    style={{ border: '1px solid #E5E7EB', borderRadius: '14px' }}
+                  >
+                    <span className="text-[14px] font-semibold text-[#FF6B1A]">+91</span>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      placeholder="98765 43210"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium placeholder:text-[#999999]"
+                      style={{ color: '#222222' }}
+                      aria-label="Phone Number"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
+            {bookingError && (
+              <div className="mt-3 p-2.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg">
+                {bookingError}
+              </div>
+            )}
+            {bookingSuccess && (
+              <div className="mt-3 p-2.5 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg animate-pulse">
+                🎉 Table booked successfully! Redirecting...
+              </div>
+            )}
+
             <button
-              onClick={onLoginOpen}
-              className="w-full h-[52px] mt-5 text-[15px] font-semibold text-white transition-colors duration-150 landing-btn-press"
+              onClick={handleBookTable}
+              disabled={bookingLoading}
+              className="w-full h-[52px] mt-5 text-[15px] font-semibold text-white transition-colors duration-150 landing-btn-press flex items-center justify-center gap-2 disabled:opacity-50"
               style={{ backgroundColor: '#FF6B1A', borderRadius: '14px' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#E65A0A'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#FF6B1A'; }}
+              onMouseEnter={(e) => { if(!bookingLoading) e.currentTarget.style.backgroundColor = '#E65A0A'; }}
+              onMouseLeave={(e) => { if(!bookingLoading) e.currentTarget.style.backgroundColor = '#FF6B1A'; }}
             >
-              Find Available Tables
+              {bookingLoading ? 'Reserving...' : 'Book Table Now'}
             </button>
 
             <p className="text-center text-[12px] mt-3" style={{ color: '#666666' }}>

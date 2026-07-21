@@ -79,6 +79,49 @@ export class KitchenService {
     return KitchenBatchModel.find({ restaurantId }).sort({ createdAt: -1 });
   }
 
+  static async getSuggestedBatches(restaurantId: string | Types.ObjectId) {
+    const suggestedBatches = await OrderModel.aggregate([
+      {
+        $match: {
+          restaurantId: new Types.ObjectId(restaurantId.toString()),
+          status: { $in: [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING] },
+          batchId: null,
+        }
+      },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: {
+            menuItemId: "$items.menuItemId",
+            name: "$items.name",
+            notes: "$items.notes",
+            ingredients: "$items.ingredients"
+          },
+          totalQuantity: { $sum: "$items.quantity" },
+          orderIds: { $addToSet: "$_id" }
+        }
+      },
+      {
+        $match: {
+          // Group only if there are items from more than one order
+          $expr: { $gt: [{ $size: "$orderIds" }, 1] } 
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          menuItemId: "$_id.menuItemId",
+          name: "$_id.name",
+          notes: "$_id.notes",
+          ingredients: "$_id.ingredients",
+          totalQuantity: 1,
+          orderIds: 1
+        }
+      }
+    ]);
+    return suggestedBatches;
+  }
+
   static async getBatchById(
     restaurantId: string | Types.ObjectId,
     batchId: string | Types.ObjectId,

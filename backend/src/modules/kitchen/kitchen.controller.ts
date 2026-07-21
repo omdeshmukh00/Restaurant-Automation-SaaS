@@ -214,6 +214,22 @@ export class KitchenController {
     }
   }
 
+  static async getSuggestedBatches(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const batches = await KitchenService.getSuggestedBatches(restaurantId);
+
+      ok(res, {
+        batches,
+        meta: {
+          count: batches.length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getBatch(req: Request, res: Response, next: NextFunction) {
     try {
       const restaurantId = KitchenController.getRequiredRestaurantId(req);
@@ -229,6 +245,11 @@ export class KitchenController {
     try {
       const restaurantId = KitchenController.getRequiredRestaurantId(req);
       const batch = await KitchenService.createBatch(restaurantId, req.body);
+
+      // Emit socket event for Kitchen
+      const { socketService } = await import('../../sockets/socket.service');
+      const { SocketEvent } = await import('../../constants/events');
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.KITCHEN_BATCH_UPDATED, { batch });
 
       await logAudit(req, {
         entityType: AuditEntity.KITCHEN,
@@ -247,6 +268,11 @@ export class KitchenController {
     try {
       const restaurantId = KitchenController.getRequiredRestaurantId(req);
       const batch = await KitchenService.updateBatch(restaurantId, req.params.id, req.body);
+
+      // Emit socket event for Kitchen
+      const { socketService } = await import('../../sockets/socket.service');
+      const { SocketEvent } = await import('../../constants/events');
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.KITCHEN_BATCH_UPDATED, { batch });
 
       await logAudit(req, {
         entityType: AuditEntity.KITCHEN,

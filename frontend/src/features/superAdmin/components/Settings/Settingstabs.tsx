@@ -3,20 +3,12 @@ import {
   Globe,
   Bell,
   ShieldCheck,
-  Palette,
-  CreditCard,
-  Plug,
-  TriangleAlert,
 } from "lucide-react";
 
 export type SettingsTab =
   | "general"
   | "notifications"
-  | "security"
-  | "appearance"
-  | "billing"
-  | "integrations"
-  | "danger";
+  | "security";
 
 interface Tab {
   id: SettingsTab;
@@ -29,10 +21,6 @@ const TABS: Tab[] = [
   { id: "general", label: "General", icon: Globe },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "security", label: "Security", icon: ShieldCheck },
-  { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "billing", label: "Billing", icon: CreditCard },
-  { id: "integrations", label: "Integrations", icon: Plug },
-  { id: "danger", label: "Danger Zone", icon: TriangleAlert, danger: true },
 ];
 
 interface SettingsTabsProps {

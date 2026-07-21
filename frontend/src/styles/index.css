@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -151,10 +153,22 @@
     letter-spacing: normal;
   }
 
-  /* Override kitchen, staff, cleaning, admin and superadmin panel headers to use Inter only */
+  /* Override kitchen, customer, staff, cleaning, partner, admin and superadmin panel headers to use Inter only */
   .kitchen-panel h1,
   .kitchen-panel h2,
   .kitchen-panel h3,
+  .customer-panel h1,
+  .customer-panel h2,
+  .customer-panel h3,
+  .customer-panel h4,
+  .customer-panel h5,
+  .customer-panel h6,
+  .partner-page h1,
+  .partner-page h2,
+  .partner-page h3,
+  .partner-page h4,
+  .partner-page h5,
+  .partner-page h6,
   .staff-panel h1,
   .staff-panel h2,
   .staff-panel h3,
@@ -167,7 +181,7 @@
   .superadmin-panel h1,
   .superadmin-panel h2,
   .superadmin-panel h3 {
-    font-family: "Inter", "Segoe UI", sans-serif;
+    font-family: "Inter", "Segoe UI", sans-serif !important;
     letter-spacing: normal;
   }
 
@@ -197,6 +211,10 @@
 
   .soft-shadow {
     box-shadow: var(--shadow-soft);
+  }
+
+  .font-instrument-serif {
+    font-family: 'Instrument Serif', Georgia, serif !important;
   }
 }
 

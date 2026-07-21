@@ -52,6 +52,14 @@ app.use(
         return;
       }
 
+      if (env.isDevelopment) {
+        const isLocalNetwork = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+        if (isLocalNetwork) {
+          callback(null, true);
+          return;
+        }
+      }
+
       callback(new Error('CORS origin denied'));
     },
     credentials: true,
@@ -60,17 +68,17 @@ app.use(
 );
 
 app.use(
-  morgan(env.isProduction ? 'combined' : 'dev', {
+  morgan((env.isProduction ? 'combined' : 'dev') as any, {
     stream: {
       write: (message) => logger.http(message.trim()),
     },
-    skip: () => !env.ENABLE_REQUEST_LOGS,
+    skip: (req) => !env.ENABLE_REQUEST_LOGS || Boolean(req.url?.includes('/platform-settings') || req.url?.includes('/health')),
   }),
 );
 
 app.use(`${env.API_PREFIX}/payments/webhook/razorpay`, express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(cookieParser(env.COOKIE_SECRET));
 app.use(mongoSanitize());
 app.use(`/${env.UPLOAD_PATH}`, express.static(path.resolve(process.cwd(), env.UPLOAD_PATH)));
@@ -121,23 +129,23 @@ app.get(
 app.use(`${env.API_PREFIX}/sessions`, tableSessionRoutes);
 app.use(`${env.API_PREFIX}/customer/requests`, customerRequestsRoutes);
 app.use(`${env.API_PREFIX}/notifications`, notificationsRoutes);
-app.use(`${env.API_PREFIX}`, billingRoutes);
+app.use(`${env.API_PREFIX}/billing`, billingRoutes);
 app.use(env.API_PREFIX, apiRouter);
 
-// Express route stack printer utility for debugging
-function printStack(stack: any[], prefix = '') {
-  for (const layer of stack) {
-    if (layer.route) {
-      console.log(`[Route Stack] ${prefix}${layer.route.path} (${Object.keys(layer.route.methods).join(',')})`);
-    } else if (layer.name === 'router') {
-      const match = layer.regexp.toString().match(/^\/\^\\(.*?)\\\//);
-      const subPrefix = match ? match[1].replace(/\\\//g, '/').replace(/\?/g, '') : '';
-      printStack(layer.handle.stack, `${prefix}${subPrefix}`);
-    } else {
-      console.log(`[Middleware Stack] ${prefix} -> ${layer.name || 'anonymous'}`);
-    }
-  }
-}
+// // Express route stack printer utility for debugging
+// function printStack(stack: any[], prefix = '') {
+//   for (const layer of stack) {
+//     if (layer.route) {
+//       console.log(`[Route Stack] ${prefix}${layer.route.path} (${Object.keys(layer.route.methods).join(',')})`);
+//     } else if (layer.name === 'router') {
+//       const match = layer.regexp.toString().match(/^\/\^\\(.*?)\\\//);
+//       const subPrefix = match ? match[1].replace(/\\\//g, '/').replace(/\?/g, '') : '';
+//       printStack(layer.handle.stack, `${prefix}${subPrefix}`);
+//     } else {
+//       console.log(`[Middleware Stack] ${prefix} -> ${layer.name || 'anonymous'}`);
+//     }
+//   }
+// }
 // setTimeout(() => {
 //   console.log('=== EXPRESS ROUTE STACK ===');
 //   printStack(app._router.stack);

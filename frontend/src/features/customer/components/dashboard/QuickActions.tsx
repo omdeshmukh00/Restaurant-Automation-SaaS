@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useCustomerStore } from '../../store/customer.store';
+import { createCustomerRequest, requestFinalBill, CustomerRequestType } from '../../api/customer.api';
 
 interface QuickAction {
   icon: string;
@@ -20,22 +21,22 @@ const ACTIONS: QuickAction[] = [
 ];
 
 export default function QuickActions() {
-  const { requestService } = useCustomerStore();
   const [sentActions, setSentActions] = useState<Set<string>>(new Set());
   const [toastMsg, setToastMsg] = useState('');
   
   // Modal State for Writing Request
   const [activeActionForModal, setActiveActionForModal] = useState<QuickAction | null>(null);
   const [requestNotes, setRequestNotes] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   function handleActionClick(action: QuickAction) {
     setActiveActionForModal(action);
     setRequestNotes('');
   }
 
-  function handleModalSubmit(e: React.FormEvent) {
+  async function handleModalSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeActionForModal) return;
+    if (!activeActionForModal || isLoading) return;
 
     const action = activeActionForModal;
     const isAdditionalRequest = action.label === 'Additional Request';
@@ -44,34 +45,50 @@ export default function QuickActions() {
       return; // Notes required for additional requests
     }
 
-    // Submit to Zustand store
-    requestService({
-      id: action.label.toLowerCase().replace(/\s+/g, '-'),
-      label: action.label,
-      description: requestNotes.trim() ? `Notes: ${requestNotes}` : action.description,
-      type: action.label === 'Call Waiter' ? 'waiter' : action.label === 'Call for Water' ? 'water' : action.label === 'Cleaning Staff' ? 'cleaning' : 'other',
-    });
+    let apiType: CustomerRequestType = 'help';
+    if (action.label === 'Request Bill') apiType = 'bill';
+    else if (action.label === 'Extra Cutlery') apiType = 'cutlery';
+    else if (action.label === 'Call for Water') apiType = 'water';
+    else if (action.label === 'Cleaning Staff') apiType = 'cleaning';
+    else if (action.label === 'Call Waiter') apiType = 'waiter';
 
-    setSentActions((prev) => new Set(prev).add(action.label));
-    
-    const displayMsg = requestNotes.trim() 
-      ? `✅ ${action.label} sent: "${requestNotes}"`
-      : `✅ ${action.label} request sent to staff!`;
+    setIsLoading(true);
+
+    try {
+      if (action.label === 'Request Bill') {
+        await requestFinalBill();
+      } else {
+        await createCustomerRequest(apiType);
+      }
+
+      useCustomerStore.getState().recordActivity();
+
+      setSentActions((prev) => new Set(prev).add(action.label));
       
-    setToastMsg(displayMsg);
-    setActiveActionForModal(null);
+      const displayMsg = requestNotes.trim() 
+        ? `✅ ${action.label} sent: "${requestNotes}"`
+        : `✅ ${action.label} request sent to staff!`;
+        
+      setToastMsg(displayMsg);
+      setActiveActionForModal(null);
 
-    // Clear Toast
-    setTimeout(() => setToastMsg(''), 4000);
+      // Clear Toast
+      setTimeout(() => setToastMsg(''), 4000);
 
-    // Auto-reset after 30s so user can re-request
-    setTimeout(() => {
-      setSentActions((prev) => {
-        const next = new Set(prev);
-        next.delete(action.label);
-        return next;
-      });
-    }, 30000);
+      // Auto-reset after 30s so user can re-request
+      setTimeout(() => {
+        setSentActions((prev) => {
+          const next = new Set(prev);
+          next.delete(action.label);
+          return next;
+        });
+      }, 30000);
+    } catch (error: any) {
+      setToastMsg(`❌ Failed to send request. Please try again.`);
+      setTimeout(() => setToastMsg(''), 4000);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -169,9 +186,10 @@ export default function QuickActions() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-sd-primary text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all font-sans"
+                  disabled={isLoading}
+                  className="px-5 py-2.5 bg-sd-primary text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all font-sans disabled:opacity-50"
                 >
-                  Send Request
+                  {isLoading ? 'Sending...' : 'Send Request'}
                 </button>
               </div>
             </form>

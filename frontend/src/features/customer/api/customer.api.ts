@@ -121,3 +121,37 @@ export async function cancelCustomerReservation(id: string) {
 
   return response.data.data.reservation;
 }
+
+export async function placeCustomerOrder(specialInstructions: string = '') {
+  const response = await apiClient.post<ApiResponse<any>>('/customer/orders', {
+    specialInstructions,
+  });
+  return response.data.data;
+}
+
+export type CustomerRequestType = 'waiter' | 'water' | 'cutlery' | 'cleaning' | 'bill' | 'help';
+
+export async function createCustomerRequest(type: CustomerRequestType) {
+  const response = await apiClient.post<ApiResponse<any>>(`/customer/requests/${type}`);
+  return response.data;
+}
+
+export type SubmitFeedbackInput = {
+  rating: number;
+  comment?: string;
+};
+
+export async function submitCustomerFeedback(input: SubmitFeedbackInput) {
+  const response = await apiClient.post<ApiResponse<any>>('/customer/feedback', input);
+  return response.data;
+}
+
+export async function getLiveBill() {
+  const response = await apiClient.get<ApiResponse<any>>('/billing/customer/bill');
+  return response.data.data;
+}
+
+export async function requestFinalBill() {
+  const response = await apiClient.post<ApiResponse<any>>('/billing/customer/bill/request');
+  return response.data.data;
+}

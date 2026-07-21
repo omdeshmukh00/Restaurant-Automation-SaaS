@@ -1,4 +1,4 @@
-export type LogType = 'Admin' | 'Restaurant' | 'Subscription';
+export type LogType = 'Admin' | 'Restaurant' | 'Subscription' | 'Transaction' | 'System';
 
 export interface LogItem {
   id: string;

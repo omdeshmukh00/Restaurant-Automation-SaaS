@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { tableAPI } from '../api/staff.api';
 
 export default function StaffDashboard() {
   const { query } = useStaffSearch();
@@ -22,13 +23,13 @@ export default function StaffDashboard() {
     { label: 'Walk-in Queue', value: `${activeQueueCount} Group${activeQueueCount !== 1 ? 's' : ''}`, icon: 'groups', color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/40', link: '/staff/reservations' },
   ];
 
-  const zoneATables = tables.filter(t => t.id >= 1 && t.id <= 4);
+  const zoneATables = tables.filter(t => t.section === 'Zone A');
   const activeTables = zoneATables.map(t => {
     let action = 'Order';
     if (t.status === 'Cleaning') action = 'Clean';
     else if (t.status === 'Occupied') {
-      if (t.id === 2) action = 'Pay';
-      else if (t.id === 3) action = 'Service';
+      if (t.id === '2') action = 'Pay';
+      else if (t.id === '3') action = 'Service';
       else action = 'Order';
     }
     return {
@@ -171,8 +172,13 @@ export default function StaffDashboard() {
                         {table.action === 'Clean' ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              setTables(prev => prev.map(t => t.id === table.id ? { ...t, status: 'Available', currentBill: 0 } : t));
+                            onClick={async () => {
+                              try {
+                                await tableAPI.updateStatus(table.id, 'available');
+                                setTables(prev => prev.map(t => t.id === table.id ? { ...t, status: 'Available', currentBill: 0 } : t));
+                              } catch (err) {
+                                console.error('Failed to update table status', err);
+                              }
                             }}
                             className="inline-flex items-center justify-center gap-1 text-[11px] font-extrabold text-dine-orange hover:bg-dine-light-orange dark:hover:bg-orange-950/30 px-3 py-1.5 rounded-lg transition-all border-none outline-none cursor-pointer"
                           >

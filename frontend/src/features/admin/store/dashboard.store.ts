@@ -49,6 +49,7 @@ export interface ActivityItem {
   bg: string;
   text: string;
   time: string;
+  timeRaw: number;
 }
 
 export interface DashboardState {
@@ -89,11 +90,84 @@ const seedTopItems: TopItem[] = [
   { name: 'Caesar Salad',     category: 'Popular', orders: 102, revenue: '₹11,400', trend: '+2%'  },
 ];
 
+function formatActivityTime(isoOrTimestamp: string | number): string {
+  const date = new Date(isoOrTimestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 const seedActivities: ActivityItem[] = [
-  { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30', text: 'Order #1042 marked as served', time: '2 min ago' },
-  { icon: Clock,        color: 'text-blue-500',  bg: 'bg-blue-50 dark:bg-blue-900/30',  text: 'New reservation: Sat 8 PM, party of 4', time: '10 min ago' },
-  { icon: XCircle,      color: 'text-red-500',   bg: 'bg-red-50 dark:bg-red-900/30',    text: 'Order #1038 cancelled by customer', time: '25 min ago' },
-  { icon: Settings,     color: 'text-purple-500',bg: 'bg-purple-50 dark:bg-purple-900/30', text: 'Inventory restocked: Olive Oil', time: '1 hr ago' },
+  {
+    icon: CheckCircle2,
+    color: 'text-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/30',
+    text: 'Order #1042 marked as served',
+    time: formatActivityTime(seedNow - 2 * 60000),
+    timeRaw: seedNow - 2 * 60000,
+  },
+  {
+    icon: Clock,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'New reservation: Sat 8 PM, party of 4',
+    time: formatActivityTime(seedNow - 10 * 60000),
+    timeRaw: seedNow - 10 * 60000,
+  },
+  {
+    icon: XCircle,
+    color: 'text-red-500',
+    bg: 'bg-red-50 dark:bg-red-900/30',
+    text: 'Order #1038 cancelled by customer',
+    time: formatActivityTime(seedNow - 25 * 60000),
+    timeRaw: seedNow - 25 * 60000,
+  },
+  {
+    icon: Settings,
+    color: 'text-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/30',
+    text: 'Inventory restocked: Olive Oil',
+    time: formatActivityTime(seedNow - 60 * 60000),
+    timeRaw: seedNow - 60 * 60000,
+  },
+  {
+    icon: Activity,
+    color: 'text-gray-500',
+    bg: 'bg-gray-50 dark:bg-gray-800/50',
+    text: 'QR menu refreshed for Table 6',
+    time: formatActivityTime(seedNow - 3 * 60 * 60000),
+    timeRaw: seedNow - 3 * 60 * 60000,
+  },
+  {
+    icon: CheckCircle2,
+    color: 'text-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/30',
+    text: 'Payment verified for Order #1031',
+    time: formatActivityTime(seedNow - 6 * 60 * 60000),
+    timeRaw: seedNow - 6 * 60 * 60000,
+  },
+  {
+    icon: Clock,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'Table session extended for Table 2',
+    time: formatActivityTime(seedNow - 12 * 60 * 60000),
+    timeRaw: seedNow - 12 * 60 * 60000,
+  },
+  {
+    icon: Settings,
+    color: 'text-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/30',
+    text: 'Menu pricing updated for beverages',
+    time: formatActivityTime(seedNow - 23 * 60 * 60000),
+    timeRaw: seedNow - 23 * 60 * 60000,
+  },
 ];
 
 function seedStatTiles(): StatTile[] {
@@ -276,17 +350,9 @@ function titleCase(s: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function relativeTime(iso: string): string {
+function getActivityTimestamp(iso: string): number {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  const diff = Math.max(0, Date.now() - d.getTime());
-  const min = Math.round(diff / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr} hr ago`;
-  const day = Math.round(hr / 24);
-  return `${day} day${day > 1 ? 's' : ''} ago`;
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
 function mapActivity(log: AuditLogEntry): ActivityItem {
@@ -326,7 +392,8 @@ function mapActivity(log: AuditLogEntry): ActivityItem {
     bg = 'bg-purple-50 dark:bg-purple-900/30';
   }
 
-  return { icon, color, bg, text: text + suffix, time: relativeTime(log.createdAt) };
+  const timeRaw = getActivityTimestamp(log.createdAt);
+  return { icon, color, bg, text: text + suffix, time: formatActivityTime(timeRaw), timeRaw };
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────
@@ -419,7 +486,12 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       const revenueData = buildRevenueData(revData?.revenue || []);
       const recentOrders = buildRecentOrders(orders);
       const topItems = buildTopItems(backendOrders);
-      const activities = (audData?.logs || []).slice(0, 8).map(mapActivity);
+      const last24HoursCutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const activities = (audData?.logs || [])
+        .filter((log) => getActivityTimestamp(log.createdAt) >= last24HoursCutoff)
+        .map(mapActivity)
+        .sort((a, b) => b.timeRaw - a.timeRaw)
+        .slice(0, 12);
 
       set({ loading: false, statTiles, revenueData, recentOrders, topItems, activities });
     } catch (err) {

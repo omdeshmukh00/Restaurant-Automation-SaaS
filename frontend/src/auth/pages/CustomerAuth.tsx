@@ -17,9 +17,10 @@ const CustomerAuth: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const tableToken = searchParams.get('table_token');
-  const from = (location.state as any)?.from?.pathname || '/customer';
+  const fromPath = (location.state as any)?.from;
+  const from = fromPath ? `${fromPath.pathname}${fromPath.search || ''}` : '/customer';
 
-  const [mobile, setMobile] = useState('');
+  const [mobile, setMobile] = useState(searchParams.get('mobile') || '');
   const [otp, setOtp] = useState<string[]>(['', '', '', '']);
   const [name, setName] = useState('');
   const [userExists, setUserExists] = useState(false);
@@ -121,7 +122,7 @@ const CustomerAuth: React.FC = () => {
       // Focus first OTP field
       setTimeout(() => otpRefs[0].current?.focus(), 100);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to send OTP. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -194,7 +195,7 @@ const CustomerAuth: React.FC = () => {
         }
       }, 800);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid OTP code. Please try again.');
+      setError(err.response?.data?.error?.message || err.response?.data?.message || 'Invalid OTP code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -210,8 +211,11 @@ const CustomerAuth: React.FC = () => {
   };
 
   const handleGuestContinue = () => {
-    signInAs('customer');
-    navigate('/customer', { replace: true });
+    if (tableToken) {
+      navigate(`/table?token=${tableToken}`, { replace: true });
+    } else {
+      navigate('/customer?scan=true', { replace: true });
+    }
   };
 
   const formatCountdown = (seconds: number) => {
@@ -373,6 +377,17 @@ const CustomerAuth: React.FC = () => {
           </span>
           <ArrowRight className="w-5 h-5" />
         </button>
+
+        {/* Guest Continue Option */}
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={handleGuestContinue}
+            className="text-sm font-semibold text-slate-500 hover:text-orange-600 dark:text-zinc-400 dark:hover:text-orange-400 transition-colors font-sans"
+          >
+            Continue as Guest
+          </button>
+        </div>
       </form>
 
       {/* Footer */}

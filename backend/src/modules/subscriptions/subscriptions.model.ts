@@ -79,6 +79,8 @@ export interface ISubscription extends Document {
   restaurantId: Types.ObjectId;
   plan: string;
   planId: Types.ObjectId;
+  priceMonthly: number;
+  addons?: Array<{ name: string; priceMonthly: number; addedAt?: Date }>;
   status: SubscriptionStatus;
   billingCycle: BillingCycle;
   startedAt: Date;
@@ -113,6 +115,14 @@ const subscriptionSchema = new Schema<ISubscription>(
     restaurantId: { type: Schema.Types.ObjectId, required: true, ref: 'Restaurant' },
     plan: { type: String, required: true, trim: true },
     planId: { type: Schema.Types.ObjectId, ref: 'PlatformPlan', required: true },
+    priceMonthly: { type: Number, default: 0 },
+    addons: [
+      {
+        name: { type: String, required: true, trim: true },
+        priceMonthly: { type: Number, required: true, min: 0 },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
     status: {
       type: String,
       required: true,

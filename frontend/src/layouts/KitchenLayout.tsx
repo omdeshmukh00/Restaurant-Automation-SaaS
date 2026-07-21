@@ -7,8 +7,12 @@ import LiveAlertsBar from '../features/kitchen/components/dashboard/LiveAlertsBa
 import KitchenProfilePanel from '../features/kitchen/components/dashboard/KitchenProfilePanel';
 import { useKitchenStore } from '../features/kitchen/store/kitchen.store';
 import { getKitchenRolePermissions } from '../features/kitchen/utils/kitchenRoleAccess';
-
+import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
+import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
+import { connectSocket, getSocket } from '../lib/socket';
+import { refreshDashboard, scheduleRefresh } from '../features/kitchen/hooks/useKitchenDashboard';
 export default function KitchenLayout(): JSX.Element {
+  const { settings } = usePlatformSettingsGuard();
   const { profile } = useKitchenStore();
   const location = useLocation();
 
@@ -47,7 +51,28 @@ export default function KitchenLayout(): JSX.Element {
       }
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    
+    // Initial fetch on mount
+    void refreshDashboard();
+
+    connectSocket();
+    const socket = getSocket();
+    if (socket) {
+      socket.on('order.created', scheduleRefresh);
+      socket.on('order.updated', scheduleRefresh);
+      socket.on('order.ready', scheduleRefresh);
+      socket.on('kitchen:batch-updated', scheduleRefresh);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (socket) {
+        socket.off('order.created', scheduleRefresh);
+        socket.off('order.updated', scheduleRefresh);
+        socket.off('order.ready', scheduleRefresh);
+        socket.off('kitchen:batch-updated', scheduleRefresh);
+      }
+    };
   }, []);
 
   if (!isAllowed && allowedPaths.length > 0) {
@@ -101,6 +126,13 @@ export default function KitchenLayout(): JSX.Element {
 
         {/* Profile Panel Drawer */}
         <KitchenProfilePanel isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+
+        {/* Maintenance Alert Modal overlay */}
+        <MaintenanceAlertModal
+          isOpen={!!settings?.disableKitchenPanel}
+          title="Kitchen Panel Disabled"
+          message="Due to temporary platform maintenance, the Kitchen Panel is currently disabled."
+        />
       </div>
     </KitchenSearchProvider>
   );
