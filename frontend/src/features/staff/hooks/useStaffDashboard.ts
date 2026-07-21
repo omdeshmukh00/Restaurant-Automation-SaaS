@@ -74,7 +74,11 @@ function mapRequest(request: any): RequestItem {
   const priority = request?.priority?.toUpperCase?.() ?? 'NORMAL';
   const status = request?.status?.toUpperCase?.() ?? 'PENDING';
   const type = request?.type?.toUpperCase?.() ?? 'WAITER';
-  const typeLabel = type === 'WATER' ? 'Water Bottle' : type === 'CUTLERY' ? 'Extra Napkins' : type === 'CLEANING' ? 'Clean Table' : 'Call Waiter';
+  const typeLabel = 
+    type === 'WATER' ? 'Water Bottle' : 
+    type === 'CUTLERY' ? 'Extra Cutlery' : 
+    type === 'CLEANING' ? 'Clean Table' : 
+    type === 'HELP' ? 'Extra Napkins' : 'Call Waiter';
   const createdAt = request?.createdAt || request?.updatedAt;
 
   return {

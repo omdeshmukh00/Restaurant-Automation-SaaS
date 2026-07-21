@@ -42,7 +42,7 @@ export interface ReadyItem {
 export interface RequestItem {
   id: string;
   table: string;
-  type: 'Call Waiter' | 'Water Bottle' | 'Extra Napkins' | 'Clean Table' | 'Cutlery';
+  type: 'Call Waiter' | 'Water Bottle' | 'Extra Napkins' | 'Clean Table' | 'Extra Cutlery';
   time: string;
   elapsedMinutes: number;
   status: 'Pending' | 'InProgress' | 'Resolved';
@@ -256,7 +256,7 @@ class StaffStore {
       { id: '2', table: 'Table 1', type: 'Extra Napkins', time: '5 mins ago', elapsedMinutes: 5, status: 'Pending', severity: 'low' },
       { id: '3', table: 'Table 3', type: 'Water Bottle', time: '8 mins ago', elapsedMinutes: 8, status: 'InProgress', severity: 'low' },
       { id: '4', table: 'Table 4', type: 'Clean Table', time: '12 mins ago', elapsedMinutes: 12, status: 'Pending', severity: 'medium' },
-      { id: '5', table: 'Table 5', type: 'Cutlery', time: '15 mins ago', elapsedMinutes: 15, status: 'Resolved', severity: 'low' },
+      { id: '5', table: 'Table 5', type: 'Extra Cutlery', time: '15 mins ago', elapsedMinutes: 15, status: 'Resolved', severity: 'low' },
     ];
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dineease-staff-requests');
