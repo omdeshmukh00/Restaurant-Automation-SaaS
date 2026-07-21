@@ -1,23 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { INVENTORY, type InventoryItem } from '../store/kitchenData';
+import { type InventoryItem } from '../store/kitchenData';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
+import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
 
 export default function KitchenInventoryPage() {
   const { query } = useKitchenSearch();
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_inventory');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse kitchen inventory", e);
-        }
-      }
-    }
-    return INVENTORY;
-  });
+  const { inventory, setInventory } = useKitchenDashboard();
 
   const [selectedCategory, setSelectedCategory] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -26,10 +15,6 @@ export default function KitchenInventoryPage() {
     }
     return 'All';
   });
-
-  useEffect(() => {
-    localStorage.setItem('kitchen_inventory', JSON.stringify(inventory));
-  }, [inventory]);
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);

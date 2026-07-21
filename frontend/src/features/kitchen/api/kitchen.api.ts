@@ -65,114 +65,50 @@ export const getKitchenOrders = async (): Promise<KitchenOrder[]> => {
   }
 };
 
-export const acceptOrder = async (id: string): Promise<KitchenOrder> => {
-  try {
-    const res = await apiClient.patch(`/kitchen/orders/${id}/accept`);
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Accepted order ${id}`);
-    const order = mockOrders.find(o => o.id === id);
-    if (order) order.status = 'PREPARING';
-    return order || { id, table: '?', item: '?', status: 'PREPARING', quantity: 1 };
-  }
+export const acceptOrder = async (id: string, estimatedPreparationTime?: number): Promise<KitchenOrder> => {
+  const payload = estimatedPreparationTime ? { estimatedPreparationTime } : {};
+  const res = await apiClient.patch(`/kitchen/orders/${id}/accept`, payload);
+  return res.data?.data || res.data;
 };
 
 export const startOrder = async (id: string): Promise<KitchenOrder> => {
-  try {
-    const res = await apiClient.patch(`/kitchen/orders/${id}/start`);
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Started preparing order ${id}`);
-    const order = mockOrders.find(o => o.id === id);
-    if (order) order.status = 'PREPARING';
-    return order || { id, table: '?', item: '?', status: 'PREPARING', quantity: 1 };
-  }
+  const res = await apiClient.patch(`/kitchen/orders/${id}/start`);
+  return res.data?.data || res.data;
 };
 
 export const readyOrder = async (id: string): Promise<KitchenOrder> => {
-  try {
-    const res = await apiClient.patch(`/kitchen/orders/${id}/ready`);
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Marked order ${id} as ready`);
-    const order = mockOrders.find(o => o.id === id);
-    if (order) order.status = 'READY';
-    return order || { id, table: '?', item: '?', status: 'READY', quantity: 1 };
-  }
+  const res = await apiClient.patch(`/kitchen/orders/${id}/ready`);
+  return res.data?.data || res.data;
 };
 
 export const delayOrder = async (id: string): Promise<KitchenOrder> => {
-  try {
-    const res = await apiClient.patch(`/kitchen/orders/${id}/delay`);
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Delayed order ${id}`);
-    const order = mockOrders.find(o => o.id === id);
-    if (order) order.status = 'DELAYED';
-    return order || { id, table: '?', item: '?', status: 'DELAYED', quantity: 1 };
-  }
+  const res = await apiClient.patch(`/kitchen/orders/${id}/delay`);
+  return res.data?.data || res.data;
 };
 
 export const rejectOrder = async (id: string): Promise<KitchenOrder> => {
-  try {
-    const res = await apiClient.patch(`/kitchen/orders/${id}/reject`);
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Rejected order ${id}`);
-    const order = mockOrders.find(o => o.id === id);
-    if (order) order.status = 'REJECTED';
-    return order || { id, table: '?', item: '?', status: 'REJECTED', quantity: 1 };
-  }
+  const res = await apiClient.patch(`/kitchen/orders/${id}/reject`);
+  return res.data?.data || res.data;
 };
 
-export const getKitchenBatches = async (): Promise<KitchenBatch[]> => {
-  try {
-    const res = await apiClient.get('/kitchen/batches');
-    return res.data?.data || res.data || mockBatches;
-  } catch (err) {
-    console.warn('Using mock kitchen batches due to API error:', err);
-    return mockBatches;
-  }
+export const getKitchenBatches = async (): Promise<any[]> => {
+  const res = await apiClient.get('/kitchen/batches');
+  return res.data?.data?.batches || res.data?.batches || res.data?.data || res.data || [];
 };
 
-export const createKitchenBatch = async (data: { item: string; orders: string[] }): Promise<KitchenBatch> => {
-  try {
-    const res = await apiClient.post('/kitchen/batches', data);
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Created batch for ${data.item}`);
-    const newBatch: KitchenBatch = {
-      id: `b-${Date.now()}`,
-      item: data.item,
-      quantity: data.orders.length,
-      orders: data.orders,
-      status: 'PENDING'
-    };
-    mockBatches.push(newBatch);
-    return newBatch;
-  }
+export const getSuggestedBatches = async (): Promise<any[]> => {
+  const res = await apiClient.get('/kitchen/batches/suggestions');
+  return res.data?.data?.batches || res.data?.batches || res.data?.data || res.data || [];
 };
 
-export const updateKitchenBatchStatus = async (id: string, status: 'PENDING' | 'PREPARING' | 'READY'): Promise<KitchenBatch> => {
-  try {
-    const res = await apiClient.patch(`/kitchen/batches/${id}`, { status });
-    return res.data?.data || res.data;
-  } catch (err) {
-    console.warn(`[Mock] Updated batch ${id} status to ${status}`);
-    const batch = mockBatches.find(b => b.id === id);
-    if (batch) {
-      batch.status = status;
-      // Also update orders in the batch
-      batch.orders.forEach(orderId => {
-        const order = mockOrders.find(o => o.id === orderId);
-        if (order) {
-          if (status === 'PREPARING') order.status = 'PREPARING';
-          if (status === 'READY') order.status = 'READY';
-        }
-      });
-    }
-    return batch || { id, item: '?', quantity: 0, orders: [], status };
-  }
+export const createKitchenBatch = async (data: { name: string; orderIds: string[]; station?: string }): Promise<any> => {
+  const res = await apiClient.post('/kitchen/batches', data);
+  return res.data?.data?.batch || res.data?.batch || res.data?.data || res.data;
+};
+
+export const updateKitchenBatchStatus = async (id: string, status: string): Promise<any> => {
+  const res = await apiClient.patch(`/kitchen/batches/${id}`, { status });
+  return res.data?.data?.batch || res.data?.batch || res.data?.data || res.data;
 };
 
 export const getKitchenLoad = async (): Promise<KitchenLoad> => {
@@ -203,28 +139,4 @@ export const getKitchenPerformance = async (): Promise<KitchenPerformance> => {
   }
 };
 
-export const acceptAllOrders = async (): Promise<KitchenOrder[]> => {
-  try {
-    const res = await apiClient.post('/kitchen/orders/accept-all');
-    return res.data?.data || res.data || mockOrders;
-  } catch (err) {
-    console.warn('[Mock] Accepted all placed orders');
-    mockOrders.forEach(o => {
-      if (o.status === 'PLACED') o.status = 'PREPARING';
-    });
-    return mockOrders;
-  }
-};
 
-export const delayAllOrders = async (): Promise<KitchenOrder[]> => {
-  try {
-    const res = await apiClient.post('/kitchen/orders/delay-all');
-    return res.data?.data || res.data || mockOrders;
-  } catch (err) {
-    console.warn('[Mock] Delayed all preparing orders');
-    mockOrders.forEach(o => {
-      if (o.status === 'PREPARING') o.status = 'DELAYED';
-    });
-    return mockOrders;
-  }
-};

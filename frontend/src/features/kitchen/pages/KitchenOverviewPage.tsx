@@ -1,29 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import { ORDERS, POPULAR_ITEMS, type KitchenOrder } from '../store/kitchenData';
+import { POPULAR_ITEMS, type KitchenOrder as UIKitchenOrder } from '../store/kitchenData';
 import OrderCard from '../components/dashboard/OrderCard';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
+import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
+import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder } from '../api/kitchen.api';
+import { apiClient } from '../../../shared/services/apiClient';
+import ETAModal from '../components/ETAModal';
 
 export default function KitchenOverviewPage() {
   const { query } = useKitchenSearch();
 
-  // Load and save orders state
-  const [orders, setOrders] = useState<KitchenOrder[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_orders');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse stored kitchen orders", e);
-        }
-      }
-    }
-    return ORDERS;
-  });
+  const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
+  const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('kitchen_orders', JSON.stringify(orders));
-  }, [orders]);
+  const orders = React.useMemo(() => {
+    return rawOrders.map((bo: any): UIKitchenOrder => {
+      let status: UIKitchenOrder['status'] = 'new';
+      const rawStatus = String(bo.status || '').toLowerCase();
+      
+      if (rawStatus === 'pending') status = 'new';
+      else if (rawStatus === 'preparing' || rawStatus === 'confirmed') status = 'preparing';
+      else if (rawStatus === 'ready') status = 'ready';
+      else if (rawStatus === 'delayed') status = 'delayed';
+      else if (rawStatus === 'completed' || rawStatus === 'served') status = 'completed';
+      else if (rawStatus === 'cancelled' || rawStatus === 'rejected') status = 'cancelled';
+
+      const items = (bo.items || []).map((item: any) => ({
+        name: item.name || item.menuItemId?.name || 'Dish',
+        qty: item.quantity || 1,
+        price: item.price || 0,
+      }));
+
+      const minutes = bo.createdAt ? Math.round((Date.now() - new Date(bo.createdAt).getTime()) / 60000) : 0;
+      const timeAgo = minutes <= 0 ? 'Just now' : `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+      const time = bo.createdAt
+        ? new Date(bo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '';
+
+      const tableNum = bo.tableNumber || bo.tableId?.tableNumber || bo.tableId;
+      const tableStr = tableNum ? (String(tableNum).startsWith('Table') ? tableNum : `Table ${tableNum}`) : 'Table ?';
+
+      return {
+        id: bo._id || bo.id,
+        table: tableStr,
+        items,
+        status,
+        type: 'dine-in',
+        time,
+        timeAgo,
+        progress: status === 'preparing' ? 50 : 0,
+      };
+    });
+  }, [rawOrders]);
 
   // Load and save active tab state
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -45,7 +73,7 @@ export default function KitchenOverviewPage() {
     setExpandedColumns(prev => ({ ...prev, [columnTitle]: !prev[columnTitle] }));
   };
 
-  const filterByQuery = (o: KitchenOrder) => {
+  const filterByQuery = (o: UIKitchenOrder) => {
     if (!query) return true;
     const q = query.toLowerCase();
     return o.id.toLowerCase().includes(q) || o.table.toLowerCase().includes(q) || o.items.some(i => i.name.toLowerCase().includes(q));
@@ -56,17 +84,25 @@ export default function KitchenOverviewPage() {
   const ready = orders.filter(o => o.status === 'ready' && filterByQuery(o));
   const delayed = orders.filter(o => o.status === 'delayed' && filterByQuery(o));
 
-  const handleAccept = (id: string) => setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'preparing' as const, progress: 10 } : o));
-  const handleReject = (id: string) => setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'cancelled' as const } : o));
-  const handleMarkReady = (id: string) => setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'ready' as const } : o));
-  const handleDelay = (id: string) => setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'delayed' as const, delayMins: 5 } : o));
-  const handlePickup = (id: string) => setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'completed' as const } : o));
-  const handleRush = (id: string) => setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'preparing' as const, progress: 50 } : o));
-  const handleAcceptAll = () => setOrders(prev => prev.map(o => o.status === 'new' ? { ...o, status: 'preparing' as const, progress: 10 } : o));
-  const handleRefreshFeed = () => {
-    setOrders(ORDERS);
-    localStorage.setItem('kitchen_orders', JSON.stringify(ORDERS));
+  const handleAccept = (id: string) => { setEtaOrderId(id); };
+  
+  const handleEtaConfirm = async (eta: number) => {
+    if (!etaOrderId) return;
+    try {
+      await acceptOrder(etaOrderId, eta);
+      await startOrder(etaOrderId);
+    } catch (e) {
+      console.error(e);
+    }
+    setEtaOrderId(null);
+    refreshDashboard();
   };
+
+  const handleReject = async (id: string) => { await rejectOrder(id); refreshDashboard(); };
+  const handleMarkReady = async (id: string) => { await readyOrder(id); refreshDashboard(); };
+  const handleDelay = async (id: string) => { await delayOrder(id); refreshDashboard(); };
+  const handleRush = async (id: string) => { await startOrder(id); refreshDashboard(); };
+  const handleRefreshFeed = () => refreshDashboard();
 
   const columns = [
     { title: 'NEW ORDERS', icon: 'assignment', count: newOrders.length, color: 'blue', items: newOrders },
@@ -143,7 +179,7 @@ export default function KitchenOverviewPage() {
               {/* Cards */}
               <div className="space-y-4 overflow-y-auto pr-1 flex-1" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                 {(expandedColumns[title] ? items : items.slice(0, 3)).map(order => (
-                  <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelay} onPickup={handlePickup} onRush={handleRush} />
+                  <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelay} onPickup={() => {}} onRush={handleRush} />
                 ))}
                 {items.length > 3 && (
                   <button onClick={() => toggleColumnExpand(title)} className={`w-full text-center py-2 ${c.text} font-bold text-xs font-sans bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors`}>
@@ -173,14 +209,6 @@ export default function KitchenOverviewPage() {
               <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 font-sans">Quick Chef Controls</h3>
             </div>
             <div className="space-y-3">
-              <button onClick={handleAcceptAll} className="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-100 font-sans hover:bg-red-600 active:scale-[0.98] transition-all">
-                <span className="material-symbols-outlined text-[18px]">notifications_active</span>
-                Accept All New Orders
-              </button>
-              <button className="w-full py-3 border border-orange-200 text-orange-500 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-orange-50 font-sans transition-colors">
-                <span className="material-symbols-outlined text-[18px]">schedule</span>
-                Delay All Preparing Orders
-              </button>
               <button onClick={handleRefreshFeed} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Refresh Feed
@@ -243,6 +271,13 @@ export default function KitchenOverviewPage() {
           </div>
         </div>
       </div>
+
+      <ETAModal
+        isOpen={!!etaOrderId}
+        orderId={etaOrderId}
+        onConfirm={handleEtaConfirm}
+        onCancel={() => setEtaOrderId(null)}
+      />
     </div>
   );
 }

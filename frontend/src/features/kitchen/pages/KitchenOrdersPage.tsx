@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { type KitchenOrder as UIKitchenOrder, type OrderStatus, type OrderType } from '../store/kitchenData';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
 import {
-  getKitchenOrders,
   acceptOrder,
   startOrder,
   readyOrder,
   rejectOrder,
 } from '../api/kitchen.api';
-import { connectSocket, getSocket } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
+import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
+import ETAModal from '../components/ETAModal';
 
 const STATUS_TABS: { label: string; value: OrderStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -39,8 +39,8 @@ const STATUS_BADGE: Record<string, string> = {
 export default function KitchenOrdersPage() {
   const { query } = useKitchenSearch();
 
-  const [orders, setOrders] = useState<UIKitchenOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
+  const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(() => {
     if (typeof window !== 'undefined') {
@@ -58,77 +58,44 @@ export default function KitchenOrdersPage() {
     return 'all';
   });
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
-    try {
-      const raw = await getKitchenOrders();
-      const mapped = raw.map((bo: any): UIKitchenOrder => {
-        let status: OrderStatus = 'new';
-        const rawStatus = String(bo.status || '').toLowerCase();
-        
-        if (rawStatus === 'pending') status = 'new';
-        else if (rawStatus === 'preparing' || rawStatus === 'confirmed') status = 'preparing';
-        else if (rawStatus === 'ready') status = 'ready';
-        else if (rawStatus === 'delayed') status = 'delayed';
-        else if (rawStatus === 'completed' || rawStatus === 'served') status = 'completed';
-        else if (rawStatus === 'cancelled' || rawStatus === 'rejected') status = 'cancelled';
+  const orders = React.useMemo(() => {
+    return rawOrders.map((bo: any): UIKitchenOrder => {
+      let status: OrderStatus = 'new';
+      const rawStatus = String(bo.status || '').toLowerCase();
+      
+      if (rawStatus === 'pending') status = 'new';
+      else if (rawStatus === 'preparing' || rawStatus === 'confirmed') status = 'preparing';
+      else if (rawStatus === 'ready') status = 'ready';
+      else if (rawStatus === 'delayed') status = 'delayed';
+      else if (rawStatus === 'completed' || rawStatus === 'served') status = 'completed';
+      else if (rawStatus === 'cancelled' || rawStatus === 'rejected') status = 'cancelled';
 
-        const items = (bo.items || []).map((item: any) => ({
-          name: item.name || item.menuItemId?.name || 'Dish',
-          qty: item.quantity || 1,
-          price: item.price || 0,
-        }));
+      const items = (bo.items || []).map((item: any) => ({
+        name: item.name || item.menuItemId?.name || 'Dish',
+        qty: item.quantity || 1,
+        price: item.price || 0,
+      }));
 
-        const minutes = bo.createdAt ? Math.round((Date.now() - new Date(bo.createdAt).getTime()) / 60000) : 0;
-        const timeAgo = minutes <= 0 ? 'Just now' : `${minutes} min${minutes > 1 ? 's' : ''} ago`;
-        const time = bo.createdAt
-          ? new Date(bo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : '';
+      const minutes = bo.createdAt ? Math.round((Date.now() - new Date(bo.createdAt).getTime()) / 60000) : 0;
+      const timeAgo = minutes <= 0 ? 'Just now' : `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+      const time = bo.createdAt
+        ? new Date(bo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '';
 
-        const tableNum = bo.tableNumber || bo.tableId?.tableNumber || bo.tableId;
-        const tableStr = tableNum ? (String(tableNum).startsWith('Table') ? tableNum : `Table ${tableNum}`) : 'Table ?';
+      const tableNum = bo.tableNumber || bo.tableId?.tableNumber || bo.tableId;
+      const tableStr = tableNum ? (String(tableNum).startsWith('Table') ? tableNum : `Table ${tableNum}`) : 'Table ?';
 
-        return {
-          id: bo._id || bo.id,
-          table: tableStr,
-          items,
-          status,
-          type: 'dine-in',
-          time,
-          timeAgo,
-        };
-      });
-      setOrders(mapped);
-    } catch (err) {
-      console.error('Failed to fetch kitchen orders', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
-
-  useEffect(() => {
-    connectSocket();
-    const socket = getSocket();
-    if (!socket) return;
-
-    const handleOrderUpdate = () => {
-      loadOrders();
-    };
-
-    socket.on('order.created', handleOrderUpdate);
-    socket.on('order.new', handleOrderUpdate);
-    socket.on('order.updated', handleOrderUpdate);
-
-    return () => {
-      socket.off('order.created', handleOrderUpdate);
-      socket.off('order.new', handleOrderUpdate);
-      socket.off('order.updated', handleOrderUpdate);
-    };
-  }, [loadOrders]);
+      return {
+        id: bo._id || bo.id,
+        table: tableStr,
+        items,
+        status,
+        type: 'dine-in',
+        time,
+        timeAgo,
+      };
+    });
+  }, [rawOrders]);
 
   const handleStatusFilterChange = (filter: OrderStatus | 'all') => {
     setStatusFilter(filter);
@@ -151,21 +118,32 @@ export default function KitchenOrdersPage() {
   });
 
   const handleAction = async (id: string, newStatus: OrderStatus) => {
+    if (newStatus === 'preparing') {
+      setEtaOrderId(id);
+      return;
+    }
     try {
-      if (newStatus === 'preparing') {
-        await acceptOrder(id);
-        await startOrder(id);
-      } else if (newStatus === 'ready') {
+      if (newStatus === 'ready') {
         await readyOrder(id);
       } else if (newStatus === 'cancelled') {
         await rejectOrder(id);
-      } else if (newStatus === 'completed') {
-        await apiClient.patch(`/staff/orders/${id}/serve`);
       }
     } catch (err) {
       console.error('Action failed:', err);
     }
-    loadOrders();
+    refreshDashboard();
+  };
+
+  const handleEtaConfirm = async (eta: number) => {
+    if (!etaOrderId) return;
+    try {
+      await acceptOrder(etaOrderId, eta);
+      await startOrder(etaOrderId);
+    } catch (err) {
+      console.error('Accept action failed:', err);
+    }
+    setEtaOrderId(null);
+    refreshDashboard();
   };
 
   return (
@@ -219,7 +197,7 @@ export default function KitchenOrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {filtered.length === 0 && rawOrders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-sans">
                     <div className="flex items-center justify-center gap-2">
@@ -257,7 +235,7 @@ export default function KitchenOrdersPage() {
                           <button onClick={() => handleAction(order.id, 'ready')} className="px-3 py-1 bg-orange-600 text-white rounded-lg text-[10px] font-bold hover:bg-orange-700">Ready</button>
                         )}
                         {order.status === 'ready' && (
-                          <button onClick={() => handleAction(order.id, 'completed')} className="px-3 py-1 bg-green-600 text-white rounded-lg text-[10px] font-bold hover:bg-green-700">Pickup</button>
+                          <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider font-sans">Waiting for Staff</span>
                         )}
                         {order.status === 'delayed' && (
                           <button onClick={() => handleAction(order.id, 'preparing')} className="px-3 py-1 border border-red-200 text-red-500 rounded-lg text-[10px] font-bold">⚡ Rush</button>
@@ -267,13 +245,20 @@ export default function KitchenOrdersPage() {
                   </tr>
                 ))
               )}
-              {!loading && filtered.length === 0 && (
+              {rawOrders.length > 0 && filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-sans">No orders match your filters</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+      
+      <ETAModal
+        isOpen={!!etaOrderId}
+        orderId={etaOrderId}
+        onConfirm={handleEtaConfirm}
+        onCancel={() => setEtaOrderId(null)}
+      />
     </div>
   );
 }
