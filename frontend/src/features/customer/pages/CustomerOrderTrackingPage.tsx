@@ -13,11 +13,12 @@ const STEPS = [
 export default function CustomerOrderTrackingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { orders, reorder, tableCode, diningSession, fetchOrders } = useCustomerStore();
+  const { orders, reorder, tableCode, diningSession, fetchOrders, liveBill, fetchLiveBill } = useCustomerStore();
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+    fetchLiveBill();
+  }, [fetchOrders, fetchLiveBill]);
   
   // Read invoice query param: e.g. ?invoice=ORD-2840
   const invoiceOrderId = searchParams.get('invoice');
@@ -26,9 +27,10 @@ export default function CustomerOrderTrackingPage() {
     : null;
 
   // Find active orders (status in Placed, Preparing, Ready)
-  const activeOrder = diningSession 
-    ? orders.find(o => o.status === 'Placed' || o.status === 'Preparing' || o.status === 'Ready')
-    : undefined;
+  const activeOrders = diningSession 
+    ? orders.filter(o => o.status === 'Placed' || o.status === 'Preparing' || o.status === 'Ready')
+    : [];
+  const primaryActiveOrder = activeOrders.length > 0 ? activeOrders[0] : undefined;
   // Find past orders (status in Served, Completed)
   const pastOrders = orders.filter(o => o.status === 'Served' || o.status === 'Completed');
 
@@ -40,14 +42,14 @@ export default function CustomerOrderTrackingPage() {
   };
 
   // Local simulated progress for live cooking section
-  const [progress, setProgress] = useState(() => getInitialProgress(activeOrder?.status));
-  const [prevOrderId, setPrevOrderId] = useState<string | undefined>(activeOrder?.id);
-  const [prevOrderStatus, setPrevOrderStatus] = useState<string | undefined>(activeOrder?.status);
+  const [progress, setProgress] = useState(() => getInitialProgress(primaryActiveOrder?.status));
+  const [prevOrderId, setPrevOrderId] = useState<string | undefined>(primaryActiveOrder?.id);
+  const [prevOrderStatus, setPrevOrderStatus] = useState<string | undefined>(primaryActiveOrder?.status);
 
-  if (activeOrder?.id !== prevOrderId || activeOrder?.status !== prevOrderStatus) {
-    setPrevOrderId(activeOrder?.id);
-    setPrevOrderStatus(activeOrder?.status);
-    setProgress(getInitialProgress(activeOrder?.status));
+  if (primaryActiveOrder?.id !== prevOrderId || primaryActiveOrder?.status !== prevOrderStatus) {
+    setPrevOrderId(primaryActiveOrder?.id);
+    setPrevOrderStatus(primaryActiveOrder?.status);
+    setProgress(getInitialProgress(primaryActiveOrder?.status));
   }
 
   useEffect(() => {
@@ -69,15 +71,33 @@ export default function CustomerOrderTrackingPage() {
     }
   };
 
-  const getStepTime = (stepIdx: number, orderId: string) => {
-    // Return standard mock times based on order ID hash
-    const numId = parseInt(orderId.replace(/\D/g, '')) || 1200;
-    const hour = (numId % 2) + 7; 
-    const min = (numId % 50);
-    
-    if (stepIdx === 0) return `${hour}:${String(min).padStart(2, '0')} PM`;
-    if (stepIdx === 1) return `${hour}:${String(min + 7).padStart(2, '0')} PM`;
-    if (stepIdx === 2) return `${hour}:${String(min + 15).padStart(2, '0')} PM`;
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return '--:--';
+    return new Date(isoString).toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getStepTime = (stepIdx: number, order: TrackedOrder) => {
+    if (stepIdx === 0 && order.createdAt) return formatTime(order.createdAt);
+    if (stepIdx === 1 && order.preparingStartedAt) return formatTime(order.preparingStartedAt);
+    if (stepIdx === 2 && order.readyAt) return formatTime(order.readyAt);
+    if (stepIdx === 3 && order.servedAt) return formatTime(order.servedAt);
+
+    // Estimate for future timestamps based on previous steps
+    if (order.createdAt) {
+      const baseTime = new Date(order.createdAt).getTime();
+      const numId = parseInt(order.id.replace(/\D/g, '')) || 1200;
+      const minOffset = (numId % 5) + 3; // random 3-7 mins
+
+      if (stepIdx === 1) return formatTime(new Date(baseTime + minOffset * 60000).toISOString());
+      if (stepIdx === 2) return formatTime(new Date(baseTime + (minOffset + 10) * 60000).toISOString());
+      if (stepIdx === 3) return formatTime(new Date(baseTime + (minOffset + 15) * 60000).toISOString());
+    }
+
     return '--:--';
   };
 
@@ -419,57 +439,58 @@ export default function CustomerOrderTrackingPage() {
           </div>
 
           {/* Active order tracking */}
-          {activeOrder ? (
+          {activeOrders.length > 0 ? (
             <div className="space-y-6">
-              {/* Stepper Card */}
-              <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h3 className="text-base font-bold text-sd-on-surface font-sans">Order {activeOrder.id}</h3>
-                    <p className="text-xs text-sd-on-surface-variant font-sans">Estimated Prep Time: {activeOrder.eta || '15 mins'}</p>
+              {activeOrders.map(activeOrder => (
+                <div key={activeOrder.id} className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
+                  <div className="flex justify-between items-start mb-8">
+                    <div>
+                      <h3 className="text-base font-bold text-sd-on-surface font-sans">Order {activeOrder.id}</h3>
+                      <p className="text-xs text-sd-on-surface-variant font-sans">Estimated Prep Time: {activeOrder.eta || '15 mins'}</p>
+                    </div>
+                    <span className="bg-sd-primary/10 text-sd-primary px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 font-sans">
+                      <span className="w-2 h-2 bg-sd-primary rounded-full animate-pulse" />
+                      In Kitchen
+                    </span>
                   </div>
-                  <span className="bg-sd-primary/10 text-sd-primary px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 font-sans">
-                    <span className="w-2 h-2 bg-sd-primary rounded-full animate-pulse" />
-                    In Kitchen
-                  </span>
-                </div>
 
-                {/* Stepper */}
-                <div className="relative flex justify-between items-start">
-                  <div className="absolute top-6 left-0 right-0 h-0.5 bg-sd-surface-variant dark:bg-sd-surface-variant/40" />
-                  <div 
-                    className="absolute top-6 left-0 h-0.5 bg-sd-primary transition-all duration-1000" 
-                    style={{ width: `${(getActiveStep(activeOrder.status) / (STEPS.length - 1)) * 100}%` }} 
-                  />
-                  {STEPS.map((step, i) => {
-                    const activeStepIdx = getActiveStep(activeOrder.status);
-                    const isDone = i < activeStepIdx;
-                    const isActive = i === activeStepIdx;
-                    const isFuture = i > activeStepIdx;
-                    
-                    return (
-                      <div key={step.label} className={`relative z-10 flex flex-col items-center text-center w-1/4 ${isFuture ? 'opacity-40' : ''}`}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all duration-500 ${
-                          isActive ? 'bg-sd-primary text-white shadow-lg scale-110' :
-                          isDone ? 'border-2 border-sd-primary bg-white dark:bg-sd-surface text-sd-primary shadow-md' :
-                          'border-2 border-sd-outline-variant dark:border-sd-outline-variant/40 bg-white dark:bg-sd-surface text-sd-on-surface-variant'
-                        }`}>
-                          <span className="material-symbols-outlined text-[20px]">{step.icon}</span>
+                  {/* Stepper */}
+                  <div className="relative flex justify-between items-start">
+                    <div className="absolute top-6 left-0 right-0 h-0.5 bg-sd-surface-variant dark:bg-sd-surface-variant/40" />
+                    <div 
+                      className="absolute top-6 left-0 h-0.5 bg-sd-primary transition-all duration-1000" 
+                      style={{ width: `${(getActiveStep(activeOrder.status) / (STEPS.length - 1)) * 100}%` }} 
+                    />
+                    {STEPS.map((step, i) => {
+                      const activeStepIdx = getActiveStep(activeOrder.status);
+                      const isDone = i < activeStepIdx;
+                      const isActive = i === activeStepIdx;
+                      const isFuture = i > activeStepIdx;
+                      
+                      return (
+                        <div key={step.label} className={`relative z-10 flex flex-col items-center text-center w-1/4 ${isFuture ? 'opacity-40' : ''}`}>
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all duration-500 ${
+                            isActive ? 'bg-sd-primary text-white shadow-lg scale-110' :
+                            isDone ? 'border-2 border-sd-primary bg-white dark:bg-sd-surface text-sd-primary shadow-md' :
+                            'border-2 border-sd-outline-variant dark:border-sd-outline-variant/40 bg-white dark:bg-sd-surface text-sd-on-surface-variant'
+                          }`}>
+                            <span className="material-symbols-outlined text-[20px]">{step.icon}</span>
+                          </div>
+                          <span className={`text-xs font-semibold font-sans ${isActive ? 'text-sd-primary font-bold' : isDone ? 'text-sd-primary' : 'text-sd-on-surface'}`}>
+                            {step.label}
+                          </span>
+                          <span className="text-[10px] font-sans mt-0.5 text-sd-on-surface-variant">
+                            {getStepTime(i, activeOrder)}
+                          </span>
                         </div>
-                        <span className={`text-xs font-semibold font-sans ${isActive ? 'text-sd-primary font-bold' : isDone ? 'text-sd-primary' : 'text-sd-on-surface'}`}>
-                          {step.label}
-                        </span>
-                        <span className="text-[10px] font-sans mt-0.5 text-sd-on-surface-variant">
-                          {getStepTime(i, activeOrder.id)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ))}
 
               {/* Live Cooking Feed */}
-              {activeOrder.status === 'Preparing' && (
+              {primaryActiveOrder?.status === 'Preparing' && (
                 <div className="bg-white dark:bg-sd-surface-container rounded-2xl overflow-hidden border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow flex flex-col md:flex-row">
                   <div className="p-6 md:p-8 flex-1 flex flex-col justify-center">
                     <div className="flex items-center gap-2 mb-3">
@@ -523,31 +544,55 @@ export default function CustomerOrderTrackingPage() {
         {/* Right / Bill Details Column */}
         <div className="lg:col-span-4 space-y-5">
           {/* Active Order Item details */}
-          {activeOrder && (
+          {liveBill && liveBill.orders && liveBill.orders.length > 0 && (
             <div className="bg-white dark:bg-sd-surface-container p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 rounded-2xl sd-food-card-shadow">
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-base font-bold text-sd-on-surface font-sans">Active Bill Items</h3>
                 <span className="text-sd-primary font-bold text-sm font-sans">
-                  {parseOrderItems(activeOrder.items).reduce((sum, item) => sum + item.qty, 0)} Items
+                  {liveBill.orders.reduce((sum: number, order: any) => sum + (order.items?.length || 0), 0)} Items
                 </span>
               </div>
               <div className="space-y-3 mb-6">
-                {parseOrderItems(activeOrder.items).map((item, idx) => (
+                {liveBill.orders.flatMap((order: any) => order.items).map((item: any, idx: number) => (
                   <div key={idx} className="flex gap-3 items-center">
                     <div className="w-10 h-10 rounded-xl bg-sd-surface-variant/40 flex items-center justify-center shrink-0">
                       <span className="material-symbols-outlined text-sd-on-surface-variant text-[18px]">restaurant</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-sd-on-surface text-sm font-sans truncate">{item.name}</h4>
-                      <p className="text-[10px] text-sd-on-surface-variant font-sans">Qty: {item.qty} • Unit: ₹{item.price}</p>
+                      <p className="text-[10px] text-sd-on-surface-variant font-sans">Qty: {item.quantity} • Unit: ₹{item.price}</p>
                     </div>
-                    <span className="font-bold text-sd-on-surface text-sm font-sans shrink-0">₹{item.total}</span>
+                    <span className="font-bold text-sd-on-surface text-sm font-sans shrink-0">₹{item.price * item.quantity}</span>
                   </div>
                 ))}
               </div>
-              <div className="pt-4 border-t border-sd-surface-variant flex justify-between items-center text-sm font-sans text-sd-on-surface">
-                <span className="font-bold">Total Bill (approx.)</span>
-                <span className="font-bold text-sd-primary text-base">₹{activeOrder.total}</span>
+              <div className="pt-4 border-t border-sd-surface-variant space-y-2">
+                <div className="flex justify-between items-center text-sm font-sans text-sd-on-surface-variant">
+                  <span>Item Total</span>
+                  <span>₹{liveBill.subtotal || 0}</span>
+                </div>
+                {liveBill.taxAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm font-sans text-sd-on-surface-variant">
+                    <span>Taxes</span>
+                    <span>₹{liveBill.taxAmount}</span>
+                  </div>
+                )}
+                {liveBill.serviceCharge > 0 && (
+                  <div className="flex justify-between items-center text-sm font-sans text-sd-on-surface-variant">
+                    <span>Restaurant Charges</span>
+                    <span>₹{liveBill.serviceCharge}</span>
+                  </div>
+                )}
+                {liveBill.discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm font-sans text-sd-secondary">
+                    <span>Discount</span>
+                    <span className="font-bold">- ₹{liveBill.discountAmount}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-sd-surface-variant/50 flex justify-between items-center text-sm font-sans text-sd-on-surface mt-2">
+                  <span className="font-bold">Total Bill</span>
+                  <span className="font-bold text-sd-primary text-base">₹{liveBill.finalAmount}</span>
+                </div>
               </div>
             </div>
           )}

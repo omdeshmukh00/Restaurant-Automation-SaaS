@@ -129,7 +129,7 @@ app.get(
 app.use(`${env.API_PREFIX}/sessions`, tableSessionRoutes);
 app.use(`${env.API_PREFIX}/customer/requests`, customerRequestsRoutes);
 app.use(`${env.API_PREFIX}/notifications`, notificationsRoutes);
-app.use(`${env.API_PREFIX}`, billingRoutes);
+app.use(`${env.API_PREFIX}/billing`, billingRoutes);
 app.use(env.API_PREFIX, apiRouter);
 
 // // Express route stack printer utility for debugging

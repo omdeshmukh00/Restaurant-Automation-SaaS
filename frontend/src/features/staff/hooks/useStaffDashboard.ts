@@ -172,8 +172,71 @@ function mapAlert(n: any): AlertItem {
   };
 }
 
-let isFetchingStaffDashboard = false;
-let lastStaffFetchTime = 0;
+let refreshScheduled = false;
+let refreshInProgress = false;
+let queuedRefresh = false;
+
+export const scheduleRefresh = () => {
+  if (refreshScheduled) return;
+  refreshScheduled = true;
+  setTimeout(() => {
+    refreshScheduled = false;
+    void refreshDashboard();
+  }, 200);
+};
+
+export const refreshDashboard = async () => {
+  if (refreshInProgress) {
+    queuedRefresh = true;
+    return;
+  }
+  refreshInProgress = true;
+  queuedRefresh = false;
+  
+  try {
+    const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, menuRes, alertsRes] = await Promise.all([
+      tableAPI.getTables(),
+      requestsAPI.getPending(),
+      reservationsAPI.getReservations(),
+      ordersAPI.getReadyOrders(),
+      menuAPI.getItems(),
+      notificationsAPI.getAll(),
+    ]);
+
+    if (tablesRes.success && Array.isArray(tablesRes.data)) {
+      staffStore.setTables(tablesRes.data.map(mapTable));
+    }
+
+    if (requestsRes.success && Array.isArray(requestsRes.data)) {
+      staffStore.setRequests(requestsRes.data.map(mapRequest));
+    }
+
+    if (reservationsRes.success && Array.isArray(reservationsRes.data)) {
+      staffStore.setReservations(reservationsRes.data.map(mapReservation));
+    }
+
+    if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
+      staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
+      staffStore.setOrders(readyOrdersRes.data.map(mapOrder));
+    }
+
+    if (menuRes.success && Array.isArray(menuRes.data)) {
+      staffStore.setMenuItems(menuRes.data.map(mapMenuItem));
+    }
+
+    if (alertsRes.success && Array.isArray(alertsRes.data)) {
+      staffStore.setAlerts(alertsRes.data.map(mapAlert));
+    }
+  } catch (err) {
+    console.error('Unable to refresh staff data', err);
+  } finally {
+    refreshInProgress = false;
+    if (queuedRefresh) {
+      queuedRefresh = false;
+      scheduleRefresh();
+    }
+  }
+};
 
 export function useStaffDashboard() {
   const [orders, setOrdersState] = useState(() => staffStore.orders);
@@ -183,8 +246,6 @@ export function useStaffDashboard() {
   const [tables, setTablesState] = useState(() => staffStore.tables);
   const [reservations, setReservationsState] = useState(() => staffStore.reservations);
   const [menuItems, setMenuItemsState] = useState(() => staffStore.menuItems);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = staffStore.subscribe(() => {
@@ -201,59 +262,6 @@ export function useStaffDashboard() {
     };
   }, []);
 
-  const refreshDashboard = async () => {
-    const now = Date.now();
-    if (isFetchingStaffDashboard || now - lastStaffFetchTime < 1000) {
-      return;
-    }
-    isFetchingStaffDashboard = true;
-    lastStaffFetchTime = now;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, menuRes, alertsRes] = await Promise.all([
-        tableAPI.getTables(),
-        requestsAPI.getPending(),
-        reservationsAPI.getReservations(),
-        ordersAPI.getReadyOrders(),
-        menuAPI.getItems(),
-        notificationsAPI.getAll(),
-      ]);
-
-      if (tablesRes.success && Array.isArray(tablesRes.data)) {
-        staffStore.setTables(tablesRes.data.map(mapTable));
-      }
-
-      if (requestsRes.success && Array.isArray(requestsRes.data)) {
-        staffStore.setRequests(requestsRes.data.map(mapRequest));
-      }
-
-      if (reservationsRes.success && Array.isArray(reservationsRes.data)) {
-        staffStore.setReservations(reservationsRes.data.map(mapReservation));
-      }
-
-      if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
-        staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
-        staffStore.setOrders(readyOrdersRes.data.map(mapOrder));
-      }
-
-      if (menuRes.success && Array.isArray(menuRes.data)) {
-        staffStore.setMenuItems(menuRes.data.map(mapMenuItem));
-      }
-
-      if (alertsRes.success && Array.isArray(alertsRes.data)) {
-        staffStore.setAlerts(alertsRes.data.map(mapAlert));
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to refresh staff data';
-      setError(message);
-    } finally {
-      isFetchingStaffDashboard = false;
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     void refreshDashboard();
 
@@ -261,7 +269,7 @@ export function useStaffDashboard() {
     const socket = getSocket();
     if (socket) {
       const handleSync = () => {
-        void refreshDashboard();
+        scheduleRefresh();
       };
       socket.on('table.status.changed', handleSync);
       socket.on('table.cleaned', handleSync);
@@ -293,8 +301,8 @@ export function useStaffDashboard() {
     tables,
     reservations,
     menuItems,
-    loading,
-    error,
+    loading: false,
+    error: null,
     refreshDashboard,
     setOrders: (newOrders: Order[] | ((prev: Order[]) => Order[])) => staffStore.setOrders(newOrders),
     setReadyItems: (newReadyItems: ReadyItem[] | ((prev: ReadyItem[]) => ReadyItem[])) => staffStore.setReadyItems(newReadyItems),

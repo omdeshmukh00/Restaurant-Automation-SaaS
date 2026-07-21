@@ -211,8 +211,11 @@ const CustomerAuth: React.FC = () => {
   };
 
   const handleGuestContinue = () => {
-    signInAs('customer');
-    navigate('/customer', { replace: true });
+    if (tableToken) {
+      navigate(`/table?token=${tableToken}`, { replace: true });
+    } else {
+      navigate('/customer?scan=true', { replace: true });
+    }
   };
 
   const formatCountdown = (seconds: number) => {
@@ -374,6 +377,17 @@ const CustomerAuth: React.FC = () => {
           </span>
           <ArrowRight className="w-5 h-5" />
         </button>
+
+        {/* Guest Continue Option */}
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={handleGuestContinue}
+            className="text-sm font-semibold text-slate-500 hover:text-orange-600 dark:text-zinc-400 dark:hover:text-orange-400 transition-colors font-sans"
+          >
+            Continue as Guest
+          </button>
+        </div>
       </form>
 
       {/* Footer */}

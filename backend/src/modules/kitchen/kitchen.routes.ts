@@ -50,6 +50,7 @@ router.patch(
 );
 
 router.get('/batches', KitchenController.getBatches);
+router.get('/batches/suggestions', KitchenController.getSuggestedBatches);
 router.get('/batches/:id', validate({ params: kitchenBatchParamsSchema }), KitchenController.getBatch);
 router.post('/batches', validate({ body: createKitchenBatchBodySchema }), KitchenController.createBatch);
 router.patch(

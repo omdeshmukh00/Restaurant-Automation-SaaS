@@ -19,7 +19,6 @@ import { tenantContext } from '../utils/tenantContext';
  * Usage: router.post('/customer/orders', requireSession, handler)
  */
 export async function requireSession(req: Request, _res: Response, next: NextFunction) {
-  console.log(`[requireSession Debug] Running for ${req.method} ${req.originalUrl}. Token: ${req.headers['x-session-token']}`);
   try {
     const token = req.headers['x-session-token'] as string;
 
@@ -40,8 +39,11 @@ export async function requireSession(req: Request, _res: Response, next: NextFun
     // Validate session (checks ACTIVE, hard expiry, idle timeout)
     const session = await sessionService.validateSession(token, isClosedAllowed);
 
-    // Touch activity timestamp
-    await sessionService.touchActivity(session._id.toString());
+    // Touch activity timestamp ONLY for business actions
+    const ALLOWED_ACTIVITY_METHODS = ['POST', 'PATCH', 'PUT', 'DELETE'];
+    if (ALLOWED_ACTIVITY_METHODS.includes(req.method)) {
+      await sessionService.touchActivity(session._id.toString());
+    }
 
     const tenantId = (session as any).tenantId?.toString() || session.restaurantId.toString();
 

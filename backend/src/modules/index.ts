@@ -39,10 +39,7 @@ export const apiRouter = Router();
 
 apiRouter.use(requirePasswordChange);
 
-apiRouter.get('/customer/session', (req, res, next) => {
-  console.log(`[apiRouter Debug] GET /customer/session matched. headers:`, JSON.stringify(req.headers));
-  next();
-});
+
 
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/users', usersRouter);

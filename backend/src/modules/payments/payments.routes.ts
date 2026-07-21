@@ -16,6 +16,8 @@ import {
   verifyCustomerPaymentController,
   razorpayWebhookController,
   refundPaymentController,
+  requestCashPaymentController,
+  confirmCashPaymentController,
 } from './payments.controller';
 import {
   createPaymentBodySchema,
@@ -60,6 +62,12 @@ router.post(
   verifyCustomerPaymentController,
 );
 
+router.post(
+  '/customer/cash',
+  requireSession,
+  requestCashPaymentController
+);
+
 router.get('/customer', requireSession, listCustomerPaymentsController);
 
 router.get(
@@ -100,6 +108,15 @@ router.patch(
   tenantGuard,
   validate({ params: paymentIdParamsSchema }),
   markCashPaymentCollectedController,
+);
+
+router.post(
+  '/admin/:paymentId/confirm',
+  requireAuth,
+  roleGuard(...billingRoles),
+  tenantGuard,
+  validate({ params: paymentIdParamsSchema }),
+  confirmCashPaymentController,
 );
 
 router.post(
