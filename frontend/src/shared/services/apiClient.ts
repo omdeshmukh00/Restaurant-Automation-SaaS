@@ -99,6 +99,23 @@ apiClient.interceptors.response.use(
       url.includes('/session/end');
 
     if (
+      status === 401 && 
+      (errorCode === 'SESSION_INVALID' || errorCode === 'TABLE_SESSION_EXPIRED' || errorCode === 'SESSION_IDLE_TIMEOUT')
+    ) {
+      localStorage.removeItem('x-session-token');
+      
+      // Use dynamic import to prevent circular dependency with customer.store.ts
+      import('../../features/customer/store/customer.store').then(({ useCustomerStore }) => {
+        useCustomerStore.getState().clearDiningSession(true);
+        // Toast via notification system or standard toast
+      });
+
+      // Redirect to QR scanner
+      window.location.href = '/customer?scan=true&expired=true';
+      return Promise.reject(error);
+    }
+
+    if (
       !isAuthAction &&
       status === 401 &&
       (errorCode === 'TOKEN_EXPIRED' ||

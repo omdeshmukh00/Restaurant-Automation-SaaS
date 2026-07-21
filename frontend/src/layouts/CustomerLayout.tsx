@@ -8,6 +8,8 @@ import CustomerBottomNav from '../features/customer/components/dashboard/Custome
 import CartSidebar from '../features/customer/components/dashboard/CartSidebar';
 import QRScannerModal from '../features/customer/components/dashboard/QRScannerModal';
 import { useCustomerStore } from '../features/customer/store/customer.store';
+import { useRestaurantStore } from '../features/restaurant/store/restaurant.store';
+import { getCustomerRouteAccessLevel, isValidDiningSession } from '../app/routeAccess';
 import { useAuth } from '../auth/AuthProvider';
 import { apiClient } from '../shared/services/apiClient';
 import { connectSocket, getSocket } from '../lib/socket';
@@ -50,8 +52,13 @@ export default function CustomerLayout() {
   useEffect(() => {
     if (searchParams.get('scan') === 'true') {
       setScannerOpen(true);
+      if (searchParams.get('expired') === 'true') {
+        setToastMsg('Your dining session has ended. Please scan the QR code again.');
+        setTimeout(() => setToastMsg(''), 4000);
+      }
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('scan');
+      newParams.delete('expired');
       setSearchParams(newParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -215,7 +222,7 @@ export default function CustomerLayout() {
               status: 'ACTIVE',
             });
             
-            signInAs('customer');
+            // Removed fake JWT login: signInAs('customer')
             
             // Clean query params
             const newParams = new URLSearchParams(searchParams);
@@ -230,7 +237,7 @@ export default function CustomerLayout() {
       };
       initSession();
     }
-  }, [qrToken, setDiningSession, signInAs, searchParams, setSearchParams]);
+  }, [qrToken, setDiningSession, searchParams, setSearchParams]);
 
   // Show cart panel only on home/menu pages
   const showCartPanel = ['/customer/home', '/customer/menu', '/customer'].some((p) =>
@@ -250,9 +257,8 @@ export default function CustomerLayout() {
     }
   }, [location.pathname, cartVisible]);
 
-  const requiresSession = ['/customer/home', '/customer/menu'].some((p) =>
-    location.pathname === p || location.pathname.startsWith(p + '/')
-  ) || location.pathname === '/customer' || location.pathname === '/customer/';
+  const accessLevel = getCustomerRouteAccessLevel(location.pathname);
+  const requiresSession = accessLevel === 'SESSION';
 
   const extractQrToken = (scannedText: string): string => {
     if (!scannedText) return '';
@@ -305,7 +311,7 @@ export default function CustomerLayout() {
           status: 'ACTIVE',
         });
 
-        signInAs('customer');
+        // Removed fake JWT login: signInAs('customer')
         setToastMsg(`✅ Connected to Table ${data.session?.table?.table_no || ''}!`);
         navigate('/customer/menu');
       } else {
@@ -339,7 +345,7 @@ export default function CustomerLayout() {
             <CustomerTopBar onToggleCart={() => setCartOpen(!cartOpen)} />
 
             <main className="flex-1 overflow-hidden h-full">
-              {!diningSession && requiresSession ? (
+              {!isValidDiningSession(diningSession) && requiresSession ? (
                 <div className="h-full w-full flex items-center justify-center bg-slate-50 dark:bg-zinc-950 p-4 relative overflow-hidden">
                   <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl" />
                   <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl" />

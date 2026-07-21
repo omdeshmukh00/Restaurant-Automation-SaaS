@@ -310,6 +310,20 @@ export class BillingService {
       bill.invoiceNumber = `INV-${currentYear}-${sequenceStr}`;
     }
 
+    // 3. Automatically store customerId if a matching user exists
+    if (!bill.customerId && bill.customerPhone) {
+      try {
+        const { UserModel } = await import('../users/users.model');
+        const { UserRole } = await import('../../constants/roles');
+        const user = await UserModel.findOne({ mobile: bill.customerPhone, role: UserRole.CUSTOMER }).session(dbSession || null);
+        if (user) {
+          bill.customerId = user._id as mongoose.Types.ObjectId;
+        }
+      } catch (err) {
+        logger.error('Failed to link customerId during settlement', err);
+      }
+    }
+
     await bill.save({ session: dbSession });
 
     return { bill, updatedOrders };

@@ -172,7 +172,7 @@ type CustomerStore = {
 
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
-  clearDiningSession: () => Promise<void>;
+  clearDiningSession: (forceLocalOnly?: boolean) => Promise<void>;
   recordActivity: () => void;
   checkSessionInactivity: () => Promise<void>;
 
@@ -380,20 +380,24 @@ export const useCustomerStore = create<CustomerStore>()(
           disconnectSocket();
         }
       },
-      clearDiningSession: async () => {
+      clearDiningSession: async (forceLocalOnly = false) => {
         const { diningSession } = get();
-        if (diningSession) {
+        if (diningSession && !forceLocalOnly) {
           try {
             await apiClient.post('/customer/session/end');
           } catch (e: any) {
             console.error('Failed to end dining session on backend', e);
-            throw new Error(e.response?.data?.message || 'Failed to end dining session');
+            // Don't throw, we still want to clean up local state
           }
         }
         localStorage.removeItem('x-session-token');
         set({
           diningSession: null,
           lastActivity: null,
+          cart: [],
+          orders: [],
+          liveBill: null,
+          tableCode: 'T07', // Reset to default or clear it
         });
         disconnectSocket();
       },
