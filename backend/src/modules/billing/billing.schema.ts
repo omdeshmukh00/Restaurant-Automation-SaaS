@@ -55,6 +55,10 @@ export interface IBill extends Document {
 
   finalAmount: number;
 
+  grossTotal?: number;
+  paymentsApplied?: number;
+  outstandingBalance?: number;
+
   appliedCoupons: IAppliedCoupon[];
 
   paymentMethod?: PaymentMethod;
@@ -189,6 +193,24 @@ export const billingSchema = new Schema<IBill>(
       min: 0,
     },
 
+    grossTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    paymentsApplied: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    outstandingBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     appliedCoupons: {
       type: [appliedCouponSchema],
       default: [],
@@ -267,7 +289,7 @@ export const billingSchema = new Schema<IBill>(
 billingSchema.index({ restaurantId: 1 });
 billingSchema.index({ customerId: 1 });
 billingSchema.index({ tableId: 1 });
-billingSchema.index({ sessionId: 1 });
+billingSchema.index({ sessionId: 1 }, { unique: true, sparse: true });
 billingSchema.index({ status: 1 });
 
 export default billingSchema;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../services/apiClient";
+import { connectSocket, getSocket } from "../../lib/socket";
 
 export interface PlatformSettingsData {
   maintenanceMode: boolean;
@@ -23,6 +24,31 @@ let globalLoading = true;
 let isFetching = false;
 let lastFetchTime = 0;
 const listeners = new Set<(settings: PlatformSettingsData | null) => void>();
+let socketConnected = false;
+
+function updateGlobalSettings(data: any) {
+  if (!data) return;
+  globalSettings = {
+    maintenanceMode: !!data.maintenanceMode,
+    disableCustomerPanel: !!data.disableCustomerPanel,
+    disableKitchenPanel: !!data.disableKitchenPanel,
+    disableStaffPanel: !!data.disableStaffPanel,
+    disableCleaningPanel: !!data.disableCleaningPanel,
+    disableAdminPanel: !!data.disableAdminPanel,
+    enablePartnerRegistration:
+      data.enablePartnerRegistration !== undefined
+        ? !!data.enablePartnerRegistration
+        : true,
+    applicationFeeEnabled: !!data.applicationFeeEnabled,
+    applicationFeeAmount: data.applicationFeeAmount !== undefined ? Number(data.applicationFeeAmount) : 0,
+    currency: data.currency || 'INR',
+    refundPolicy: data.refundPolicy || 'refundable',
+    platformName: data.platformName,
+    supportEmail: data.supportEmail,
+  };
+  globalLoading = false;
+  listeners.forEach((listener) => listener(globalSettings));
+}
 
 async function fetchGlobalSettings(force = false) {
   const now = Date.now();
@@ -35,34 +61,23 @@ async function fetchGlobalSettings(force = false) {
     const res = await apiClient.get("/public/platform-settings");
     const data = res.data?.data || res.data;
     if (data) {
-      globalSettings = {
-        maintenanceMode: !!data.maintenanceMode,
-        disableCustomerPanel: !!data.disableCustomerPanel,
-        disableKitchenPanel: !!data.disableKitchenPanel,
-        disableStaffPanel: !!data.disableStaffPanel,
-        disableCleaningPanel: !!data.disableCleaningPanel,
-        disableAdminPanel: !!data.disableAdminPanel,
-        enablePartnerRegistration:
-          data.enablePartnerRegistration !== undefined
-            ? !!data.enablePartnerRegistration
-            : true,
-        applicationFeeEnabled: !!data.applicationFeeEnabled,
-        applicationFeeAmount: data.applicationFeeAmount !== undefined ? Number(data.applicationFeeAmount) : 0,
-        currency: data.currency || 'INR',
-        refundPolicy: data.refundPolicy || 'refundable',
-        platformName: data.platformName,
-        supportEmail: data.supportEmail,
-      };
+      updateGlobalSettings(data);
       lastFetchTime = Date.now();
-      globalLoading = false;
-
-      // Broadcast to active component subscribers
-      listeners.forEach((listener) => listener(globalSettings));
     }
   } catch (err) {
     console.error("Failed to fetch public platform settings guard:", err);
   } finally {
     isFetching = false;
+  }
+}
+
+function setupGlobalSocket() {
+  if (socketConnected) return;
+  connectSocket();
+  const socket = getSocket();
+  if (socket) {
+    socket.on("platform.settings.updated", updateGlobalSettings);
+    socketConnected = true;
   }
 }
 
@@ -77,6 +92,7 @@ export function usePlatformSettingsGuard() {
     };
 
     listeners.add(listener);
+    setupGlobalSocket();
 
     if (globalSettings) {
       setSettings(globalSettings);

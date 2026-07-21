@@ -37,11 +37,6 @@ router.delete(
 |--------------------------------------------------------------------------
 */
 
-router.post(
-  "/customer/payments/create",
-  requireSession,
-  BillingController.createPayment
-);
 
 router.post(
   "/customer/payments/verify",

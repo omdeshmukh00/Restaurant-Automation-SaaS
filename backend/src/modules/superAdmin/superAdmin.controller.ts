@@ -172,6 +172,7 @@ export const updatePlatformSettingsController = asyncHandler(async (req: Request
   }
 
   await settings.save();
+  socketService.broadcast('platform.settings.updated', settings);
   ok(res, settings);
 });
 

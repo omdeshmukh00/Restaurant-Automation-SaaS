@@ -98,7 +98,6 @@ export async function validateSession(token: string, allowClosed = false): Promi
 
   if (!hasOrders) {
     const idleLimit = 5 * 60_000; // 5 minutes
-    console.log(`[validateSession Debug] sessionToken: ${token.slice(0, 10)}..., Date.now(): ${Date.now()}, lastActivityAt: ${session.lastActivityAt.getTime()} (${session.lastActivityAt.toISOString()}), diff: ${Date.now() - session.lastActivityAt.getTime()}, limit: ${idleLimit}`);
     if (Date.now() - session.lastActivityAt.getTime() > idleLimit) {
       session.status = SessionStatus.EXPIRED;
       await session.save();

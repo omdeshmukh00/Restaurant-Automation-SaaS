@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import type { Panel } from '../../auth/tokenStore';
+import { getCustomerRouteAccessLevel } from '../routeAccess';
 
 // ── Path-to-panel mapping ─────────────────────────────────────────────
 
@@ -35,8 +36,20 @@ export function ProtectedRoute(): JSX.Element {
   const qrToken = searchParams.get('qr_token');
 
   useEffect(() => {
-    if (matched && isPanelAuthenticated(matched.panel)) {
-      switchPanel(matched.panel);
+    if (matched) {
+      let shouldSwitchPanel = isPanelAuthenticated(matched.panel);
+      
+      // For customer panel, allow guests on PUBLIC or SESSION routes
+      if (!shouldSwitchPanel && matched.panel === 'customer') {
+        const accessLevel = getCustomerRouteAccessLevel(location.pathname);
+        if (accessLevel !== 'AUTH') {
+          shouldSwitchPanel = true;
+        }
+      }
+
+      if (shouldSwitchPanel) {
+        switchPanel(matched.panel);
+      }
     }
   }, [location.pathname, matched, isPanelAuthenticated, switchPanel]);
 
@@ -54,10 +67,16 @@ export function ProtectedRoute(): JSX.Element {
   }
 
   if (!isPanelAuthenticated(matched.panel)) {
-    if (matched.panel === 'customer' && qrToken) {
-      return <Navigate replace to={`/auth/customer?table_token=${qrToken}`} />;
+    if (matched.panel === 'customer') {
+      const accessLevel = getCustomerRouteAccessLevel(location.pathname);
+      if (accessLevel === 'AUTH') {
+        return <Navigate replace state={{ from: location }} to={matched.loginPath} />;
+      }
+      // For PUBLIC and SESSION routes, allow access without JWT.
+      // CustomerLayout will enforce the x-session-token requirement for SESSION routes.
+    } else {
+      return <Navigate replace state={{ from: location }} to={matched.loginPath} />;
     }
-    return <Navigate replace state={{ from: location }} to={matched.loginPath} />;
   }
 
   // To prevent rendering children with the wrong/stale user context during

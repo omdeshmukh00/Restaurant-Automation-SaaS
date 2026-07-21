@@ -26,37 +26,6 @@ describe('BillingController', () => {
     jest.clearAllMocks();
   });
 
-  describe('createPayment', () => {
-    it('throws validation error if customerEmail is invalid', async () => {
-      req.body = {
-        paymentMethod: 'ONLINE',
-        customerEmail: 'invalid-email',
-      };
-
-      await BillingController.createPayment(req as Request, res as Response, next);
-
-      expect(next).toHaveBeenCalledWith(expect.any(AppError));
-      const error = next.mock.calls[0][0];
-      expect(error.statusCode).toBe(400);
-      expect(error.message).toBe('Invalid email format');
-    });
-
-    it('trims and lowercases customerEmail and passes it to service', async () => {
-      req.body = {
-        paymentMethod: 'ONLINE',
-        customerEmail: '  TeSt@ExAmPle.COM  ',
-      };
-
-      (BillingService.createPayment as jest.Mock).mockResolvedValue({ id: 'bill1' });
-
-      await BillingController.createPayment(req as Request, res as Response, next);
-
-      expect(BillingService.createPayment).toHaveBeenCalledWith('rest123', 'session123', 'ONLINE', 'test@example.com');
-      expect(res.status).toHaveBeenCalledWith(201);
-      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-    });
-  });
-
   describe('requestFinalBill', () => {
     it('throws validation error if customerEmail is invalid', async () => {
       req.body = {

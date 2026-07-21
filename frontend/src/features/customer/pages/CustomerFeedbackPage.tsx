@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useCustomerStore } from '../store/customer.store';
+import { createCustomerRequest, submitCustomerFeedback } from '../api/customer.api';
 
 const EMOJIS = [
   { id: 'bad', emoji: '😠', label: 'Very Bad' },
@@ -16,7 +17,7 @@ const CATEGORIES = [
 ];
 
 export default function CustomerFeedbackPage() {
-  const { orders, requestService, addNotification } = useCustomerStore();
+  const { orders, addNotification } = useCustomerStore();
 
   // Find the latest served/completed order for feedback. Fallback to first order, then a mock fallback if no orders exist.
   const latestServedOrder = orders.find(o => o.status === 'Served' || o.status === 'Completed') || orders[0];
@@ -35,6 +36,8 @@ export default function CustomerFeedbackPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
+  const [isSupportLoading, setIsSupportLoading] = useState(false);
+  const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedData, setSubmittedData] = useState<{
     overall: string;
@@ -74,57 +77,80 @@ export default function CustomerFeedbackPage() {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSendSupport = (e: React.FormEvent) => {
+  const handleSendSupport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supportMsg.trim()) {
-      showToast('Please type a message first.', 'error');
+    if (!supportMsg.trim() || isSupportLoading) {
+      if (!supportMsg.trim()) showToast('Please type a message first.', 'error');
       return;
     }
 
-    requestService({
-      id: `req-${Date.now()}`,
-      label: 'Support Request',
-      description: supportMsg,
-      type: 'other',
-      status: 'Pending',
-    });
+    setIsSupportLoading(true);
 
-    addNotification(
-      'Support Ticket Created ✉️',
-      `Your support ticket has been submitted. Message: "${supportMsg.slice(0, 30)}..."`,
-      'info',
-      '/customer/feedback'
-    );
+    try {
+      await createCustomerRequest('help');
 
-    showToast('Support ticket submitted successfully!');
-    setSupportMsg('');
-    setSupportModalOpen(false);
+      addNotification(
+        'Support Ticket Created ✉️',
+        `Your support ticket has been submitted. Message: "${supportMsg.slice(0, 30)}..."`,
+        'info',
+        '/customer/feedback'
+      );
+
+      showToast('Support ticket submitted successfully!');
+      setSupportMsg('');
+      setSupportModalOpen(false);
+    } catch (error: any) {
+      showToast('❌ Failed to send support request. Please try again.', 'error');
+    } finally {
+      setIsSupportLoading(false);
+    }
   };
 
-  const handleSubmitFeedback = () => {
+  const handleSubmitFeedback = async () => {
     const selectedEmojiObj = EMOJIS.find((e) => e.id === selected);
     const overallText = selectedEmojiObj?.label || selected;
     const overallEmoji = selectedEmojiObj?.emoji || '🤩';
 
-    addNotification(
-      'Feedback Received! 🌟',
-      `Thank you for your rating: "${overallText}". We appreciate your feedback!`,
-      'info',
-      '/customer/feedback'
-    );
+    const ratingMap: Record<string, number> = {
+      bad: 1,
+      okay: 3,
+      good: 4,
+      excellent: 5
+    };
+    const numericalRating = ratingMap[selected] || 5;
 
-    setSubmittedData({
-      overall: overallText,
-      emoji: overallEmoji,
-      ratings: { ...ratings },
-      feedback: feedback,
-      photos: [...photos],
-      date: orderDate,
-      orderId: orderId,
-    });
-    setIsSubmitted(true);
+    setIsFeedbackLoading(true);
 
-    showToast('Feedback submitted! Thank you.');
+    try {
+      await submitCustomerFeedback({
+        rating: numericalRating,
+        comment: feedback,
+      });
+
+      addNotification(
+        'Feedback Received! 🌟',
+        `Thank you for your rating: "${overallText}". We appreciate your feedback!`,
+        'info',
+        '/customer/feedback'
+      );
+
+      setSubmittedData({
+        overall: overallText,
+        emoji: overallEmoji,
+        ratings: { ...ratings },
+        feedback: feedback,
+        photos: [...photos],
+        date: orderDate,
+        orderId: orderId,
+      });
+      setIsSubmitted(true);
+
+      showToast('Feedback submitted! Thank you.');
+    } catch (error: any) {
+      showToast('❌ Failed to submit feedback. Please try again.', 'error');
+    } finally {
+      setIsFeedbackLoading(false);
+    }
   };
 
   if (isSubmitted && submittedData) {
@@ -399,10 +425,11 @@ export default function CustomerFeedbackPage() {
         <div className="lg:col-span-3 mt-2">
           <button 
             onClick={handleSubmitFeedback}
-            className="w-full max-w-md mx-auto block py-4 bg-sd-primary-container text-white rounded-2xl font-bold text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all font-sans flex items-center justify-center gap-3"
+            disabled={isFeedbackLoading}
+            className="w-full max-w-md mx-auto block py-4 bg-sd-primary-container text-white rounded-2xl font-bold text-base shadow-xl hover:scale-[1.02] active:scale-95 transition-all font-sans flex items-center justify-center gap-3 disabled:opacity-50"
           >
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-            Submit Feedback
+            {isFeedbackLoading ? 'Submitting...' : 'Submit Feedback'}
           </button>
           <p className="text-center text-xs text-sd-on-surface-variant mt-3 font-sans">Thank you! Your feedback helps us improve.</p>
         </div>
@@ -443,9 +470,10 @@ export default function CustomerFeedbackPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-sd-primary text-white rounded-xl text-xs font-bold hover:shadow-lg transition-colors font-sans"
+                  disabled={isSupportLoading}
+                  className="px-5 py-2 bg-sd-primary text-white rounded-xl text-xs font-bold hover:shadow-lg transition-colors font-sans disabled:opacity-50"
                 >
-                  Send Message
+                  {isSupportLoading ? 'Sending...' : 'Send Message'}
                 </button>
               </div>
             </form>

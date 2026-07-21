@@ -38,11 +38,6 @@ export default function TableSessionPage(): JSX.Element {
       return;
     }
 
-    if (!isPanelAuthenticated('customer')) {
-      navigate(`/auth/customer?table_token=${token}`, { replace: true });
-      return;
-    }
-
     let cancelled = false;
 
     async function initSession() {

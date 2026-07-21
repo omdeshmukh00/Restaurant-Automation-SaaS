@@ -127,6 +127,89 @@ export const deleteAccount = asyncHandler(async (req: Request, res: Response) =>
 });
 
 /**
+ * GET /users/me/order-history — Get past paid bills for the current customer
+ */
+export const getOrderHistory = asyncHandler(async (req: Request, res: Response) => {
+  const { UserModel } = await import('./users.model');
+  const user = await UserModel.findById(req.user!._id).lean();
+  if (!user) {
+    throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
+  }
+
+  const { BillingModel } = await import('../billing/billing.model');
+  const { BillStatus } = await import('../billing/billing.schema');
+
+  // Pagination
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const skip = (page - 1) * limit;
+
+  const query = {
+    status: BillStatus.PAID,
+    $or: [
+      { customerId: user._id },
+      { customerPhone: user.mobile }
+    ]
+  };
+
+  const total = await BillingModel.countDocuments(query);
+
+  const bills = await BillingModel.find(query)
+    .sort({ paidAt: -1, createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate('restaurantId', 'name logo')
+    .populate({
+      path: 'orderIds',
+      select: 'items status',
+    })
+    .lean();
+
+  // Format response optimized for the frontend
+  const formattedHistory = bills.map((bill: any) => {
+    // Flatten ordered items from all orders in this bill
+    const allItems = bill.orderIds?.flatMap((order: any) => order.items || []) || [];
+    
+    const formattedItems = allItems.map((item: any) => ({
+      itemName: item.name,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      lineTotal: item.price * item.quantity,
+    }));
+
+    return {
+      restaurantId: bill.restaurantId?._id || null,
+      restaurantName: bill.restaurantId?.name || 'Unknown Restaurant',
+      restaurantLogo: bill.restaurantId?.logo || null,
+      invoiceNumber: bill.invoiceNumber || null,
+      billNumber: bill._id,
+      paidAt: bill.paidAt || bill.createdAt,
+      paymentMethod: bill.paymentMethod || 'UNKNOWN',
+      grandTotal: bill.finalAmount,
+      items: formattedItems,
+      summary: {
+        subtotal: bill.subtotal,
+        tax: bill.taxAmount + (bill.serviceCharge || 0),
+        discount: bill.discountAmount - (bill.appliedCoupons?.reduce((sum: number, c: any) => sum + (c.discountAmount || 0), 0) || 0),
+        couponDiscount: bill.appliedCoupons?.reduce((sum: number, c: any) => sum + (c.discountAmount || 0), 0) || 0,
+        grandTotal: bill.finalAmount,
+      },
+      status: 'PAID'
+    };
+  });
+
+  sendSuccess(res, { 
+    orderHistory: formattedHistory,
+    pagination: {
+      page,
+      limit,
+      total,
+      hasNext: skip + bills.length < total
+    }
+  });
+});
+
+/**
  * GET /users/me/reservations — Get all reservations for the current customer
  */
 export const getMyReservations = asyncHandler(async (req: Request, res: Response) => {
