@@ -19,6 +19,7 @@ export interface IPayment extends Document {
 
   status: PaymentStatus;
   verifiedAt?: Date | null;
+  confirmedBy?: Types.ObjectId | null;
   failureReason?: string | null;
   metadata?: Record<string, unknown>;
   createdAt: Date;
@@ -48,6 +49,11 @@ const paymentSchema = new Schema<IPayment>(
       default: PaymentStatus.PENDING,
     },
     verifiedAt: { type: Date, default: null },
+    confirmedBy: {
+  type: Schema.Types.ObjectId,
+  ref: 'User',
+  default: null,
+},
     failureReason: { type: String, default: null, trim: true },
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
