@@ -82,16 +82,17 @@ export default function StaffProfilePage() {
     setShowInfoModal(false);
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (enteredOtp.trim() === sentOtp.trim()) {
-      updateProfile({
+      await updateProfile({
         name: editName,
         role: editRole,
         id: editId,
         section: editSection,
         phone: editPhone,
         email: editEmail,
+        mobileOtp: enteredOtp,
       });
       setShowInfoModal(false);
       setOtpStep(false);
@@ -99,7 +100,7 @@ export default function StaffProfilePage() {
       setEnteredOtp('');
       setOtpError(null);
     } else {
-      setOtpError('Invalid OTP code. Please enter the 6-digit OTP printed in the backend terminal console.');
+      setOtpError('Invalid OTP code. Please enter the 4-digit OTP printed in the backend terminal console.');
     }
   };
 

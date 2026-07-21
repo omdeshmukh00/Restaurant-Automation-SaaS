@@ -573,11 +573,14 @@ export const offersAPI = {
 
 export const profileAPI = {
   sendPhoneOTP: (phone: string): Promise<ApiResponse<{ otp: string }>> => {
-    return fetchAPI<{ otp: string }>('/staff/send-phone-otp', {
+    return fetchAPI<{ otp: string }>('/users/me/request-mobile-otp', {
       method: 'POST',
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ mobile: phone }),
     });
   },
+  updateProfile: (updates: any): Promise<ApiResponse<StaffMember>> => {
+    return userAPI.updateProfile(updates);
+  }
 };
 
 // ── Issues & Tickets ──
@@ -782,7 +785,7 @@ export const userAPI = {
   },
 
   /** PATCH /users/me — update profile */
-  updateProfile: async (updates: Partial<StaffMember> & { mobile?: string }): Promise<ApiResponse<StaffMember>> => {
+  updateProfile: async (updates: Partial<StaffMember> & { mobile?: string; mobileOtp?: string }): Promise<ApiResponse<StaffMember>> => {
     const payload: any = { ...updates };
     if (updates.phone) {
       payload.mobile = updates.phone;
@@ -804,3 +807,5 @@ export const userAPI = {
     return fetchAPI<void>('/auth/logout', { method: 'POST' });
   },
 };
+
+
