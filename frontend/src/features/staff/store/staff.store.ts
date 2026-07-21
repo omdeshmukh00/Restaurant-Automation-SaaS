@@ -68,6 +68,12 @@ export interface StaffTable {
   action?: string;
   assignedGuest?: string;
   turns?: number;
+  assignedStaffId?: string | null;
+  assignedWaiterId?: string | null;
+  assignedWaiterName?: string;
+  occupiedAt?: string | Date | null;
+  estimatedVacantAt?: string | Date | null;
+  waitingAssigned?: boolean;
 }
 
 export interface StaffReservation {
@@ -76,7 +82,7 @@ export interface StaffReservation {
   pax: number;
   time: string;
   phone: string;
-  status: 'Confirmed' | 'Seated' | 'Cancelled';
+  status: 'Confirmed' | 'Seated' | 'Cancelled' | 'Notified';
   type: 'Reservation' | 'Walk-in';
   queueNo?: number;
   assignedTable?: string;

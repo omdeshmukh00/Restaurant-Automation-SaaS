@@ -86,6 +86,44 @@ staffRouter.get('/tables/:id', validate({ params: entityIdParamsSchema }), async
   }
 });
 
+import { OrdersController } from '../orders/orders.controller';
+import { emitSessionEvent } from '../../services/sessionEvents';
+
+staffRouter.patch(
+  '/tables/:id/assign-waiter',
+  async (req, res, next) => {
+    try {
+      const staffId = req.body?.waiterId ?? req.body?.staffId ?? req.user?.id ?? null;
+      const table = ensureFound(
+        await TableModel.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            restaurantId: req.user?.restaurantId,
+          },
+          {
+            assignedStaffId: staffId,
+            assignedWaiterId: staffId,
+          },
+          { new: true },
+        ),
+        'Table not found',
+      ) as any;
+
+      if (req.user?.restaurantId) {
+        emitSessionEvent(req.user.restaurantId, 'staff.table.waiter_assigned', {
+          tableId: table._id,
+          tableNumber: table.tableNumber,
+          assignedWaiterId: staffId,
+        });
+      }
+
+      ok(res, { table });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 staffRouter.patch(
   '/tables/:id/assign',
   validate({ params: entityIdParamsSchema, body: assignTableBodySchema }),
@@ -99,6 +137,7 @@ staffRouter.patch(
         },
         {
           assignedStaffId: req.body?.staffId ?? req.user?.id ?? null,
+          assignedWaiterId: req.body?.staffId ?? req.user?.id ?? null,
         },
         { new: true },
       ),
@@ -278,8 +317,56 @@ staffRouter.post('/issues/escalate', validate({ body: issueEscalationBodySchema 
       },
     });
 
-    ok(res, { escalation }, 201);
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId, 'staff.ticket.created', {
+        ticketId: escalation._id,
+        reporterId: req.user?.id,
+        notes: req.body.notes,
+      });
+    }
+
+    ok(res, { escalation, ticket: escalation }, 201);
   } catch (error) {
     next(error);
   }
 });
+
+staffRouter.post('/tickets', async (req, res, next) => {
+  try {
+    const { category, priority, subject, description, tableId, entityId } = req.body;
+    const escalation = await AuditLogModel.create({
+      actorId: req.user?.id || null,
+      actorRole: req.user?.role || 'staff',
+      restaurantId: req.user?.restaurantId || null,
+      entityType: AuditEntity.TABLE,
+      entityId: entityId || tableId || 'STAFF_TICKET',
+      action: AuditAction.ESCALATE_ISSUE,
+      metadata: {
+        restaurantId: req.user?.restaurantId,
+        category: category || 'GENERAL',
+        priority: priority || 'HIGH',
+        subject: subject || 'Escalation Ticket',
+        description: description || '',
+        notes: `[${category || 'GENERAL'} - ${priority || 'HIGH'}] ${subject}: ${description}`,
+      },
+    });
+
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId, 'staff.ticket.created', {
+        ticketId: escalation._id,
+        reporterId: req.user?.id,
+        category,
+        priority,
+        subject,
+        description,
+      });
+    }
+
+    ok(res, { ticket: escalation, escalation }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
+
+staffRouter.post('/orders/:id/apply-offer', OrdersController.applyWaiterOffer);
+staffRouter.get('/offers', OrdersController.getActiveOffers);

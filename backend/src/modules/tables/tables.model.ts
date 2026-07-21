@@ -11,6 +11,10 @@ export interface ITable extends Document {
   floor: number;
   section: string;
   assignedStaffId?: Types.ObjectId | null;
+  assignedWaiterId?: Types.ObjectId | null;
+  occupiedAt?: Date | null;
+  estimatedVacantAt?: Date | null;
+  waitingAssigned?: boolean;
   status: TableStatus;
   qrCode?: string;
   qrToken: string;
@@ -27,16 +31,18 @@ export interface ITable extends Document {
 
 /** Valid state transitions for the table lifecycle */
 export const TABLE_TRANSITIONS: Record<TableStatus, TableStatus[]> = {
-  [TableStatus.AVAILABLE]: [TableStatus.RESERVED, TableStatus.OCCUPIED, TableStatus.MAINTENANCE, TableStatus.NEEDS_CLEANING],
+  [TableStatus.AVAILABLE]: [TableStatus.RESERVED, TableStatus.OCCUPIED, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE, TableStatus.NEEDS_CLEANING, TableStatus.WAITING_ASSIGNED],
   [TableStatus.RESERVED]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
-  [TableStatus.OCCUPIED]: [TableStatus.AVAILABLE, TableStatus.ORDERING, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY, TableStatus.RESERVED],
+  [TableStatus.WAITING_ASSIGNED]: [TableStatus.AVAILABLE, TableStatus.OCCUPIED, TableStatus.RESERVED],
+  [TableStatus.OCCUPIED]: [TableStatus.AVAILABLE, TableStatus.ORDERING, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY, TableStatus.RESERVED, TableStatus.UNDER_MAINTENANCE],
   [TableStatus.ORDERING]: [TableStatus.AVAILABLE, TableStatus.BILL_PENDING, TableStatus.PAYMENT_PENDING, TableStatus.DIRTY],
   [TableStatus.BILL_PENDING]: [TableStatus.PAID, TableStatus.DIRTY],
   [TableStatus.PAYMENT_PENDING]: [TableStatus.PAID, TableStatus.DIRTY],
   [TableStatus.PAID]: [TableStatus.DIRTY],
-  [TableStatus.DIRTY]: [TableStatus.CLEANING, TableStatus.AVAILABLE, TableStatus.MAINTENANCE],
-  [TableStatus.CLEANING]: [TableStatus.DIRTY, TableStatus.AVAILABLE, TableStatus.MAINTENANCE],
+  [TableStatus.DIRTY]: [TableStatus.CLEANING, TableStatus.AVAILABLE, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE],
+  [TableStatus.CLEANING]: [TableStatus.DIRTY, TableStatus.AVAILABLE, TableStatus.MAINTENANCE, TableStatus.UNDER_MAINTENANCE],
   [TableStatus.MAINTENANCE]: [],
+  [TableStatus.UNDER_MAINTENANCE]: [],
 };
 
 const tableSchema = new Schema<ITable>(
@@ -72,6 +78,23 @@ const tableSchema = new Schema<ITable>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: null,
+    },
+    assignedWaiterId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    occupiedAt: {
+      type: Date,
+      default: null,
+    },
+    estimatedVacantAt: {
+      type: Date,
+      default: null,
+    },
+    waitingAssigned: {
+      type: Boolean,
+      default: false,
     },
     status: {
       type: String,

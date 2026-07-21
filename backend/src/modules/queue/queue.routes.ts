@@ -14,6 +14,7 @@ import {
   updateQueuePriorityController,
   seatWalkInController,
   cancelQueueController,
+  notifyWaitingCustomerController,
 } from './queue.controller';
 
 const router = Router();
@@ -24,5 +25,6 @@ router.get('/:id', validate({ params: entityIdParamsSchema }), getQueueEntryById
 router.patch('/:id/priority', validate({ params: entityIdParamsSchema, body: updateQueuePriorityBodySchema }), updateQueuePriorityController);
 router.patch('/:id/seat', validate({ params: entityIdParamsSchema, body: seatWalkInBodySchema }), seatWalkInController);
 router.patch('/:id/cancel', validate({ params: entityIdParamsSchema }), cancelQueueController);
+router.post('/:id/notify', validate({ params: entityIdParamsSchema }), notifyWaitingCustomerController);
 
 export default router;

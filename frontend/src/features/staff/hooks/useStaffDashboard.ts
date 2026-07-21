@@ -61,6 +61,12 @@ function mapTable(table: any): StaffTable {
     currentBill: 0,
     elapsed: 'Live',
     action: mapTableStatus(table?.status) === 'Available' ? 'Order' : undefined,
+    assignedStaffId: table?.assignedStaffId?.toString?.() || table?.assignedStaffId || null,
+    assignedWaiterId: table?.assignedWaiterId?.toString?.() || table?.assignedWaiterId || table?.assignedStaffId?.toString?.() || null,
+    assignedWaiterName: table?.assignedStaffId?.name || table?.assignedWaiterId?.name || undefined,
+    occupiedAt: table?.occupiedAt || null,
+    estimatedVacantAt: table?.estimatedVacantAt || null,
+    waitingAssigned: Boolean(table?.waitingAssigned),
   };
 }
 
@@ -90,7 +96,7 @@ function mapReservation(reservation: any): StaffReservation {
     pax: Number(reservation?.guests ?? reservation?.pax ?? 2),
     time: reservation?.slot || reservation?.time || 'Scheduled',
     phone: reservation?.mobile || reservation?.phone || '',
-    status: status === 'CHECKED_IN' ? 'Seated' : status === 'CANCELLED' ? 'Cancelled' : 'Confirmed',
+    status: status === 'CHECKED_IN' || status === 'SEATED' ? 'Seated' : status === 'NOTIFIED' ? 'Notified' : status === 'CANCELLED' ? 'Cancelled' : 'Confirmed',
     type: reservation?.tableId ? 'Reservation' : 'Walk-in',
     assignedTable: reservation?.tableId?.tableNumber ? `Table ${reservation.tableId.tableNumber}` : undefined,
   };
@@ -262,6 +268,9 @@ export function useStaffDashboard() {
       socket.on('cleaning.completed', handleSync);
       socket.on('cleaning.started', handleSync);
       socket.on('cleaning.task.created', handleSync);
+      socket.on('staff.table.waiter_assigned', handleSync);
+      socket.on('queue.notified', handleSync);
+      socket.on('staff.ticket.created', handleSync);
 
       return () => {
         socket.off('table.status.changed', handleSync);
@@ -269,6 +278,9 @@ export function useStaffDashboard() {
         socket.off('cleaning.completed', handleSync);
         socket.off('cleaning.started', handleSync);
         socket.off('cleaning.task.created', handleSync);
+        socket.off('staff.table.waiter_assigned', handleSync);
+        socket.off('queue.notified', handleSync);
+        socket.off('staff.ticket.created', handleSync);
       };
     }
   }, []);

@@ -504,6 +504,113 @@ void logAudit(req, {
     } catch (error) {
       next(error);
     }
-    
+  }
+
+  // POST /staff/orders/:id/apply-offer
+  static async applyWaiterOffer(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id } = req.params;
+      const { offerCode, offerId, discountPercentage } = req.body;
+
+      const { OrderModel } = await import('./orders.model');
+      const { OfferModel } = await import('../offers/offers.model');
+
+      const order = await OrderModel.findOne({
+        $or: [{ _id: id }, { orderNumber: id }],
+        restaurantId,
+      });
+
+      if (!order) {
+        throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
+      }
+
+      let discountPercent = Number(discountPercentage || 0);
+      let offer = null;
+
+      if (offerId) {
+        offer = await OfferModel.findOne({ _id: offerId, restaurantId, active: true });
+        if (offer) discountPercent = offer.discountPercent;
+      } else if (offerCode) {
+        const codeUpper = String(offerCode).trim().toUpperCase();
+        offer = await OfferModel.findOne({ code: codeUpper, restaurantId, active: true });
+        if (offer) {
+          discountPercent = offer.discountPercent;
+        } else {
+          // Standard waiter coupon fallback codes
+          const defaultOffers: Record<string, number> = {
+            'LOYALTY10': 10,
+            'FESTIVAL15': 15,
+            'VIP20': 20,
+            'STAFF05': 5,
+            'WELCOME10': 10,
+          };
+          if (defaultOffers[codeUpper]) {
+            discountPercent = defaultOffers[codeUpper];
+          } else {
+            throw new AppError(`Invalid or expired offer code: ${offerCode}`, 400, ErrorCode.VALIDATION_ERROR);
+          }
+        }
+      }
+
+      if (discountPercent <= 0) {
+        throw new AppError('Offer must specify a valid discount percentage', 400, ErrorCode.VALIDATION_ERROR);
+      }
+
+      const discountAmount = Math.round((order.totalAmount * discountPercent) / 100);
+      order.discountAmount = discountAmount;
+      order.appliedDiscountAmount = discountAmount;
+      order.finalAmount = Math.max(0, order.totalAmount + (order.taxAmount || 0) - discountAmount);
+      if (offer) {
+        order.appliedOfferId = offer._id;
+      }
+      if (req.user?.id) {
+        order.assistedByWaiterId = req.user.id as any;
+      }
+
+      await order.save();
+
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.ORDER_OFFER_APPLIED,
+        metadata: {
+          appliedOfferCode: offerCode || offer?.code,
+          discountAmount,
+          finalAmount: order.finalAmount,
+          assistedByWaiter: req.user?.id,
+        },
+      });
+
+      ok(res, {
+        order,
+        discountAmount,
+        finalAmount: order.finalAmount,
+        message: `Applied ${discountPercent}% discount (₹${discountAmount} off)`,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /staff/offers
+  static async getActiveOffers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { OfferModel } = await import('../offers/offers.model');
+
+      const dbOffers = await OfferModel.find({ restaurantId, active: true });
+      const defaultOffers = [
+        { id: 'off-1', name: '10% Loyalty Discount', code: 'LOYALTY10', discountPercent: 10, requiredPoints: 0, active: true },
+        { id: 'off-2', name: '15% Festive Special', code: 'FESTIVAL15', discountPercent: 15, requiredPoints: 0, active: true },
+        { id: 'off-3', name: '20% VIP Dining Coupon', code: 'VIP20', discountPercent: 20, requiredPoints: 100, active: true },
+        { id: 'off-4', name: '5% Service Courtesy', code: 'STAFF05', discountPercent: 5, requiredPoints: 0, active: true },
+      ];
+
+      const offers = dbOffers.length > 0 ? dbOffers : defaultOffers;
+      ok(res, { offers });
+    } catch (error) {
+      next(error);
+    }
   }
 }

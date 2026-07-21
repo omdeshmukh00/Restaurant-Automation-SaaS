@@ -41,12 +41,20 @@ export default function CleaningRequestsPage() {
   const [priorityFilter, setPriorityFilter] = useState('All Priority');
   const [typeFilter, setTypeFilter] = useState('All Type');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const { addNotification } = useNotifications();
 
   // New request form state
   const [newRequestType, setNewRequestType] = useState('Spill Cleanup');
   const [newRequestLocation, setNewRequestLocation] = useState(() => cleaningStore.tables[0]?.id || '');
   const [newRequestPriority, setNewRequestPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+
+  // Maintenance form state
+  const [mTableId, setMTableId] = useState(() => cleaningStore.tables[0]?.id || '');
+  const [mIssueType, setMIssueType] = useState<'BROKEN_FURNITURE' | 'WATER_LEAK' | 'ELECTRICAL' | 'HYGIENE' | 'OTHER'>('BROKEN_FURNITURE');
+  const [mDescription, setMDescription] = useState('');
+  const [mSeverity, setMSeverity] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
+
   // 💥 Premium Custom Top Filter Dropdowns Tracking States
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isPriorityOpen, setIsPriorityOpen] = useState(false);
@@ -63,7 +71,7 @@ export default function CleaningRequestsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const { urgentTasks, startTask, completeTask, verifyTask, reportIssue } = useCleaning();
+  const { urgentTasks, startTask, completeTask, verifyTask, reportIssue, reportMaintenanceIssue } = useCleaning();
   const safeTasks = (urgentTasks || []) as unknown as TableTask[];
 
   const [allRequests, setAllRequests] = useState(cleaningStore.requests);
@@ -203,6 +211,24 @@ export default function CleaningRequestsPage() {
 
     setShowAddModal(false);
   };
+
+  const handleReportMaintenance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mTableId || !mDescription.trim()) return;
+    try {
+      await reportMaintenanceIssue({
+        tableId: mTableId,
+        issueType: mIssueType,
+        description: mDescription,
+        severity: mSeverity,
+      });
+      showToast('Table locked (Under Maintenance). Admin notified.', 'success');
+      setShowMaintenanceModal(false);
+      setMDescription('');
+    } catch (err) {
+      showToast('Failed to report maintenance issue.', 'error');
+    }
+  };
   const handleAction = (data: unknown) => {
     console.log(data);
   };
@@ -308,6 +334,13 @@ export default function CleaningRequestsPage() {
     <div className="space-y-6 lg:space-y-8 animate-fadeIn cleaning-panel">
       {/* Header Info Action Buttons */}
       <div className="flex justify-end gap-3 mb-4">
+        <button
+          onClick={() => setShowMaintenanceModal(true)}
+          className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-amber-500/10 cursor-pointer text-xs"
+        >
+          <span className="material-symbols-outlined text-[18px]">build</span>
+          Report Maintenance Issue
+        </button>
         <button
           onClick={() => setShowAddModal(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
@@ -931,6 +964,106 @@ export default function CleaningRequestsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Report Maintenance Issue Modal */}
+      {showMaintenanceModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-amber-500">warning</span>
+              Report Maintenance Issue
+            </h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-455 mb-4 font-sans leading-relaxed">
+              Report damaged items (broken chair, leak) to lock the table in Under Maintenance state.
+            </p>
+            <form onSubmit={handleReportMaintenance} className="space-y-4 font-sans text-xs">
+              <div>
+                <label htmlFor="m-table-id" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                  Select Table
+                </label>
+                <select
+                  id="m-table-id"
+                  value={mTableId}
+                  onChange={(e) => setMTableId(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-500"
+                  required
+                >
+                  {cleaningStore.tables.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.id} ({t.area})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="m-issue-type" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                  Issue Category
+                </label>
+                <select
+                  id="m-issue-type"
+                  value={mIssueType}
+                  onChange={(e) => setMIssueType(e.target.value as any)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="BROKEN_FURNITURE">Broken Furniture 🪑</option>
+                  <option value="WATER_LEAK">Water Leak 💧</option>
+                  <option value="ELECTRICAL">Electrical Issue ⚡</option>
+                  <option value="HYGIENE">Hygiene Concern 🧼</option>
+                  <option value="OTHER">Other Issue ⚠️</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="m-severity" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                  Severity Level
+                </label>
+                <select
+                  id="m-severity"
+                  value={mSeverity}
+                  onChange={(e) => setMSeverity(e.target.value as any)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-500"
+                >
+                  <option value="LOW">Low (Minor scratch/stain)</option>
+                  <option value="MEDIUM">Medium (Requires fix today)</option>
+                  <option value="HIGH">High (Urgent repair needed)</option>
+                  <option value="CRITICAL">Critical (Immediate safety hazard)</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="m-description" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                  Description Details
+                </label>
+                <textarea
+                  id="m-description"
+                  rows={3}
+                  placeholder="e.g. Chair leg broken, water leaking near socket..."
+                  value={mDescription}
+                  onChange={(e) => setMDescription(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-500"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowMaintenanceModal(false)}
+                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all active:scale-95"
+                >
+                  Lock Table & Alert
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

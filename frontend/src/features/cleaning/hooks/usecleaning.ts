@@ -4,7 +4,6 @@ import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleani
 import { connectSocket, getSocket } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
 
-// Hum yahan temporary interface bana rahe hain taaki TypeScript error na de
 interface ProcessedTask extends UrgentTask {
   rawStatus: string;
   rawPriority: string;
@@ -12,6 +11,10 @@ interface ProcessedTask extends UrgentTask {
   area?: string;
   section?: string;
   floor?: number;
+  assignedStaffId?: string | { _id: string; name: string } | null;
+  isPaused?: boolean;
+  isDeepCleaning?: boolean;
+  queueWaitingCount?: number;
 }
 
 export function useCleaning() {
@@ -97,7 +100,6 @@ export function useCleaning() {
         displayStatus = 'Available';
         badgeColor = '#22c55e';
         badgeBg = 'rgba(34,197,94,0.15)';
-        
         rawStatus = 'VERIFIED';
       }
 
@@ -117,14 +119,21 @@ export function useCleaning() {
         area: task.area,
         section: task.section,
         floor: task.floor,
+        assignedStaffId: (task as any).assignedStaffId,
+        isPaused: (task as any).isPaused,
+        isDeepCleaning: (task as any).isDeepCleaning,
+        queueWaitingCount: (task as any).queueWaitingCount,
       } as ProcessedTask;
     });
 
-    const priorityWeight: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
+    const priorityWeight: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
     const sortedTasks = [...processedTasks].sort((a: ProcessedTask, b: ProcessedTask) => {
       if (a.rawStatus === 'REQUESTED' && b.rawStatus !== 'REQUESTED') return -1;
       if (a.rawStatus !== 'REQUESTED' && b.rawStatus === 'REQUESTED') return 1;
+      if ((b.queueWaitingCount || 0) !== (a.queueWaitingCount || 0)) {
+        return (b.queueWaitingCount || 0) - (a.queueWaitingCount || 0);
+      }
       return (priorityWeight[b.rawPriority] || 0) - (priorityWeight[a.rawPriority] || 0);
     });
 
@@ -160,8 +169,6 @@ export function useCleaning() {
     }
   }, []);
 
-
-// Pehla Effect
   useEffect(() => {
     const timer = setTimeout(() => processAndSyncData(), 0);
     const unsubscribe = cleaningStore.subscribe(() => {
@@ -171,13 +178,12 @@ export function useCleaning() {
       clearTimeout(timer);
       unsubscribe();
     };
-  }, [processAndSyncData]); // <--- Yahan 'processAndSyncData' daal diya
+  }, [processAndSyncData]);
 
-  // Dusra Effect
   useEffect(() => {
     const timer = setTimeout(() => loadDashboard(), 0);
     return () => clearTimeout(timer);
-  }, [loadDashboard]); // <--- Yahan 'loadDashboard' daal diya
+  }, [loadDashboard]);
 
   // Socket sync effect
   useEffect(() => {
@@ -189,11 +195,19 @@ export function useCleaning() {
       };
       socket.on('cleaning.started', handleSync);
       socket.on('cleaning.completed', handleSync);
+      socket.on('cleaning.issue.reported', handleSync);
+      socket.on('cleaning.task.assigned', handleSync);
+      socket.on('cleaning.task.paused', handleSync);
+      socket.on('cleaning.task.deepclean', handleSync);
       socket.on('table.status.changed', handleSync);
 
       return () => {
         socket.off('cleaning.started', handleSync);
         socket.off('cleaning.completed', handleSync);
+        socket.off('cleaning.issue.reported', handleSync);
+        socket.off('cleaning.task.assigned', handleSync);
+        socket.off('cleaning.task.paused', handleSync);
+        socket.off('cleaning.task.deepclean', handleSync);
         socket.off('table.status.changed', handleSync);
       };
     }
@@ -252,6 +266,10 @@ export function useCleaning() {
       await cleaningAPI.startTask(taskId);
       await loadDashboard();
     },
+    assignTaskToStaff: async (taskId: string, staffId?: string | null) => {
+      await cleaningAPI.assignTask(taskId, staffId);
+      await loadDashboard();
+    },
     startTask: async (taskId: string) => {
       await cleaningAPI.startTask(taskId);
       await loadDashboard();
@@ -263,6 +281,24 @@ export function useCleaning() {
     verifyTask: async (taskId: string) => {
       await cleaningAPI.verifyTask(taskId);
       await loadDashboard();
+    },
+    pauseTask: async (taskId: string, isPaused?: boolean) => {
+      await cleaningAPI.pauseTask(taskId, isPaused);
+      await loadDashboard();
+    },
+    triggerDeepClean: async (taskId: string, isDeepCleaning?: boolean) => {
+      await cleaningAPI.triggerDeepClean(taskId, isDeepCleaning);
+      await loadDashboard();
+    },
+    reportMaintenanceIssue: async (data: {
+      tableId: string;
+      issueType: string;
+      description: string;
+      severity?: string;
+    }) => {
+      const res = await cleaningAPI.reportMaintenanceIssue(data);
+      await loadDashboard();
+      return res;
     },
     reportIssue: (taskId: string, issue: string) => cleaningStore.reportMaintenance(taskId, issue),
     refresh: loadDashboard,

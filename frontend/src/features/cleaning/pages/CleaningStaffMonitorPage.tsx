@@ -307,7 +307,7 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
 
 // ── Main Page Component ───────────────────────────────────────────────────
 export default function CleaningStaffMonitorPage() {
-  const { staffMembers, removeStaffMember } = useCleaning();
+  const { staffMembers, removeStaffMember, urgentTasks, assignTaskToStaff } = useCleaning();
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [activeReportMember, setActiveReportMember] = useState<CleaningStaffMember | null>(null);
@@ -532,6 +532,82 @@ export default function CleaningStaffMonitorPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Supervisor Task Assignment & Dispatch Control Panel */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">
+              Supervisor Task Assignment & Staff Dispatch
+            </h3>
+            <p className="text-xs text-slate-400 font-sans mt-0.5">
+              Assign high-priority turnover tasks directly to individual cleaners on shift.
+            </p>
+          </div>
+          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-orange-500/10 text-orange-500 font-sans">
+            {urgentTasks.length} Active Tasks
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {urgentTasks.slice(0, 6).map((task) => {
+            const assignedStaffName =
+              typeof task.assignedStaffId === 'object' && task.assignedStaffId
+                ? (task.assignedStaffId as any).name
+                : staffMembers.find((s) => s.id === task.assignedStaffId)?.name || 'Unassigned';
+
+            return (
+              <div
+                key={task.id}
+                className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
+                      {task.title || `Table ${task.tableNumber}`}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-semibold">{task.subtitle}</p>
+                  </div>
+                  <span
+                    className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+                      task.priority === 'High' || task.priority === 'REQUESTED'
+                        ? 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400'
+                        : 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400'
+                    }`}
+                  >
+                    {task.priority}
+                  </span>
+                </div>
+
+                {task.queueWaitingCount ? (
+                  <p className="text-[11px] font-bold text-red-500 flex items-center gap-1">
+                    <span>👥</span> {task.queueWaitingCount} Waiting in Queue
+                  </p>
+                ) : null}
+
+                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">Assigned To</span>
+                  <select
+                    value={typeof task.assignedStaffId === 'string' ? task.assignedStaffId : (task.assignedStaffId as any)?._id || ''}
+                    onChange={async (e) => {
+                      await assignTaskToStaff(task.id, e.target.value || null);
+                      triggerToast('success', `Task assigned to staff member.`);
+                    }}
+                    className="text-xs font-bold px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-700 dark:text-slate-200"
+                  >
+                    <option value="">{assignedStaffName !== 'Unassigned' ? assignedStaffName : 'Assign Staff...'}</option>
+                    {staffMembers.map((sm) => (
+                      <option key={sm.id} value={sm.id}>
+                        {sm.name} ({sm.area})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

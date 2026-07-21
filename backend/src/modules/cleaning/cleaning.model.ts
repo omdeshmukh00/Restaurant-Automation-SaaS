@@ -6,6 +6,10 @@ export interface ICleaningTask extends Document {
   tableId: Types.ObjectId;
   priority: Priority;
   status: CleaningStatus;
+  assignedStaffId?: Types.ObjectId | null;
+  isPaused?: boolean;
+  isDeepCleaning?: boolean;
+  queueWaitingCount?: number;
   startedBy?: Types.ObjectId | null;
   completedBy?: Types.ObjectId | null;
   verifiedBy?: Types.ObjectId | null;
@@ -30,6 +34,10 @@ const cleaningTaskSchema = new Schema<ICleaningTask>(
       enum: Object.values(CleaningStatus),
       default: CleaningStatus.PENDING,
     },
+    assignedStaffId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    isPaused: { type: Boolean, default: false },
+    isDeepCleaning: { type: Boolean, default: false },
+    queueWaitingCount: { type: Number, default: 0 },
     startedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     completedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     verifiedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },

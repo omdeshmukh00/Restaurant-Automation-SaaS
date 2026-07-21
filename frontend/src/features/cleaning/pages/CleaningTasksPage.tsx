@@ -39,7 +39,7 @@ interface TableTask {
 export default function CleaningTasksPage() {
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
-  const { startTask, completeTask } = useCleaning();
+  const { startTask, completeTask, pauseTask, triggerDeepClean, assignTaskToStaff, urgentTasks, staffMembers } = useCleaning();
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [priorityFilter, setPriorityFilter] = useState('All Priority');
   const [areaFilter, setAreaFilter] = useState('All Area');
@@ -507,25 +507,67 @@ export default function CleaningTasksPage() {
 
                       {/* Dropdown Menu */}
                       {openMenuId === row.id && (
-                        <div className="absolute right-0 top-12 w-44 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1 font-sans">
+                        <div className="absolute right-0 top-12 w-52 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1.5 font-sans space-y-1">
                           <button
-                            onClick={() => handleActionClick(row, 'start')}
-                            className="w-full text-left px-4 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg"
+                            onClick={() => {
+                              handleActionClick(row, 'start');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg flex items-center gap-1.5"
                           >
+                            <span className="material-symbols-outlined text-sm">play_arrow</span>
                             Start Task
                           </button>
                           <button
-                            onClick={() => handleActionClick(row, 'complete')}
-                            className="w-full text-left px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg"
+                            onClick={async () => {
+                              await pauseTask(row.rawId);
+                              showToast(`Task ${row.id} pause status updated.`, 'info');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-lg flex items-center gap-1.5"
                           >
-                            Mark Completed
+                            <span className="material-symbols-outlined text-sm">pause</span>
+                            Pause / Resume Task
                           </button>
                           <button
-                            onClick={() => handleActionClick(row, 'delete')}
-                            className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg"
+                            onClick={async () => {
+                              await triggerDeepClean(row.rawId);
+                              showToast(`Deep cleaning mode toggled for ${row.id}.`, 'warning');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20 rounded-lg flex items-center gap-1.5"
                           >
-                            Delete Task
+                            <span className="material-symbols-outlined text-sm">sanitizer</span>
+                            Deep Clean Mode
                           </button>
+                          <button
+                            onClick={() => {
+                              handleActionClick(row, 'complete');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            Mark Completed
+                          </button>
+                          <div className="border-t border-slate-100 dark:border-slate-700 my-1 pt-1">
+                            <p className="px-3 text-[10px] font-bold text-slate-400 uppercase">Assign Staff</p>
+                            <select
+                              onChange={async (e) => {
+                                await assignTaskToStaff(row.rawId, e.target.value || null);
+                                showToast(`Task ${row.id} assigned.`, 'success');
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full mt-1 px-2 py-1 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold outline-none"
+                            >
+                              <option value="">Unassigned</option>
+                              {(staffMembers || []).map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       )}
                     </td>

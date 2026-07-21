@@ -39,13 +39,7 @@ describe('Cleaning Lifecycle Integration', () => {
       _id: restaurantId,
       name: 'Cleaning Test Restaurant',
       slug: `cleaning-test-${Date.now()}`,
-      address: {
-        street: '123 Test St',
-        city: 'Test City',
-        state: 'Test State',
-        country: 'Test Country',
-        zipCode: '12345',
-      },
+      address: '123 Test St, Test City',
       city: 'Test City',
       cuisine: 'Test Cuisine',
       settings: { currency: 'USD', timezone: 'UTC', taxRate: 10 },
@@ -118,15 +112,15 @@ describe('Cleaning Lifecycle Integration', () => {
     expect(completeRes.status).toBe(200);
     expect(completeRes.body.data.task.status).toBe(CleaningStatus.COMPLETED);
 
-    // Verify emission for Task Completed -> NEEDS_CLEANING
+    // Verify emission for Task Completed -> AVAILABLE
     expect(emitSessionEvent).toHaveBeenCalledWith(
       restaurantId.toString(),
-      SocketEvent.TABLE_NEEDS_CLEANING,
-      expect.objectContaining({ status: TableStatus.NEEDS_CLEANING })
+      SocketEvent.TABLE_AVAILABLE,
+      expect.objectContaining({ status: TableStatus.AVAILABLE })
     );
 
     const tableAfterComplete = await TableModel.findById(tableId);
-    expect(tableAfterComplete?.status).toBe(TableStatus.NEEDS_CLEANING);
+    expect(tableAfterComplete?.status).toBe(TableStatus.AVAILABLE);
 
     // 3. Task Verified (Table Available)
     const verifyRes = await request(app)

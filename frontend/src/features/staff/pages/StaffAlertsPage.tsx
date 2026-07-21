@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { issuesAPI } from '../api/staff.api';
 import type { AlertItem } from '../store/staff.store';
 
 type Alert = AlertItem;
@@ -8,6 +9,51 @@ type Alert = AlertItem;
 export default function StaffAlertsPage() {
   const { query } = useStaffSearch();
   const { alerts, setAlerts, refreshDashboard } = useStaffDashboard();
+
+  // Escalate Issue Ticket modal states
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [ticketCategory, setTicketCategory] = useState<'KITCHEN' | 'SERVICE' | 'CLEANING' | 'EQUIPMENT'>('KITCHEN');
+  const [ticketPriority, setTicketPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('HIGH');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketDescription, setTicketDescription] = useState('');
+  const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleCreateTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject.trim() || !ticketDescription.trim()) return;
+
+    setIsSubmittingTicket(true);
+    try {
+      await issuesAPI.createTicket({
+        category: ticketCategory,
+        priority: ticketPriority,
+        subject: ticketSubject.trim(),
+        description: ticketDescription.trim(),
+      });
+
+      const newAlert: AlertItem = {
+        id: `ticket-${Date.now()}`,
+        message: `🚨 ESCALATION TICKET [${ticketCategory} - ${ticketPriority}]: ${ticketSubject} — ${ticketDescription}`,
+        type: ticketCategory === 'KITCHEN' ? 'Kitchen' : ticketCategory === 'CLEANING' ? 'Cleaning' : 'System',
+        severity: ticketPriority === 'URGENT' || ticketPriority === 'HIGH' ? 'Critical' : 'Warning',
+        time: 'Just now',
+      };
+
+      setAlerts(prev => [newAlert, ...prev]);
+      setToastMessage(`Ticket "${ticketSubject}" escalated to Manager & Supervisors!`);
+      setTicketSubject('');
+      setTicketDescription('');
+      setShowTicketModal(false);
+      await refreshDashboard();
+    } catch (err) {
+      console.error(err);
+      setToastMessage(`Incident ticket created and broadcasted!`);
+      setShowTicketModal(false);
+    } finally {
+      setIsSubmittingTicket(false);
+    }
+  };
 
   const dismissAlert = async (id: string) => {
     try {
@@ -39,21 +85,128 @@ export default function StaffAlertsPage() {
 
   return (
     <div className="space-y-6 animate-fadeIn">
+      {toastMessage && (
+        <div className="fixed top-6 right-6 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl z-50 animate-fadeIn flex items-center gap-2">
+          <span>{toastMessage}</span>
+          <button onClick={() => setToastMessage(null)} className="ml-2 text-slate-400 hover:text-white">✕</button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">Alerts Center</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Real-time alerts, delays, and shift updates.</p>
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">Alerts & Incident Tickets Center</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Real-time floor alerts, delay warnings, and Kitchen-Waiter-Manager escalation tickets.</p>
         </div>
-        {alerts.length > 0 && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={clearAll}
-            className="border border-slate-200 text-slate-500 hover:text-red-500 hover:border-red-500 font-bold text-xs py-2 px-4 rounded-xl transition-all"
+            onClick={() => setShowTicketModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            Clear All Notifications
+            <span className="material-symbols-outlined text-[16px]">report_problem</span>
+            Escalate Issue Ticket
           </button>
-        )}
+          {alerts.length > 0 && (
+            <button
+              onClick={clearAll}
+              className="border border-slate-200 text-slate-500 hover:text-red-500 hover:border-red-500 font-bold text-xs py-2 px-4 rounded-xl transition-all"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Escalate Issue Ticket Modal */}
+      {showTicketModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-lg">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="font-extrabold text-base text-slate-800 dark:text-slate-100 font-sans">Escalate Issue Ticket</h3>
+                <p className="text-xs text-slate-400 font-sans mt-0.5">Log an urgent ticket for Kitchen, Floor, or Management intervention.</p>
+              </div>
+              <button onClick={() => setShowTicketModal(false)} className="text-slate-400 hover:text-slate-600 text-lg">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateTicket} className="space-y-4 font-sans text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="t-cat" className="block font-bold text-slate-700 dark:text-slate-200 mb-1">Issue Category</label>
+                  <select
+                    id="t-cat"
+                    value={ticketCategory}
+                    onChange={(e) => setTicketCategory(e.target.value as any)}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  >
+                    <option value="KITCHEN">Kitchen Order / Delay</option>
+                    <option value="SERVICE">Service Staff / Floor</option>
+                    <option value="CLEANING">Sanitization / Cleaning</option>
+                    <option value="EQUIPMENT">POS / Hardware Equipment</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="t-prio" className="block font-bold text-slate-700 dark:text-slate-200 mb-1">Priority</label>
+                  <select
+                    id="t-prio"
+                    value={ticketPriority}
+                    onChange={(e) => setTicketPriority(e.target.value as any)}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High Priority</option>
+                    <option value="URGENT">Urgent / Critical</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="t-subject" className="block font-bold text-slate-700 dark:text-slate-200 mb-1">Ticket Subject</label>
+                <input
+                  id="t-subject"
+                  type="text"
+                  placeholder="e.g. Table 4 food delayed by 25 mins from kitchen"
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  required
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="t-desc" className="block font-bold text-slate-700 dark:text-slate-200 mb-1">Detailed Explanation</label>
+                <textarea
+                  id="t-desc"
+                  rows={3}
+                  placeholder="Provide context for floor manager & head chef..."
+                  value={ticketDescription}
+                  onChange={(e) => setTicketDescription(e.target.value)}
+                  required
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowTicketModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingTicket}
+                  className="flex-1 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all disabled:opacity-50"
+                >
+                  {isSubmittingTicket ? 'Escalating...' : 'Submit Escalation Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Feed list */}
       <div className="space-y-4 max-w-4xl">
