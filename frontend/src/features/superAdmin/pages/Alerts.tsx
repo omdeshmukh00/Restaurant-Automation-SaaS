@@ -50,10 +50,10 @@ export default function AlertsDashboard() {
 
   return (
     <div className={cx(
-      'min-h-screen font-sans antialiased transition-colors duration-300 py-6',
+      'min-h-screen font-sans antialiased transition-colors duration-300',
       darkMode ? 'bg-slate-950 text-slate-50' : 'bg-slate-50 text-slate-900'
     )}>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         <Header darkMode={darkMode} toggleTheme={toggleTheme} newCount={stats.new} />
         <StatsGrid stats={stats} darkMode={darkMode} />
         <Toolbar

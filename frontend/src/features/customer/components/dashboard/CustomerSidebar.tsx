@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useCustomerStore } from '../../store/customer.store';
 import { useAuth } from '../../../../auth/AuthProvider';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 const NAV_ITEMS = [
   { to: '/customer/home', icon: 'home', label: 'Home' },
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export default function CustomerSidebar({ collapsed, onToggle, onOpenScanner }: Props) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "Smart Dining";
   const { profile, diningSession } = useCustomerStore();
   const { isAuthenticated } = useAuth();
 
@@ -37,7 +40,7 @@ export default function CustomerSidebar({ collapsed, onToggle, onOpenScanner }: 
               </span>
             </div>
             {!collapsed && (
-              <h1 className="text-lg font-extrabold text-sd-primary font-sans whitespace-nowrap tracking-tight">Smart Dining</h1>
+              <h1 className="text-lg font-extrabold text-sd-primary font-sans whitespace-nowrap tracking-tight">{platformName}</h1>
             )}
           </div>
           {!collapsed && (

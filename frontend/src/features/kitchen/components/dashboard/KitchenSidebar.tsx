@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useKitchenStore } from '../../store/kitchen.store';
 import { useAuth } from '../../../../auth/AuthProvider';
 import { getKitchenRolePermissions } from '../../utils/kitchenRoleAccess';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 const NAV_ITEMS = [
   { to: '/kitchen', icon: 'dashboard', label: 'Overview', end: true },
@@ -24,6 +25,8 @@ interface Props {
 }
 
 export default function KitchenSidebar({ collapsed, onToggle, onItemClick, onProfileClick }: Props) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "Flavoroast";
   const { profile } = useKitchenStore();
   const { user } = useAuth();
   const internalRole = user?.internal_role;
@@ -55,7 +58,7 @@ export default function KitchenSidebar({ collapsed, onToggle, onItemClick, onPro
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h1 className="font-bold text-lg text-slate-800 leading-tight font-sans dark:text-white">Flavoroast</h1>
+              <h1 className="font-bold text-lg text-slate-800 leading-tight font-sans dark:text-white">{platformName}</h1>
               <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase font-sans">Kitchen Dashboard</p>
             </div>
           )}

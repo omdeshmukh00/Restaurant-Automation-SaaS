@@ -102,12 +102,31 @@ export async function listRestaurants(filters: RestaurantListQuery) {
 
   // Calculate remaining cooldown in seconds for each restaurant
   const recipientEmails = restaurants.map((r: any) => r.email).filter(Boolean);
+  const restaurantIds = restaurants.map((r: any) => r._id);
   const oneMinuteAgo = new Date(Date.now() - 60000);
-  const recentLogs = await EmailLogModel.find({
-    recipient: { $in: recipientEmails },
-    status: 'SENT',
-    sentAt: { $gte: oneMinuteAgo }
-  }).lean();
+
+  const { OrderModel } = await import('../orders/orders.model');
+  const { SubscriptionPaymentModel, SubscriptionModel } = await import('../subscriptions/subscriptions.model');
+
+  const [recentLogs, orderSalesAgg, subPaymentsAgg, activeSubs] = await Promise.all([
+    EmailLogModel.find({
+      recipient: { $in: recipientEmails },
+      status: 'SENT',
+      sentAt: { $gte: oneMinuteAgo }
+    }).lean(),
+
+    OrderModel.aggregate([
+      { $match: { restaurantId: { $in: restaurantIds }, status: { $in: ['COMPLETED', 'SERVED', 'PAID'] } } },
+      { $group: { _id: '$restaurantId', totalSales: { $sum: '$finalAmount' } } }
+    ]).option({ bypassTenant: true }),
+
+    SubscriptionPaymentModel.aggregate([
+      { $match: { restaurantId: { $in: restaurantIds }, status: { $in: ['completed', 'COMPLETED'] } } },
+      { $group: { _id: '$restaurantId', totalPaid: { $sum: '$amount' } } }
+    ]).option({ bypassTenant: true }),
+
+    SubscriptionModel.find({ restaurantId: { $in: restaurantIds } }).lean()
+  ]);
 
   const cooldownMap: Record<string, number> = {};
   recentLogs.forEach((log: any) => {
@@ -118,12 +137,40 @@ export async function listRestaurants(filters: RestaurantListQuery) {
     }
   });
 
+  const orderSalesMap: Record<string, number> = {};
+  orderSalesAgg.forEach((item: any) => {
+    if (item._id) orderSalesMap[item._id.toString()] = item.totalSales || 0;
+  });
+
+  const subPaymentsMap: Record<string, number> = {};
+  subPaymentsAgg.forEach((item: any) => {
+    if (item._id) subPaymentsMap[item._id.toString()] = item.totalPaid || 0;
+  });
+
+  const subMap: Record<string, any> = {};
+  activeSubs.forEach((sub: any) => {
+    if (sub.restaurantId) subMap[sub.restaurantId.toString()] = sub;
+  });
+
   const enrichedRestaurants = restaurants.map((r: any) => {
     const email = r.email;
     const cooldown = email ? (cooldownMap[email] || 0) : 0;
+    const rId = r._id.toString();
+    const totalOrderSales = orderSalesMap[rId] || 0;
+    const totalSubscriptionRevenue = subPaymentsMap[rId] || 0;
+    const sub = subMap[rId];
+    
+    // Real revenue: order sales if present, otherwise subscription payments collected from this restaurant
+    const revenue = totalOrderSales > 0 ? totalOrderSales : totalSubscriptionRevenue;
+    const mrr = sub?.priceMonthly ?? 0;
+
     return {
       ...r,
       cooldownRemaining: cooldown,
+      totalOrderSales,
+      totalSubscriptionRevenue,
+      revenue,
+      mrr,
     };
   });
 

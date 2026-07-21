@@ -207,7 +207,7 @@ export default function Analytics() {
           : "bg-slate-50 text-slate-900"
       }`}
     >
-      <main className="w-full px-4 sm:px-6 xl:px-8 py-6 sm:py-8 max-w-[1600px] mx-auto space-y-6">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
 
         {/* 1 ── Page header */}
         <AnalyticsHeader

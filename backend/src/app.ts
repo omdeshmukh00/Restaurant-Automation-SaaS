@@ -52,6 +52,14 @@ app.use(
         return;
       }
 
+      if (env.isDevelopment) {
+        const isLocalNetwork = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+        if (isLocalNetwork) {
+          callback(null, true);
+          return;
+        }
+      }
+
       callback(new Error('CORS origin denied'));
     },
     credentials: true,
@@ -60,11 +68,11 @@ app.use(
 );
 
 app.use(
-  morgan(env.isProduction ? 'combined' : 'dev', {
+  morgan((env.isProduction ? 'combined' : 'dev') as any, {
     stream: {
       write: (message) => logger.http(message.trim()),
     },
-    skip: () => !env.ENABLE_REQUEST_LOGS,
+    skip: (req) => !env.ENABLE_REQUEST_LOGS || Boolean(req.url?.includes('/platform-settings') || req.url?.includes('/health')),
   }),
 );
 

@@ -16,7 +16,6 @@ import { RestaurantModel } from '../restaurants/restaurants.model';
 import { OfferModel } from '../offers/offers.model';
 import { TableModel } from '../tables/tables.model';
 import { ReservationModel } from '../reservations/reservations.model';
-import { QueueEntryModel } from '../queue/queue.model';
 import { RestaurantStatus, TableStatus, ReservationStatus } from '../../constants/statuses';
 import { ok } from '../../utils/responses';
 import { AppError } from '../../utils/AppError';

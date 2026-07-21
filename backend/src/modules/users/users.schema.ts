@@ -76,6 +76,7 @@ export const updateProfileSchema = z.object({
   themeMode: z.enum(['light', 'dark', 'system']).optional(),
   location: z.string().optional(),
   bio: z.string().optional(),
+  otp: z.string().optional(),
 });
 
 
@@ -89,6 +90,7 @@ export const changePasswordSchema = z.object({
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
       'Password must contain at least one uppercase letter, one lowercase letter, and one number'
     ),
+  otp: z.string().optional(),
 });
 
 export const deleteAccountSchema = z.object({

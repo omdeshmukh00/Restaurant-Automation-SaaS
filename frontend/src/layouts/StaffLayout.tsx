@@ -100,6 +100,10 @@ export default function StaffLayout(): JSX.Element {
       socket.on('bill.paid', scheduleRefresh);
       socket.on('order.created', scheduleRefresh);
       socket.on('order.updated', scheduleRefresh);
+      socket.on('table.cleaned', scheduleRefresh);
+      socket.on('cleaning.completed', scheduleRefresh);
+      socket.on('cleaning.started', scheduleRefresh);
+      socket.on('cleaning.task.created', scheduleRefresh);
     }
 
     return () => {
@@ -113,6 +117,10 @@ export default function StaffLayout(): JSX.Element {
         socket.off('bill.paid');
         socket.off('order.created');
         socket.off('order.updated');
+        socket.off('table.cleaned');
+        socket.off('cleaning.completed');
+        socket.off('cleaning.started');
+        socket.off('cleaning.task.created');
       }
     };
   }, []);

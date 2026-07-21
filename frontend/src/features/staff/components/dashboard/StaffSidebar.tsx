@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useStaffProfile } from '../../hooks/useStaffProfile';
 import { useStaffDashboard } from '../../hooks/useStaffDashboard';
 import { getRolePermissions } from '../../utils/roleAccess';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 interface Props {
   collapsed: boolean;
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props) {
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || "DineEase";
   const { profile } = useStaffProfile();
   const { orders, readyItems, requests, alerts } = useStaffDashboard();
 
@@ -52,7 +55,7 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <h1 className="font-bold text-lg text-slate-800 leading-tight font-sans dark:text-white">DineEase</h1>
+              <h1 className="font-bold text-lg text-slate-800 leading-tight font-sans dark:text-white">{platformName}</h1>
               <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase font-sans">Staff Panel</p>
             </div>
           )}

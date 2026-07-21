@@ -10,82 +10,105 @@ export interface PlatformSettingsData {
   disableCleaningPanel: boolean;
   disableAdminPanel: boolean;
   enablePartnerRegistration: boolean;
+  applicationFeeEnabled?: boolean;
+  applicationFeeAmount?: number;
+  currency?: string;
+  refundPolicy?: string;
   platformName?: string;
   supportEmail?: string;
 }
 
-export function usePlatformSettingsGuard() {
-  const [settings, setSettings] = useState<PlatformSettingsData | null>(null);
-  const [loading, setLoading] = useState(true);
+// Global cached state & subscriber store to eliminate repeated background requests
+let globalSettings: PlatformSettingsData | null = null;
+let globalLoading = true;
+let isFetching = false;
+let lastFetchTime = 0;
+const listeners = new Set<(settings: PlatformSettingsData | null) => void>();
+let socketConnected = false;
 
-  const fetchSettings = useCallback(async () => {
-    try {
-      const res = await apiClient.get("/public/platform-settings");
-      const data = res.data?.data || res.data;
-      if (data) {
-        setSettings({
-          maintenanceMode: !!data.maintenanceMode,
-          disableCustomerPanel: !!data.disableCustomerPanel,
-          disableKitchenPanel: !!data.disableKitchenPanel,
-          disableStaffPanel: !!data.disableStaffPanel,
-          disableCleaningPanel: !!data.disableCleaningPanel,
-          disableAdminPanel: !!data.disableAdminPanel,
-          enablePartnerRegistration:
-            data.enablePartnerRegistration !== undefined
-              ? !!data.enablePartnerRegistration
-              : true,
-          platformName: data.platformName,
-          supportEmail: data.supportEmail,
-        });
-      }
-    } catch (err) {
-      console.error("Failed to fetch public platform settings guard:", err);
-    } finally {
-      setLoading(false);
+function updateGlobalSettings(data: any) {
+  if (!data) return;
+  globalSettings = {
+    maintenanceMode: !!data.maintenanceMode,
+    disableCustomerPanel: !!data.disableCustomerPanel,
+    disableKitchenPanel: !!data.disableKitchenPanel,
+    disableStaffPanel: !!data.disableStaffPanel,
+    disableCleaningPanel: !!data.disableCleaningPanel,
+    disableAdminPanel: !!data.disableAdminPanel,
+    enablePartnerRegistration:
+      data.enablePartnerRegistration !== undefined
+        ? !!data.enablePartnerRegistration
+        : true,
+    applicationFeeEnabled: !!data.applicationFeeEnabled,
+    applicationFeeAmount: data.applicationFeeAmount !== undefined ? Number(data.applicationFeeAmount) : 0,
+    currency: data.currency || 'INR',
+    refundPolicy: data.refundPolicy || 'refundable',
+    platformName: data.platformName,
+    supportEmail: data.supportEmail,
+  };
+  globalLoading = false;
+  listeners.forEach((listener) => listener(globalSettings));
+}
+
+async function fetchGlobalSettings(force = false) {
+  const now = Date.now();
+  if (isFetching || (!force && now - lastFetchTime < 10000 && globalSettings !== null)) {
+    return;
+  }
+
+  isFetching = true;
+  try {
+    const res = await apiClient.get("/public/platform-settings");
+    const data = res.data?.data || res.data;
+    if (data) {
+      updateGlobalSettings(data);
+      lastFetchTime = Date.now();
     }
-  }, []);
+  } catch (err) {
+    console.error("Failed to fetch public platform settings guard:", err);
+  } finally {
+    isFetching = false;
+  }
+}
+
+function setupGlobalSocket() {
+  if (socketConnected) return;
+  connectSocket();
+  const socket = getSocket();
+  if (socket) {
+    socket.on("platform.settings.updated", updateGlobalSettings);
+    socketConnected = true;
+  }
+}
+
+export function usePlatformSettingsGuard() {
+  const [settings, setSettings] = useState<PlatformSettingsData | null>(globalSettings);
+  const [loading, setLoading] = useState(globalLoading);
 
   useEffect(() => {
-    fetchSettings();
-
-    // Ensure socket is connected to receive global broadcasts
-    connectSocket();
-    const socket = getSocket();
-
-    const handleSettingsUpdate = (data: any) => {
-      if (data) {
-        setSettings({
-          maintenanceMode: !!data.maintenanceMode,
-          disableCustomerPanel: !!data.disableCustomerPanel,
-          disableKitchenPanel: !!data.disableKitchenPanel,
-          disableStaffPanel: !!data.disableStaffPanel,
-          disableCleaningPanel: !!data.disableCleaningPanel,
-          disableAdminPanel: !!data.disableAdminPanel,
-          enablePartnerRegistration:
-            data.enablePartnerRegistration !== undefined
-              ? !!data.enablePartnerRegistration
-              : true,
-          platformName: data.platformName,
-          supportEmail: data.supportEmail,
-        });
-      }
+    const listener = (newSettings: PlatformSettingsData | null) => {
+      setSettings(newSettings);
+      setLoading(false);
     };
 
-    if (socket) {
-      socket.on("platform.settings.updated", handleSettingsUpdate);
+    listeners.add(listener);
+    setupGlobalSocket();
+
+    if (globalSettings) {
+      setSettings(globalSettings);
+      setLoading(false);
+    } else {
+      fetchGlobalSettings();
     }
 
-    // Re-check instantly when window gains focus
-    const handleFocus = () => fetchSettings();
-    window.addEventListener("focus", handleFocus);
-
     return () => {
-      window.removeEventListener("focus", handleFocus);
-      if (socket) {
-        socket.off("platform.settings.updated", handleSettingsUpdate);
-      }
+      listeners.delete(listener);
     };
-  }, [fetchSettings]);
+  }, []);
 
-  return { settings, loading, refetch: fetchSettings };
+  const refetch = useCallback(() => {
+    fetchGlobalSettings(true);
+  }, []);
+
+  return { settings, loading, refetch };
 }

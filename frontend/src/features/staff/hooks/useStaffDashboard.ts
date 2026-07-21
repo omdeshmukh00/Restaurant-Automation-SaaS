@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { menuAPI, ordersAPI, requestsAPI, reservationsAPI, tableAPI, notificationsAPI } from '../api/staff.api';
 import { staffStore, type Order, type ReadyItem, type RequestItem, type AlertItem, type StaffTable, type StaffReservation, type MenuItem } from '../store/staff.store';
+import { connectSocket, getSocket } from '../../../lib/socket';
 
 function toDisplayTime(value?: string | Date | null) {
   if (!value) return 'Just now';
@@ -254,6 +255,7 @@ export function useStaffDashboard() {
       unsubscribe();
     };
   }, []);
+
 
   return {
     orders,

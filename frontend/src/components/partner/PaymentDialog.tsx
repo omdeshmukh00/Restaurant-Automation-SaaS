@@ -95,7 +95,10 @@ export default function PaymentDialog({
         prefill: {
           name: ownerName,
           email: email,
-          contact: phone,
+          contact: (phone || '').replace(/[^\d+]/g, ''),
+        },
+        readonly: {
+          contact: true,
         },
         notes: {
           requestId,
