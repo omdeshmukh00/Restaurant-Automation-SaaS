@@ -13,6 +13,15 @@ export default function KitchenOverviewPage() {
   const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
   const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
 
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const orders = React.useMemo(() => {
     return rawOrders.map((bo: any): UIKitchenOrder => {
       let status: UIKitchenOrder['status'] = 'new';
@@ -31,7 +40,7 @@ export default function KitchenOverviewPage() {
         price: item.price || 0,
       }));
 
-      const minutes = bo.createdAt ? Math.round((Date.now() - new Date(bo.createdAt).getTime()) / 60000) : 0;
+      const minutes = bo.createdAt ? Math.round((now - new Date(bo.createdAt).getTime()) / 60000) : 0;
       const timeAgo = minutes <= 0 ? 'Just now' : `${minutes} min${minutes > 1 ? 's' : ''} ago`;
       const time = bo.createdAt
         ? new Date(bo.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -51,7 +60,7 @@ export default function KitchenOverviewPage() {
         progress: status === 'preparing' ? 50 : 0,
       };
     });
-  }, [rawOrders]);
+  }, [rawOrders, now]);
 
   // Load and save active tab state
   const [activeTab, setActiveTab] = useState<string>(() => {

@@ -8,7 +8,7 @@ import CustomerBottomNav from '../features/customer/components/dashboard/Custome
 import CartSidebar from '../features/customer/components/dashboard/CartSidebar';
 import QRScannerModal from '../features/customer/components/dashboard/QRScannerModal';
 import { useCustomerStore } from '../features/customer/store/customer.store';
-import { useRestaurantStore } from '../features/restaurant/store/restaurant.store';
+
 import { getCustomerRouteAccessLevel, isValidDiningSession } from '../app/routeAccess';
 import { useAuth } from '../auth/AuthProvider';
 import { apiClient } from '../shared/services/apiClient';
