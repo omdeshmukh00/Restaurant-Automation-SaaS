@@ -93,7 +93,7 @@ export default function CleaningTablesPage() {
   const priorityRef = useRef<HTMLDivElement>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
 
-  const { urgentTasks, startTask, completeTask, verifyTask } = useCleaning();
+  const { urgentTasks, startTask, completeTask, verifyTask, assignTaskToStaff } = useCleaning();
   const safeTasks: TableTask[] = (urgentTasks || []) as unknown as TableTask[];
 
   useEffect(() => {
@@ -196,19 +196,33 @@ export default function CleaningTablesPage() {
     setOpenMenuId(null);
   };
 
-  const handleAssignStaff = (member: CleaningStaffMember) => {
+  const handleAssignStaff = async (member: CleaningStaffMember) => {
     if (!assigningTableId) return;
-    cleaningStore.assignTableStaff(assigningTableId, { name: member.name, avatar: member.avatar });
-    showToast(`${member.name} assigned to Table ${assigningTableId}.`, 'success');
-    setShowAssignModal(false);
-    setAssigningTableId(null);
-    setOpenMenuId(null);
+    const tableObj = tableList.find(t => t.id === assigningTableId || t.taskId === assigningTableId);
+    const taskId = tableObj?.taskId || assigningTableId;
+
+    try {
+      await assignTaskToStaff(taskId, member.id);
+      showToast(`${member.name} assigned to ${tableObj?.id || assigningTableId}.`, 'success');
+      setShowAssignModal(false);
+      setAssigningTableId(null);
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error('Failed to assign staff', err);
+    }
   };
 
-  const handleUnassignStaff = (tableId: string) => {
-    cleaningStore.assignTableStaff(tableId, null);
-    showToast(`Staff unassigned from Table ${tableId}.`, 'info');
-    setOpenMenuId(null);
+  const handleUnassignStaff = async (tableId: string) => {
+    const tableObj = tableList.find(t => t.id === tableId || t.taskId === tableId);
+    const taskId = tableObj?.taskId || tableId;
+
+    try {
+      await assignTaskToStaff(taskId, null);
+      showToast(`Staff unassigned from ${tableObj?.id || tableId}.`, 'info');
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error('Failed to unassign staff', err);
+    }
   };
 
   const handleExportData = () => {
@@ -549,17 +563,43 @@ export default function CleaningTablesPage() {
 
                       {/* Dropdown Menu */}
                       {openMenuId === row.rawId && (
-                        <div className="absolute right-0 top-12 w-48 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1 font-sans">
-                          <button
-                            onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg flex items-center gap-2"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">play_arrow</span>
-                            {row.status === 'Pending' ? 'Start Cleaning' : row.status === 'In Progress' ? 'Update Progress' : 'Mark Complete'}
-                          </button>
+                        <div className="absolute right-0 top-12 w-48 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1 font-sans text-left">
+                          {(row.status === 'Needs Cleaning' || row.status === 'Pending') && (
+                            <button
+                              onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">play_arrow</span>
+                              Start Cleaning
+                            </button>
+                          )}
+                          {row.status === 'In Progress' && (
+                            <button
+                              onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">done</span>
+                              Mark Complete
+                            </button>
+                          )}
+                          {row.status === 'Ready for Inspection' && (
+                            <button
+                              onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">verified</span>
+                              Verify & Approve
+                            </button>
+                          )}
+                          {row.status !== 'Needs Cleaning' && row.status !== 'Pending' && row.status !== 'In Progress' && row.status !== 'Ready for Inspection' && (
+                            <div className="px-3 py-2 text-xs font-semibold text-slate-400 dark:text-slate-500 italic">
+                              No Active Cleaning Task
+                            </div>
+                          )}
+                          <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
                           <button
                             onClick={() => { setAssigningTableId(row.rawId); setOpenMenuId(null); setShowAssignModal(true); }}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2"
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[15px]">person_add</span>
                             Assign Staff
@@ -567,27 +607,12 @@ export default function CleaningTablesPage() {
                           {row.assignedTo && (
                             <button
                               onClick={() => handleUnassignStaff(row.rawId)}
-                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2"
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2 cursor-pointer"
                             >
                               <span className="material-symbols-outlined text-[15px]">person_remove</span>
                               Unassign Staff
                             </button>
                           )}
-                          <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-                          <button
-                            onClick={() => handleOpenEditModal(row)}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">edit</span>
-                            Edit Table
-                          </button>
-                          <button
-                            onClick={() => { setDeleteConfirmId(row.rawId); setOpenMenuId(null); }}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg flex items-center gap-2"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">delete</span>
-                            Delete Table
-                          </button>
                         </div>
                       )}
                     </td>

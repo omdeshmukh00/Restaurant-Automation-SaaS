@@ -184,6 +184,15 @@ export function useCleaning() {
           if (activeTask?.priority === 'HIGH') priority = 'High';
           else if (activeTask?.priority === 'LOW') priority = 'Low';
 
+          let assignedTo = null;
+          if (activeTask?.assignedStaffId) {
+            const staff = activeTask.assignedStaffId as any;
+            assignedTo = {
+              name: staff.name || 'Staff Member',
+              avatar: staff.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(staff.name || 'Staff')}`,
+            };
+          }
+
           return {
             id: `Table ${table.tableNumber ?? 1}`,
             area: table.section || 'Dining Area A',
@@ -191,7 +200,7 @@ export function useCleaning() {
             status: status as any,
             priority: priority as any,
             timeAgo: activeTask?.createdAt ? new Date(activeTask.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Just Now',
-            assignedTo: activeTask?.startedBy ? { name: 'Staff Member', avatar: '' } : null,
+            assignedTo,
             progress,
             taskId,
             floor: table.floor || 1,
