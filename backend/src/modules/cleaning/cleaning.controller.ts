@@ -336,4 +336,14 @@ export class CleaningController {
       next(error);
     }
   }
+
+  static async getTables(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = CleaningController.getRequiredRestaurantId(req);
+      const tables = await TableModel.find({ restaurantId }).sort({ floor: 1, tableNumber: 1 });
+      ok(res, { tables });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

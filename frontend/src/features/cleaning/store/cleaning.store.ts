@@ -434,6 +434,11 @@ class CleaningStore {
     });
     this.notify();
   }
+
+  public syncAllTables(tables: TableItem[]) {
+    this.tables = tables;
+    this.notify();
+  }
   private listeners: Set<() => void> = new Set();
 
   constructor() {

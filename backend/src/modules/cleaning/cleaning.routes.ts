@@ -33,6 +33,8 @@ router.patch(
   CleaningController.updateMaintenanceIssue
 );
 
+router.get('/tables', CleaningController.getTables);
+
 // Task routes
 router.get('/tasks', validate({ query: cleaningTaskQuerySchema }), CleaningController.getTasks);
 router.get('/tasks/:id', validate({ params: cleaningTaskParamsSchema }), CleaningController.getTask);

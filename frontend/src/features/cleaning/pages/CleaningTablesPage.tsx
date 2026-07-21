@@ -9,7 +9,7 @@ interface TableRow {
   id: string;
   area: string;
   seats: number;
-  status: 'Pending' | 'In Progress' | 'Completed' | 'Done' | '--';
+  status: string;
   priority: 'High' | 'Medium' | 'Low';
   lastCleaned: string;
   assignedTo: { name: string; avatar: string } | null;
@@ -109,22 +109,15 @@ export default function CleaningTablesPage() {
   }, []);
 
   const tables: TableRow[] = tableList.map((t) => {
-    let displayStatus: 'Pending' | 'In Progress' | 'Completed' | 'Done' | '--' = 'Pending';
-    if (t.status === 'Needs Cleaning' || t.status === 'Cleaning Requested') displayStatus = 'Pending';
-    if (t.status === 'In Progress') displayStatus = 'In Progress';
-    if (t.status === 'Ready for Inspection') displayStatus = 'Completed';
-    if (t.status === 'Done') displayStatus = 'Done';
-    if (t.status === '--') displayStatus = '--';
-
     return {
       id: t.id,
       area: t.area,
       seats: t.seats,
-      status: displayStatus,
+      status: t.status,
       priority: t.priority,
       lastCleaned: t.timeAgo,
       assignedTo: t.assignedTo || null,
-      rawId: t.id,
+      rawId: t.taskId || t.id,
     };
   });
 
@@ -158,16 +151,19 @@ export default function CleaningTablesPage() {
     setShowAddModal(false);
   };
 
-  const handleToggleStatus = (rawId: string, currentStatus: string) => {
-    if (currentStatus === 'Pending') {
-      cleaningStore.startCleaning(rawId);
-      showToast(`Started cleaning Table ${rawId}.`, 'success');
+  const handleToggleStatus = async (rawId: string, currentStatus: string) => {
+    const tableObj = tableList.find(t => t.id === rawId || t.taskId === rawId);
+    const taskId = tableObj?.taskId || rawId;
+
+    if (currentStatus === 'Needs Cleaning') {
+      await startTask(taskId);
+      showToast(`Started cleaning ${tableObj?.id || rawId}.`, 'success');
     } else if (currentStatus === 'In Progress') {
-      cleaningStore.updateProgress(rawId);
-      showToast(`Progress updated for Table ${rawId}.`, 'info');
-    } else if (currentStatus === 'Completed') {
-      cleaningStore.completeInspection(rawId);
-      showToast(`Table ${rawId} inspection complete.`, 'success');
+      await completeTask(taskId);
+      showToast(`Finished cleaning ${tableObj?.id || rawId}. Sent for inspection.`, 'success');
+    } else if (currentStatus === 'Ready for Inspection') {
+      await verifyTask(taskId);
+      showToast(`Table ${tableObj?.id || rawId} verified as Available.`, 'success');
     }
   };
 
@@ -487,13 +483,15 @@ export default function CleaningTablesPage() {
                       <button
                         onClick={() => handleToggleStatus(row.rawId, row.status)}
                         className={`px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wider border cursor-pointer transition-colors duration-150 ${
-                          row.status === 'Completed' || row.status === 'Done'
+                          row.status === 'Available' || row.status === 'Done'
                             ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/30'
                             : row.status === 'In Progress'
                               ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/30'
-                              : row.status === '--'
-                                ? 'bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                                : 'bg-orange-500/10 text-orange-500 border-orange-200 dark:bg-slate-800 dark:text-orange-400'
+                              : row.status === 'Ready for Inspection'
+                                ? 'bg-purple-50 text-purple-750 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/30'
+                                : row.status === 'Occupied' || row.status === 'Reserved'
+                                  ? 'bg-red-50 text-red-650 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30'
+                                  : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-slate-800 dark:text-orange-400'
                         }`}
                       >
                         {row.status}

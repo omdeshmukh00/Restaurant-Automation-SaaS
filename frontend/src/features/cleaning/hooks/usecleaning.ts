@@ -143,9 +143,64 @@ export function useCleaning() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await cleaningAPI.getTasks();
-      if (res.success && res.data?.tasks) {
-        cleaningStore.syncTasks(res.data.tasks);
+      const [tasksRes, tablesRes] = await Promise.all([
+        cleaningAPI.getTasks(),
+        cleaningAPI.getTables(),
+      ]);
+
+      if (tablesRes.success && Array.isArray(tablesRes.data)) {
+        const mappedTables = tablesRes.data.map((table: any) => {
+          const activeTask = tasksRes.success && Array.isArray(tasksRes.data?.tasks)
+            ? tasksRes.data.tasks.find((task: any) => String(task.tableDetails?._id || task.tableId) === String(table._id))
+            : null;
+
+          let status = 'Available';
+          let progress = 0;
+          let taskId = activeTask?._id;
+
+          if (activeTask) {
+            if (activeTask.status === 'IN_PROGRESS') {
+              status = 'In Progress';
+              progress = 45;
+            } else if (activeTask.status === 'COMPLETED') {
+              status = 'Ready for Inspection';
+            } else {
+              status = 'Needs Cleaning';
+            }
+          } else {
+            const tableStatusUpper = (table.status || '').toUpperCase();
+            if (['OCCUPIED', 'BILL_PENDING', 'PAYMENT_PENDING', 'PAID', 'ORDERING', 'FOOD_SERVED'].includes(tableStatusUpper)) {
+              status = 'Occupied';
+            } else if (tableStatusUpper === 'RESERVED') {
+              status = 'Reserved';
+            } else if (['DIRTY', 'NEEDS_CLEANING'].includes(tableStatusUpper)) {
+              status = 'Needs Cleaning';
+            } else {
+              status = 'Available';
+            }
+          }
+
+          let priority = 'Medium';
+          if (activeTask?.priority === 'HIGH') priority = 'High';
+          else if (activeTask?.priority === 'LOW') priority = 'Low';
+
+          return {
+            id: `Table ${table.tableNumber ?? 1}`,
+            area: table.section || 'Dining Area A',
+            seats: Number(table.capacity || 4),
+            status: status as any,
+            priority: priority as any,
+            timeAgo: activeTask?.createdAt ? new Date(activeTask.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Just Now',
+            assignedTo: activeTask?.startedBy ? { name: 'Staff Member', avatar: '' } : null,
+            progress,
+            taskId,
+            floor: table.floor || 1,
+            section: table.section || 'Main',
+          };
+        });
+
+        cleaningStore.syncTasks([]);
+        cleaningStore.syncAllTables(mappedTables);
       }
 
       const staffRes = await apiClient.get<{ success: boolean; data: any[] }>('/admin/staff');

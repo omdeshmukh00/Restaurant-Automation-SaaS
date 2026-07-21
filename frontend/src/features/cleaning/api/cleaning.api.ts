@@ -213,10 +213,14 @@ export interface MaintenanceIssue {
   updatedAt?: string;
 }
 
-// ─── API endpoint functions ───────────────────────────────────
 export const cleaningAPI = {
-  getDashboard: async (): Promise<ApiResponse<CleaningDashboardResponse>> => {
-    return Promise.resolve({ success: true, data: undefined });
+  getTables: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ tables: any[] }>('/cleaning/tables');
+    return {
+      success: res.success,
+      data: res.data?.tables,
+      error: res.error,
+    };
   },
 
   getTasks: async (query?: { status?: string; priority?: string }): Promise<ApiResponse<CleaningTasksResponse>> => {
