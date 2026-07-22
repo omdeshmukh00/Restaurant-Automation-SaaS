@@ -65,6 +65,10 @@ export const requestMobileOtp = asyncHandler(async (req: Request, res: Response)
 
   const { otp, expiresAt } = await otpService.createOTP(mobile, 'mobile');
 
+  console.log("\n-----------------------------------------");
+  console.log(`[CleanServe Security] SMS OTP sent to ${mobile} is: ${otp}`);
+  console.log("-----------------------------------------\n");
+
   const responseData: any = {
     otpSent: true,
     otpExpiresAt: expiresAt,

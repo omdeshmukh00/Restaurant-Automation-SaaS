@@ -212,16 +212,24 @@ export function useCleaning() {
         cleaningStore.syncAllTables(mappedTables);
       }
 
-      const staffRes = await apiClient.get<{ success: boolean; data: any[] }>('/admin/staff');
-      if (staffRes.data?.success && Array.isArray(staffRes.data.data)) {
-        const apiMembers = staffRes.data.data.map((m: any) => ({
-          id: String(m._id || m.id),
-          name: m.name || 'Cleaning Staff',
-          role: m.role || 'Cleaning Staff',
-          area: m.assignedArea || 'Dining Area A',
-          phone: m.phone || '+91 98000 00000',
-          avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
-        }));
+      const staffRes = await apiClient.get<{ success: boolean; data: { staff: any[] } }>('/admin/staff?role=cleaning-staff');
+      if (staffRes.data?.success && Array.isArray(staffRes.data.data?.staff)) {
+        const apiMembers = staffRes.data.data.staff.map((m: any) => {
+          let displayRole = 'Cleaning Staff';
+          if (m.cleaning_role === 'HOUSEKEEPING') displayRole = 'Housekeeper';
+          else if (m.cleaning_role === 'CLEANING_SUPERVISOR') displayRole = 'Cleaning Supervisor';
+          else if (m.role === 'cleaning-staff') displayRole = 'Cleaning Staff';
+          else displayRole = m.role || 'Cleaning Staff';
+
+          return {
+            id: String(m._id || m.id),
+            name: m.name || 'Cleaning Staff',
+            role: displayRole,
+            area: m.assignedArea || 'Dining Area A',
+            phone: m.mobile || m.phone || '+91 98000 00000',
+            avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
+          };
+        });
         if (apiMembers.length > 0) {
           cleaningStore.setStaffMembers(apiMembers);
         }
@@ -287,16 +295,47 @@ export function useCleaning() {
     urgentTasks,
     staffMembers,
     addStaffMember: async (member: any) => {
-      cleaningStore.addStaffMember(member);
       try {
-        await apiClient.post('/admin/staff', {
+        const sanitizedMobile = (member.phone || '').replace(/[^\d]/g, '').slice(0, 10).padEnd(10, '0');
+        const email = `${member.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now().toString().slice(-6)}@ambertable.com`;
+        
+        const apiRole = 'cleaning-staff';
+        let cleaningRole = 'CLEANING_STAFF';
+        if (member.role === 'Housekeeper') {
+          cleaningRole = 'HOUSEKEEPING';
+        } else if (member.role === 'Hygiene Auditor' || member.role === 'Cleaning Supervisor') {
+          cleaningRole = 'CLEANING_SUPERVISOR';
+        }
+
+        const res = await apiClient.post<{ success: boolean; data: { staff: any } }>('/admin/staff', {
           name: member.name,
-          phone: member.phone,
-          role: member.role || 'service-staff',
+          email,
+          mobile: sanitizedMobile,
+          role: apiRole,
+          cleaning_role: cleaningRole,
           assignedArea: member.area,
         });
+
+        if (res.data?.success && res.data.data?.staff) {
+          const m = res.data.data.staff;
+          let displayRole = 'Cleaning Staff';
+          if (m.cleaning_role === 'HOUSEKEEPING') displayRole = 'Housekeeper';
+          else if (m.cleaning_role === 'CLEANING_SUPERVISOR') displayRole = 'Cleaning Supervisor';
+
+          cleaningStore.addStaffMember({
+            id: String(m._id || m.id),
+            name: m.name,
+            role: displayRole,
+            area: m.assignedArea || 'Dining Area A',
+            phone: m.mobile || '+91 98000 00000',
+            avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
+          });
+        }
+        await loadDashboard();
       } catch (e) {
         console.warn('Failed to post staff member to backend', e);
+        // Fallback
+        cleaningStore.addStaffMember(member);
       }
     },
     removeStaffMember: async (id: string) => {
@@ -314,16 +353,26 @@ export function useCleaning() {
     loading,
     error,
     profile,
-    updateProfile: async (updated: Partial<StaffProfile>) => {
+    updateProfile: async (updated: Partial<StaffProfile> & { mobileOtp?: string }) => {
       cleaningStore.updateProfile(updated);
       try {
         const { profileAPI } = await import('../api/profile.api');
         await profileAPI.updateProfile({
           name: updated.name,
-          phone: updated.phone,
+          mobile: updated.phone,
+          mobileOtp: updated.mobileOtp,
         } as any);
       } catch (e) {
         console.error('Failed to sync profile changes with backend', e);
+      }
+    },
+    requestMobileOtp: async (mobile: string) => {
+      try {
+        const { profileAPI } = await import('../api/profile.api');
+        return await profileAPI.requestMobileOtp(mobile);
+      } catch (e) {
+        console.error('Failed to request mobile OTP', e);
+        return { success: false, error: 'Failed to request OTP' };
       }
     },
     assignTask: async (taskId: string) => {
@@ -331,26 +380,56 @@ export function useCleaning() {
       await loadDashboard();
     },
     assignTaskToStaff: async (taskId: string, staffId?: string | null) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      if (staffId) {
+        const staff = cleaningStore.staffMembers.find(s => s.id === staffId);
+        const staffName = staff ? staff.name : 'Staff Member';
+        cleaningStore.addActivity(`Assigned ${staffName} to ${label}`, area, 'assignment', 'blue');
+      } else {
+        cleaningStore.addActivity(`Unassigned staff from ${label}`, area, 'person_remove', 'blue');
+      }
       await cleaningAPI.assignTask(taskId, staffId);
       await loadDashboard();
     },
     startTask: async (taskId: string) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Started cleaning ${label}`, area, 'timer', 'orange');
       await cleaningAPI.startTask(taskId);
       await loadDashboard();
     },
     completeTask: async (taskId: string) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Completed cleaning ${label}`, area, 'check_circle', 'green');
       await cleaningAPI.completeTask(taskId);
       await loadDashboard();
     },
     verifyTask: async (taskId: string) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Verified & approved ${label}`, area, 'verified', 'purple');
       await cleaningAPI.verifyTask(taskId);
       await loadDashboard();
     },
     pauseTask: async (taskId: string, isPaused?: boolean) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(isPaused ? `Paused cleaning ${label}` : `Resumed cleaning ${label}`, area, 'pause', 'orange');
       await cleaningAPI.pauseTask(taskId, isPaused);
       await loadDashboard();
     },
     triggerDeepClean: async (taskId: string, isDeepCleaning?: boolean) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Triggered deep clean for ${label}`, area, 'cleaning_services', 'purple');
       await cleaningAPI.triggerDeepClean(taskId, isDeepCleaning);
       await loadDashboard();
     },
@@ -360,6 +439,11 @@ export function useCleaning() {
       description: string;
       severity?: string;
     }) => {
+      const table = cleaningStore.tables.find(t => t.id === data.tableId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      const desc = data.issueType ? data.issueType.replace(/_/g, ' ') : 'Maintenance issue';
+      cleaningStore.addActivity(`Reported maintenance for ${label}`, desc, 'warning', 'orange');
       const res = await cleaningAPI.reportMaintenanceIssue(data);
       await loadDashboard();
       return res;

@@ -4,6 +4,7 @@ import { useNotifications } from '../hooks/useNotifications';
 import { useCleaningSearch } from '../components/dashboard/CleaningSearchContext';
 import { cleaningStore, CleaningRequest, CleaningStaffMember } from '../store/cleaning.store';
 import { useToast } from '../components/dashboard/Toast';
+import { useTranslation } from '../hooks/useTranslation';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface HygieneTask {
@@ -31,6 +32,7 @@ interface TableTask {
 }
 
 export default function CleaningDashboard() {
+  const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -255,10 +257,10 @@ export default function CleaningDashboard() {
               {totalTablesToClean}
             </h3>
             <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">
-              Tables to Clean
+              {t('tablesToClean')}
             </p>
             <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5 inline-block">
-              Pending
+              {t('pending')}
             </span>
           </div>
         </div>
@@ -271,9 +273,9 @@ export default function CleaningDashboard() {
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
               {totalInProgress}
             </h3>
-            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">In Progress</p>
+            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">{t('inProgress')}</p>
             <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5 inline-block">
-              Cleaning
+              {t('cleaning')}
             </span>
           </div>
         </div>
@@ -287,10 +289,10 @@ export default function CleaningDashboard() {
               {totalCleanedToday}
             </h3>
             <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">
-              Cleaned Today
+              {t('cleanedToday')}
             </p>
             <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider mt-0.5 inline-block font-sans">
-              Completed
+              {t('completed')}
             </span>
           </div>
         </div>
@@ -304,10 +306,10 @@ export default function CleaningDashboard() {
               {hygieneScore}
             </h3>
             <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">
-              Hygiene Score
+              {t('hygieneScore')}
             </p>
             <span className="text-[10px] font-bold text-purple-600 dark:text-purple-455 uppercase tracking-wider mt-0.5 inline-block font-sans">
-              Excellent
+              {t('excellent')}
             </span>
           </div>
         </div>
@@ -321,7 +323,7 @@ export default function CleaningDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-                  Tables to Clean
+                  {t('tablesToClean')}
                 </h2>
                 <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
                   {filteredTablesToClean.length}
@@ -334,7 +336,7 @@ export default function CleaningDashboard() {
                 <span className="material-symbols-outlined text-4xl mb-2 text-slate-300 dark:text-slate-700">
                   playlist_add_check
                 </span>
-                <p className="text-xs font-semibold">No pending tables to clean matching search.</p>
+                <p className="text-xs font-semibold">{t('noPendingTables')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -356,7 +358,7 @@ export default function CleaningDashboard() {
                         <span
                           className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${table.priorityClass}`}
                         >
-                          {table.priority} Priority
+                          {t(table.priority.toLowerCase())} {t('priority')}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-[11px] mb-3 font-sans font-bold">
@@ -366,7 +368,7 @@ export default function CleaningDashboard() {
                       <div className="flex items-center justify-between text-slate-450 dark:text-slate-400 text-[10px] mb-4 font-sans font-semibold">
                         <div className="flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">groups</span>
-                          {table.seats} Seats
+                          {table.seats} {t('seats')}
                         </div>
                         <div className="flex items-center gap-1">
                           <span className="material-symbols-outlined text-[14px]">schedule</span>
@@ -378,7 +380,7 @@ export default function CleaningDashboard() {
                       onClick={() => handleStartCleaning(table)}
                       className="w-full py-2 bg-transparent border border-orange-500 text-orange-500 rounded-xl text-xs font-bold hover:bg-orange-500 hover:text-white transition-all duration-200 active:scale-95 cursor-pointer"
                     >
-                      Start Cleaning
+                      {t('startCleaning')}
                     </button>
                   </div>
                 ))}
@@ -391,7 +393,7 @@ export default function CleaningDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-                  Completed Today
+                  {t('completedTodayHeader')}
                 </h2>
                 <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
                   {filteredCompleted.length}
@@ -421,11 +423,11 @@ export default function CleaningDashboard() {
                         {item.id}
                       </span>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
-                        ({item.section} · Floor {item.floor})
+                        ({t(item.section || '')} · {t('floor1')} {item.floor})
                       </span>
                     </div>
                     <span className="text-slate-400 dark:text-slate-500 font-semibold">
-                      {item.seats} Seats
+                      {item.seats} {t('seats')}
                     </span>
                     <span className="text-slate-450 dark:text-slate-400 font-bold">
                       {item.rawStatus === 'COMPLETED' ? (
@@ -627,10 +629,10 @@ export default function CleaningDashboard() {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
             <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">
-              Create Cleaning Request
+              {t('newRequest')}
             </h3>
             <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              Raise a manual cleaning request for any table station.
+              {t('newRequestDesc')}
             </p>
             <form onSubmit={handleCreateRequest} className="space-y-4 font-sans text-xs">
               <div>
@@ -638,7 +640,7 @@ export default function CleaningDashboard() {
                   htmlFor="new-request-table"
                   className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5"
                 >
-                  Table Number
+                  {t('tableNo')}
                 </label>
                 <input
                   id="new-request-table"
@@ -653,7 +655,7 @@ export default function CleaningDashboard() {
 
               <div>
                 <span className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
-                  Priority
+                  {t('priority')}
                 </span>
                 <div className="grid grid-cols-3 gap-2">
                   {['High', 'Medium', 'Low'].map((p) => (
@@ -667,7 +669,7 @@ export default function CleaningDashboard() {
                           : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850'
                       }`}
                     >
-                      {p}
+                      {t(p)}
                     </button>
                   ))}
                 </div>
@@ -679,13 +681,13 @@ export default function CleaningDashboard() {
                   onClick={() => setShowHistoryModal(false)}
                   className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
                 >
-                  Request
+                  {t('newRequest')}
                 </button>
               </div>
             </form>
@@ -831,9 +833,9 @@ export default function CleaningDashboard() {
       <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800/60 shadow-sm p-6">
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">Cleaning Staff</h2>
+            <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">{t('cleaningStaff')}</h2>
             <p className="text-[11px] text-slate-400 dark:text-slate-455 mt-0.5 font-sans">
-              {staffList.length} team member{staffList.length !== 1 ? 's' : ''} registered
+              {staffList.length} {t('teamMembersRegistered')}
             </p>
           </div>
           <button
@@ -841,7 +843,7 @@ export default function CleaningDashboard() {
             className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">person_add</span>
-            Add Staff
+            {t('addCleaner')}
           </button>
         </div>
 
@@ -864,7 +866,7 @@ export default function CleaningDashboard() {
                 />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate">{member.name}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-455 truncate">{member.role} · {member.area}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-455 truncate">{t(member.role)} · {t(member.area)}</p>
                 </div>
                 <button
                   onClick={() => {

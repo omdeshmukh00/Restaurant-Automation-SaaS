@@ -3,6 +3,7 @@ import { useCleaning } from '../hooks/usecleaning';
 import { useCleaningSearch } from '../components/dashboard/CleaningSearchContext';
 import { cleaningStore, CleaningStaffMember } from '../store/cleaning.store';
 import { useToast } from '../components/dashboard/Toast';
+import { useTranslation } from '../hooks/useTranslation';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface TableRow {
@@ -31,6 +32,7 @@ interface TableTask {
 }
 
 export default function CleaningTablesPage() {
+  const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -51,6 +53,7 @@ export default function CleaningTablesPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigningTableId, setAssigningTableId] = useState<string | null>(null);
+  const [assigningTableLabel, setAssigningTableLabel] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<CleaningStaffMember[]>(cleaningStore.staffMembers);
 
   const [tableList, setTableList] = useState(cleaningStore.tables);
@@ -279,7 +282,7 @@ export default function CleaningTablesPage() {
               {totalTables}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">
-              Total Tables
+              {t('totalTables')}
             </p>
           </div>
         </div>
@@ -292,7 +295,7 @@ export default function CleaningTablesPage() {
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
               {totalInProgress}
             </h3>
-            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">In Progress</p>
+            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">{t('inProgress')}</p>
           </div>
         </div>
 
@@ -305,7 +308,7 @@ export default function CleaningTablesPage() {
               {totalCleanedToday}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">
-              Cleaned Today
+              {t('cleanedToday')}
             </p>
           </div>
         </div>
@@ -319,7 +322,7 @@ export default function CleaningTablesPage() {
               {totalHighPriority}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">
-              High Priority
+              {t('highPriority')}
             </p>
           </div>
         </div>
@@ -354,7 +357,7 @@ export default function CleaningTablesPage() {
                 }}
                 className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
               >
-                <span>{statusFilter}</span>
+                <span>{t(statusFilter)}</span>
                 <span className="material-symbols-outlined text-sm text-slate-400">
                   keyboard_arrow_down
                 </span>
@@ -376,7 +379,7 @@ export default function CleaningTablesPage() {
                           : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                       }`}
                     >
-                      {st}
+                      {t(st)}
                     </button>
                   ))}
                 </div>
@@ -394,7 +397,7 @@ export default function CleaningTablesPage() {
                 }}
                 className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
               >
-                <span>{priorityFilter}</span>
+                <span>{t(priorityFilter)}</span>
                 <span className="material-symbols-outlined text-sm text-slate-400">
                   keyboard_arrow_down
                 </span>
@@ -416,7 +419,7 @@ export default function CleaningTablesPage() {
                           : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                       }`}
                     >
-                      {pr}
+                      {t(pr)}
                     </button>
                   ))}
                 </div>
@@ -431,14 +434,14 @@ export default function CleaningTablesPage() {
               className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">download</span>
-              Export
+              {t('export')}
             </button>
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl text-xs font-sans font-bold hover:bg-orange-600 transition-all shadow-md shadow-orange-500/10 active:scale-95 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">add</span>
-              Add Table
+              {t('addTable')}
             </button>
           </div>
         </div>
@@ -448,14 +451,14 @@ export default function CleaningTablesPage() {
           <table className="w-full text-left border-collapse font-sans text-xs">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 font-bold">
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Table ID</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Area</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Seats</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Priority</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('tableNo')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('area')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('seats')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('priority')}</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider">Last Cleaned</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Assigned To</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('assignedTo')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -487,8 +490,8 @@ export default function CleaningTablesPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-slate-500 dark:text-slate-450 font-semibold">
-                      {row.area}
+                    <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold">
+                      {t(row.area)}
                     </td>
                     <td className="px-6 py-4 font-extrabold text-slate-850 dark:text-slate-300">
                       {row.seats}
@@ -508,7 +511,7 @@ export default function CleaningTablesPage() {
                                   : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-slate-800 dark:text-orange-400'
                         }`}
                       >
-                        {row.status}
+                        {t(row.status.toLowerCase().replace(/\s+/g, ''))}
                       </button>
                     </td>
                     <td className="px-6 py-4">
@@ -521,7 +524,7 @@ export default function CleaningTablesPage() {
                               : 'bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400'
                         }`}
                       >
-                        {row.priority}
+                        {t(row.priority.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold">
@@ -598,7 +601,7 @@ export default function CleaningTablesPage() {
                           )}
                           <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
                           <button
-                            onClick={() => { setAssigningTableId(row.rawId); setOpenMenuId(null); setShowAssignModal(true); }}
+                            onClick={() => { setAssigningTableId(row.rawId); setAssigningTableLabel(row.id); setOpenMenuId(null); setShowAssignModal(true); }}
                             className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[15px]">person_add</span>
@@ -626,8 +629,8 @@ export default function CleaningTablesPage() {
         {/* Table Footer / Pagination Panels */}
         <div className="px-6 py-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white dark:bg-sd-surface-container border-t border-slate-100 dark:border-slate-800 relative z-30">
           <p className="text-slate-400 dark:text-slate-455 font-bold">
-            Showing {indexOfFirstRow + 1} to {Math.min(indexOfLastRow, filteredTables.length)} of{' '}
-            {totalTables} tables
+            {t('Showing')} {indexOfFirstRow + 1} {t('to')} {Math.min(indexOfLastRow, filteredTables.length)} {t('of')}{' '}
+            {totalTables} {t('tables')}
           </p>
           <div className="flex flex-wrap items-center gap-4">
             {/* 💥 Custom HTML Pagination Active Layout Links Control Block */}
@@ -666,7 +669,7 @@ export default function CleaningTablesPage() {
 
             {/* 💥 FIXED: Custom dropup layout list component for rows menu logic (Orange theme highlight applied!) */}
             <div className="flex items-center gap-2" ref={rowsRef}>
-              <span className="text-slate-400 dark:text-slate-455 font-bold">Rows per page:</span>
+              <span className="text-slate-400 dark:text-slate-455 font-bold">{t('rowsPerPage')}:</span>
               <div className="relative">
                 <button
                   type="button"
@@ -934,7 +937,7 @@ export default function CleaningTablesPage() {
       {showAssignModal && assigningTableId && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm font-sans">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1">Assign Staff to Table {assigningTableId}</h3>
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1">Assign Staff to {assigningTableLabel}</h3>
             <p className="text-[11px] text-slate-400 mb-4">Select a team member to assign to this table.</p>
             {staffList.length === 0 ? (
               <div className="text-center py-8 text-slate-400">

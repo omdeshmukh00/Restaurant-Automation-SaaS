@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useCleaning } from '../../hooks/usecleaning';
 import { getCleaningRolePermissions } from '../../utils/cleaningRoleAccess';
 import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
+import { useTranslation } from '../../hooks/useTranslation';
 
 interface NavItem {
   to: string;
@@ -22,6 +23,19 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/cleaning/settings', icon: 'settings', label: 'Settings' },
 ];
 
+const getTranslationKey = (label: string): any => {
+  switch (label) {
+    case 'Dashboard': return 'dashboard';
+    case 'Tables': return 'tables';
+    case 'Requests': return 'requests';
+    case 'Tasks': return 'tasks';
+    case 'Monitor Staff': return 'staff';
+    case 'Profile': return 'profile';
+    case 'Settings': return 'settings';
+    default: return 'dashboard';
+  }
+};
+
 interface Props {
   collapsed: boolean;
   onToggle: () => void;
@@ -32,6 +46,7 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
   const { settings } = usePlatformSettingsGuard();
   const platformName = settings?.platformName || "CleanServe";
   const { profile } = useCleaning();
+  const { t } = useTranslation();
   const allowedPaths = getCleaningRolePermissions(profile.role);
   const filteredNavItems = NAV_ITEMS.filter(({ to }) => allowedPaths.includes(to));
 
@@ -65,47 +80,50 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
 
       {/* Navigation */}
       <nav className="flex-grow space-y-1 px-3 py-4 overflow-y-auto sd-no-scrollbar">
-        {filteredNavItems.map(({ to, icon, label, badge, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            onClick={onItemClick}
-            className={({ isActive }) =>
-              `flex items-center transition-all duration-200 font-sans text-sm font-semibold group ${
-                isActive
-                  ? 'bg-orange-500/10 text-orange-500 dark:bg-orange-500/20 dark:text-white'
-                  : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
-              } ${
-                collapsed
-                  ? 'w-10 h-10 justify-center p-0 rounded-full mx-auto'
-                  : 'justify-between px-4 py-2.5 rounded-xl'
-              }`
-            }
-            title={collapsed ? label : undefined}
-          >
-            {({ isActive }) => (
-              <>
-                <div className={collapsed ? 'flex items-center justify-center' : 'flex items-center gap-3'}>
-                  <span
-                    className={`material-symbols-outlined text-[20px] ${isActive ? 'text-orange-500 dark:text-white' : ''}`}
-                    style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}
-                  >
-                    {icon}
-                  </span>
-                  <span className={isActive ? 'text-orange-500 dark:text-white' : ''}>{!collapsed && label}</span>
-                </div>
-                {!collapsed && badge && (
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold transition-all ${
-                    isActive
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-error text-on-error'
-                  }`}>{badge}</span>
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
+        {filteredNavItems.map(({ to, icon, label, badge, end }) => {
+          const translatedLabel = t(getTranslationKey(label));
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={onItemClick}
+              className={({ isActive }) =>
+                `flex items-center transition-all duration-200 font-sans text-sm font-semibold group ${
+                  isActive
+                    ? 'bg-orange-500/10 text-orange-500 dark:bg-orange-500/20 dark:text-white'
+                    : 'text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800'
+                } ${
+                  collapsed
+                    ? 'w-10 h-10 justify-center p-0 rounded-full mx-auto'
+                    : 'justify-between px-4 py-2.5 rounded-xl'
+                }`
+              }
+              title={collapsed ? translatedLabel : undefined}
+            >
+              {({ isActive }) => (
+                <>
+                  <div className={collapsed ? 'flex items-center justify-center' : 'flex items-center gap-3'}>
+                    <span
+                      className={`material-symbols-outlined text-[20px] ${isActive ? 'text-orange-500 dark:text-white' : ''}`}
+                      style={{ fontVariationSettings: isActive ? "'FILL' 1" : "'FILL' 0" }}
+                    >
+                      {icon}
+                    </span>
+                    <span className={isActive ? 'text-orange-500 dark:text-white' : ''}>{!collapsed && translatedLabel}</span>
+                  </div>
+                  {!collapsed && badge && (
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold transition-all ${
+                      isActive
+                        ? 'bg-orange-500 text-white'
+                        : 'bg-error text-on-error'
+                    }`}>{badge}</span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Need Help Card (Hidden when collapsed) */}

@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme, ThemeMode } from '../../../app/providers/ThemeProvider';
+import { cleaningStore } from '../store/cleaning.store';
+import { useTranslation } from '../hooks/useTranslation';
 
 export default function CleaningSettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
 
   // Notification toggles context controllers
   const [urgentAlerts, setUrgentAlerts] = useState(() => {
@@ -30,13 +33,20 @@ export default function CleaningSettingsPage() {
   });
   
   // Custom Language Dropdown layout trackers
-  const [selectedLanguage, setSelectedLanguage] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('cleanserve-settings-language');
-      return saved !== null ? saved : 'en';
-    }
-    return 'en';
-  });
+  const [selectedLanguage, setSelectedLanguageState] = useState(cleaningStore.language);
+
+  useEffect(() => {
+    const unsubscribe = cleaningStore.subscribe(() => {
+      setSelectedLanguageState(cleaningStore.language);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  const setSelectedLanguage = (lang: string) => {
+    cleaningStore.setLanguage(lang);
+  };
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -52,10 +62,6 @@ export default function CleaningSettingsPage() {
   useEffect(() => {
     localStorage.setItem('cleanserve-settings-shiftAlerts', String(shiftAlerts));
   }, [shiftAlerts]);
-
-  useEffect(() => {
-    localStorage.setItem('cleanserve-settings-language', selectedLanguage);
-  }, [selectedLanguage]);
 
   const languages = [
     { code: 'en', label: 'English (US)' },
@@ -81,16 +87,16 @@ export default function CleaningSettingsPage() {
       <div className="space-y-6">
         {/* Theme Toggles (Stitch style 3-way layout block) */}
         <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-          <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-150 font-sans mb-1">Display Theme</h2>
+          <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-150 font-sans mb-1">{t('displayTheme')}</h2>
           <p className="text-xs text-slate-450 dark:text-slate-400 mb-4 leading-relaxed font-sans font-semibold">
-            Choose light or dark mode, or match your device&apos;s system appearance.
+            {t('themeDesc')}
           </p>
 
           <div className="grid grid-cols-3 gap-3">
             {[
-              { id: 'light', label: 'Light Mode', icon: 'light_mode' },
-              { id: 'dark', label: 'Dark Mode', icon: 'dark_mode' },
-              { id: 'system', label: 'System Theme', icon: 'desktop_windows' }
+              { id: 'light', label: t('lightMode'), icon: 'light_mode' },
+              { id: 'dark', label: t('darkMode'), icon: 'dark_mode' },
+              { id: 'system', label: t('systemTheme'), icon: 'desktop_windows' }
             ].map(item => (
               <button
                 key={item.id}
@@ -111,13 +117,13 @@ export default function CleaningSettingsPage() {
 
         {/* Notifications Settings Preferences */}
         <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-          <h2 className="font-extrabold text-sm text-slate-855 dark:text-slate-150 font-sans mb-4">Notification Preferences</h2>
+          <h2 className="font-extrabold text-sm text-slate-855 dark:text-slate-150 font-sans mb-4">{t('notificationPrefs')}</h2>
           
           <div className="space-y-4 font-sans text-xs">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Urgent Cleaning Tickets</p>
-                <p className="text-[10px] text-slate-455 dark:text-slate-400 mt-0.5">Vibrate or play audio alert when high priority requests are raised.</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200">{t('urgentTickets')}</p>
+                <p className="text-[10px] text-slate-455 dark:text-slate-400 mt-0.5">{t('urgentTicketsDesc')}</p>
               </div>
               <button
                 type="button"
@@ -134,8 +140,8 @@ export default function CleaningSettingsPage() {
 
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Routine Task Reminders</p>
-                <p className="text-[10px] text-slate-455 dark:text-slate-400 mt-0.5">Alert immediately when routine sanitization checks are near schedule due times.</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200">{t('routineReminders')}</p>
+                <p className="text-[10px] text-slate-455 dark:text-slate-400 mt-0.5">{t('routineRemindersDesc')}</p>
               </div>
               <button
                 type="button"
@@ -152,8 +158,8 @@ export default function CleaningSettingsPage() {
 
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-bold text-slate-800 dark:text-slate-200">Shift Assignments & Announcements</p>
-                <p className="text-[10px] text-slate-455 dark:text-slate-400 mt-0.5">Receive shift changes, zoning assignment notices or supervisor announcements.</p>
+                <p className="font-bold text-slate-800 dark:text-slate-200">{t('shiftAnnouncements')}</p>
+                <p className="text-[10px] text-slate-455 dark:text-slate-400 mt-0.5">{t('shiftAnnouncementsDesc')}</p>
               </div>
               <button
                 type="button"
@@ -172,7 +178,7 @@ export default function CleaningSettingsPage() {
 
         {/* Language Selection Custom Options Dropdown */}
         <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-          <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-150 font-sans mb-4">Preferred Language</h2>
+          <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-150 font-sans mb-4">{t('preferredLanguage')}</h2>
           
           <div className="relative w-full md:w-64" ref={dropdownRef}>
             <button

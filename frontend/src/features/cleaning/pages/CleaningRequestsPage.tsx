@@ -4,6 +4,7 @@ import { useCleaningSearch } from '../components/dashboard/CleaningSearchContext
 import { useNotifications } from '../hooks/useNotifications';
 import { cleaningStore } from '../store/cleaning.store';
 import { useToast } from '../components/dashboard/Toast';
+import { useTranslation } from '../hooks/useTranslation';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface CleaningRequest {
@@ -35,6 +36,7 @@ interface TableTask {
 }
 
 export default function CleaningRequestsPage() {
+  const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -339,21 +341,21 @@ export default function CleaningRequestsPage() {
           className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-amber-500/10 cursor-pointer text-xs"
         >
           <span className="material-symbols-outlined text-[18px]">build</span>
-          Report Maintenance Issue
+          {t('reportMaintenance')}
         </button>
         <button
           onClick={() => setShowAddModal(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
-          New Request
+          {t('newRequest')}
         </button>
         <button 
           onClick={handleExportCSV}
           className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-all active:scale-95 text-xs cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">download</span>
-          Export
+          {t('export')}
         </button>
       </div>
 
@@ -368,7 +370,7 @@ export default function CleaningRequestsPage() {
               {totalCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Total Requests
+              {t('totalRequests')}
             </p>
           </div>
         </div>
@@ -382,7 +384,7 @@ export default function CleaningRequestsPage() {
               {inProgressCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              In Progress
+              {t('inProgress')}
             </p>
           </div>
         </div>
@@ -396,7 +398,7 @@ export default function CleaningRequestsPage() {
               {completedCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Completed
+              {t('completed')}
             </p>
           </div>
         </div>
@@ -410,7 +412,7 @@ export default function CleaningRequestsPage() {
               {scheduledCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Scheduled
+              {t('scheduled')}
             </p>
           </div>
         </div>
@@ -424,7 +426,7 @@ export default function CleaningRequestsPage() {
               {cancelledCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Cancelled
+              {t('cancelled')}
             </p>
           </div>
         </div>
@@ -444,7 +446,7 @@ export default function CleaningRequestsPage() {
               }}
               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 cursor-pointer"
             >
-              <span>{statusFilter}</span>
+              <span>{t(statusFilter)}</span>
               <span className="material-symbols-outlined text-sm text-slate-400">
                 keyboard_arrow_down
               </span>
@@ -466,7 +468,7 @@ export default function CleaningRequestsPage() {
                         : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                     }`}
                   >
-                    {st}
+                    {t(st)}
                   </button>
                 ))}
               </div>
@@ -484,7 +486,7 @@ export default function CleaningRequestsPage() {
               }}
               className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 cursor-pointer"
             >
-              <span>{priorityFilter}</span>
+              <span>{t(priorityFilter)}</span>
               <span className="material-symbols-outlined text-sm text-slate-400">
                 keyboard_arrow_down
               </span>
@@ -506,7 +508,7 @@ export default function CleaningRequestsPage() {
                         : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                     }`}
                   >
-                    {pr}
+                    {t(pr)}
                   </button>
                 ))}
               </div>
@@ -522,9 +524,9 @@ export default function CleaningRequestsPage() {
                 setIsStatusOpen(false);
                 setIsPriorityOpen(false);
               }}
-              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
+              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 cursor-pointer"
             >
-              <span>{typeFilter}</span>
+              <span>{t(typeFilter)}</span>
               <span className="material-symbols-outlined text-sm text-slate-400">
                 keyboard_arrow_down
               </span>
@@ -552,7 +554,7 @@ export default function CleaningRequestsPage() {
                         : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                     }`}
                   >
-                    {tp}
+                    {t(tp)}
                   </button>
                 ))}
               </div>
@@ -579,16 +581,16 @@ export default function CleaningRequestsPage() {
           <table className="w-full text-left border-collapse font-sans text-xs">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-550 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 font-bold">
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Request ID</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Location / Area</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Requested By</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Priority</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Requested On</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Assigned To</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('requestId')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('type')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('locationArea')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('requestedBy')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('priority')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('requestedOn')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('assignedTo')}</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider text-center">
-                  Actions
+                  {t('actions')}
                 </th>
               </tr>
             </thead>
@@ -613,11 +615,11 @@ export default function CleaningRequestsPage() {
                         <span className={`material-symbols-outlined text-[18px] ${row.iconColor}`}>
                           {row.icon}
                         </span>
-                        {row.type}
+                        {t(row.type)}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold">
-                      {row.location}
+                      {t(row.location)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -641,7 +643,7 @@ export default function CleaningRequestsPage() {
                               : 'bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400'
                         }`}
                       >
-                        {row.priority}
+                        {t(row.priority.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -657,7 +659,7 @@ export default function CleaningRequestsPage() {
                                 : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
                         }`}
                       >
-                        {row.status}
+                        {t(row.status.toLowerCase().replace(/\s+/g, ''))}
                       </button>
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold leading-relaxed">
@@ -734,13 +736,13 @@ export default function CleaningRequestsPage() {
             {/* Pagination Panel Footer */}
         <div className="px-6 py-4 bg-white dark:bg-sd-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-800 relative z-30">
           <p className="text-slate-400 dark:text-slate-455 font-bold">
-            Showing {indexOfFirstRow + 1} to {Math.min(indexOfLastRow, filteredRequests.length)} of{' '}
-            {filteredRequests.length} requests
+            {t('Showing')} {indexOfFirstRow + 1} {t('to')} {Math.min(indexOfLastRow, filteredRequests.length)} {t('of')}{' '}
+            {filteredRequests.length} {t('requests')}
           </p>
           <div className="flex items-center gap-6">
             {/* Custom HTML Rows Per Page Menu Block */}
             <div className="flex items-center gap-2" ref={rowsRef}>
-              <span className="text-slate-400 dark:text-slate-455 font-bold">Rows per page</span>
+              <span className="text-slate-400 dark:text-slate-455 font-bold">{t('rowsPerPage')}</span>
               <div className="relative">
                 <button
                   type="button"
@@ -991,7 +993,7 @@ export default function CleaningRequestsPage() {
                   required
                 >
                   {cleaningStore.tables.map((t) => (
-                    <option key={t.id} value={t.id}>
+                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" key={t.id} value={t.id}>
                       {t.id} ({t.area})
                     </option>
                   ))}
@@ -1008,11 +1010,11 @@ export default function CleaningRequestsPage() {
                   onChange={(e) => setMIssueType(e.target.value as any)}
                   className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-500"
                 >
-                  <option value="BROKEN_FURNITURE">Broken Furniture 🪑</option>
-                  <option value="WATER_LEAK">Water Leak 💧</option>
-                  <option value="ELECTRICAL">Electrical Issue ⚡</option>
-                  <option value="HYGIENE">Hygiene Concern 🧼</option>
-                  <option value="OTHER">Other Issue ⚠️</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="BROKEN_FURNITURE">Broken Furniture 🪑</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="WATER_LEAK">Water Leak 💧</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="ELECTRICAL">Electrical Issue ⚡</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="HYGIENE">Hygiene Concern 🧼</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="OTHER">Other Issue ⚠️</option>
                 </select>
               </div>
 
@@ -1026,10 +1028,10 @@ export default function CleaningRequestsPage() {
                   onChange={(e) => setMSeverity(e.target.value as any)}
                   className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-amber-500"
                 >
-                  <option value="LOW">Low (Minor scratch/stain)</option>
-                  <option value="MEDIUM">Medium (Requires fix today)</option>
-                  <option value="HIGH">High (Urgent repair needed)</option>
-                  <option value="CRITICAL">Critical (Immediate safety hazard)</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="LOW">Low (Minor scratch/stain)</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="MEDIUM">Medium (Requires fix today)</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="HIGH">High (Urgent repair needed)</option>
+                  <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="CRITICAL">Critical (Immediate safety hazard)</option>
                 </select>
               </div>
 
