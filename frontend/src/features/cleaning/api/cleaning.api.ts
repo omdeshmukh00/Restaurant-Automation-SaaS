@@ -2,9 +2,7 @@
  * cleaning.api.ts
  * Location: src/features/cleaning/api/cleaning.api.ts
  *
- * This file defines canonical types and endpoint stubs for the cleaning feature.
- * Placeholder responses are returned while the backend is not available.
- * When the real service is ready, uncomment the fetchAPI line in each endpoint.
+ * API functions and interfaces for cleaning tasks, maintenance issues, staff assignments, and queue pressure tracking.
  */
 
 import type { AxiosRequestConfig } from 'axios';
@@ -114,6 +112,10 @@ export interface UrgentTask {
   area?: string;
   section?: string;
   floor?: number;
+  assignedStaffId?: string | { _id: string; name: string } | null;
+  isPaused?: boolean;
+  isDeepCleaning?: boolean;
+  queueWaitingCount?: number;
 }
 
 export interface CleaningStaffMember {
@@ -170,8 +172,13 @@ export interface CleaningDashboardResponse {
 export interface CleaningTask {
   _id: string;
   tableId: string;
+  tableDetails?: any;
   priority: string;
   status: string;
+  assignedStaffId?: string | { _id: string; name: string; avatar?: string } | null;
+  isPaused?: boolean;
+  isDeepCleaning?: boolean;
+  queueWaitingCount?: number;
   startedBy?: string | null;
   completedBy?: string | null;
   verifiedBy?: string | null;
@@ -193,12 +200,27 @@ export interface CleaningTasksResponse {
   };
 }
 
-// ─── API endpoint functions ───────────────────────────────────
+export interface MaintenanceIssue {
+  _id: string;
+  restaurantId: string;
+  tableId: string | any;
+  reportedBy: string | any;
+  issueType: 'BROKEN_FURNITURE' | 'WATER_LEAK' | 'ELECTRICAL' | 'HYGIENE' | 'OTHER';
+  description: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'REPORTED' | 'IN_REPAIR' | 'RESOLVED';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const cleaningAPI = {
-  getDashboard: async (): Promise<ApiResponse<CleaningDashboardResponse>> => {
-    // A cleaning dashboard endpoint is not currently implemented in the backend.
-    // Keep this stub until a dedicated dashboard route exists.
-    return Promise.resolve({ success: true, data: undefined });
+  getTables: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ tables: any[] }>('/cleaning/tables');
+    return {
+      success: res.success,
+      data: res.data?.tables,
+      error: res.error,
+    };
   },
 
   getTasks: async (query?: { status?: string; priority?: string }): Promise<ApiResponse<CleaningTasksResponse>> => {
@@ -213,10 +235,10 @@ export const cleaningAPI = {
     return fetchAPI<{ task: CleaningTask }>(`/cleaning/tasks/${taskId}`);
   },
 
-  assignTask: async (taskId: string, staffId?: string): Promise<ApiResponse<void>> => {
-    return fetchAPI<void>(`/cleaning/tasks/${taskId}/start`, {
+  assignTask: async (taskId: string, staffId?: string | null): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/cleaning/tasks/${taskId}/assign`, {
       method: 'PATCH',
-      body: JSON.stringify({ staffId }),
+      body: JSON.stringify({ staffId: staffId || null }),
     });
   },
 
@@ -241,8 +263,56 @@ export const cleaningAPI = {
     });
   },
 
+  pauseTask: async (taskId: string, isPaused?: boolean): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/cleaning/tasks/${taskId}/pause`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isPaused }),
+    });
+  },
+
+  triggerDeepClean: async (taskId: string, isDeepCleaning?: boolean): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/cleaning/tasks/${taskId}/deep-clean`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isDeepCleaning }),
+    });
+  },
+
+  reportMaintenanceIssue: async (data: {
+    tableId: string;
+    issueType: string;
+    description: string;
+    severity?: string;
+  }): Promise<ApiResponse<{ issue: MaintenanceIssue }>> => {
+    return fetchAPI<{ issue: MaintenanceIssue }>('/cleaning/maintenance-issues', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getMaintenanceIssues: async (query?: {
+    status?: string;
+    tableId?: string;
+  }): Promise<ApiResponse<{ issues: MaintenanceIssue[] }>> => {
+    const params = new URLSearchParams();
+    if (query?.status) params.append('status', query.status);
+    if (query?.tableId) params.append('tableId', query.tableId);
+    const endpoint = params.toString()
+      ? `/cleaning/maintenance-issues?${params.toString()}`
+      : '/cleaning/maintenance-issues';
+    return fetchAPI<{ issues: MaintenanceIssue[] }>(endpoint);
+  },
+
+  updateMaintenanceIssue: async (
+    issueId: string,
+    status: 'REPORTED' | 'IN_REPAIR' | 'RESOLVED'
+  ): Promise<ApiResponse<{ issue: MaintenanceIssue }>> => {
+    return fetchAPI<{ issue: MaintenanceIssue }>(`/cleaning/maintenance-issues/${issueId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
   updateJobStatus: async (_jobId: string, _status: string): Promise<ApiResponse<void>> => {
-    // This method is not part of the documented cleaning tasks API, but is retained for compatibility.
     return Promise.resolve({ success: true });
   },
 
@@ -282,7 +352,10 @@ export const cleaningAPI = {
     return Promise.resolve({ success: true });
   },
 
-  updateStaffMember: async (_memberId: string, _updates: Partial<CleaningStaffMember>): Promise<ApiResponse<void>> => {
+  updateStaffMember: async (
+    _memberId: string,
+    _updates: Partial<CleaningStaffMember>
+  ): Promise<ApiResponse<void>> => {
     return Promise.resolve({ success: true });
   },
 

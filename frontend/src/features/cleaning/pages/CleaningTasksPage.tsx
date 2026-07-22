@@ -3,6 +3,7 @@ import { useCleaning } from '../hooks/usecleaning';
 import { useCleaningSearch } from '../components/dashboard/CleaningSearchContext';
 import { cleaningStore, CleaningStaffMember, RoutineChore } from '../store/cleaning.store';
 import { useToast } from '../components/dashboard/Toast';
+import { useTranslation } from '../hooks/useTranslation';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface CleanTask {
@@ -37,9 +38,10 @@ interface TableTask {
 }
 
 export default function CleaningTasksPage() {
+  const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
-  const { startTask, completeTask } = useCleaning();
+  const { startTask, completeTask, pauseTask, triggerDeepClean, assignTaskToStaff, urgentTasks, staffMembers } = useCleaning();
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [priorityFilter, setPriorityFilter] = useState('All Priority');
   const [areaFilter, setAreaFilter] = useState('All Area');
@@ -264,7 +266,7 @@ export default function CleaningTasksPage() {
           className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
-          Add Task
+          {t('addTask')}
         </button>
         {/* 🔥 Connected onClick Trigger for Export button */}
         <button 
@@ -272,7 +274,7 @@ export default function CleaningTasksPage() {
           className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-all active:scale-95 text-xs cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">download</span>
-          Export
+          {t('export')}
         </button>
       </div>
 
@@ -287,7 +289,7 @@ export default function CleaningTasksPage() {
               {totalCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Total Tasks
+              {t('totalTasks')}
             </p>
           </div>
         </div>
@@ -301,7 +303,7 @@ export default function CleaningTasksPage() {
               {pendingCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Pending
+              {t('pending')}
             </p>
           </div>
         </div>
@@ -315,7 +317,7 @@ export default function CleaningTasksPage() {
               {inProgressCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              In Progress
+              {t('inProgress')}
             </p>
           </div>
         </div>
@@ -329,7 +331,7 @@ export default function CleaningTasksPage() {
               {completedCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Completed
+              {t('completed')}
             </p>
           </div>
         </div>
@@ -343,7 +345,7 @@ export default function CleaningTasksPage() {
               {overdueCount}
             </h3>
             <p className="text-[10px] text-slate-400 dark:text-slate-400 mt-1 font-sans font-semibold">
-              Overdue
+              {t('overdue')}
             </p>
           </div>
         </div>
@@ -357,10 +359,10 @@ export default function CleaningTasksPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 focus:ring-2 focus:ring-orange-500 font-bold text-slate-700 dark:text-slate-200 outline-none"
           >
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100">All Status</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Pending">Pending</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="In Progress">In Progress</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Completed">Completed</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="All Status">{t('allStatus')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Pending">{t('pending')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="In Progress">{t('inProgress')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Completed">{t('completed')}</option>
           </select>
 
           <select
@@ -368,10 +370,10 @@ export default function CleaningTasksPage() {
             onChange={(e) => setPriorityFilter(e.target.value)}
             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 focus:ring-2 focus:ring-orange-500 font-bold text-slate-700 dark:text-slate-200 outline-none"
           >
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100">All Priority</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="High">High</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Medium">Medium</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Low">Low</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="All Priority">{t('allPriority')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="High">{t('high')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Medium">{t('medium')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Low">{t('low')}</option>
           </select>
 
           <select
@@ -379,9 +381,9 @@ export default function CleaningTasksPage() {
             onChange={(e) => setAreaFilter(e.target.value)}
             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 focus:ring-2 focus:ring-orange-500 font-bold text-slate-700 dark:text-slate-200 outline-none"
           >
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100">All Area</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Dining Area">Dining Area</option>
-            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Restroom">Restroom</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="All Area">{t('allArea')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Dining Area">{t('diningareaa')}</option>
+            <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Restroom">{t('restroom')}</option>
             <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Pantry">Pantry Area</option>
             <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Conference">Conference Room</option>
           </select>
@@ -392,7 +394,7 @@ export default function CleaningTasksPage() {
             className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 text-xs font-sans font-bold text-slate-600 dark:text-slate-300 hover:text-orange-500 hover:border-orange-500 rounded-xl transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">filter_alt</span>
-            Filter
+            {t('filter')}
           </button>
         </div>
 
@@ -408,14 +410,14 @@ export default function CleaningTasksPage() {
           <table className="w-full text-left border-collapse font-sans text-xs">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-550 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 font-bold">
-                <th className="px-6 py-4">Task ID</th>
-                <th className="px-6 py-4">Task Name</th>
-                <th className="px-6 py-4">Table / Location</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Priority</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Due Time</th>
-                <th className="px-6 py-4 text-center">Actions</th>
+                <th className="px-6 py-4">{t('taskId')}</th>
+                <th className="px-6 py-4">{t('taskName')}</th>
+                <th className="px-6 py-4">{t('tableLocation')}</th>
+                <th className="px-6 py-4">{t('type')}</th>
+                <th className="px-6 py-4">{t('priority')}</th>
+                <th className="px-6 py-4">{t('status')}</th>
+                <th className="px-6 py-4">{t('dueTime')}</th>
+                <th className="px-6 py-4 text-center">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -435,17 +437,17 @@ export default function CleaningTasksPage() {
                       {row.id}
                     </td>
                     <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200">
-                      {row.name}
+                      {t(row.name)}
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold">
-                      {row.location}
+                      {t(row.location)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-355">
                         <span className={`material-symbols-outlined text-[16px] ${row.iconColor}`}>
                           {row.icon}
                         </span>
-                        {row.type}
+                        {t(row.type)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -458,7 +460,7 @@ export default function CleaningTasksPage() {
                               : 'bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400'
                         }`}
                       >
-                        {row.priority}
+                        {t(row.priority.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -472,16 +474,16 @@ export default function CleaningTasksPage() {
                               : 'bg-orange-500/10 text-orange-500 border-orange-200 dark:bg-slate-800 dark:text-orange-400'
                         }`}
                       >
-                        {row.status}
+                        {t(row.status.toLowerCase().replace(/\s+/g, ''))}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap leading-relaxed">
                       <div className="font-semibold text-slate-700 dark:text-slate-300">
-                        {row.dueTime}
+                        {t(row.dueTime)}
                       </div>
                       {row.overdue && row.status !== 'Completed' && (
                         <span className="text-[10px] text-red-500 font-extrabold uppercase tracking-tighter">
-                          Overdue
+                          {t('overdue')}
                         </span>
                       )}
                     </td>
@@ -507,25 +509,67 @@ export default function CleaningTasksPage() {
 
                       {/* Dropdown Menu */}
                       {openMenuId === row.id && (
-                        <div className="absolute right-0 top-12 w-44 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1 font-sans">
+                        <div className="absolute right-0 top-12 w-52 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1.5 font-sans space-y-1">
                           <button
-                            onClick={() => handleActionClick(row, 'start')}
-                            className="w-full text-left px-4 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg"
+                            onClick={() => {
+                              handleActionClick(row, 'start');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg flex items-center gap-1.5"
                           >
+                            <span className="material-symbols-outlined text-sm">play_arrow</span>
                             Start Task
                           </button>
                           <button
-                            onClick={() => handleActionClick(row, 'complete')}
-                            className="w-full text-left px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg"
+                            onClick={async () => {
+                              await pauseTask(row.rawId);
+                              showToast(`Task ${row.id} pause status updated.`, 'info');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-lg flex items-center gap-1.5"
                           >
-                            Mark Completed
+                            <span className="material-symbols-outlined text-sm">pause</span>
+                            Pause / Resume Task
                           </button>
                           <button
-                            onClick={() => handleActionClick(row, 'delete')}
-                            className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg"
+                            onClick={async () => {
+                              await triggerDeepClean(row.rawId);
+                              showToast(`Deep cleaning mode toggled for ${row.id}.`, 'warning');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/20 rounded-lg flex items-center gap-1.5"
                           >
-                            Delete Task
+                            <span className="material-symbols-outlined text-sm">sanitizer</span>
+                            Deep Clean Mode
                           </button>
+                          <button
+                            onClick={() => {
+                              handleActionClick(row, 'complete');
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            {t('complete')}
+                          </button>
+                          <div className="border-t border-slate-100 dark:border-slate-700 my-1 pt-1">
+                            <p className="px-3 text-[10px] font-bold text-slate-400 uppercase">{t('assignStaff')}</p>
+                            <select
+                              onChange={async (e) => {
+                                await assignTaskToStaff(row.rawId, e.target.value || null);
+                                showToast(`Task ${row.id} assigned.`, 'success');
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full mt-1 px-2 py-1 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-semibold outline-none"
+                            >
+                              <option value="">{t('unassigned')}</option>
+                              {(staffMembers || []).map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       )}
                     </td>
@@ -539,13 +583,13 @@ export default function CleaningTasksPage() {
         {/*  FIXED: Bottom Pagination layout container blended seamlessly (Silver line cleared!) */}
         <div className="px-6 py-4 bg-white dark:bg-sd-surface-container flex flex-col md:flex-row md:items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-800 relative z-30">
           <p className="text-slate-400 dark:text-slate-455 font-bold">
-            Showing {indexOfFirstRow + 1} to {Math.min(indexOfLastRow, filteredTasks.length)} of{' '}
-            {totalCount} tasks
+            {t('Showing')} {indexOfFirstRow + 1} {t('to')} {Math.min(indexOfLastRow, filteredTasks.length)} {t('of')}{' '}
+            {totalCount} {t('tasks')}
           </p>
           <div className="flex items-center gap-6">
             {/* 💥 Custom HTML Rows Per Page Menu Block (No System Blue Highlight) */}
             <div className="flex items-center gap-2" ref={rowsRef}>
-              <span className="text-slate-400 dark:text-slate-455 font-bold">Rows per page</span>
+              <span className="text-slate-400 dark:text-slate-455 font-bold">{t('rowsPerPage')}</span>
               <div className="relative">
                 <button
                   type="button"
@@ -623,7 +667,7 @@ export default function CleaningTasksPage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-0">
         <div className="lg:col-span-2 bg-white dark:bg-sd-surface-container p-6 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-sm">
           <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-200 mb-4 font-sans">
-            Weekly Cleaning Efficiency
+            {t('weeklyEfficiency')}
           </h3>
           <div className="flex items-end gap-3 h-32 pl-4 border-l border-slate-100 dark:border-slate-800">
             {[
@@ -654,15 +698,14 @@ export default function CleaningTasksPage() {
 
         <div className="bg-gradient-to-br from-orange-500 to-amber-700 p-6 rounded-2xl text-white shadow-sm flex flex-col justify-between relative overflow-hidden shadow-orange-500/10">
           <div className="relative z-10 font-sans">
-            <h3 className="font-extrabold text-sm mb-2">Efficiency Tip</h3>
+            <h3 className="font-extrabold text-sm mb-2">{t('efficiencyTip')}</h3>
             <p className="text-xs opacity-90 leading-relaxed">
-              Focus on &quot;High Priority&quot; tasks in Dining Area A first to maintain peak
-              service hygiene during peak dining rush hours.
+              {t('efficiencyTipDesc')}
             </p>
           </div>
           <div className="mt-4 relative z-10">
             <button className="bg-white/25 hover:bg-white/35 backdrop-blur-md text-white border border-white/30 px-4 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95">
-              View Efficiency Report
+              {t('viewEfficiencyReport')}
             </button>
           </div>
           <div className="absolute -right-10 -bottom-10 w-28 h-28 bg-white/10 rounded-full blur-2xl shrink-0" />

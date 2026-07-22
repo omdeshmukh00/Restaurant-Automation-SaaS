@@ -58,8 +58,14 @@ router.post(
 
 const serviceRoles = [UserRole.SERVICE_STAFF, UserRole.RESTAURANT_ADMIN, UserRole.SUPER_ADMIN];
 
+// Get All Staff Orders
+router.get('/staff/orders', requireAuth, roleGuard(...serviceRoles), OrdersController.getStaffOrders);
+
 // Ready Orders Queue
 router.get('/staff/orders/ready', requireAuth, roleGuard(...serviceRoles), OrdersController.getReadyOrders);
+
+// Auto-create order on seating
+router.post('/staff/orders/create-for-table', requireAuth, roleGuard(...serviceRoles), OrdersController.createTableOrder);
 
 // Pick Food
 router.patch(
@@ -85,6 +91,14 @@ router.patch(
   roleGuard(...serviceRoles),
   validate({ params: orderIdParamsSchema }),
   OrdersController.markCompleted
+);
+
+router.patch(
+  '/staff/orders/:id/items',
+  requireAuth,
+  roleGuard(...serviceRoles),
+  validate({ params: orderIdParamsSchema }),
+  OrdersController.updateOrderItems
 );
 
 export default router;

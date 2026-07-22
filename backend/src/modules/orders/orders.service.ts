@@ -18,14 +18,14 @@ import { InventoryService } from '../inventory/inventory.service';
 import { assertPlanLimit, recordSubscriptionUsage } from '../subscriptions/subscriptionEnforcement.service';
 
 const ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
-  [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.REJECTED],
-  [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.DELAYED, OrderStatus.CANCELLED],
-  [OrderStatus.PREPARING]: [OrderStatus.READY, OrderStatus.DELAYED],
-  [OrderStatus.DELAYED]: [OrderStatus.READY, OrderStatus.PREPARING],
-  [OrderStatus.READY]: [OrderStatus.PICKED, OrderStatus.SERVED],
-  [OrderStatus.PICKED]: [OrderStatus.SERVED],
+  [OrderStatus.PENDING]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.REJECTED, OrderStatus.COMPLETED],
+  [OrderStatus.CONFIRMED]: [OrderStatus.PREPARING, OrderStatus.DELAYED, OrderStatus.CANCELLED, OrderStatus.COMPLETED],
+  [OrderStatus.PREPARING]: [OrderStatus.READY, OrderStatus.DELAYED, OrderStatus.COMPLETED],
+  [OrderStatus.DELAYED]: [OrderStatus.READY, OrderStatus.PREPARING, OrderStatus.COMPLETED],
+  [OrderStatus.READY]: [OrderStatus.PICKED, OrderStatus.SERVED, OrderStatus.COMPLETED],
+  [OrderStatus.PICKED]: [OrderStatus.SERVED, OrderStatus.COMPLETED],
   [OrderStatus.SERVED]: [OrderStatus.BILLED, OrderStatus.COMPLETED],
-  [OrderStatus.BILLED]: [OrderStatus.PAID, OrderStatus.CONFIRMED],
+  [OrderStatus.BILLED]: [OrderStatus.PAID, OrderStatus.CONFIRMED, OrderStatus.COMPLETED],
   [OrderStatus.PAID]: [OrderStatus.COMPLETED, OrderStatus.CONFIRMED],
 };
 
@@ -818,7 +818,13 @@ export class OrdersService {
   }
 
   static async getKitchenOrderDetails(restaurantId: string | Types.ObjectId, orderId: string | Types.ObjectId) {
-    const order = await OrderModel.findOne({ _id: orderId, restaurantId }).populate('items.menuItemId');
+    let order = null;
+    if (Types.ObjectId.isValid(orderId)) {
+      order = await OrderModel.findOne({ _id: orderId, restaurantId }).populate('items.menuItemId');
+    }
+    if (!order) {
+      order = await OrderModel.findOne({ orderNumber: orderId, restaurantId }).populate('items.menuItemId');
+    }
     if (!order) {
       throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
     }

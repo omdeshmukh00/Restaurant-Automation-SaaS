@@ -43,8 +43,8 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
 
   return (
     <aside
-      className={`flex flex-col h-screen fixed left-0 top-0 bg-white border-r border-slate-200 z-50 transition-all duration-300 ${
-        collapsed ? 'w-[72px]' : 'w-64 shadow-xl lg:shadow-none'
+      className={`flex flex-col h-screen fixed left-0 top-0 bg-white dark:bg-sd-surface-container border-r border-slate-200 dark:border-sd-outline-variant/40 z-50 transition-all duration-300 ${
+        collapsed ? '-translate-x-full lg:translate-x-0 w-64 lg:w-[72px]' : 'translate-x-0 w-64 shadow-xl lg:shadow-none'
       }`}
     >
       {/* Header */}

@@ -18,6 +18,9 @@ router.get('/me', userController.getMe);
 // POST /users/me/request-otp — Send profile/password change OTP
 router.post('/me/request-otp', userController.requestProfileOtp);
 
+// POST /users/me/request-mobile-otp — Send mobile verification OTP
+router.post('/me/request-mobile-otp', userController.requestMobileOtp);
+
 // GET /users/me/order-history — Get past paid bills for the current customer
 router.get('/me/order-history', userController.getOrderHistory);
 

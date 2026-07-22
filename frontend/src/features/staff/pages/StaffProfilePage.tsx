@@ -21,6 +21,13 @@ export default function StaffProfilePage() {
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
 
+  // OTP Verification states
+  const [otpStep, setOtpStep] = useState<boolean>(false);
+  const [sentOtp, setSentOtp] = useState<string>('');
+  const [enteredOtp, setEnteredOtp] = useState<string>('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+
   // Cropper states
   const [cropImageSrc, setCropImageSrc] = useState('');
 
@@ -31,11 +38,39 @@ export default function StaffProfilePage() {
     setEditSection(profile.section);
     setEditPhone(profile.phone);
     setEditEmail(profile.email);
+    setOtpStep(false);
+    setSentOtp('');
+    setEnteredOtp('');
+    setOtpError(null);
     setShowInfoModal(true);
   };
 
-  const handleSaveInfo = (e: React.FormEvent) => {
+  const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check if phone number was modified
+    if (editPhone.trim() !== (profile.phone || '').trim()) {
+      setIsSendingOtp(true);
+      setOtpError(null);
+      try {
+        const { profileAPI } = await import('../api/staff.api');
+        const res = await profileAPI.sendPhoneOTP(editPhone);
+        if (res.success && res.data?.otp) {
+          setSentOtp(res.data.otp);
+          setOtpStep(true);
+        } else {
+          setOtpError(res.error || 'Failed to generate verification OTP.');
+        }
+      } catch (err) {
+        console.error('OTP send failed', err);
+        setOtpError('Failed to send OTP to backend terminal.');
+      } finally {
+        setIsSendingOtp(false);
+      }
+      return;
+    }
+
+    // Direct save if phone number was not changed
     updateProfile({
       name: editName,
       role: editRole,
@@ -45,6 +80,28 @@ export default function StaffProfilePage() {
       email: editEmail,
     });
     setShowInfoModal(false);
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enteredOtp.trim() === sentOtp.trim()) {
+      await updateProfile({
+        name: editName,
+        role: editRole,
+        id: editId,
+        section: editSection,
+        phone: editPhone,
+        email: editEmail,
+        mobileOtp: enteredOtp,
+      });
+      setShowInfoModal(false);
+      setOtpStep(false);
+      setSentOtp('');
+      setEnteredOtp('');
+      setOtpError(null);
+    } else {
+      setOtpError('Invalid OTP code. Please enter the 4-digit OTP printed in the backend terminal console.');
+    }
   };
 
   const handlePhotoClick = () => {
@@ -279,93 +336,163 @@ export default function StaffProfilePage() {
       {showInfoModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Edit Profile Information</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              Update your employee details below.
-            </p>
-            <form onSubmit={handleSaveInfo} className="space-y-4 font-sans text-xs">
+            {otpStep ? (
+              /* Step 2: OTP Verification Form */
               <div>
-                <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Full Name</label>
-                <input
-                  id="edit-name"
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
+                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Verify Phone Change</h3>
+                <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
+                  An OTP has been generated for changing phone number to <strong className="text-slate-700 dark:text-slate-200">{editPhone}</strong>.
+                </p>
+
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded-xl text-[11px] text-amber-700 dark:text-amber-300 font-sans mb-4 space-y-1">
+                  <p className="font-extrabold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">terminal</span>
+                    Terminal OTP Sent!
+                  </p>
+                  <p>Check your running backend server terminal console to get the 6-digit OTP code.</p>
+                </div>
+
+                <form onSubmit={handleVerifyOtp} className="space-y-4 font-sans text-xs">
+                  <div>
+                    <label htmlFor="otp-input" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Enter 6-Digit OTP</label>
+                    <input
+                      id="otp-input"
+                      type="text"
+                      maxLength={6}
+                      value={enteredOtp}
+                      onChange={(e) => {
+                        setEnteredOtp(e.target.value);
+                        setOtpError(null);
+                      }}
+                      placeholder="e.g. 123456"
+                      className="w-full p-2.5 text-center tracking-widest font-mono text-base border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                      autoFocus
+                    />
+                  </div>
+
+                  {otpError && (
+                    <p className="text-[11px] font-bold text-red-500 font-sans">{otpError}</p>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpStep(false);
+                        setOtpError(null);
+                      }}
+                      className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95 cursor-pointer"
+                    >
+                      Verify & Update
+                    </button>
+                  </div>
+                </form>
               </div>
+            ) : (
+              /* Step 1: Info Edit Form */
               <div>
-                <label htmlFor="edit-role" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Role</label>
-                <input
-                  id="edit-role"
-                  type="text"
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
+                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Edit Profile Information</h3>
+                <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
+                  Update your employee details below.
+                </p>
+                <form onSubmit={handleSaveInfo} className="space-y-4 font-sans text-xs">
+                  <div>
+                    <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Full Name</label>
+                    <input
+                      id="edit-name"
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-role" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Role</label>
+                    <input
+                      id="edit-role"
+                      type="text"
+                      value={editRole}
+                      onChange={(e) => setEditRole(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-id" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Staff ID</label>
+                    <input
+                      id="edit-id"
+                      type="text"
+                      value={editId}
+                      onChange={(e) => setEditId(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-section" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Assigned Section</label>
+                    <input
+                      id="edit-section"
+                      type="text"
+                      value={editSection}
+                      onChange={(e) => setEditSection(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Email</label>
+                    <input
+                      id="edit-email"
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Phone</label>
+                    <input
+                      id="edit-phone"
+                      type="text"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+
+                  {otpError && (
+                    <p className="text-[11px] font-bold text-red-500 font-sans">{otpError}</p>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInfoModal(false)}
+                      className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSendingOtp}
+                      className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSendingOtp ? 'Sending OTP...' : 'Save Changes'}
+                    </button>
+                  </div>
+                </form>
               </div>
-              <div>
-                <label htmlFor="edit-id" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Staff ID</label>
-                <input
-                  id="edit-id"
-                  type="text"
-                  value={editId}
-                  onChange={(e) => setEditId(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-section" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Assigned Section</label>
-                <input
-                  id="edit-section"
-                  type="text"
-                  value={editSection}
-                  onChange={(e) => setEditSection(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Email</label>
-                <input
-                  id="edit-email"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Phone</label>
-                <input
-                  id="edit-phone"
-                  type="text"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowInfoModal(false)}
-                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95 cursor-pointer"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
+            )}
           </div>
         </div>
       )}

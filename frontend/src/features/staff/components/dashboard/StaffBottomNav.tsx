@@ -1,5 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useStaffProfile } from '../../hooks/useStaffProfile';
+import { getRolePermissions } from '../../utils/roleAccess';
 
 const NAV = [
   { to: '/staff', icon: 'dashboard', label: 'Overview', end: true },
@@ -10,9 +12,13 @@ const NAV = [
 ];
 
 export default function StaffBottomNav() {
+  const { profile } = useStaffProfile();
+  const allowedPaths = getRolePermissions(profile.role);
+  const filteredNav = NAV.filter(item => allowedPaths.includes(item.to));
+
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center h-16 px-2 pb-[env(safe-area-inset-bottom)] bg-white dark:bg-sd-surface-container border-t border-slate-200 dark:border-sd-outline-variant/40 shadow-lg z-40">
-      {NAV.map(({ to, icon, label, end }) => (
+      {filteredNav.map(({ to, icon, label, end }) => (
         <NavLink
           key={to}
           to={to}

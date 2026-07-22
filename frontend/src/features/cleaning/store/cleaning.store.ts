@@ -29,6 +29,15 @@ export interface RoutineChore {
   lastDone?: string;
 }
 
+export interface ActivityItem {
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  timestamp: string;
+  subtitle: string;
+}
+
 export interface TableItem {
   id: string;
   area: string;
@@ -120,6 +129,98 @@ class CleaningStore {
     this.profile = { ...this.profile, ...updated };
     if (typeof window !== 'undefined') {
       localStorage.setItem('cleanserve-profile', JSON.stringify(this.profile));
+    }
+    this.notify();
+  }
+
+  public language: string = this.loadLanguage();
+
+  private loadLanguage(): string {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cleanserve-settings-language');
+      return saved || 'en';
+    }
+    return 'en';
+  }
+
+  public setLanguage(lang: string) {
+    this.language = lang;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cleanserve-settings-language', lang);
+    }
+    this.notify();
+  }
+
+  public activities: ActivityItem[] = this.loadActivities();
+
+  private loadActivities(): ActivityItem[] {
+    const defaultActivities: ActivityItem[] = [
+      {
+        icon: 'check_circle',
+        iconBg: 'bg-green-100 dark:bg-green-950/30',
+        iconColor: 'text-green-600 dark:text-green-400',
+        title: 'Completed table T01',
+        timestamp: 'Jun 16, 2026',
+        subtitle: 'Dining Area A • 10:30 AM',
+      },
+      {
+        icon: 'timer',
+        iconBg: 'bg-orange-100 dark:bg-orange-950/30',
+        iconColor: 'text-orange-600 dark:text-orange-400',
+        title: 'Started cleaning table T12',
+        timestamp: 'Jun 16, 2026',
+        subtitle: 'Dining Area A • 10:18 AM',
+      },
+      {
+        icon: 'assignment',
+        iconBg: 'bg-orange-100 dark:bg-orange-950/30',
+        iconColor: 'text-orange-500 dark:text-orange-400',
+        title: 'Completed task',
+        timestamp: 'Jun 16, 2026',
+        subtitle: 'Restroom Sanitization • 09:15 AM',
+      },
+    ];
+
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cleanserve-activities');
+      if (saved) {
+        try { return JSON.parse(saved); } catch { return defaultActivities; }
+      }
+    }
+    return defaultActivities;
+  }
+
+  public addActivity(title: string, subtitle: string, icon = 'info', colorType: 'green' | 'orange' | 'blue' | 'purple' = 'blue') {
+    let iconBg = 'bg-blue-100 dark:bg-blue-950/30';
+    let iconColor = 'text-blue-600 dark:text-blue-400';
+    let materialIcon = 'info';
+
+    if (colorType === 'green') {
+      iconBg = 'bg-green-100 dark:bg-green-950/30';
+      iconColor = 'text-green-600 dark:text-green-400';
+      materialIcon = icon === 'info' ? 'check_circle' : icon;
+    } else if (colorType === 'orange') {
+      iconBg = 'bg-orange-100 dark:bg-orange-950/30';
+      iconColor = 'text-orange-600 dark:text-orange-400';
+      materialIcon = icon === 'info' ? 'timer' : icon;
+    } else if (colorType === 'purple') {
+      iconBg = 'bg-purple-100 dark:bg-purple-950/30';
+      iconColor = 'text-purple-600 dark:text-purple-400';
+      materialIcon = icon === 'info' ? 'verified' : icon;
+    }
+
+    const newActivity: ActivityItem = {
+      icon: materialIcon,
+      iconBg,
+      iconColor,
+      title,
+      timestamp: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      subtitle: `${subtitle} • ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
+    };
+
+    this.activities = [newActivity, ...this.activities].slice(0, 50);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cleanserve-activities', JSON.stringify(this.activities));
     }
     this.notify();
   }
@@ -259,6 +360,11 @@ class CleaningStore {
         notes: t.notes || '',
       };
     });
+    this.notify();
+  }
+
+  public syncAllTables(tables: TableItem[]) {
+    this.tables = tables;
     this.notify();
   }
   private listeners: Set<() => void> = new Set();

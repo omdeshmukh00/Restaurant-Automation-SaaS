@@ -56,6 +56,10 @@ export interface IOrder extends Document {
 
   discountAmount: number;
 
+  appliedOfferId?: mongoose.Types.ObjectId | null;
+  appliedDiscountAmount?: number;
+  assistedByWaiterId?: mongoose.Types.ObjectId | null;
+
   finalAmount: number;
 
   status: OrderStatus;
@@ -247,6 +251,24 @@ export const orderSchema = new Schema<IOrder>(
       type: Number,
       default: 0,
       min: 0,
+    },
+
+    appliedOfferId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Offer',
+      default: null,
+    },
+
+    appliedDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    assistedByWaiterId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
 
     finalAmount: {

@@ -284,6 +284,19 @@ export const tableAPI = {
     };
   },
 
+  /** PATCH /staff/tables/:id/assign-waiter — assign a specific waiter to table */
+  assignWaiter: async (id: string, waiterId?: string | null): Promise<ApiResponse<Table>> => {
+    const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/assign-waiter`, {
+      method: 'PATCH',
+      body: JSON.stringify({ waiterId: waiterId ?? null }),
+    });
+    return {
+      success: res.success,
+      data: res.data?.table,
+      error: res.error,
+    };
+  },
+
   /** PATCH /staff/tables/:id/reserve — mark a table reserved */
   reserve: async (id: string): Promise<ApiResponse<Table>> => {
     const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/reserve`, { method: 'PATCH' });
@@ -323,6 +336,45 @@ export const tableAPI = {
     const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status: backendStatus }),
+    });
+    return {
+      success: res.success,
+      data: res.data?.table,
+      error: res.error,
+    };
+  },
+
+  /** GET /staff/tables/:id/guest-loyalty — fetch guest loyalty points, tier status & offers */
+  getGuestLoyaltyAndOffers: async (id: string): Promise<ApiResponse<{
+    hasSession: boolean;
+    customerName: string | null;
+    mobile: string | null;
+    loyalty: {
+      pointsBalance: number;
+      lifetimePoints: number;
+      tier: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM';
+    };
+    offers: Array<{
+      id: string;
+      name: string;
+      code: string;
+      discountPercent: number;
+      requiredPoints: number;
+      eligible: boolean;
+    }>;
+  }>> => {
+    return fetchAPI(`/staff/tables/${id}/guest-loyalty`);
+  },
+
+  create: async (payload: {
+    tableNumber: string;
+    capacity: number;
+    section: string;
+    floor?: number;
+  }): Promise<ApiResponse<Table>> => {
+    const res = await fetchAPI<{ table: Table }>('/staff/tables', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
     return {
       success: res.success,
@@ -382,10 +434,16 @@ export const queueAPI = {
     };
   },
 
-  updatePriority: (id: number, priority: 'LOW' | 'MEDIUM' | 'HIGH'): Promise<ApiResponse<void>> => {
+  updatePriority: (id: number | string, priority: 'LOW' | 'MEDIUM' | 'HIGH'): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/queue/${id}/priority`, {
       method: 'PATCH',
       body: JSON.stringify({ priority }),
+    });
+  },
+
+  notifyCustomer: (id: string): Promise<ApiResponse<{ message: string }>> => {
+    return fetchAPI<{ message: string }>(`/staff/queue/${id}/notify`, {
+      method: 'POST',
     });
   },
 };
@@ -448,6 +506,15 @@ export const reservationsAPI = {
 // ── Orders ──
 
 export const ordersAPI = {
+  getAllOrders: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ orders: any[] }>('/staff/orders');
+    return {
+      success: res.success,
+      data: res.data?.orders,
+      error: res.error,
+    };
+  },
+
   getReadyOrders: async (): Promise<ApiResponse<OrderItem[]>> => {
     const res = await fetchAPI<{ orders: OrderItem[]; meta?: unknown }>('/staff/orders/ready');
     return {
@@ -455,6 +522,13 @@ export const ordersAPI = {
       data: res.data?.orders,
       error: res.error,
     };
+  },
+
+  createTableOrder: async (tableId?: string, tableNumber?: string, guestName?: string): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>('/staff/orders/create-for-table', {
+      method: 'POST',
+      body: JSON.stringify({ tableId, tableNumber, guestName }),
+    });
   },
 
   pickOrder: (id: string): Promise<ApiResponse<void>> => {
@@ -468,13 +542,65 @@ export const ordersAPI = {
   completeOrder: (id: string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/staff/orders/${id}/complete`, { method: 'PATCH' });
   },
+
+  applyOffer: (id: string, offerCode?: string, offerId?: string): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>(`/staff/orders/${id}/apply-offer`, {
+      method: 'POST',
+      body: JSON.stringify({ offerCode, offerId }),
+    });
+  },
+
+  updateItems: (id: string, items: any[]): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>(`/staff/orders/${id}/items`, {
+      method: 'PATCH',
+      body: JSON.stringify({ items }),
+    });
+  },
 };
 
-// ── Issues ──
+// ── Offers ──
+
+export const offersAPI = {
+  getActive: async (): Promise<ApiResponse<any[]>> => {
+    const res = await fetchAPI<{ offers: any[] }>('/staff/offers');
+    return {
+      success: res.success,
+      data: res.data?.offers,
+      error: res.error,
+    };
+  },
+};
+
+export const profileAPI = {
+  sendPhoneOTP: (phone: string): Promise<ApiResponse<{ otp: string }>> => {
+    return fetchAPI<{ otp: string }>('/users/me/request-mobile-otp', {
+      method: 'POST',
+      body: JSON.stringify({ mobile: phone }),
+    });
+  },
+  updateProfile: (updates: any): Promise<ApiResponse<StaffMember>> => {
+    return userAPI.updateProfile(updates);
+  }
+};
+
+// ── Issues & Tickets ──
 
 export const issuesAPI = {
   escalate: (payload: EscalationPayload): Promise<ApiResponse<void>> => {
     return fetchAPI<void>('/staff/issues/escalate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  createTicket: (payload: {
+    category: string;
+    priority: string;
+    subject: string;
+    description: string;
+    tableId?: string;
+  }): Promise<ApiResponse<any>> => {
+    return fetchAPI<any>('/staff/tickets', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -659,7 +785,7 @@ export const userAPI = {
   },
 
   /** PATCH /users/me — update profile */
-  updateProfile: async (updates: Partial<StaffMember> & { mobile?: string }): Promise<ApiResponse<StaffMember>> => {
+  updateProfile: async (updates: Partial<StaffMember> & { mobile?: string; mobileOtp?: string }): Promise<ApiResponse<StaffMember>> => {
     const payload: any = { ...updates };
     if (updates.phone) {
       payload.mobile = updates.phone;
@@ -681,3 +807,5 @@ export const userAPI = {
     return fetchAPI<void>('/auth/logout', { method: 'POST' });
   },
 };
+
+

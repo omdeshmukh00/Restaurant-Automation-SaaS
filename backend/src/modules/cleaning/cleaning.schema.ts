@@ -28,3 +28,30 @@ export const completeCleaningBodySchema = z.object({
 export const verifyCleaningBodySchema = z.object({
   verifiedBy: nullableObjectIdSchema.optional(),
 });
+
+export const assignCleaningTaskBodySchema = z.object({
+  staffId: nullableObjectIdSchema.optional(),
+});
+
+export const pauseCleaningBodySchema = z.object({
+  isPaused: z.boolean().optional(),
+});
+
+export const deepCleanBodySchema = z.object({
+  isDeepCleaning: z.boolean().optional(),
+});
+
+export const reportMaintenanceIssueBodySchema = z.object({
+  tableId: objectIdSchema,
+  issueType: z.enum(['BROKEN_FURNITURE', 'WATER_LEAK', 'ELECTRICAL', 'HYGIENE', 'OTHER']),
+  description: z.string().min(1, 'Description is required'),
+  severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+});
+
+export const updateMaintenanceIssueBodySchema = z.object({
+  status: z.enum(['REPORTED', 'IN_REPAIR', 'RESOLVED']),
+});
+
+export const maintenanceIssueParamsSchema = z.object({
+  id: objectIdSchema,
+});

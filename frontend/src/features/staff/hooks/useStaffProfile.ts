@@ -35,12 +35,13 @@ export function useStaffProfile() {
 
   return {
     profile,
-    updateProfile: async (updated: Partial<WaiterProfile>) => {
+    updateProfile: async (updated: Partial<WaiterProfile> & { mobileOtp?: string }) => {
       staffStore.updateProfile(updated);
       try {
         await userAPI.updateProfile({
           name: updated.name,
           phone: updated.phone,
+          mobileOtp: updated.mobileOtp,
         } as any);
       } catch (error) {
         console.error('Failed to sync profile change with backend', error);

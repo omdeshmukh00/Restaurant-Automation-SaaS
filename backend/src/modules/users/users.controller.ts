@@ -55,10 +55,43 @@ export const requestProfileOtp = asyncHandler(async (req: Request, res: Response
 });
 
 /**
+ * POST /users/me/request-mobile-otp — Send mobile verification OTP for phone updates.
+ */
+export const requestMobileOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { mobile } = req.body;
+  if (!mobile) {
+    throw new AppError('Mobile number is required', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const { otp, expiresAt } = await otpService.createOTP(mobile, 'mobile');
+
+  console.log("\n-----------------------------------------");
+  console.log(`[CleanServe Security] SMS OTP sent to ${mobile} is: ${otp}`);
+  console.log("-----------------------------------------\n");
+
+  const responseData: any = {
+    otpSent: true,
+    otpExpiresAt: expiresAt,
+    otpExpiresIn: 300,
+    otp,
+  };
+
+  sendSuccess(res, responseData);
+});
+
+/**
  * PATCH /users/me — Update current user's profile.
  */
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { otp, ...updates } = req.body;
+  const { otp, mobileOtp, ...updates } = req.body;
+
+  // If mobile number is being updated, verify it with mobileOtp
+  if (updates.mobile && updates.mobile !== (req.user as any)?.mobile) {
+    if (!mobileOtp) {
+      throw new AppError('Mobile OTP verification is required to update phone number.', 400, ErrorCode.INVALID_REQUEST);
+    }
+    await otpService.verifyOTP(updates.mobile, 'mobile', mobileOtp);
+  }
 
   // If OTP is provided, verify it against the registered email
   if (otp) {

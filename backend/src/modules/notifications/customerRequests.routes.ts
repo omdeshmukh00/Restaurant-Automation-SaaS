@@ -8,6 +8,7 @@ import { Priority, RequestStatus, RequestType } from '../../constants/statuses';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { StaffRequestModel } from '../staff/staffRequest.model';
+import { emitSessionEvent } from '../../services/sessionEvents';
 import { z } from 'zod';
 
 const router = Router();
@@ -118,6 +119,10 @@ async function executeCustomerRequest(
         type: staffRequestType,
         status: RequestStatus.PENDING,
         priority: staffRequestPriority,
+      });
+
+      emitSessionEvent(session.restaurantId.toString(), 'staff:request-new', {
+        request: staffRequest,
       });
     }
 

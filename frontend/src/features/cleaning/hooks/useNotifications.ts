@@ -41,7 +41,28 @@ export function useNotifications() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const unreadCount = useMemo(() => notifications.filter((item) => !item.read).length, [notifications]);
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((item) => {
+      const tone = item.tone || 'info';
+      if (typeof window !== 'undefined') {
+        if (tone === 'urgent') {
+          const saved = localStorage.getItem('cleanserve-settings-urgentAlerts');
+          if (saved === 'false') return false;
+        }
+        if (tone === 'cleaning' || tone === 'success') {
+          const saved = localStorage.getItem('cleanserve-settings-taskReminders');
+          if (saved === 'false') return false;
+        }
+        if (tone === 'info') {
+          const saved = localStorage.getItem('cleanserve-settings-shiftAlerts');
+          if (saved === 'false') return false;
+        }
+      }
+      return true;
+    });
+  }, [notifications]);
+
+  const unreadCount = useMemo(() => filteredNotifications.filter((item) => !item.read).length, [filteredNotifications]);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -92,7 +113,7 @@ export function useNotifications() {
   const clearRead = useCallback(() => {
     setNotifications((current) => current.filter((item) => !item.read));
   }, []);
-  // Add this function (Around line 92)
+
   const addNotification = useCallback((title: string, message: string) => {
     const newNotif: NotificationItem = {
       id: Date.now(),
@@ -104,26 +125,60 @@ export function useNotifications() {
     };
     setNotifications((prev) => [newNotif, ...prev]);
   }, []);
- // useNotifications.ts (Around line 107-109)
-useEffect(() => {
-  const loadData = async () => {
-    await fetchNotifications();
-  };
-  loadData();
-}, [fetchNotifications]);
-  
+
+  useEffect(() => {
+    const loadData = async () => {
+      await fetchNotifications();
+    };
+    loadData();
+  }, [fetchNotifications]);
+
   useEffect(() => {
     const handleNewRequest = (event: Event) => {
-  const customEvent = event as CustomEvent; 
-  setNotifications((prev) => [customEvent.detail, ...prev]);
-};
+      const customEvent = event as CustomEvent; 
+      const newNotif = customEvent.detail;
+      setNotifications((prev) => [newNotif, ...prev]);
+
+      const tone = newNotif.tone || 'urgent';
+      if (tone === 'urgent') {
+        const playAlert = localStorage.getItem('cleanserve-settings-urgentAlerts') !== 'false';
+        if (playAlert) {
+          try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.12);
+
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.frequency.setValueAtTime(783.99, ctx.currentTime + 0.15);
+            gain2.gain.setValueAtTime(0.12, ctx.currentTime + 0.15);
+            osc2.start(ctx.currentTime + 0.15);
+            osc2.stop(ctx.currentTime + 0.32);
+          } catch (e) {
+            console.warn('Audio alert failed', e);
+          }
+
+          if ('vibrate' in navigator) {
+            navigator.vibrate([100, 60, 100]);
+          }
+        }
+      }
+    };
 
     window.addEventListener('new-cleaning-request', handleNewRequest);
     return () => window.removeEventListener('new-cleaning-request', handleNewRequest);
   }, []);
-  
+
   return {
-    notifications,
+    notifications: filteredNotifications,
     unreadCount,
     addNotification,
     loading,
