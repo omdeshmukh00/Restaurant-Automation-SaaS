@@ -104,67 +104,87 @@ export default function CustomerLayout() {
 
       const socket = getSocket();
       if (socket) {
-        const handleOrderUpdate = () => {
+        const handleOrderUpdate = (data: any) => {
+          if (data && data.orderId && data.status) {
+            useCustomerStore.getState().updateOrderStatusFromSocket(data.orderId, data.status);
+          } else {
+            useCustomerStore.getState().fetchOrders(); // Fallback if no specific payload
+          }
+        };
+
+        const handleNewOrder = (data: any) => {
+          // New order from REST is already handled there, but if we receive order.new via socket
+          // without full order data, we could fetch, but for customers we shouldn't get this usually 
+          // unless another device ordered for same table.
           useCustomerStore.getState().fetchOrders();
         };
 
+        const handleReconnect = () => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().fetchLiveBill();
+        };
+
+        // Socket.io 'connect' fires on initial connect AND subsequent reconnects.
+        // It provides robust recovery if the network drops.
+        socket.on('connect', handleReconnect);
         socket.on('order.updated', handleOrderUpdate);
-        socket.on('order.new', handleOrderUpdate);
+        socket.on('order.new', handleNewOrder);
+        socket.on('payment.success', () => useCustomerStore.getState().fetchOrders());
         
         socket.on('order.accepted', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
           useCustomerStore.getState().addNotification(
             'Order Confirmed! 👨‍🍳',
-            `Your order ${data.order.orderNumber} has been confirmed.`,
+            `Your order ${data.order?.orderNumber || 'has'} been confirmed.`,
             'order'
           );
         });
 
         socket.on('order.preparing', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
           useCustomerStore.getState().addNotification(
             'Preparing Food! 🍳',
-            `Chef has started cooking your order ${data.order.orderNumber}.`,
+            `Chef has started cooking your order ${data.order?.orderNumber || ''}.`,
             'order'
           );
         });
 
         socket.on('order.ready', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
           useCustomerStore.getState().addNotification(
             'Order Ready! 🛎️',
-            `Your food for order ${data.order.orderNumber} is ready for pickup!`,
+            `Your food for order ${data.order?.orderNumber || ''} is ready for pickup!`,
             'order'
           );
         });
 
         socket.on('order.serving', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
           useCustomerStore.getState().addNotification(
             'Serving Food! 🏃‍♂️',
-            `Staff is serving your order ${data.order.orderNumber}.`,
+            `Staff is serving your order ${data.order?.orderNumber || ''}.`,
             'order'
           );
         });
 
         socket.on('order.served', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
           useCustomerStore.getState().addNotification(
             'Order Served! 🍽️',
-            `Your order ${data.order.orderNumber} has been served! Enjoy your meal!`,
+            `Your order ${data.order?.orderNumber || ''} has been served! Enjoy your meal!`,
             'order'
           );
         });
 
         socket.on('order.completed', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
         });
 
         socket.on('order.rejected', (data: any) => {
-          useCustomerStore.getState().fetchOrders();
+          if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);
           useCustomerStore.getState().addNotification(
             'Order Rejected ❌',
-            `Your order ${data.order.orderNumber} was rejected: ${data.reason}`,
+            `Your order ${data.order?.orderNumber || ''} was rejected: ${data.reason}`,
             'order'
           );
         });
@@ -183,8 +203,10 @@ export default function CustomerLayout() {
         });
 
         return () => {
+          socket.off('connect', handleReconnect);
           socket.off('order.updated', handleOrderUpdate);
           socket.off('order.new', handleOrderUpdate);
+          socket.off('payment.success');
           socket.off('order.accepted');
           socket.off('order.preparing');
           socket.off('order.ready');

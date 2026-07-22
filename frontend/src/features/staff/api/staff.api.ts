@@ -614,34 +614,34 @@ export const staffAPI = {
 // ── Analytics ──
 
 export const analyticsAPI = {
-  /** GET /analytics/attendance */
+  /** GET /admin/staff/attendance */
   getAttendance: (): Promise<ApiResponse<AttendanceData>> => {
-    return fetchAPI<AttendanceData>('/analytics/attendance');
+    return fetchAPI<AttendanceData>('/admin/staff/attendance');
   },
 
-  /** GET /analytics/payroll */
+  /** GET /admin/staff/payroll */
   getPayroll: (): Promise<ApiResponse<PayrollData>> => {
-    return fetchAPI<PayrollData>('/analytics/payroll');
+    return fetchAPI<PayrollData>('/admin/staff/payroll');
   },
 
-  /** GET /analytics/performance */
+  /** GET /admin/staff/performance */
   getPerformance: (): Promise<ApiResponse<PerformanceData>> => {
-    return fetchAPI<PerformanceData>('/analytics/performance');
+    return fetchAPI<PerformanceData>('/admin/staff/performance');
   },
 
-  /** GET /analytics/roles */
+  /** GET /admin/staff/roles */
   getRoles: (): Promise<ApiResponse<RolesData>> => {
-    return fetchAPI<RolesData>('/analytics/roles');
+    return fetchAPI<RolesData>('/admin/staff/roles');
   },
 
-  /** GET /schedule/today */
+  /** GET /admin/staff/shifts/list */
   getSchedule: (): Promise<ApiResponse<ScheduleItem[]>> => {
-    return fetchAPI<ScheduleItem[]>('/schedule/today');
+    return fetchAPI<ScheduleItem[]>('/admin/staff/shifts/list');
   },
 
-  /** GET /staff/birthdays/upcoming */
+  /** GET /admin/staff/birthdays */
   getBirthdays: (): Promise<ApiResponse<BirthdayItem[]>> => {
-    return fetchAPI<BirthdayItem[]>('/staff/birthdays/upcoming');
+    return fetchAPI<BirthdayItem[]>('/admin/staff/birthdays');
   },
 };
 

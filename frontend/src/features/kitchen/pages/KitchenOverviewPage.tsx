@@ -3,15 +3,21 @@ import { POPULAR_ITEMS, type KitchenOrder as UIKitchenOrder } from '../store/kit
 import OrderCard from '../components/dashboard/OrderCard';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
 import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
-import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder } from '../api/kitchen.api';
+import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder, addInternalNote } from '../api/kitchen.api';
 import { apiClient } from '../../../shared/services/apiClient';
 import ETAModal from '../components/ETAModal';
+import MenuAvailabilityModal from '../components/MenuAvailabilityModal';
+import InternalNotesModal from '../components/InternalNotesModal';
+import DelayOrderModal from '../components/DelayOrderModal';
 
 export default function KitchenOverviewPage() {
   const { query } = useKitchenSearch();
 
   const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
   const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+  const [notesOrderId, setNotesOrderId] = useState<string | null>(null);
+  const [delayModalOrderId, setDelayModalOrderId] = useState<string | null>(null);
 
   const [now, setNow] = useState(() => Date.now());
 
@@ -109,9 +115,24 @@ export default function KitchenOverviewPage() {
 
   const handleReject = async (id: string) => { await rejectOrder(id); refreshDashboard(); };
   const handleMarkReady = async (id: string) => { await readyOrder(id); refreshDashboard(); };
-  const handleDelay = async (id: string) => { await delayOrder(id); refreshDashboard(); };
+  const handleDelayClick = (id: string) => { setDelayModalOrderId(id); };
+
+  const handleDelayConfirm = async (delayMinutes: number, reason: string) => {
+    if (!delayModalOrderId) return;
+    await delayOrder(delayModalOrderId, delayMinutes, reason);
+    setDelayModalOrderId(null);
+    refreshDashboard();
+  };
+
   const handleRush = async (id: string) => { await startOrder(id); refreshDashboard(); };
   const handleRefreshFeed = () => refreshDashboard();
+  const handleAddNote = (id: string) => { setNotesOrderId(id); };
+
+  const handleNotesSave = async (content: string) => {
+    if (!notesOrderId) return;
+    await addInternalNote(notesOrderId, content);
+    refreshDashboard();
+  };
 
   const columns = [
     { title: 'NEW ORDERS', icon: 'assignment', count: newOrders.length, color: 'blue', items: newOrders },
@@ -188,7 +209,7 @@ export default function KitchenOverviewPage() {
               {/* Cards */}
               <div className="space-y-4 overflow-y-auto pr-1 flex-1" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                 {(expandedColumns[title] ? items : items.slice(0, 3)).map(order => (
-                  <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelay} onPickup={() => {}} onRush={handleRush} />
+                  <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelayClick} onPickup={() => {}} onRush={handleRush} onAddNote={handleAddNote} />
                 ))}
                 {items.length > 3 && (
                   <button onClick={() => toggleColumnExpand(title)} className={`w-full text-center py-2 ${c.text} font-bold text-xs font-sans bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors`}>
@@ -218,6 +239,10 @@ export default function KitchenOverviewPage() {
               <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 font-sans">Quick Chef Controls</h3>
             </div>
             <div className="space-y-3">
+              <button onClick={() => setIsMenuModalOpen(true)} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
+                <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
+                Menu Availability
+              </button>
               <button onClick={handleRefreshFeed} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Refresh Feed
@@ -283,9 +308,28 @@ export default function KitchenOverviewPage() {
 
       <ETAModal
         isOpen={!!etaOrderId}
-        orderId={etaOrderId}
-        onConfirm={handleEtaConfirm}
         onCancel={() => setEtaOrderId(null)}
+        onConfirm={handleEtaConfirm}
+        orderId={etaOrderId || ''}
+      />
+      
+      <InternalNotesModal
+        isOpen={!!notesOrderId}
+        onClose={() => setNotesOrderId(null)}
+        onSave={handleNotesSave}
+        orderId={notesOrderId || ''}
+      />
+
+      <DelayOrderModal
+        isOpen={!!delayModalOrderId}
+        onClose={() => setDelayModalOrderId(null)}
+        onConfirm={handleDelayConfirm}
+        orderId={delayModalOrderId || ''}
+      />
+
+      <MenuAvailabilityModal
+        isOpen={isMenuModalOpen}
+        onClose={() => setIsMenuModalOpen(false)}
       />
     </div>
   );

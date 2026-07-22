@@ -46,9 +46,11 @@ export interface IMenuItem extends Document {
   images?: string[];
   isVeg: boolean;
   isAvailable: boolean;
+  availabilityStatus?: string;
   isHidden: boolean;
   stockQuantity: number;
   preparationTime?: number; // in minutes
+  preparationComplexity?: number; // 1-10
   spiceLevel?: number; // 0-5
   tags?: string[];
   displayOrder: number;
@@ -75,9 +77,11 @@ const MenuItemSchema = new Schema<IMenuItem>(
     images: [{ type: String, trim: true }],
     isVeg: { type: Boolean, default: false },
     isAvailable: { type: Boolean, default: true },
+    availabilityStatus: { type: String, enum: ['AVAILABLE', 'OUT_OF_STOCK', 'TEMPORARILY_UNAVAILABLE'] },
     isHidden: { type: Boolean, default: false },
     stockQuantity: { type: Number, default: 0, min: 0 },
     preparationTime: { type: Number, min: 0 },
+    preparationComplexity: { type: Number, min: 1, max: 10, default: 1 },
     spiceLevel: { type: Number, min: 0, max: 5 },
     tags: [{ type: String, trim: true }],
     displayOrder: { type: Number, default: 0, min: 0 },

@@ -28,6 +28,7 @@ export function MenuItemCard({ item }: Props): JSX.Element {
   const [editStock,  setEditStock]  = useState(String(item.stockQuantity));
   const [editAvailable, setEditAvailable] = useState(item.isAvailable);
   const [editVeg, setEditVeg] = useState(item.isVeg);
+  const [editComplexity, setEditComplexity] = useState(String(item.preparationComplexity || 1));
   const [editCat,    setEditCat]    = useState(item.categoryId);
   const [confirmDel, setConfirmDel] = useState(false);
 
@@ -56,6 +57,7 @@ export function MenuItemCard({ item }: Props): JSX.Element {
       stockQuantity: parseInt(editStock, 10) || 0,
       isAvailable:   editAvailable,
       isVeg:         editVeg,
+      preparationComplexity: parseInt(editComplexity, 10) || 1,
       categoryId:    editCat,
     });
     setShowEdit(false);
@@ -118,6 +120,10 @@ export function MenuItemCard({ item }: Props): JSX.Element {
           <button type="button" onClick={() => setEditAvailable((v) => !v)} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${editAvailable ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${editAvailable ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </button>
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 dark:border-gray-700 dark:bg-gray-800 gap-2">
+          <span className="text-xs text-gray-600 dark:text-gray-300">Complexity (1-10)</span>
+          <input value={editComplexity} onChange={(e) => setEditComplexity(e.target.value)} type="number" min="1" max="10" className={`${inputClass} w-16 text-center`} />
         </div>
         <select value={editCat} onChange={(e) => setEditCat(e.target.value)} className={inputClass}>
           {validCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

@@ -213,6 +213,10 @@ export function requireKitchenRole(allowedRoles: KitchenRole[]) {
 
     const internalRole = _req.user.internal_role as KitchenRole | undefined;
 
+    if (_req.user.role === 'restaurant-admin' || _req.user.role === 'super-admin') {
+      return next();
+    }
+
     if (!internalRole || !allowedRoles.includes(internalRole)) {
       next(
         new AppError(

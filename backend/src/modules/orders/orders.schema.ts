@@ -25,6 +25,8 @@ export interface IOrderItem {
   quantity: number;
   price: number;
   totalPrice: number;
+  preparationTime?: number;
+  preparationComplexity?: number;
   notes?: string;
   ingredients?: {
     inventoryItemId: mongoose.Types.ObjectId;
@@ -63,6 +65,20 @@ export interface IOrder extends Document {
   paymentMethod?: PaymentMethod | null;
 
   specialInstructions?: string;
+  
+  serviceFlags?: {
+    isVip: boolean;
+    isRush: boolean;
+    allergyAlert: boolean;
+  };
+  
+  internalNotes?: {
+    authorId: mongoose.Types.ObjectId;
+    authorName: string;
+    role: string;
+    content: string;
+    createdAt: Date;
+  }[];
 
   estimatedPreparationTime?: number;
   kitchenStaffId?: mongoose.Types.ObjectId | null;
@@ -71,6 +87,13 @@ export interface IOrder extends Document {
   acceptedAt?: Date;
   preparingStartedAt?: Date;
   delayedAt?: Date;
+  
+  delayHistory?: {
+    delayMinutes: number;
+    reason: string;
+    actorId?: mongoose.Types.ObjectId | null;
+    createdAt: Date;
+  }[];
 
   readyAt?: Date;
   rejectedAt?: Date;
@@ -122,6 +145,16 @@ const orderItemSchema = new Schema<IOrderItem>(
       type: Number,
       required: true,
       min: 0,
+    },
+
+    preparationTime: {
+      type: Number,
+      default: 15,
+    },
+
+    preparationComplexity: {
+      type: Number,
+      default: 1,
     },
 
     notes: {
@@ -252,6 +285,34 @@ export const orderSchema = new Schema<IOrder>(
       default: "",
     },
 
+    internalNotes: {
+      type: [
+        {
+          authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+          authorName: { type: String, required: true },
+          role: { type: String, required: true },
+          content: { type: String, required: true },
+          createdAt: { type: Date, default: Date.now },
+          _id: false
+        }
+      ],
+      default: [],
+    },
+
+    serviceFlags: {
+      type: {
+        isVip: { type: Boolean, default: false },
+        isRush: { type: Boolean, default: false },
+        allergyAlert: { type: Boolean, default: false },
+      },
+      default: {
+        isVip: false,
+        isRush: false,
+        allergyAlert: false,
+      },
+      _id: false,
+    },
+
     estimatedPreparationTime: {
       type: Number,
       default: null,
@@ -282,6 +343,19 @@ export const orderSchema = new Schema<IOrder>(
     delayedAt: {
       type: Date,
       default: null,
+    },
+
+    delayHistory: {
+      type: [
+        {
+          delayMinutes: { type: Number, required: true },
+          reason: { type: String, required: true },
+          actorId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+          createdAt: { type: Date, default: Date.now },
+          _id: false
+        }
+      ],
+      default: [],
     },
 
     readyAt: {
@@ -389,9 +463,26 @@ export const delayOrderBodySchema = z.object({
     .number()
     .int()
     .positive('Delay minutes must be positive'),
+  reason: z.enum([
+    'INGREDIENT_SHORTAGE',
+    'HIGH_LOAD',
+    'EQUIPMENT_ISSUE',
+    'COMPLEX_ORDER',
+    'OTHER'
+  ]).optional().default('OTHER'),
 });
 
 export type DelayOrderInput = z.infer<typeof delayOrderBodySchema>;
+
+export const addInternalNoteBodySchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, 'Note content is required')
+    .max(1000, 'Note cannot exceed 1000 characters'),
+});
+
+export type AddInternalNoteInput = z.infer<typeof addInternalNoteBodySchema>;
 
 export const orderIdParamsSchema = z.object({
   id: z.string().refine((value) => mongoose.Types.ObjectId.isValid(value), {

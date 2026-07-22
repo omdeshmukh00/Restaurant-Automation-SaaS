@@ -4,6 +4,7 @@ import { MenuCategoryPanel } from '../components/menu/MenuCategoryPanel';
 import { MenuFilterBar } from '../components/menu/MenuFilterBar';
 import { MenuGrid } from '../components/menu/MenuGrid';
 import { useMenuStore } from '../store/menu.store';
+import { getSocket } from '../../../lib/socket';
 
 export function MenuManagementPage(): JSX.Element {
   const [showCategories, setShowCategories] = useState(false);
@@ -11,6 +12,20 @@ export function MenuManagementPage(): JSX.Element {
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+    
+    const handleUpdate = () => {
+      void refresh();
+    };
+
+    socket.on('menu.updated', handleUpdate);
+    return () => {
+      socket.off('menu.updated', handleUpdate);
+    };
   }, [refresh]);
 
   return (

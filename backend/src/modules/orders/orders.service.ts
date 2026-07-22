@@ -110,7 +110,43 @@ function normalizeAdminOrderStatusFilter(status?: string): string | string[] | u
   }
 }
 
+export interface DynamicEtaContext {
+  items: any[]; // Order items
+  kitchenLoadMultiplier: number;
+  batchMultiplier?: number;
+  manualOverride?: number;
+}
+
 export class OrdersService {
+  /**
+   * Calculates the dynamic ETA based on context inputs.
+   */
+  private static calculateDynamicETA(context: DynamicEtaContext): number {
+    if (context.manualOverride) {
+      return context.manualOverride;
+    }
+
+    let maxPrepTime = 0;
+    let maxComplexity = 1;
+
+    for (const item of context.items) {
+      const prepTime = item.preparationTime || 15;
+      const complexity = item.preparationComplexity || 1;
+
+      if (prepTime > maxPrepTime) maxPrepTime = prepTime;
+      if (complexity > maxComplexity) maxComplexity = complexity;
+    }
+
+    const loadMultiplier = context.kitchenLoadMultiplier || 1.0;
+    const batchMultiplier = context.batchMultiplier || 1.0;
+    const complexityFactor = 1 + (maxComplexity * 0.1); // e.g. complexity 5 = 1.5x
+
+    const eta = Math.ceil(maxPrepTime * complexityFactor * loadMultiplier * batchMultiplier);
+    
+    // Ensure a minimum ETA of 5 minutes just in case
+    return Math.max(eta, 5);
+  }
+
   /**
    * Helper method to map cart items to the structure required by OrderModel.
    * Resolves ingredients from MenuItem references.
@@ -146,6 +182,8 @@ export class OrdersService {
         quantity: item.quantity,
         price: item.unitPrice,
         totalPrice: item.subtotal,
+        preparationTime: fullMenuItem.preparationTime || 15,
+        preparationComplexity: fullMenuItem.preparationComplexity || 1,
         notes: item.notes || '',
         ingredients: ingredientsSnapshot,
       };
@@ -191,7 +229,22 @@ export class OrdersService {
       throw new AppError('Table session not found', 404, ErrorCode.NOT_FOUND);
     }
 
-    // 5. Create Order
+    // 5. Calculate Dynamic ETA
+    const activeOrdersCount = await OrderModel.countDocuments({
+      restaurantId: restId,
+      status: { $in: [OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELAYED] }
+    }).session(session ? session : null as any);
+
+    let kitchenLoadMultiplier = 1.0;
+    if (activeOrdersCount >= 20) kitchenLoadMultiplier = 1.5;
+    else if (activeOrdersCount >= 10) kitchenLoadMultiplier = 1.2;
+
+    const estimatedPreparationTime = this.calculateDynamicETA({
+      items: orderItems,
+      kitchenLoadMultiplier
+    });
+
+    // 6. Create Order
     const order = await OrderModel.create([{
       restaurantId: restId,
       tableId: sessionDoc.tableId,
@@ -206,6 +259,7 @@ export class OrdersService {
       paymentStatus,
       priority: 'NORMAL',
       specialInstructions,
+      estimatedPreparationTime,
     }], options);
 
     const createdOrder = order[0];
@@ -689,8 +743,8 @@ export class OrdersService {
       batch?: boolean;
     } = {}
   ) {
-    const query: Record<string, unknown> = {
-      restaurantId,
+    const matchQuery: Record<string, unknown> = {
+      restaurantId: typeof restaurantId === 'string' ? new mongoose.Types.ObjectId(restaurantId) : restaurantId,
       status: options.status
         ? options.status
         : {
@@ -698,32 +752,69 @@ export class OrdersService {
               OrderStatus.PENDING,
               OrderStatus.CONFIRMED,
               OrderStatus.PREPARING,
+              OrderStatus.DELAYED,
               OrderStatus.READY,
             ],
           },
     };
 
     if (options.priority) {
-      query.priority = options.priority;
+      matchQuery.priority = options.priority;
     }
 
     if (options.batch) {
-      query.batchId = { $ne: null };
+      matchQuery.batchId = { $ne: null };
     }
 
     if (options.table) {
       if (Types.ObjectId.isValid(options.table)) {
-        query.tableId = new Types.ObjectId(options.table);
+        matchQuery.tableId = new Types.ObjectId(options.table);
       } else {
         const tableIds = await TableModel.find({
           restaurantId,
           tableNumber: options.table,
         }).distinct('_id');
-        query.tableId = tableIds.length > 0 ? { $in: tableIds } : null;
+        matchQuery.tableId = tableIds.length > 0 ? { $in: tableIds } : null;
       }
     }
 
-    return OrderModel.find(query).populate('tableId').sort({ createdAt: 1 });
+    const pipeline = [
+      { $match: matchQuery },
+      {
+        $addFields: {
+          priorityWeight: {
+            $switch: {
+              branches: [
+                { case: { $eq: ['$priority', 'URGENT'] }, then: 4 },
+                { case: { $eq: ['$priority', 'HIGH'] }, then: 3 },
+                { case: { $eq: ['$priority', 'NORMAL'] }, then: 2 },
+                { case: { $eq: ['$priority', 'LOW'] }, then: 1 }
+              ],
+              default: 2
+            }
+          },
+          orderComplexity: { 
+            $ifNull: [
+              { $max: '$items.preparationComplexity' }, 
+              1 
+            ] 
+          }
+        }
+      },
+      {
+        $sort: {
+          priorityWeight: -1,
+          orderComplexity: -1,
+          createdAt: 1
+        }
+      }
+    ];
+
+    const aggregatedOrders = await OrderModel.aggregate(pipeline as any);
+    
+    // Convert back to Mongoose documents and populate tableId
+    const orders = aggregatedOrders.map(doc => OrderModel.hydrate(doc));
+    return OrderModel.populate(orders, { path: 'tableId' });
   }
 
   static async getKitchenOrderDetails(restaurantId: string | Types.ObjectId, orderId: string | Types.ObjectId) {
@@ -869,6 +960,7 @@ export class OrdersService {
     restaurantId: string | Types.ObjectId,
     orderId: string | Types.ObjectId,
     delayMinutes: number,
+    reason: string = 'OTHER',
     actorId?: string | Types.ObjectId | null,
   ) {
     const order = await this.getKitchenOrderDetails(restaurantId, orderId);
@@ -884,11 +976,45 @@ export class OrdersService {
     order.delayedAt = new Date();
     order.kitchenStaffId = toNullableObjectId(actorId);
 
+    if (!order.delayHistory) {
+      order.delayHistory = [];
+    }
+    order.delayHistory.push({
+      delayMinutes,
+      reason,
+      actorId: toNullableObjectId(actorId),
+      createdAt: new Date()
+    });
+
     await order.save();
 
     socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
     socketService.emitToSession(order.sessionId!.toString(), 'order.updated', { orderId: order._id, status: order.status });
 
+    return order;
+  }
+
+  static async addInternalNote(
+    restaurantId: string | Types.ObjectId,
+    orderId: string | Types.ObjectId,
+    content: string,
+    actor: { id: string; name: string; role: string }
+  ) {
+    const order = await this.getKitchenOrderDetails(restaurantId, orderId);
+
+    if (!order.internalNotes) {
+      order.internalNotes = [];
+    }
+
+    order.internalNotes.push({
+      authorId: new Types.ObjectId(actor.id),
+      authorName: actor.name,
+      role: actor.role,
+      content,
+      createdAt: new Date(),
+    });
+
+    await order.save();
     return order;
   }
 

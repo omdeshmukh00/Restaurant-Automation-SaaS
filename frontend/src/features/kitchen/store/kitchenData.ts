@@ -21,6 +21,9 @@ export interface KitchenOrder {
   delayMins?: number;
   priority?: 'normal' | 'high' | 'vip';
   chef?: string;
+  internalNotes?: { authorName: string; content: string; createdAt: string }[];
+  delayHistory?: { delayMinutes: number; reason: string; createdAt: string }[];
+  serviceFlags?: { isVip: boolean; isRush: boolean; allergyAlert: boolean; };
 }
 
 export const ORDERS: KitchenOrder[] = [

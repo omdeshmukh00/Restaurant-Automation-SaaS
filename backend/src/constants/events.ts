@@ -56,6 +56,8 @@ export const SocketEvent = {
 
   // ── QR events ─────────────────────────────────────────────────────────
   QR_REGENERATED: 'qr.regenerated',
+  // ── Menu events ───────────────────────────────────────────────────────
+  MENU_UPDATED: 'menu.updated',
 } as const;
 
 export type SocketEventType = typeof SocketEvent[keyof typeof SocketEvent];

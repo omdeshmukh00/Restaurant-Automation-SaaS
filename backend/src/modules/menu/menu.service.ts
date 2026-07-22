@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { buildPaginationMeta } from '../../utils/pagination';
 import { socketService } from '../../sockets/socket.service';
+import { ItemAvailabilityStatus } from '../../constants/statuses';
 
 export class MenuService {
   /*
@@ -322,6 +323,34 @@ export class MenuService {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
     socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
+    return item;
+  }
+
+  static async updateItemAvailabilityStatus(
+    restaurantId: string | Types.ObjectId,
+    itemId: string | Types.ObjectId,
+    availabilityStatus: ItemAvailabilityStatus,
+    userId: string | Types.ObjectId
+  ): Promise<IMenuItem> {
+    const isAvailable = availabilityStatus === ItemAvailabilityStatus.AVAILABLE;
+
+    const item = await MenuItem.findOneAndUpdate(
+      { _id: itemId, restaurantId },
+      { $set: { availabilityStatus, isAvailable, updatedBy: userId } },
+      { new: true }
+    );
+
+    if (!item) {
+      throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
+    }
+    
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { 
+      menuItemId: item._id,
+      availabilityStatus: item.availabilityStatus,
+      isAvailable: item.isAvailable,
+      updatedAt: item.updatedAt
+    });
+    
     return item;
   }
 

@@ -34,30 +34,32 @@ export default function CustomerOrderTrackingPage() {
   // Find past orders (status in Served, Completed)
   const pastOrders = orders.filter(o => o.status === 'Served' || o.status === 'Completed');
 
-  const getInitialProgress = (status?: string) => {
-    if (status === 'Placed') return 25;
-    if (status === 'Preparing') return 60;
-    if (status === 'Ready') return 90;
-    return 65;
-  };
-
-  // Local simulated progress for live cooking section
-  const [progress, setProgress] = useState(() => getInitialProgress(primaryActiveOrder?.status));
-  const [prevOrderId, setPrevOrderId] = useState<string | undefined>(primaryActiveOrder?.id);
-  const [prevOrderStatus, setPrevOrderStatus] = useState<string | undefined>(primaryActiveOrder?.status);
-
-  if (primaryActiveOrder?.id !== prevOrderId || primaryActiveOrder?.status !== prevOrderStatus) {
-    setPrevOrderId(primaryActiveOrder?.id);
-    setPrevOrderStatus(primaryActiveOrder?.status);
-    setProgress(getInitialProgress(primaryActiveOrder?.status));
-  }
-
+  const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
-    const interval = setInterval(() => {
-      setProgress((prev) => (prev < 95 ? prev + Math.random() * 0.5 : prev));
-    }, 5000);
+    const interval = setInterval(() => setNowMs(Date.now()), 10000);
     return () => clearInterval(interval);
   }, []);
+
+  const getProgress = (order?: TrackedOrder) => {
+    if (!order) return 0;
+    if (order.status === 'Ready') return 90;
+    if (order.status === 'Served' || order.status === 'Completed') return 100;
+    if (order.status === 'Placed') return 25;
+    if (order.status === 'Preparing') {
+      if (order.preparingStartedAt && order.eta) {
+        const start = new Date(order.preparingStartedAt).getTime();
+        const etaMins = parseInt(order.eta.replace(/\D/g, '')) || 15;
+        const elapsed = nowMs - start;
+        const total = etaMins * 60000;
+        let percent = 25 + (elapsed / total) * 65;
+        if (percent > 90) percent = 90;
+        return percent;
+      }
+      return 60;
+    }
+    return 0;
+  };
+  const progress = getProgress(primaryActiveOrder);
 
   const getActiveStep = (status: string) => {
     switch (status) {
@@ -86,52 +88,26 @@ export default function CustomerOrderTrackingPage() {
     if (stepIdx === 1 && order.preparingStartedAt) return formatTime(order.preparingStartedAt);
     if (stepIdx === 2 && order.readyAt) return formatTime(order.readyAt);
     if (stepIdx === 3 && order.servedAt) return formatTime(order.servedAt);
-
-    // Estimate for future timestamps based on previous steps
-    if (order.createdAt) {
-      const baseTime = new Date(order.createdAt).getTime();
-      const numId = parseInt(order.id.replace(/\D/g, '')) || 1200;
-      const minOffset = (numId % 5) + 3; // random 3-7 mins
-
-      if (stepIdx === 1) return formatTime(new Date(baseTime + minOffset * 60000).toISOString());
-      if (stepIdx === 2) return formatTime(new Date(baseTime + (minOffset + 10) * 60000).toISOString());
-      if (stepIdx === 3) return formatTime(new Date(baseTime + (minOffset + 15) * 60000).toISOString());
-    }
-
     return '--:--';
   };
 
-  // Helper to parse items list string: "Hyderabadi Biryani x1, Mango Lassi x1" -> array of { name, qty, estimatedPrice }
-  const parseOrderItems = (itemsStr: string) => {
-    return itemsStr.split(', ').map(itemStr => {
+  const getOrderItems = (order: TrackedOrder) => {
+    if (order.structuredItems && order.structuredItems.length > 0) {
+      return order.structuredItems;
+    }
+    // Fallback if structured items are not available
+    return order.items.split(', ').map(itemStr => {
       const match = itemStr.match(/(.+)\s+x(\d+)/);
       if (match) {
-        const name = match[1];
-        const qty = parseInt(match[2]);
-        let price = 150; // default estimated price fallback
-        // Match with known MENU_ITEMS prices for high fidelity
-        if (name.includes("Biryani")) price = 249;
-        else if (name.includes("Lassi")) price = 89;
-        else if (name.includes("Burger")) price = 259;
-        else if (name.includes("Naan")) price = 49;
-        else if (name.includes("Butter Chicken")) price = 229;
-        else if (name.includes("Pizza")) price = 199;
-        else if (name.includes("Jamun")) price = 99;
-        else if (name.includes("Paneer")) price = 229;
-        else if (name.includes("Manchurian")) price = 199;
-        else if (name.includes("Pasta")) price = 199;
-        else if (name.includes("Cake")) price = 149;
-        
-        return { name, qty, price, total: price * qty };
+        return { name: match[1], qty: parseInt(match[2]), price: 0, total: 0 };
       }
-      return { name: itemStr, qty: 1, price: 150, total: 150 };
+      return { name: itemStr, qty: 1, price: 0, total: 0 };
     });
   };
 
-  // Download PDF receipt generator
   const downloadInvoice = (order: TrackedOrder) => {
     const doc = new jsPDF();
-    const orderItems = parseOrderItems(order.items);
+    const orderItems = getOrderItems(order);
     
     // Header styling
     doc.setFillColor(235, 120, 40); // Smart Dining primary color tone
@@ -679,7 +655,7 @@ export default function CustomerOrderTrackingPage() {
                 <div className="border-t border-b border-sd-surface-variant py-4">
                   <h4 className="text-[10px] font-bold text-sd-on-surface-variant uppercase tracking-wider mb-3 font-sans">Bill Summary</h4>
                   <div className="space-y-3">
-                    {parseOrderItems(matchedOrder.items).map((item, idx) => (
+                    {getOrderItems(matchedOrder).map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center text-sm font-sans text-sd-on-surface">
                         <div className="flex-1">
                           <p className="font-bold">{item.name}</p>

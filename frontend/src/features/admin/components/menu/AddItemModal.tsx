@@ -41,6 +41,7 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
   const [category, setCategory] = useState('');
   const [isVeg, setIsVeg] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [preparationComplexity, setPreparationComplexity] = useState('1');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -100,9 +101,10 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
         isVeg,
         isAvailable,
         stockQuantity: stockNum,
-        image: imageUrl || undefined,
+        preparationComplexity: Number(preparationComplexity) || 1,
+        image: imageUrl || '',
       });
-      onClose();
+      if (!formError) onClose();
     } catch (err: any) {
       setFormError(err?.response?.data?.message ?? 'Failed to create item');
       setUploading(false);
@@ -169,6 +171,19 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
                 placeholder="0"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Preparation Complexity (1-10)</label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              className={inputClass}
+              value={preparationComplexity}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPreparationComplexity(e.target.value)}
+              placeholder="1"
+            />
           </div>
 
           <div>

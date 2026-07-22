@@ -130,3 +130,9 @@ export enum Priority {
   HIGH = 'HIGH',
   URGENT = 'URGENT',
 }
+
+export enum ItemAvailabilityStatus {
+  AVAILABLE = 'AVAILABLE',
+  OUT_OF_STOCK = 'OUT_OF_STOCK',
+  TEMPORARILY_UNAVAILABLE = 'TEMPORARILY_UNAVAILABLE',
+}

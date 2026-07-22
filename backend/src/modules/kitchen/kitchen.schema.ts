@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { BatchStatus, Priority } from '../../constants/statuses';
 import { OrderStatus } from '../orders/orders.schema';
+import { ItemAvailabilityStatus } from '../../constants/statuses';
 
 const objectIdSchema = z.string().refine((value) => Types.ObjectId.isValid(value), {
   message: 'Invalid id',
@@ -37,3 +38,11 @@ export const updateKitchenBatchBodySchema = z
   .refine((value) => value.name !== undefined || value.status !== undefined || value.station !== undefined, {
     message: 'At least one field must be provided',
   });
+
+export const updateMenuAvailabilityParamsSchema = z.object({
+  id: objectIdSchema,
+});
+
+export const updateMenuAvailabilityBodySchema = z.object({
+  availabilityStatus: z.nativeEnum(ItemAvailabilityStatus),
+});

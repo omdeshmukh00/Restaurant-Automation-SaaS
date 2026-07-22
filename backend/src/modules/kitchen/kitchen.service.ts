@@ -192,14 +192,34 @@ export class KitchenService {
 
   static async getStationLoad(restaurantId: string | Types.ObjectId) {
     const batches = await KitchenBatchModel.find({ restaurantId }).select('station status');
-
-    return ['Hot Line', 'Cold Pass', 'Dessert'].map((station) => {
+    
+    const stations = ['Hot Line', 'Cold Pass', 'Dessert'].map((station) => {
       const stationLoad = batches.filter((batch) => batch.station === station).length;
       return {
         station,
         loadPercent: Math.min(100, stationLoad * 30),
       };
     });
+
+    const activeOrdersCount = await OrderModel.countDocuments({
+      restaurantId,
+      status: { $in: [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING] },
+    });
+
+    let load: 'Low' | 'Medium' | 'High' = 'Low';
+    if (activeOrdersCount >= 20) {
+      load = 'High';
+    } else if (activeOrdersCount >= 10) {
+      load = 'Medium';
+    }
+
+    return {
+      stations,
+      aggregate: {
+        load,
+        activeOrdersCount,
+      },
+    };
   }
 
   static async getPerformance(restaurantId: string | Types.ObjectId) {

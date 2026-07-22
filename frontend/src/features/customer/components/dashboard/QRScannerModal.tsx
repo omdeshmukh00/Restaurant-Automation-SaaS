@@ -64,12 +64,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
     }, 500);
   };
 
-  const handleSimulateScan = () => {
-    setScanned(true);
-    setTimeout(() => {
-      onScanSuccess('T07'); // Default mock table
-    }, 800);
-  };
+
 
   const handleRetryScan = () => {
     setScanned(false);
@@ -332,14 +327,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
             </p>
 
             <div className="flex flex-col gap-2.5 mt-4 w-full px-4 items-center">
-              {/* Simulate QR Scan Button for Demo */}
-              <button
-                onClick={handleSimulateScan}
-                className="px-5 py-2.5 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-xs font-semibold text-white/95 transition-all active:scale-95 flex items-center gap-2 font-sans"
-              >
-                <span className="material-symbols-outlined text-[16px] text-sd-primary-container">sensors</span>
-                Simulate QR Detection
-              </button>
+
 
               {/* Manual Entry Fallback Button */}
               <button

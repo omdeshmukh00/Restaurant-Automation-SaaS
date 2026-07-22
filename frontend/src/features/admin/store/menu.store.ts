@@ -40,6 +40,7 @@ export interface MenuItem {
   isHidden: boolean;
   enabled: boolean;
   stockQuantity: number;
+  preparationComplexity: number;
   status: MenuItemStatus;
 }
 
@@ -51,6 +52,7 @@ export interface ItemCreateInput {
   isVeg: boolean;
   isAvailable?: boolean;
   stockQuantity?: number;
+  preparationComplexity?: number;
   image?: string;
 }
 
@@ -63,6 +65,7 @@ export type ItemUpdateInput = Partial<{
   isAvailable: boolean;
   isHidden: boolean;
   stockQuantity: number;
+  preparationComplexity: number;
   image: string;
 }>;
 
@@ -80,6 +83,7 @@ interface RawItem {
   isAvailable?: boolean;
   isHidden?: boolean;
   stockQuantity?: number;
+  preparationComplexity?: number;
 }
 interface RawCategory {
   id?: string;
@@ -138,6 +142,7 @@ function mapItem(raw: RawItem, categoryName = ''): MenuItem {
     isHidden,
     enabled: !isHidden,
     stockQuantity,
+    preparationComplexity: raw.preparationComplexity ?? 1,
     status: deriveStatus(isAvailable, isHidden, stockQuantity),
   };
 }
@@ -301,7 +306,7 @@ export const useMenuStore = create<MenuStore>()(
           set({ categories: [allCategory, ...mapped] });
           get().recomputeCounts();
         } catch (e: any) {
-          set({ error: e?.response?.data?.message ?? 'Failed to load categories' });
+          set({ error: e?.response?.data?.error?.message ?? e?.response?.data?.message ?? 'Failed to load categories' });
         }
       },
 
@@ -315,7 +320,7 @@ export const useMenuStore = create<MenuStore>()(
           set({ items, isLoading: false });
           get().recomputeCounts();
         } catch (e: any) {
-          set({ isLoading: false, error: e?.response?.data?.message ?? 'Failed to load menu items' });
+          set({ isLoading: false, error: e?.response?.data?.error?.message ?? e?.response?.data?.message ?? 'Failed to load menu items' });
         }
       },
 

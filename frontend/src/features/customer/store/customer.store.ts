@@ -46,6 +46,7 @@ export type ServiceRequestItem = {
 export type TrackedOrder = {
   id: string;
   items: string;
+  structuredItems?: { name: string; qty: number; price: number; total: number }[];
   total: number;
   status: 'Placed' | 'Preparing' | 'Ready' | 'Served' | 'Completed';
   eta: string;
@@ -54,6 +55,7 @@ export type TrackedOrder = {
   preparingStartedAt?: string;
   readyAt?: string;
   servedAt?: string;
+  updatedAt?: string;
 };
 
 export type CustomerNotification = {
@@ -168,6 +170,8 @@ type CustomerStore = {
   setTableCode: (code: string) => void;
   addOrder: (order: TrackedOrder) => void;
   fetchOrders: () => Promise<void>;
+  upsertOrderFromSocket: (order: any) => void;
+  updateOrderStatusFromSocket: (orderId: string, status: string) => void;
   fetchLiveBill: () => Promise<void>;
 
   // Dining Session Actions
@@ -207,9 +211,39 @@ function mapBackendOrderStatusToFrontend(status: string): TrackedOrder['status']
       return 'Served';
     case 'COMPLETED':
       return 'Completed';
+    case 'CANCELLED':
+    case 'REJECTED':
+      // Frontend doesn't explicitly have a cancelled step in the UI yet, map to Placed or add it if needed
+      // Currently, they just shouldn't be in the active list.
+      return 'Placed';
     default:
       return 'Placed';
   }
+}
+
+export function mapBackendOrderToTrackedOrder(o: any): TrackedOrder {
+  const itemsStr = o.items?.map((i: any) => `${i.name} x${i.quantity}`).join(', ') || '';
+  const structuredItems = o.items?.map((i: any) => ({
+    name: i.name,
+    qty: i.quantity,
+    price: i.price,
+    total: i.totalPrice || (i.price * i.quantity)
+  })) || [];
+  
+  return {
+    id: o.orderNumber || o._id,
+    items: itemsStr,
+    structuredItems: structuredItems,
+    total: o.finalAmount || o.totalAmount || 0,
+    status: mapBackendOrderStatusToFrontend(o.status),
+    eta: o.estimatedPreparationTime ? `${o.estimatedPreparationTime} min` : '15 min',
+    date: new Date(o.createdAt).toLocaleString('en-IN'),
+    createdAt: o.createdAt,
+    preparingStartedAt: o.preparingStartedAt,
+    readyAt: o.readyAt,
+    servedAt: o.servedAt,
+    updatedAt: o.updatedAt,
+  };
 }
 
 export const useCustomerStore = create<CustomerStore>()(
@@ -260,26 +294,66 @@ export const useCustomerStore = create<CustomerStore>()(
           const res = await apiClient.get('/customer/orders');
           const data = res.data?.data || res.data;
           if (data && data.orders) {
-            const mapped: TrackedOrder[] = data.orders.map((o: any) => {
-              const itemsStr = o.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ');
-              return {
-                id: o.orderNumber || o._id,
-                items: itemsStr,
-                total: o.finalAmount || o.totalAmount,
-                status: mapBackendOrderStatusToFrontend(o.status),
-                eta: o.preparationTime ? `${o.preparationTime} min` : '15 min',
-                date: new Date(o.createdAt).toLocaleString('en-IN'),
-                createdAt: o.createdAt,
-                preparingStartedAt: o.preparingStartedAt,
-                readyAt: o.readyAt,
-                servedAt: o.servedAt,
-              };
-            });
+            const mapped: TrackedOrder[] = data.orders.map(mapBackendOrderToTrackedOrder);
             set({ orders: mapped });
           }
         } catch (err) {
           console.error('Failed to fetch customer orders', err);
         }
+      },
+      upsertOrderFromSocket: (orderPayload: any) => {
+        set((state) => {
+          const newOrder = mapBackendOrderToTrackedOrder(orderPayload);
+          const existingOrder = state.orders.find(o => o.id === newOrder.id);
+          
+          if (existingOrder) {
+            // Idempotency / Stale event protection
+            if (newOrder.updatedAt && existingOrder.updatedAt) {
+              const newTime = new Date(newOrder.updatedAt).getTime();
+              const oldTime = new Date(existingOrder.updatedAt).getTime();
+              if (newTime < oldTime) return state; // Ignore stale event
+            }
+          }
+
+          const nextOrders = existingOrder 
+            ? state.orders.map(o => o.id === newOrder.id ? newOrder : o)
+            : [newOrder, ...state.orders];
+
+          // Priority for Active Workflow Sorting
+          const statusRank: Record<string, number> = {
+            'Placed': 3,
+            'Preparing': 2,
+            'Ready': 1,
+            'Served': 4,
+            'Completed': 5
+          };
+
+          nextOrders.sort((a, b) => {
+            const rankA = statusRank[a.status] ?? 99;
+            const rankB = statusRank[b.status] ?? 99;
+            
+            if (rankA !== rankB) return rankA - rankB;
+            
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeB - timeA;
+          });
+
+          return { orders: nextOrders };
+        });
+      },
+      updateOrderStatusFromSocket: (orderId: string, status: string) => {
+        set((state) => {
+          const mappedStatus = mapBackendOrderStatusToFrontend(status);
+          return {
+            orders: state.orders.map(o => {
+              if (o.id === orderId || o.id === `ORD-${orderId}` || orderId.endsWith(o.id) || o.id.endsWith(orderId)) {
+                return { ...o, status: mappedStatus };
+              }
+              return o;
+            })
+          };
+        });
       },
       fetchLiveBill: async () => {
         try {
@@ -358,19 +432,7 @@ export const useCustomerStore = create<CustomerStore>()(
           disconnectSocket();
           connectSocket();
 
-          const socket = getSocket();
-          if (socket) {
-            const handleOrderUpdate = () => {
-              get().fetchOrders();
-              get().fetchLiveBill();
-            };
-            socket.on('order.updated', handleOrderUpdate);
-            socket.on('order.new', handleOrderUpdate);
-            socket.on('payment.success', handleOrderUpdate);
-            socket.on('session.closed', () => {
-              get().clearDiningSession();
-            });
-          }
+          // Socket bindings are handled by CustomerLayout.tsx to ensure proper cleanup
         } else {
           localStorage.removeItem('x-session-token');
           set({
