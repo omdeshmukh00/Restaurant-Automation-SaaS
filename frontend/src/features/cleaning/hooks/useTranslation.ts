@@ -79,6 +79,11 @@ export const translations = {
     efficiencyTip: 'Efficiency Tip',
     efficiencyTipDesc: 'Focus on "High Priority" tasks in Dining Area A first to maintain peak service hygiene during peak dining rush hours.',
     viewEfficiencyReport: 'View Efficiency Report',
+    continue: 'Continue',
+    cleaningRequestFeatures: 'Cleaning Request Features',
+    verifyAudit: 'Verify Audit',
+    noActiveCleaningTasks: 'No active cleaning tasks in progress.',
+    noCompletedTables: 'No completed tables to show.',
 
     // Filters & Dropdowns
     allStatus: 'All Status',
@@ -341,6 +346,11 @@ export const translations = {
     efficiencyTip: 'दक्षता टिप',
     efficiencyTipDesc: 'पीक आवर्स के दौरान सेवा स्वच्छता बनाए रखने के लिए डाइनिंग एरिया ए में पहले "उच्च प्राथमिकता" कार्यों पर ध्यान दें।',
     viewEfficiencyReport: 'दक्षता रिपोर्ट देखें',
+    continue: 'जारी रखें',
+    cleaningRequestFeatures: 'सफाई अनुरोध विशेषताएं',
+    verifyAudit: 'ऑडिट सत्यापित करें',
+    noActiveCleaningTasks: 'प्रगति पर कोई सक्रिय सफाई कार्य नहीं है।',
+    noCompletedTables: 'दिखाने के लिए कोई पूर्ण तालिका नहीं है।',
 
     // Filters & Dropdowns
     allStatus: 'सभी स्थिति',
@@ -603,6 +613,11 @@ export const translations = {
     efficiencyTip: 'Consejo de Eficiencia',
     efficiencyTipDesc: 'Céntrese primero en las tareas de "Alta Prioridad" en el Área de Comedor A para mantener la máxima higiene del servicio durante las horas punta.',
     viewEfficiencyReport: 'Ver Reporte de Eficiencia',
+    continue: 'Continuar',
+    cleaningRequestFeatures: 'Funciones de Solicitud de Limpieza',
+    verifyAudit: 'Verificar Auditoría',
+    noActiveCleaningTasks: 'No hay tareas de limpieza activas en progreso.',
+    noCompletedTables: 'No hay mesas completadas para mostrar.',
 
     // Filters & Dropdowns
     allStatus: 'Todos los Estados',

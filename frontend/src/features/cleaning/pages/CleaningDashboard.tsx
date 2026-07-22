@@ -400,10 +400,9 @@ export default function CleaningDashboard() {
                 </span>
               </div>
             </div>
-
-            {filteredCompleted.length === 0 ? (
+            {filteredCompleted.length === 0 ? (
               <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400">
-                <p className="text-xs">No completed tables to show.</p>
+                <p className="text-xs">{t('noCompletedTables')}</p>
               </div>
             ) : (
               <div className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
@@ -423,7 +422,7 @@ export default function CleaningDashboard() {
                         {item.id}
                       </span>
                       <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
-                        ({t(item.section || '')} · {t('floor1')} {item.floor})
+                        ({t(item.section || '')} · {t('floor')} {item.floor})
                       </span>
                     </div>
                     <span className="text-slate-400 dark:text-slate-500 font-semibold">
@@ -433,11 +432,11 @@ export default function CleaningDashboard() {
                       {item.rawStatus === 'COMPLETED' ? (
                         <button
                          onClick={() => {
-       verifyTask(item.rawId || '');
-    }}
+        verifyTask(item.rawId || '');
+     }}
                           className="bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-150 active:scale-95 cursor-pointer"
                         >
-                          Verify Audit
+                          {t('verifyAudit')}
                         </button>
                       ) : (
                         item.time
@@ -457,7 +456,7 @@ export default function CleaningDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-                  In Progress
+                  {t('inProgress')}
                 </h2>
                 <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
                   {filteredInProgress.length}
@@ -467,7 +466,7 @@ export default function CleaningDashboard() {
 
             {filteredInProgress.length === 0 ? (
               <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400">
-                <p className="text-xs">No active cleaning tasks in progress.</p>
+                <p className="text-xs">{t('noActiveCleaningTasks')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
@@ -508,7 +507,7 @@ export default function CleaningDashboard() {
                       {item.id}
                     </div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 font-sans font-semibold">
-                      {item.section} · Floor {item.floor}
+                      {t(item.section || '')} · {t('floor')} {item.floor}
                     </div>
                     <p className="text-[10px] text-slate-400 mb-3 font-sans font-semibold">
                       {item.timeAgo}
@@ -517,7 +516,7 @@ export default function CleaningDashboard() {
                       onClick={() => handleContinue(item)}
                       className="w-full py-1.5 bg-orange-500 text-white rounded-xl text-[11px] font-bold hover:bg-orange-600 transition-all duration-200 active:scale-95 shadow-sm shadow-orange-500/20 cursor-pointer"
                     >
-                      {item.progress >= 90 ? 'Complete' : 'Continue'}
+                      {item.progress >= 90 ? t('complete') : t('continue')}
                     </button>
                   </div>
                 ))}
@@ -528,7 +527,7 @@ export default function CleaningDashboard() {
           {/* Action Grid */}
           <div className="space-y-4">
             <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-              Cleaning Request Features
+              {t('cleaningRequestFeatures')}
             </h2>
             <div className="grid grid-cols-2 gap-4">
               <button
@@ -539,10 +538,10 @@ export default function CleaningDashboard() {
                   <span className="material-symbols-outlined text-[20px]">add_task</span>
                 </div>
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-1">
-                  New Request
+                  {t('newRequest')}
                 </span>
                 <span className="text-[9px] text-slate-400 leading-tight">
-                  Request cleaning for any table.
+                  {t('newRequestDesc')}
                 </span>
               </button>
 
@@ -554,10 +553,10 @@ export default function CleaningDashboard() {
                   <span className="material-symbols-outlined text-[20px]">history</span>
                 </div>
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-1">
-                  Request History
+                  {t('requestHistory')}
                 </span>
                 <span className="text-[9px] text-slate-400 leading-tight">
-                  View all your past requests.
+                  {t('requestHistoryDesc')}
                 </span>
               </button>
 
@@ -565,15 +564,14 @@ export default function CleaningDashboard() {
                 onClick={() => setShowSpecialModal(true)}
                 className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm text-center hover:scale-[1.02] transition-transform flex flex-col items-center group cursor-pointer col-span-2"
               >
-                {/* Baki code waisa hi rehne do */}
                 <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center text-orange-600 mb-3 group-hover:bg-orange-600 group-hover:text-white transition-colors">
                   <span className="material-symbols-outlined text-[20px]">stars</span>
                 </div>
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-1">
-                  Special Request
+                  {t('specialRequest')}
                 </span>
                 <span className="text-[9px] text-slate-400 leading-tight">
-                  Add notes for special cleaning.
+                  {t('specialRequestDesc')}
                 </span>
               </button>
             </div>
@@ -586,7 +584,7 @@ export default function CleaningDashboard() {
       {/* Hygiene Tasks Footer */}
       <section className="space-y-4 pb-8">
         <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-          Hygiene Tasks
+          {t('hygieneTasks')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
           {filteredHygiene.map((task) => (
@@ -604,7 +602,7 @@ export default function CleaningDashboard() {
                   <p
                     className={`font-bold text-sm ${task.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}
                   >
-                    {task.name}
+                    {t(task.name)}
                   </p>
                   <p className="text-[10px] text-slate-400 font-semibold">{task.lastDone}</p>
                 </div>
@@ -617,7 +615,7 @@ export default function CleaningDashboard() {
                     : 'bg-orange-500 text-white border-transparent hover:bg-orange-600'
                 }`}
               >
-                {task.completed ? 'Completed' : 'Mark Done'}
+                {task.completed ? t('completed') : t('markDone')}
               </button>
             </div>
           ))}

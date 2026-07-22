@@ -131,13 +131,13 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
         <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl mx-3 mb-4 border border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2 mb-2">
             <span className="material-symbols-outlined text-orange-500 dark:text-white">support_agent</span>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">Need Help?</span>
+            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{t('needHelp')}</span>
           </div>
           <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3 leading-tight">
-            Contact support for assistance.
+            {t('supportDesc')}
           </p>
           <button className="w-full py-1.5 bg-white border border-slate-200 dark:border-slate-700 text-orange-500 font-bold rounded-lg text-xs hover:bg-orange-500/10 transition-all active:scale-95 cursor-pointer">
-            Contact Support
+            {t('contactSupport')}
           </button>
         </div>
       )}
