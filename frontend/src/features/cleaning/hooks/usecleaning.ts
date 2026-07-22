@@ -156,7 +156,7 @@ export function useCleaning() {
 
           let status = 'Available';
           let progress = 0;
-          let taskId = activeTask?._id;
+          const taskId = activeTask?._id;
 
           if (activeTask) {
             if (activeTask.status === 'IN_PROGRESS') {

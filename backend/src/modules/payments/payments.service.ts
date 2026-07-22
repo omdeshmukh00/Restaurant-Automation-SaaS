@@ -17,9 +17,6 @@ import {
   createRazorpayRefund,
 } from '../../services/razorpay.service';
 import { env } from '../../config/env';
-import { TableSessionModel } from '../tableSessions/tableSessions.model';
-import { TableModel } from '../tables/tables.model';
-import { TableStatus } from '../../constants/statuses';
 import { socketService } from '../../sockets/socket.service';
 import { SocketEvent } from '../../constants/events';
 import { logger } from '../../config/logger';
@@ -30,18 +27,6 @@ function toObjectId(value: string): mongoose.Types.ObjectId {
   }
 
   return new mongoose.Types.ObjectId(value);
-}
-
-function mapVerificationStatus(status?: VerifyPaymentInput['simulateStatus']): BillingPaymentStatus | undefined {
-  if (!status) {
-    return undefined;
-  }
-
-  if (status === 'COMPLETED' || status === 'PAID') {
-    return undefined;
-  }
-
-  return status as BillingPaymentStatus;
 }
 
 function buildPaymentFilter(restaurantId: string, query: ListPaymentsQuery) {

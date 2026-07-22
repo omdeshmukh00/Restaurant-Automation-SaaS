@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { BillingModel } from './billing.model';
 import { OrderModel } from '../orders/orders.model';
-import { BillStatus, PaymentMethod, PaymentStatus as BillingPaymentStatus } from './billing.schema';
+import { BillStatus, PaymentStatus as BillingPaymentStatus } from './billing.schema';
 import { PaymentStatus } from '../../constants/statuses';
 import { TableModel } from '../tables/tables.model';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
@@ -14,7 +14,6 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '../../constants/roles';
 import { NotificationCategory, NotificationPriority } from '../notifications/notifications.schema';
 import { PaymentModel } from '../payments/payments.model';
-import { InvoiceCounterModel } from './invoice-counter.model';
 import { sendReceiptEmail } from '../../services/mail.service';
 import logger from "../../config/logger";
 import { endSession } from '../tableSessions/tableSessions.service';
