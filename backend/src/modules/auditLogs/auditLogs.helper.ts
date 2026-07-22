@@ -16,6 +16,7 @@ import type { Request } from 'express';
 import logger from '../../config/logger';
 import { AuditLogModel } from './auditLogs.schema';
 import type { CreateAuditLogInput } from './auditLogs.types';
+import { socketService } from '../../sockets/socket.service';
 
 // Helper to extract real client IP address from proxy headers (x-forwarded-for, x-real-ip, cf-connecting-ip)
 export function extractRealIp(req: Request): string {
@@ -52,7 +53,21 @@ function cleanIp(ip: string): string {
 export async function logAuditRaw(input: CreateAuditLogInput): Promise<void> {
   try {
     const ipAddress = input.ipAddress ? cleanIp(input.ipAddress) : '127.0.0.1';
-    await AuditLogModel.create({ ...input, ipAddress });
+    const log = await AuditLogModel.create({ ...input, ipAddress });
+
+    // Emit a real-time activity event to the restaurant room so the admin
+    // dashboard ActivityFeed updates instantly.
+    if (input.restaurantId) {
+      socketService.emitToRestaurant(input.restaurantId, 'activity:new', {
+        _id: log._id.toString(),
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        actorRole: input.actorRole,
+        metadata: input.metadata ?? {},
+        createdAt: log.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      });
+    }
   } catch (err) {
     // Log the failure but NEVER re-throw — audit logs must not break business logic
     logger.error('[AuditLog] Failed to write audit log', {

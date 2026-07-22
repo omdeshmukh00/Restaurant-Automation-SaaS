@@ -83,6 +83,12 @@ const AdminDashboard = () => {
         socket.on('order.ready', handleDashboardSync);
         socket.on('bill.paid', handleDashboardSync);
 
+        // Real‑time activity feed: new audit-logged events arrive immediately
+        const handleActivity = (data: any) => {
+          useDashboardStore.getState().addActivityFromSocket(data);
+        };
+        socket.on('activity:new', handleActivity);
+
         return () => {
           clearInterval(interval);
           clearInterval(dashInterval);
@@ -104,6 +110,8 @@ const AdminDashboard = () => {
           socket.off('order.updated', handleDashboardSync);
           socket.off('order.ready', handleDashboardSync);
           socket.off('bill.paid', handleDashboardSync);
+
+          socket.off('activity:new', handleActivity);
         };
       }
     }

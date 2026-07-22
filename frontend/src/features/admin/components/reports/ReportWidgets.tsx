@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useReportsStore } from '../../store/reports.store';
 import type { DateRange, PeakHoursRange } from '../../store/reports.store';
 
@@ -109,6 +109,9 @@ export function TopSellingItems(): JSX.Element {
   const topSellingItems = getTopSellingItems();
   const maxOrders = topSellingItems.length > 0 ? Math.max(...topSellingItems.map((i) => i.orders)) : 1;
 
+  const [showAll, setShowAll] = useState(false);
+  const visibleItems = showAll ? topSellingItems : topSellingItems.slice(0, 6);
+
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 min-w-0 w-full">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
@@ -119,8 +122,8 @@ export function TopSellingItems(): JSX.Element {
           onChange={setTopItemsRange}
         />
       </div>
-      <div className="space-y-3">
-        {topSellingItems.map((item, idx) => (
+      <div className={`${showAll ? 'max-h-80 overflow-y-auto pr-1' : ''} space-y-3`}>
+        {visibleItems.slice(0, 6).map((item, idx) => (
           <div key={item.id} className="flex items-center gap-2 sm:gap-3">
             <div className="w-5 text-center flex-shrink-0">
               <span className="text-[10px] font-bold text-gray-400">#{idx + 1}</span>
@@ -147,7 +150,39 @@ export function TopSellingItems(): JSX.Element {
             </span>
           </div>
         ))}
+        {showAll && visibleItems.length > 6 && (
+          <>
+            <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">More Items</p>
+            </div>
+            {visibleItems.slice(6).map((item, idx) => (
+              <div key={item.id} className="flex items-center gap-2 sm:gap-3">
+                <div className="w-5 text-center flex-shrink-0">
+                  <span className="text-[10px] font-bold text-gray-400">#{idx + 7}</span>
+                </div>
+                <div className="w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-950/40 flex items-center justify-center text-sm flex-shrink-0">
+                  {item.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{item.name}</p>
+                  <p className="text-[10px] text-gray-400">{item.orders.toLocaleString()} orders</p>
+                </div>
+                <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-400 flex-shrink-0">
+                  {item.revenue}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
       </div>
+      {topSellingItems.length > 6 && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="w-full text-center text-xs font-semibold text-orange-500 hover:text-orange-600 mt-3 pt-2 border-t border-gray-100 dark:border-gray-800 transition-colors"
+        >
+          {showAll ? `Show Less` : `View All (${topSellingItems.length})`}
+        </button>
+      )}
     </div>
   );
 }

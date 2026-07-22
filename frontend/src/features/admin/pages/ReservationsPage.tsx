@@ -11,7 +11,7 @@ import { useReservationsStore, type ReservationStatus } from '../store/reservati
 import { useTablesStore } from "../store/tables.store";
 import { reservationApi } from '../api/reservation.api';
 
-const STATUS_OPTIONS: Array<'All' | ReservationStatus> = ['All', 'Confirmed', 'Pending', 'Cancelled'];
+const STATUS_OPTIONS: Array<'All' | ReservationStatus> = ['All', 'Confirmed', 'Pending', 'Cancelled', 'No Show'];
 
 function to24Minutes(time: string): number {
   if (!time) return -1;

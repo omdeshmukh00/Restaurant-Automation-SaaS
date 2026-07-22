@@ -157,3 +157,38 @@ export async function mobileExists(mobile: string): Promise<boolean> {
   const count = await UserModel.countDocuments({ mobile });
   return count > 0;
 }
+
+/**
+ * Store a pending phone number awaiting OTP verification.
+ */
+export async function setPendingPhone(userId: string, phone: string): Promise<void> {
+  await UserModel.findByIdAndUpdate(userId, { pendingPhone: phone });
+}
+
+/**
+ * Apply the pending phone number to `mobile` and clear the pending field.
+ * Returns the updated user without password.
+ */
+export async function applyPendingPhone(userId: string): Promise<IUser | null> {
+  const user = await UserModel.findById(userId);
+  if (!user || !user.pendingPhone) {
+    return null;
+  }
+
+  user.mobile = user.pendingPhone;
+  user.pendingPhone = null;
+  await user.save();
+
+  const userObj = user.toObject();
+  delete (userObj as any).password;
+  delete (userObj as any).refreshTokens;
+  return userObj as IUser;
+}
+
+/**
+ * Get the pending phone number for a user.
+ */
+export async function getPendingPhone(userId: string): Promise<string | null> {
+  const user = await UserModel.findById(userId).select('pendingPhone');
+  return user?.pendingPhone ?? null;
+}

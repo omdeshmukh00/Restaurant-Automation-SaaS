@@ -63,6 +63,9 @@ export interface IUser extends Document {
   lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+
+  // Pending phone number awaiting OTP verification
+  pendingPhone?: string | null;
 }
 
 const refreshTokenSchema = new Schema({
@@ -235,6 +238,11 @@ const userSchema = new Schema<IUser>(
     },
     lastLoginAt: {
       type: Date,
+      default: null,
+    },
+
+    pendingPhone: {
+      type: String,
       default: null,
     },
   },

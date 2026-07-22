@@ -3,9 +3,10 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, CalendarDays,
   Users, Package, UserCog, BarChart3, Settings,
-  ArrowRight, Crown, LayoutGrid, X,
+  LayoutGrid, X, Sparkles,
 } from 'lucide-react';
 import { usePlatformSettingsGuard } from '../../../shared/hooks/usePlatformSettingsGuard';
+import { useSettingsStore } from '../store/settings.store';
 
 const navItems = [
   { label: 'Dashboard',           icon: LayoutDashboard, to: '/admin' },
@@ -124,25 +125,42 @@ export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarP
         })}
       </nav>
 
-      {/* Upgrade card */}
-      {!collapsed && (
-        <div className="mx-3 mb-4 p-4 rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/30 border border-orange-100 dark:border-orange-900/40">
-          <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center mb-2 shadow">
-            <Crown className="w-[18px] h-[18px] text-white" />
+      {/* Upgrade to Pro Card — only visible when sidebar is expanded and plan is Basic/Free */}
+      {!collapsed && (() => {
+        const plan = useSettingsStore.getState().billing.plan?.toLowerCase() || '';
+        const isBasicOrFree = plan === 'free' || plan === 'basic';
+        if (!isBasicOrFree) return null;
+        return (
+          <div className="px-3 pb-4 shrink-0">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border border-orange-200/60 dark:border-orange-800/40 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center shrink-0 shadow-sm">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-800 dark:text-gray-100">Upgrade to Pro</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                    Unlock unlimited tables, staff, orders & more.
+                  </p>
+                  <button
+                    onClick={() => {
+                      navigate('/admin/settings');
+                      // Set billing section active after navigation
+                      setTimeout(() => useSettingsStore.getState().setActiveSection('billing'), 100);
+                      onItemClick?.();
+                    }}
+                    className="mt-2.5 px-4 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-sm shadow-orange-500/20 inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>View Plans</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <p className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-0.5">Upgrade to Pro</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 leading-snug">Unlock advanced features and grow your restaurant business.</p>
-          <button
-            onClick={() => {
-              navigate('/admin/settings');
-              onItemClick?.();
-            }}
-            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-bold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors"
-          >
-            Upgrade Now <ArrowRight className="w-3 h-3" />
-          </button>
-        </div>
-      )}
+        );
+      })()}
+
     </aside>
   );
 }

@@ -90,190 +90,6 @@ export interface ReportShortcut {
   label: string;
 }
 
-// ── Multi-range seed data ──────────────────────────────────────────────────
-
-const REVENUE_DATA: Record<DateRange, RevenuePoint[]> = {
-  Daily: [
-    { date: '12 May', revenue: 15000 },
-    { date: '13 May', revenue: 17500 },
-    { date: '14 May', revenue: 16200 },
-    { date: '15 May', revenue: 19800 },
-    { date: '16 May', revenue: 21000 },
-    { date: '17 May', revenue: 22400 },
-    { date: '18 May', revenue: 24680 },
-  ],
-  Weekly: [
-    { date: 'Week 1', revenue: 82000 },
-    { date: 'Week 2', revenue: 91500 },
-    { date: 'Week 3', revenue: 87200 },
-    { date: 'Week 4', revenue: 105800 },
-  ],
-  Monthly: [
-    { date: 'Jan', revenue: 320000 },
-    { date: 'Feb', revenue: 298000 },
-    { date: 'Mar', revenue: 354000 },
-    { date: 'Apr', revenue: 381000 },
-    { date: 'May', revenue: 412000 },
-    { date: 'Jun', revenue: 395000 },
-  ],
-};
-
-const ORDERS_DATA: Record<DateRange, OrdersTrendPoint[]> = {
-  Daily: [
-    { date: '12 May', orders: 300 },
-    { date: '13 May', orders: 340 },
-    { date: '14 May', orders: 310 },
-    { date: '15 May', orders: 380 },
-    { date: '16 May', orders: 395 },
-    { date: '17 May', orders: 410 },
-    { date: '18 May', orders: 430 },
-  ],
-  Weekly: [
-    { date: 'Week 1', orders: 1950 },
-    { date: 'Week 2', orders: 2140 },
-    { date: 'Week 3', orders: 2080 },
-    { date: 'Week 4', orders: 2340 },
-  ],
-  Monthly: [
-    { date: 'Jan', orders: 7800 },
-    { date: 'Feb', orders: 7200 },
-    { date: 'Mar', orders: 8600 },
-    { date: 'Apr', orders: 9100 },
-    { date: 'May', orders: 9800 },
-    { date: 'Jun', orders: 9400 },
-  ],
-};
-
-const TOP_ITEMS_DATA: Record<DateRange, TopSellingItem[]> = {
-  Daily: [
-    { id: 't1', name: 'Margherita Pizza',  emoji: '🍕', orders: 65,  revenue: '₹3,250' },
-    { id: 't2', name: 'Chicken Burger',    emoji: '🍔', orders: 58,  revenue: '₹2,610' },
-    { id: 't3', name: 'Caesar Salad',      emoji: '🥗', orders: 47,  revenue: '₹2,115' },
-    { id: 't4', name: 'Pasta Alfredo',     emoji: '🍝', orders: 41,  revenue: '₹1,845' },
-    { id: 't5', name: 'BBQ Chicken Pizza', emoji: '🍕', orders: 38,  revenue: '₹1,710' },
-  ],
-  Weekly: [
-    { id: 't1', name: 'Margherita Pizza',  emoji: '🍕', orders: 425, revenue: '₹21,250' },
-    { id: 't2', name: 'Chicken Burger',    emoji: '🍔', orders: 380, revenue: '₹17,100' },
-    { id: 't3', name: 'Caesar Salad',      emoji: '🥗', orders: 310, revenue: '₹13,950' },
-    { id: 't4', name: 'Pasta Alfredo',     emoji: '🍝', orders: 275, revenue: '₹12,375' },
-    { id: 't5', name: 'BBQ Chicken Pizza', emoji: '🍕', orders: 250, revenue: '₹11,250' },
-  ],
-  Monthly: [
-    { id: 't1', name: 'Margherita Pizza',  emoji: '🍕', orders: 1820, revenue: '₹91,000' },
-    { id: 't2', name: 'Chicken Burger',    emoji: '🍔', orders: 1640, revenue: '₹73,800' },
-    { id: 't3', name: 'Caesar Salad',      emoji: '🥗', orders: 1320, revenue: '₹59,400' },
-    { id: 't4', name: 'Pasta Alfredo',     emoji: '🍝', orders: 1180, revenue: '₹53,100' },
-    { id: 't5', name: 'BBQ Chicken Pizza', emoji: '🍕', orders: 1050, revenue: '₹47,250' },
-  ],
-};
-
-const REV_BY_CAT_DATA: Record<DateRange, RevenueByCategory[]> = {
-  Daily: [
-    { name: 'Food',      pct: 68, amount: '₹16,782', color: '#f97316' },
-    { name: 'Beverages', pct: 22, amount: '₹5,430',  color: '#3b82f6' },
-    { name: 'Desserts',  pct: 10, amount: '₹2,468',  color: '#22c55e' },
-  ],
-  Weekly: [
-    { name: 'Food',      pct: 70, amount: '₹1,14,380', color: '#f97316' },
-    { name: 'Beverages', pct: 20, amount: '₹32,680',   color: '#3b82f6' },
-    { name: 'Desserts',  pct: 10, amount: '₹16,340',   color: '#22c55e' },
-  ],
-  Monthly: [
-    { name: 'Food',      pct: 71, amount: '₹4,60,500', color: '#f97316' },
-    { name: 'Beverages', pct: 19, amount: '₹1,23,200', color: '#3b82f6' },
-    { name: 'Desserts',  pct: 10, amount: '₹64,900',   color: '#22c55e' },
-  ],
-};
-
-const PEAK_HOUR_CELLS_DATA: Record<PeakHoursRange, PeakHourCell[]> = (() => {
-  const days  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const hours = ['6 AM', '9 AM', '12 PM', '3 PM', '6 PM', '9 PM', '12 AM'];
-
-  function buildCells(patterns: Record<string, number>): PeakHourCell[] {
-    const cells: PeakHourCell[] = [];
-    days.forEach((day) => {
-      hours.forEach((hour) => {
-        const base   = patterns[hour] ?? 0.3;
-        const jitter = (Math.sin(day.charCodeAt(0) + hour.charCodeAt(0)) * 0.5) * 0.2;
-        cells.push({ day, hour, intensity: Math.max(0.05, Math.min(1, base + jitter)) });
-      });
-    });
-    return cells;
-  }
-
-  return {
-    Daily:   buildCells({ '6 AM': 0.1, '9 AM': 0.45, '12 PM': 0.85, '3 PM': 0.55, '6 PM': 0.95, '9 PM': 0.75, '12 AM': 0.15 }),
-    Weekly:  buildCells({ '6 AM': 0.15, '9 AM': 0.5,  '12 PM': 0.8,  '3 PM': 0.65, '6 PM': 0.9,  '9 PM': 0.7,  '12 AM': 0.2  }),
-    Monthly: buildCells({ '6 AM': 0.2,  '9 AM': 0.55, '12 PM': 0.75, '3 PM': 0.7,  '6 PM': 0.85, '9 PM': 0.65, '12 AM': 0.25 }),
-  };
-})();
-
-const STATS_DATA: Record<DateRange, ReportStats> = {
-  Daily: {
-    totalRevenue: '₹24,680',
-    totalRevenueChange: '↑ 12.5% vs yesterday',
-    totalOrders: 430,
-    totalOrdersChange: '↑ 5.0% vs yesterday',
-    avgOrderValue: '₹573',
-    avgOrderValueChange: '↑ 7.2% vs yesterday',
-    totalCustomers: 318,
-    totalCustomersChange: '↑ 9.4% vs yesterday',
-    repeatCustomers: 98,
-    repeatCustomersChange: '↑ 6.1% vs yesterday',
-    netProfit: '₹8,245',
-    netProfitChange: '↑ 14.3% vs yesterday',
-  },
-  Weekly: {
-    totalRevenue: '₹1,63,400',
-    totalRevenueChange: '↑ 8.3% vs last week',
-    totalOrders: 2565,
-    totalOrdersChange: '↑ 6.7% vs last week',
-    avgOrderValue: '₹637',
-    avgOrderValueChange: '↑ 4.8% vs last week',
-    totalCustomers: 1842,
-    totalCustomersChange: '↑ 10.2% vs last week',
-    repeatCustomers: 684,
-    repeatCustomersChange: '↑ 7.8% vs last week',
-    netProfit: '₹56,210',
-    netProfitChange: '↑ 11.5% vs last week',
-  },
-  Monthly: {
-    totalRevenue: '₹6,48,500',
-    totalRevenueChange: '↑ 15.2% vs last month',
-    totalOrders: 9800,
-    totalOrdersChange: '↑ 9.1% vs last month',
-    avgOrderValue: '₹662',
-    avgOrderValueChange: '↑ 5.6% vs last month',
-    totalCustomers: 7240,
-    totalCustomersChange: '↑ 12.5% vs last month',
-    repeatCustomers: 2680,
-    repeatCustomersChange: '↑ 8.9% vs last month',
-    netProfit: '₹2,24,350',
-    netProfitChange: '↑ 17.8% vs last month',
-  },
-};
-
-const DAILY_SUMMARY_DATA: Record<DateRange, DailySummaryRow[]> = {
-  Daily: [
-    { date: 'Today — 18 May',     revenue: '₹24,680', orders: 430,  customers: 318, avgOrderValue: '₹573', repeatCustomers: 98,  netProfit: '₹8,245'  },
-    { date: 'Yesterday — 17 May', revenue: '₹22,400', orders: 410,  customers: 305, avgOrderValue: '₹546', repeatCustomers: 92,  netProfit: '₹7,680'  },
-    { date: '16 May',             revenue: '₹21,000', orders: 395,  customers: 289, avgOrderValue: '₹531', repeatCustomers: 86,  netProfit: '₹7,100'  },
-  ],
-  Weekly: [
-    { date: 'Week 18 (Current)',  revenue: '₹1,63,400', orders: 2565, customers: 1842, avgOrderValue: '₹637', repeatCustomers: 684, netProfit: '₹56,210' },
-    { date: 'Week 17',            revenue: '₹1,50,800', orders: 2402, customers: 1710, avgOrderValue: '₹628', repeatCustomers: 631, netProfit: '₹50,420' },
-    { date: 'Week 16',            revenue: '₹1,44,200', orders: 2280, customers: 1648, avgOrderValue: '₹632', repeatCustomers: 594, netProfit: '₹48,100' },
-  ],
-  Monthly: [
-    { date: 'May 2025',  revenue: '₹6,48,500', orders: 9800, customers: 7240, avgOrderValue: '₹662', repeatCustomers: 2680, netProfit: '₹2,24,350' },
-    { date: 'April 2025',revenue: '₹5,63,200', orders: 8950, customers: 6620, avgOrderValue: '₹629', repeatCustomers: 2380, netProfit: '₹1,90,100' },
-    { date: 'March 2025',revenue: '₹5,28,400', orders: 8600, customers: 6310, avgOrderValue: '₹614', repeatCustomers: 2180, netProfit: '₹1,75,400' },
-  ],
-};
-
-// ── Store ──────────────────────────────────────────────────────────────────
-
 // ── Store ──────────────────────────────────────────────────────────────────
 
 interface ReportsState {
@@ -340,9 +156,9 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   peakHoursRange: 'Daily',
 
   dateRangeSelection: {
-    startDate: new Date(2025, 4, 12),
-    endDate:   new Date(2025, 4, 18),
-    label:     'May 12 – May 18, 2025',
+    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    endDate:   new Date(),
+    label:     'Last 7 Days',
   },
   isCalendarOpen: false,
 
@@ -357,16 +173,16 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
   dailySummary: [],
 
   salesByChannel: [
-    { channel: 'Dine-in',  pct: 45, amount: '₹73,575', color: '#f97316' },
-    { channel: 'Takeaway', pct: 30, amount: '₹49,020', color: '#3b82f6' },
-    { channel: 'Delivery', pct: 20, amount: '₹32,680', color: '#22c55e' },
-    { channel: 'Online',   pct:  5, amount: '₹8,170',  color: '#a855f7' },
+    { channel: 'Dine-in',  pct: 45, amount: '₹0', color: '#f97316' },
+    { channel: 'Takeaway', pct: 30, amount: '₹0', color: '#3b82f6' },
+    { channel: 'Delivery', pct: 20, amount: '₹0', color: '#22c55e' },
+    { channel: 'Online',   pct:  5, amount: '₹0', color: '#a855f7' },
   ],
 
   insights: [
-    { id: 'i1', emoji: '📈', color: 'bg-green-50 dark:bg-green-950/40 border-green-100 dark:border-green-900/40',   title: 'Revenue is up 8.3% compared to last week.', body: 'Great job! Your business is growing steadily.' },
-    { id: 'i2', emoji: '🕕', color: 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/40',      title: 'Friday & Saturday are your busiest days.', body: 'Consider scheduling more staff during these peak times.' },
-    { id: 'i3', emoji: '⭐', color: 'bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40',  title: 'Margherita Pizza is your top selling item.', body: 'It contributed 17% of total sales this week.' },
+    { id: 'i1', emoji: '📈', color: 'bg-green-50 dark:bg-green-950/40 border-green-100 dark:border-green-900/40',   title: 'Revenue is trending.', body: 'Keep an eye on your daily performance.' },
+    { id: 'i2', emoji: '🕕', color: 'bg-blue-50 dark:bg-blue-950/40 border-blue-100 dark:border-blue-900/40',      title: 'Peak hours identified.', body: 'Schedule staff during busiest times.' },
+    { id: 'i3', emoji: '⭐', color: 'bg-amber-50 dark:bg-amber-950/40 border-amber-100 dark:border-amber-900/40',  title: 'Top items drive sales.', body: 'Focus marketing on your best sellers.' },
   ],
 
   shortcuts: [
@@ -431,133 +247,113 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
       const prevStartDate = new Date(prevEndDate.getTime() - durationMs);
       const prevFromStr = formatQueryDate(prevStartDate);
       const prevToStr = formatQueryDate(prevEndDate);
+      const vsLabel = 'last period';
 
-      // Fetch current and previous overview
-      const [currOverviewRes, prevOverviewRes] = await Promise.all([
+      // Build groupBy from per-widget ranges
+      const revGroupBy = get().revenueRange === 'Monthly' ? 'month' : 'day';
+      const ordGroupBy = get().ordersRange === 'Monthly' ? 'month' : 'day';
+      const topItemsLimit = 50; // get enough items for scrollable list
+
+      // Fetch all analytics endpoints in parallel
+      const [
+        currOverviewRes,
+        prevOverviewRes,
+        ordersRes,
+        topItemsRes,
+        revRes,
+        peakRes,
+      ] = await Promise.all([
         apiClient.get(`/admin/analytics/overview?from=${fromStr}&to=${toStr}`),
         apiClient.get(`/admin/analytics/overview?from=${prevFromStr}&to=${prevToStr}`),
+        apiClient.get(`/admin/analytics/orders?from=${fromStr}&to=${toStr}`),
+        apiClient.get(`/admin/analytics/top-items?from=${fromStr}&to=${toStr}&limit=${topItemsLimit}`),
+        apiClient.get(`/admin/analytics/revenue?from=${fromStr}&to=${toStr}&groupBy=${revGroupBy}`),
+        apiClient.get(`/admin/analytics/peak-hours?from=${fromStr}&to=${toStr}`),
       ]);
 
       const currData = currOverviewRes.data?.data || currOverviewRes.data || {};
       const prevData = prevOverviewRes.data?.data || prevOverviewRes.data || {};
+      const ordersData = ordersRes.data?.data || ordersRes.data || {};
+      const topItemsRaw = topItemsRes.data?.data?.items || topItemsRes.data?.items || [];
+      const revData = revRes.data?.data || revRes.data || {};
+      const peakData = peakRes.data?.data || peakRes.data || {};
 
-      // Extract current stats
+      // ── Extract current stats ──
       const currRevenue = currData.revenue || 0;
       const currOrders = currData.summary?.billCount || 0;
       const currAvgValue = currData.summary?.averageBillValue || 0;
       const currCustomers = currData.metrics?.totalCustomers || 0;
       const currRepeat = currData.metrics?.repeatCustomersCount || 0;
-      const currProfit = Math.round(currRevenue * 0.35); // 35% margin estimation
+      const currTax = currData.summary?.totalTax || 0;
+      const currDiscount = currData.summary?.totalDiscount || 0;
+      const currProfit = Math.max(0, currRevenue - currTax - currDiscount);
 
-      // Extract previous stats
+      // Extract prev stats
       const prevRevenue = prevData.revenue || 0;
       const prevOrders = prevData.summary?.billCount || 0;
       const prevAvgValue = prevData.summary?.averageBillValue || 0;
       const prevCustomers = prevData.metrics?.totalCustomers || 0;
       const prevRepeat = prevData.metrics?.repeatCustomersCount || 0;
-      const prevProfit = Math.round(prevRevenue * 0.35);
+      const prevTax = prevData.summary?.totalTax || 0;
+      const prevDiscount = prevData.summary?.totalDiscount || 0;
+      const prevProfit = Math.max(0, prevRevenue - prevTax - prevDiscount);
 
-      // Helper to compute formatted changes
-      const calculateChange = (curr: number, prev: number, label: string) => {
-        if (prev === 0) return curr > 0 ? `↑ 100% vs ${label}` : `0% vs ${label}`;
+      const calculateChange = (curr: number, prev: number) => {
+        if (prev === 0) return curr > 0 ? '↑ 100%' : '0%';
         const pct = ((curr - prev) / prev) * 100;
         const sign = pct >= 0 ? '↑' : '↓';
-        return `${sign} ${Math.abs(pct).toFixed(1)}% vs ${label}`;
+        return `${sign} ${Math.abs(pct).toFixed(1)}%`;
       };
-
-      const globalRange = get().globalRange;
-      const vsLabel = globalRange === 'Daily' ? 'yesterday' : globalRange === 'Weekly' ? 'last week' : 'last month';
 
       const stats: ReportStats = {
-        totalRevenue: `₹${currRevenue.toLocaleString('en-IN')}`,
-        totalRevenueChange: calculateChange(currRevenue, prevRevenue, vsLabel),
-        totalOrders: currOrders,
-        totalOrdersChange: calculateChange(currOrders, prevOrders, vsLabel),
-        avgOrderValue: `₹${currAvgValue.toLocaleString('en-IN')}`,
-        avgOrderValueChange: calculateChange(currAvgValue, prevAvgValue, vsLabel),
+        totalRevenue: `₹${Math.round(currRevenue).toLocaleString('en-IN')}`,
+        totalRevenueChange: `${calculateChange(currRevenue, prevRevenue)} vs ${vsLabel}`,
+        totalOrders: ordersData.totalOrders ?? currOrders,
+        totalOrdersChange: `${calculateChange(ordersData.totalOrders ?? currOrders, prevOrders)} vs ${vsLabel}`,
+        avgOrderValue: `₹${Math.round(currAvgValue).toLocaleString('en-IN')}`,
+        avgOrderValueChange: `${calculateChange(currAvgValue, prevAvgValue)} vs ${vsLabel}`,
         totalCustomers: currCustomers,
-        totalCustomersChange: calculateChange(currCustomers, prevCustomers, vsLabel),
+        totalCustomersChange: `${calculateChange(currCustomers, prevCustomers)} vs ${vsLabel}`,
         repeatCustomers: currRepeat,
-        repeatCustomersChange: calculateChange(currRepeat, prevRepeat, vsLabel),
-        netProfit: `₹${currProfit.toLocaleString('en-IN')}`,
-        netProfitChange: calculateChange(currProfit, prevProfit, vsLabel),
+        repeatCustomersChange: `${calculateChange(currRepeat, prevRepeat)} vs ${vsLabel}`,
+        netProfit: `₹${Math.round(currProfit).toLocaleString('en-IN')}`,
+        netProfitChange: `${calculateChange(currProfit, prevProfit)} vs ${vsLabel}`,
       };
 
-      // Fetch Revenue Trend (using current range settings)
-      const revRange = get().revenueRange;
-      let trendFrom = fromStr;
-      let trendTo = toStr;
-      let trendGroupBy: 'day' | 'month' = 'day';
-
-      if (revRange === 'Weekly') {
-        const weeklyStart = new Date();
-        weeklyStart.setDate(weeklyStart.getDate() - 28);
-        trendFrom = formatQueryDate(weeklyStart);
-        trendTo = formatQueryDate(new Date());
-      } else if (revRange === 'Monthly') {
-        const monthlyStart = new Date();
-        monthlyStart.setMonth(monthlyStart.getMonth() - 5);
-        trendFrom = formatQueryDate(new Date(monthlyStart.getFullYear(), monthlyStart.getMonth(), 1));
-        trendTo = toStr;
-        trendGroupBy = 'month';
-      } else {
-        const dailyStart = new Date();
-        dailyStart.setDate(dailyStart.getDate() - 6);
-        trendFrom = formatQueryDate(dailyStart);
-        trendTo = toStr;
-      }
-
-      const revRes = await apiClient.get(
-        `/admin/analytics/revenue?from=${trendFrom}&to=${trendTo}&groupBy=${trendGroupBy}`
-      );
-      
+      // ── Revenue Trend ──
+      const rawRevenuePoints = revData.revenue || [];
       const formatPeriodLabel = (period: string): string => {
         if (!period) return '';
-        if (period.includes('-')) {
-          const parts = period.split('-');
-          if (parts.length === 3) {
-            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-            return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-          } else if (parts.length === 2) {
-            const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
-            return d.toLocaleDateString('en-IN', { month: 'short' });
-          }
+        const parts = period.split('-');
+        if (parts.length === 3) {
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        } else if (parts.length === 2) {
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+          return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
         }
         return period;
       };
 
-      const rawResData = revRes.data?.data || revRes.data || {};
-      const rawRevenuePoints = rawResData.revenue || [];
+      const revenueTrend = rawRevenuePoints.map((pt: any) => ({
+        date: formatPeriodLabel(pt.period),
+        revenue: pt.totalRevenue || 0,
+      }));
+      const ordersTrend = rawRevenuePoints.map((pt: any) => ({
+        date: formatPeriodLabel(pt.period),
+        orders: pt.billCount || 0,
+      }));
 
-      // Map dynamic trends
-      let revenueTrend: RevenuePoint[] = [];
-      let ordersTrend: OrdersTrendPoint[] = [];
+      // ── Top Selling Items from backend ──
+      const topSellingItems: TopSellingItem[] = topItemsRaw.map((item: any, idx: number) => ({
+        id: `tsi-${idx}`,
+        name: item.name || 'Unknown Item',
+        emoji: ['🍕', '🍔', '🥗', '🍝', '🌮', '🥩', '🍣', '🥘', '🍛', '🧆'][idx % 10],
+        orders: item.totalQuantity || 0,
+        revenue: `₹${Math.round(item.totalRevenue || 0).toLocaleString('en-IN')}`,
+      }));
 
-      if (revRange === 'Weekly' && rawRevenuePoints.length > 0) {
-        for (let i = 0; i < rawRevenuePoints.length; i += 7) {
-          const chunk = rawRevenuePoints.slice(i, i + 7);
-          const revSum = chunk.reduce((s: number, p: any) => s + (p.totalRevenue || 0), 0);
-          const ordSum = chunk.reduce((s: number, p: any) => s + (p.billCount || 0), 0);
-          const weekLabel = `Week ${Math.floor(i / 7) + 1}`;
-          revenueTrend.push({ date: weekLabel, revenue: revSum });
-          ordersTrend.push({ date: weekLabel, orders: ordSum });
-        }
-      } else {
-        revenueTrend = rawRevenuePoints.map((pt: any) => ({
-          date: formatPeriodLabel(pt.period),
-          revenue: pt.totalRevenue || 0,
-        }));
-        ordersTrend = rawRevenuePoints.map((pt: any) => ({
-          date: formatPeriodLabel(pt.period),
-          orders: pt.billCount || 0,
-        }));
-      }
-
-
-
-      // Fetch Peak Hours Heatmap
-      const peakRes = await apiClient.get(`/admin/analytics/peak-hours?from=${fromStr}&to=${toStr}`);
-      const peakData = peakRes.data?.data || peakRes.data || {};
+      // ── Peak Hours Heatmap ──
       const rawPeak = peakData.peakHours || [];
       const maxCount = Math.max(...rawPeak.map((p: any) => p.orderCount || 0)) || 1;
       
@@ -583,28 +379,21 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         });
       });
 
-      // Sales by Category
+      // ── Revenue by Category (estimated from overview) ──
       const revenueByCategory: RevenueByCategory[] = [
         { name: 'Food', pct: 70, amount: `₹${Math.round(currRevenue * 0.70).toLocaleString('en-IN')}`, color: '#f97316' },
         { name: 'Beverages', pct: 20, amount: `₹${Math.round(currRevenue * 0.20).toLocaleString('en-IN')}`, color: '#3b82f6' },
         { name: 'Desserts', pct: 10, amount: `₹${Math.round(currRevenue * 0.10).toLocaleString('en-IN')}`, color: '#22c55e' },
       ];
 
-      // Top Selling Items (Scaled by actual revenue & orders)
-      const topSellingItems: TopSellingItem[] = [
-        { id: 't1', name: 'Margherita Pizza', emoji: '🍕', orders: Math.round(currOrders * 0.30), revenue: `₹${Math.round(currRevenue * 0.30).toLocaleString('en-IN')}` },
-        { id: 't2', name: 'Chicken Burger', emoji: '🍔', orders: Math.round(currOrders * 0.25), revenue: `₹${Math.round(currRevenue * 0.25).toLocaleString('en-IN')}` },
-        { id: 't3', name: 'Caesar Salad', emoji: '🥗', orders: Math.round(currOrders * 0.20), revenue: `₹${Math.round(currRevenue * 0.20).toLocaleString('en-IN')}` },
-        { id: 't4', name: 'Pasta Alfredo', emoji: '🍝', orders: Math.round(currOrders * 0.15), revenue: `₹${Math.round(currRevenue * 0.15).toLocaleString('en-IN')}` },
-        { id: 't5', name: 'BBQ Chicken Pizza', emoji: '🍕', orders: Math.round(currOrders * 0.10), revenue: `₹${Math.round(currRevenue * 0.10).toLocaleString('en-IN')}` },
-      ];
-
-      // Daily/Weekly/Monthly Summary rows
-      const dailySummary: DailySummaryRow[] = rawRevenuePoints.slice(0, 5).map((pt: any) => {
+      // ── Daily/Weekly/Monthly Summary rows ──
+      const dailySummary: DailySummaryRow[] = rawRevenuePoints.slice(0, 7).map((pt: any) => {
         const revVal = pt.totalRevenue || 0;
         const ordVal = pt.billCount || 0;
+        const taxVal = pt.totalTax || 0;
+        const discVal = pt.totalDiscount || 0;
         const avgVal = ordVal > 0 ? Math.round(revVal / ordVal) : 0;
-        const profitVal = Math.round(revVal * 0.35);
+        const profitVal = Math.max(0, revVal - taxVal - discVal);
         const custVal = Math.round(ordVal * 0.85);
         const repeatVal = Math.round(custVal * 0.3);
         return {
@@ -618,6 +407,37 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         };
       });
 
+      // ── Sales by Channel ──
+      const paymentReport = revData.paymentReport || currData.paymentReport || [];
+      const totalChannelAmount = paymentReport.reduce((s: number, p: any) => s + (p.totalAmount || 0), 0);
+      const channelColors: Record<string, string> = {
+        CASH: '#22c55e',
+        CARD: '#3b82f6',
+        ONLINE: '#a855f7',
+        UNKNOWN: '#6b7280',
+      };
+      const channelLabels: Record<string, SalesChannel> = {
+        CASH: 'Dine-in',
+        CARD: 'Dine-in',
+        ONLINE: 'Online',
+        UNKNOWN: 'Dine-in',
+      };
+      const salesByChannel: SalesByChannel[] = paymentReport.length > 0
+        ? paymentReport.map((p: any) => {
+            const method = p.paymentMethod || 'UNKNOWN';
+            const amount = p.totalAmount || 0;
+            return {
+              channel: channelLabels[method] || 'Dine-in',
+              pct: totalChannelAmount > 0 ? Math.round((amount / totalChannelAmount) * 100) : 0,
+              amount: `₹${Math.round(amount).toLocaleString('en-IN')}`,
+              color: channelColors[method] || '#f97316',
+            };
+          })
+        : get().salesByChannel.map((ch) => ({
+            ...ch,
+            amount: `₹${Math.round(currRevenue * (ch.pct / 100)).toLocaleString('en-IN')}`,
+          }));
+
       set({
         stats,
         revenueTrend,
@@ -626,6 +446,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         revenueByCategory,
         topSellingItems,
         dailySummary,
+        salesByChannel,
         loading: false,
       });
     } catch (err: any) {

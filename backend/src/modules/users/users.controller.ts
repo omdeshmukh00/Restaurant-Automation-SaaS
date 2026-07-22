@@ -56,26 +56,89 @@ export const requestProfileOtp = asyncHandler(async (req: Request, res: Response
 
 /**
  * PATCH /users/me — Update current user's profile.
+ *
+ * If the request includes a new `mobile` value, the phone number is NOT
+ * updated immediately. Instead it is stored as `pendingPhone` and an OTP
+ * is sent to the user's registered email. The caller must subsequently
+ * call POST /users/me/verify-phone with the OTP to finalise the change.
+ *
+ * If the request does NOT include `mobile`, fields update normally.
  */
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { otp, ...updates } = req.body;
+  const { otp, mobile, ...otherUpdates } = req.body;
+  const userId = req.user!._id;
+  const userEmail = req.user?.email;
 
-  // If OTP is provided, verify it against the registered email
-  if (otp) {
-    const userEmail = req.user?.email;
+  // If a new phone is provided, store as pending and trigger OTP
+  if (mobile) {
     if (!userEmail) {
-      throw new AppError('No registered email found to verify OTP', 400, ErrorCode.INVALID_REQUEST);
+      throw new AppError('No registered email found for OTP verification', 400, ErrorCode.INVALID_REQUEST);
     }
-    await otpService.verifyOTP(userEmail, 'email', otp);
+
+    // Store other non-phone updates immediately
+    if (Object.keys(otherUpdates).length > 0) {
+      await userService.updateProfile(userId, otherUpdates);
+    }
+
+    // Save the pending phone number
+    await userService.setPendingPhone(userId, mobile);
+
+    // Generate and send OTP to the registered email
+    const { otp: otpCode } = await otpService.createOTP(userEmail, 'email');
+
+    // Import sendOTPEmail already at top of file via mail.service
+    sendOTPEmail(userEmail, otpCode).catch((err) => {
+      logger.error('Failed to send phone change OTP email', err);
+    });
+
+    logger.warn(`[Phone Change OTP] Email=${userEmail} OTP=${otpCode}`);
+
+    sendSuccess(res, {
+      message: 'OTP sent to your registered email. Please verify to complete phone number change.',
+      pendingPhone: mobile,
+      otpSent: true,
+      otpExpiresIn: 300, // 5 minutes
+    });
+    return;
   }
 
-  const user = await userService.updateProfile(req.user!._id, updates);
-
+  // Standard update without phone change
+  const user = await userService.updateProfile(userId, req.body);
   if (!user) {
     throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
   }
-
   sendSuccess(res, { user });
+});
+
+/**
+ * POST /users/me/verify-phone — Verify OTP and finalise pending phone number change.
+ */
+export const verifyPhoneOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { otp } = req.body;
+  const userId = req.user!._id;
+
+  if (!otp) {
+    throw new AppError('OTP is required', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const userEmail = req.user?.email;
+  if (!userEmail) {
+    throw new AppError('No registered email found', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  // Verify the OTP
+  await otpService.verifyOTP(userEmail, 'email', otp);
+
+  // Apply the pending phone number
+  const updatedUser = await userService.applyPendingPhone(userId);
+  if (!updatedUser) {
+    throw new AppError('No pending phone number found to verify', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  sendSuccess(res, {
+    message: 'Phone number updated successfully.',
+    user: updatedUser,
+  });
 });
 
 /**
@@ -268,18 +331,22 @@ export const updateMyReservation = asyncHandler(async (req: Request, res: Respon
   }
 
   const { ReservationModel } = await import('../reservations/reservations.model');
+  const { ReservationsService } = await import('../reservations/reservations.service');
   const { id } = req.params;
   const updates = req.body;
 
-  const reservation = await ReservationModel.findOneAndUpdate(
-    { _id: id, mobile: user.mobile },
-    updates,
-    { new: true }
-  ).lean();
-
-  if (!reservation) {
+  // Verify the reservation belongs to this user
+  const existing = await ReservationModel.findOne({ _id: id, mobile: user.mobile }).lean();
+  if (!existing) {
     throw new AppError('Reservation not found or unauthorized', 404, ErrorCode.NOT_FOUND);
   }
+
+  // Route through the service for proper conflict detection and status transitions
+  const reservation = await ReservationsService.updateReservation(
+    existing.restaurantId.toString(),
+    id,
+    updates,
+  );
 
   sendSuccess(res, { reservation });
 });

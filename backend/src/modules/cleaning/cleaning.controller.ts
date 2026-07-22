@@ -6,6 +6,8 @@ import { ok } from '../../utils/responses';
 import { updateTableStatus } from '../tables/tables.service';
 import { CleaningTaskModel } from './cleaning.model';
 import { logger } from '../../config/logger';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../../constants/roles';
 
 function ensureCleaningStatus(currentStatus: CleaningStatus, allowedStatuses: CleaningStatus[], message: string): void {
   if (!allowedStatuses.includes(currentStatus)) {
@@ -144,6 +146,17 @@ export class CleaningController {
         TableStatus.AVAILABLE,
         task.restaurantId.toString()
       );
+
+      // Notify admin about cleaning task completion
+      NotificationsService.createNotification({
+        restaurantId: task.restaurantId.toString(),
+        recipientRole: UserRole.RESTAURANT_ADMIN,
+        title: 'Cleaning Task Completed',
+        message: `Cleaning task for table has been completed.`,
+        type: 'CLEANING_TASK_COMPLETED',
+        entityId: task._id.toString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      }).catch(() => {});
 
       logger.info('Cleaning task completed', { taskId: task._id, tableId: task.tableId });
 

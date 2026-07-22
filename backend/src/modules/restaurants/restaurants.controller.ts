@@ -12,6 +12,8 @@ import { logAudit } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import * as SubscriptionService from '../subscriptions/subscriptions.service';
 import { PlatformPlanModel } from '../superAdmin/superAdmin.model';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../../constants/roles';
 
 async function resolveRestaurantIdForRequest(req: Request): Promise<string> {
   const fromToken = req.user?.restaurantId?.toString();
@@ -96,6 +98,13 @@ export const getRestaurantSettingsController = asyncHandler(async (req: Request,
       plan: restaurant.plan ?? '',
     },
     settings: restaurant.settings ?? {},
+    gst: {
+      gstEnabled: restaurant.gstEnabled ?? false,
+      gstNumber: restaurant.gstNumber ?? '',
+      legalBusinessName: restaurant.legalBusinessName ?? '',
+      defaultGSTPercentage: restaurant.defaultGSTPercentage ?? 0,
+      invoicePrefix: restaurant.invoicePrefix ?? '',
+    },
     billing,
   });
 });
@@ -161,7 +170,7 @@ export const updateRestaurantSettingsController = asyncHandler(async (req: Reque
   const restaurant = await findRestaurantForRequest(req);
 
   // ── Top-level restaurant fields (distinct from the `settings` sub-object) ──
-  const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan'] as const;
+  const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan', 'gstEnabled', 'gstNumber', 'legalBusinessName', 'defaultGSTPercentage', 'invoicePrefix'] as const;
   const topLevel: Record<string, unknown> = {};
   for (const field of TOP_LEVEL_FIELDS) {
     if (req.body[field] !== undefined) {
@@ -215,6 +224,18 @@ export const updateRestaurantSettingsController = asyncHandler(async (req: Reque
     restaurantId: restaurant.id,
     settings: restaurant.settings,
   });
+
+  // Notify admin about settings update
+  NotificationsService.createNotification({
+    restaurantId: restaurant.id,
+    recipientRole: UserRole.RESTAURANT_ADMIN,
+    title: 'Restaurant Settings Updated',
+    message: `Restaurant settings have been modified.`,
+    type: 'RESTAURANT_SETTINGS_MODIFIED',
+    actionUrl: '/admin/settings',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  }).catch(() => {});
+
   void logAudit(req, {
     entityType: AuditEntity.RESTAURANT,
     entityId:   restaurant.id.toString(),
@@ -255,6 +276,17 @@ export const updateRestaurantProfileController = asyncHandler(async (req: Reques
   }
 
   await restaurant.save();
+
+  // Notify admin about restaurant profile update
+  NotificationsService.createNotification({
+    restaurantId: restaurant.id,
+    recipientRole: UserRole.RESTAURANT_ADMIN,
+    title: 'Restaurant Profile Updated',
+    message: `Restaurant profile has been updated successfully.`,
+    type: 'RESTAURANT_PROFILE_UPDATED',
+    actionUrl: '/admin/settings',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  }).catch(() => {});
 
   ok(res, {
     message: 'Profile updated successfully',

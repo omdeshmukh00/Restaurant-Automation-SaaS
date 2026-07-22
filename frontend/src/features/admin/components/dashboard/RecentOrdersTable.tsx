@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useOrdersStore, formatTimeAgo } from '../../store/orders.store';
+import { useOrdersStore, formatClockTime, formatOrderDate } from '../../store/orders.store';
 import { useDashboardStore } from '../../store/dashboard.store';
 
 export function RecentOrdersTable(): JSX.Element {
@@ -56,7 +56,8 @@ export function RecentOrdersTable(): JSX.Element {
                   </span>
                 </td>
                 <td className="px-4 sm:px-5 py-3.5 text-xs text-gray-400 dark:text-gray-500 hidden sm:table-cell whitespace-nowrap">
-                  {order.timeRaw ? formatTimeAgo(order.timeRaw) : order.time}
+                  <span className="block">{order.timeRaw ? formatClockTime(order.timeRaw) : order.time}</span>
+                  <span className="block text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">{order.timeRaw ? formatOrderDate(order.timeRaw) : ''}</span>
                 </td>
               </tr>
             ))}

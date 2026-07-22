@@ -33,6 +33,9 @@ router.patch('/me/reservations/:id', userController.updateMyReservation);
 // PATCH /users/me — Update profile
 router.patch('/me', validate({ body: updateProfileSchema }), userController.updateProfile);
 
+// POST /users/me/verify-phone — Verify OTP and finalise pending phone number change
+router.post('/me/verify-phone', userController.verifyPhoneOtp);
+
 // PATCH /users/me/password — Change password
 router.patch('/me/password', validate({ body: changePasswordSchema }), userController.changePassword);
 

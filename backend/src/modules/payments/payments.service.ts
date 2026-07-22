@@ -700,6 +700,20 @@ export class PaymentsService {
     payment.status = PaymentStatus.REFUNDED as any;
     await payment.save();
 
+    // Notify admin about refund
+    const { NotificationsService } = await import('../notifications/notifications.service');
+    const { UserRole } = await import('../../constants/roles');
+    NotificationsService.createNotification({
+      restaurantId: new mongoose.Types.ObjectId(restaurantId),
+      recipientRole: UserRole.RESTAURANT_ADMIN,
+      title: 'Refund Processed',
+      message: `Refund of ₹${amountToRefund.toFixed(2)} has been processed. Reason: ${reason || 'N/A'}.`,
+      type: 'PAYMENT_REFUND_PROCESSED',
+      entityId: payment._id.toString(),
+      actionUrl: '/admin/orders',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    }).catch(() => {});
+
     return payment;
   }
 
@@ -910,6 +924,24 @@ export class PaymentsService {
       payment.status = PaymentStatus.FAILED as any;
       payment.failureReason = entity.error_description ?? 'Payment failed';
       await payment.save();
+
+      // Notify admin about payment failure
+      try {
+        const { NotificationsService } = await import('../notifications/notifications.service');
+        const { UserRole } = await import('../../constants/roles');
+        NotificationsService.createNotification({
+          restaurantId: new mongoose.Types.ObjectId(payment.restaurantId),
+          recipientRole: UserRole.RESTAURANT_ADMIN,
+          title: 'Payment Failed',
+          message: `Payment of ₹${(payment.amount || 0).toFixed(2)} failed. Reason: ${payment.failureReason || 'Unknown'}.`,
+          type: 'PAYMENT_FAILED',
+          entityId: payment._id.toString(),
+          actionUrl: '/admin/orders',
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        }).catch(() => {});
+      } catch (e) {
+        // Ignore
+      }
 
       // Create platform system alert for Super Admin
       try {

@@ -400,6 +400,7 @@ function mapActivity(log: AuditLogEntry): ActivityItem {
 
 interface DashboardStore extends DashboardState {
   fetchDashboard: () => Promise<void>;
+  addActivityFromSocket: (data: any) => void;
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -500,5 +501,59 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       console.error('[dashboard] fetchDashboard derivation failed', err);
       set({ loading: false });
     }
+  },
+
+  addActivityFromSocket: (data: any) => {
+    // Transform the incoming socket activity payload into an ActivityItem
+    // and prepend it to the list (keeping max ~50 items).
+    const action: string = data.action || '';
+    const entityType: string = data.entityType || '';
+    const text = FRIENDLY_ACTION[action] ?? titleCase(action);
+
+    const meta = data.metadata || {};
+    let suffix = '';
+    if (typeof meta.total === 'number') suffix = ` · ${formatCurrency(meta.total)}`;
+    else if (typeof meta.amount === 'number') suffix = ` · ${formatCurrency(meta.amount)}`;
+
+    const negative = /CANCEL|REJECT|FAIL|EXPIRED|DELETED/.test(action);
+    const orderLike = /ORDER|KITCHEN|PAYMENT|BILL/.test(entityType) || /ORDER|KITCHEN|PAYMENT/.test(action);
+    const sessionLike = /SESSION|TABLE/.test(entityType);
+    const adminLike = /STAFF|MENU|OFFER|INVENTORY|SETTINGS|SUPPLIER/.test(entityType) || /ADMIN/.test(action);
+
+    let icon: LucideIcon = Activity;
+    let color = 'text-gray-500';
+    let bg = 'bg-gray-50 dark:bg-gray-800/50';
+
+    if (negative) {
+      icon = XCircle;
+      color = 'text-red-500';
+      bg = 'bg-red-50 dark:bg-red-900/30';
+    } else if (orderLike) {
+      icon = CheckCircle2;
+      color = 'text-green-500';
+      bg = 'bg-green-50 dark:bg-green-900/30';
+    } else if (sessionLike) {
+      icon = Clock;
+      color = 'text-blue-500';
+      bg = 'bg-blue-50 dark:bg-blue-900/30';
+    } else if (adminLike) {
+      icon = Settings;
+      color = 'text-purple-500';
+      bg = 'bg-purple-50 dark:bg-purple-900/30';
+    }
+
+    const timeRaw = getActivityTimestamp(data.createdAt);
+    const item: ActivityItem = {
+      icon,
+      color,
+      bg,
+      text: text + suffix,
+      time: formatActivityTime(timeRaw),
+      timeRaw,
+    };
+
+    set((state) => ({
+      activities: [item, ...state.activities].slice(0, 50),
+    }));
   },
 }));

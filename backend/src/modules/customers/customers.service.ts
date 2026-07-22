@@ -71,10 +71,6 @@ function deriveStatus(lastVisitAt?: Date | string | null): CustomerDto['status']
   return last.getTime() >= cutoff ? 'Active' : 'Inactive';
 }
 
-// Build a CustomerDto from a User (the login identity — the source of truth)
-// joined with its optional analytics profile (loyalty/visits/spend). Customers
-// that signed up via OTP or reservations may not yet have a profile, in which
-// case analytics default to zero and the customer is shown as Inactive.
 function shapeFromUser(user: any, profile?: any | null): CustomerDto {
   const totalSpent = profile?.totalSpent || 0;
   const totalVisits = profile?.totalVisits || 0;
@@ -134,30 +130,116 @@ interface GetCustomersResult {
   customerOverview: { active: number; inactive: number; new: number; total: number };
 }
 
+/**
+ * Build all common mobile-format variants for a digits-only number so we can
+ * reliably match Users whose `mobile` field may store '+91', '91', or plain digits.
+ */
+function mobileFormats(digits: string): string[] {
+  const formats = [digits];
+  if (digits.length === 10) {
+    formats.push(`91${digits}`, `+91${digits}`);
+  } else if (digits.length === 12 && digits.startsWith('91')) {
+    const raw = digits.slice(2);
+    formats.push(raw, `+91${raw}`);
+  }
+  return [...new Set(formats)];
+}
+
+/**
+ * Returns the set of mobile numbers (digits-only, deduplicated) that belong
+ * to the given restaurant. A customer belongs to a restaurant if:
+ *   (a) User.restaurantId matches, OR
+ *   (b) CustomerProfile.restaurantsVisited contains the restaurantId
+ */
+async function resolveRestaurantMobiles(restaurantId: string): Promise<Set<string>> {
+  const rid = new Types.ObjectId(restaurantId);
+
+  // Source A: Users who registered with this restaurant (OTP signup, admin-created)
+  const userMobiles = new Set<string>();
+  const restaurantUsers = await UserModel.find({
+    role: UserRole.CUSTOMER,
+    restaurantId: rid,
+  })
+    .setOptions({ bypassTenant: true })
+    .lean()
+    .exec();
+  for (const u of restaurantUsers) {
+    userMobiles.add(digitsOnly(u.mobile));
+  }
+
+  // Source B: CustomerProfiles that have visited this restaurant
+  const profileMobiles = new Set<string>();
+  const visitingProfiles = await CustomerProfileModel.find({
+    restaurantsVisited: rid,
+  })
+    .setOptions({ bypassTenant: true })
+    .lean()
+    .exec();
+  for (const p of visitingProfiles) {
+    profileMobiles.add(digitsOnly(p.mobile));
+  }
+
+  // Union is the complete set of mobiles that belong to this restaurant
+  return new Set([...userMobiles, ...profileMobiles]);
+}
+
 export const CustomersService = {
-  // The Customers page is backed by the `users` collection (role=CUSTOMER) — that
-  // is where every customer is created (OTP signup, reservations, admin add). We do
-  // NOT scope by restaurant so that ALL previously-created customers are shown,
-  // including OTP signups whose `restaurantId` is null. Loyalty analytics are joined
-  // from `customerprofiles` by mobile (digits-only match).
+  /**
+   * Get customers scoped to a single restaurant.
+   *
+   * A customer appears in a restaurant's list if they have at least one
+   * restaurant-scoped interaction: started a table session, placed an order,
+   * completed a payment, made a reservation, submitted feedback, or was
+   * created directly by the restaurant admin.
+   *
+   * Data sources (union, deduplicated by mobile):
+   *  1. Users with role=CUSTOMER and restaurantId == this restaurant
+   *  2. CustomerProfiles whose restaurantsVisited array includes this restaurant
+   */
   async getAdminCustomers(
     restaurantId: string,
     filters: { status?: string; tier?: string; q?: string; page?: number; perPage?: number },
   ): Promise<GetCustomersResult> {
-    // NOTE: The global tenantPlugin injects `tenantId: <currentTenant>` into every
-    // Mongoose query. Landing-page signups (and OTP signups) are created WITHOUT a
-    // tenantId, so tenant-scoping would hide them. We intentionally BYPASS tenant
-    // scoping here so the admin sees ALL their customers, including the signups.
-    const users = await UserModel.find({ role: UserRole.CUSTOMER }).setOptions({ bypassTenant: true }).lean().exec();
-    const profiles = await CustomerProfileModel.find({}).setOptions({ bypassTenant: true }).lean().exec();
+    // ── Step 1: Resolve all mobile numbers belonging to this restaurant ────
+    const relevantMobiles = await resolveRestaurantMobiles(restaurantId);
 
-    // Index loyalty profiles by mobile so we can (a) join analytics onto users
-    // and (b) surface profiles that have no matching login identity at all.
+    // ── Step 2: Load all matching Users (any mobile format) ────────────────
+    // Build a flat list of every possible mobile-string variant so we match
+    // User records regardless of whether they store '+91', '91', or plain digits.
+    const allVariants: string[] = [];
+    for (const mobile of relevantMobiles) {
+      for (const fmt of mobileFormats(mobile)) {
+        allVariants.push(fmt);
+      }
+    }
+
+    const users = allVariants.length > 0
+      ? await UserModel.find({
+          role: UserRole.CUSTOMER,
+          mobile: { $in: allVariants },
+        })
+          .setOptions({ bypassTenant: true })
+          .lean()
+          .exec()
+      : [];
+
+    // ── Step 3: Load matching CustomerProfiles ─────────────────────────────
+    const profiles = allVariants.length > 0
+      ? await CustomerProfileModel.find({
+          mobile: { $in: Array.from(relevantMobiles) },
+        })
+          .setOptions({ bypassTenant: true })
+          .lean()
+          .exec()
+      : [];
+
+    // Index profiles by mobile (digits-only) for fast lookup
     const profileByMobile = new Map<string, any>();
     for (const p of profiles) {
       profileByMobile.set(digitsOnly(p.mobile), p);
     }
 
+    // ── Step 4: Build the customer list ────────────────────────────────────
     let totalSpentSum = 0;
     let totalVisitsSum = 0;
     let loyal = 0;
@@ -172,7 +254,7 @@ export const CustomersService = {
     const items: { dto: CustomerDto; date: number }[] = [];
     const seenMobiles = new Set<string>();
 
-    // 1) Every customer login identity (users with role CUSTOMER).
+    // 4a. Every matching User → shape into CustomerDto
     for (const u of users) {
       const key = digitsOnly(u.mobile);
       seenMobiles.add(key);
@@ -192,9 +274,8 @@ export const CustomersService = {
       items.push({ dto, date: ts });
     }
 
-    // 2) Loyalty/reservation profiles that have no matching user login — e.g.
-    //    customers who booked or ordered but never did an OTP/email signup.
-    //    Without this, the admin only ever sees customers who signed up.
+    // 4b. Standalone profiles (no matching User) — customers who visited
+    //     but never did an OTP/email signup (e.g. reservation-only guests).
     for (const p of profiles) {
       const key = digitsOnly(p.mobile);
       if (seenMobiles.has(key)) continue;
@@ -221,8 +302,7 @@ export const CustomersService = {
       items.push({ dto, date: ts });
     }
 
-    // Newest first so freshly registered / created customers appear at the top
-    // of the admin list (and stay visible after a live re-fetch).
+    // Newest first
     const shaped = items.sort((a, b) => b.date - a.date).map((i) => i.dto);
     const total = shaped.length;
     const filtered = shaped.filter((c) => matchesFilters(c, filters));
@@ -277,6 +357,9 @@ export const CustomersService = {
     };
   },
 
+  /**
+   * Get a single customer by ID, but ONLY if they belong to the given restaurant.
+   */
   async getCustomerById(restaurantId: string, id: string): Promise<CustomerDto> {
     const user = await UserModel.findOne({
       _id: new Types.ObjectId(id),
@@ -285,14 +368,22 @@ export const CustomersService = {
       .setOptions({ bypassTenant: true })
       .lean()
       .exec();
+
     if (user) {
-      const profile = await CustomerProfileModel.findOne({ mobile: digitsOnly(user.mobile) })
+      // Verify this user belongs to the restaurant
+      const mobile = digitsOnly(user.mobile);
+      const belongs = await customerBelongsToRestaurant(restaurantId, user, mobile);
+      if (!belongs) {
+        throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
+      }
+      const profile = await CustomerProfileModel.findOne({ mobile })
         .setOptions({ bypassTenant: true })
         .lean()
         .exec();
       return shapeFromUser(user, profile);
     }
-    // Fallback: this id may be a standalone loyalty/reservation profile.
+
+    // Fallback: standalone CustomerProfile (no User record)
     const profile = await CustomerProfileModel.findById(new Types.ObjectId(id))
       .setOptions({ bypassTenant: true })
       .lean()
@@ -300,8 +391,22 @@ export const CustomersService = {
     if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
+    // Verify profile belongs to this restaurant
+    const rid = new Types.ObjectId(restaurantId);
+    const visited = (profile.restaurantsVisited || []).some(
+      (r: any) => r.toString() === restaurantId,
+    );
+    if (!visited) {
+      throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
+    }
     return shapeFromUser(
-      { _id: profile._id, name: profile.name || profile.mobile, email: profile.email || '', mobile: profile.mobile, avatar: undefined },
+      {
+        _id: profile._id,
+        name: profile.name || profile.mobile,
+        email: profile.email || '',
+        mobile: profile.mobile,
+        avatar: undefined,
+      },
       profile,
     );
   },
@@ -313,9 +418,6 @@ export const CustomersService = {
     const mobile = data.mobile; // digits-only (schema-normalized)
     const rid = restaurantId ? new Types.ObjectId(restaurantId) : undefined;
 
-    // The User is the login identity. Block duplicate mobile numbers with a clear
-    // 409 so the admin knows this customer already exists. We also guard the common
-    // Indian dialing formats ('+91', '91' prefixes) against the digits-only value.
     const existing = await UserModel.findOne({
       role: UserRole.CUSTOMER,
       $or: [
@@ -345,16 +447,14 @@ export const CustomersService = {
         isEmailVerified: false,
       });
     } catch (err: any) {
-      // Email is a sparse unique field; a collision surfaces as 11000.
       if (err?.code === 11000) {
         throw new AppError('A user with this email already exists', 409, ErrorCode.CONFLICT);
       }
       throw err;
     }
 
-    // Mirror into the analytics profile (no auth) so this customer shows spend/visits
-    // consistently alongside OTP/reservation-created customers. Never overwrite an
-    // existing profile's accumulated analytics.
+    // Mirror into the analytics profile — ensure restaurantsVisited is set so this
+    // customer appears in the restaurant's customer list.
     const profile = await CustomerProfileModel.findOne({ mobile })
       .setOptions({ bypassTenant: true })
       .lean()
@@ -415,31 +515,45 @@ export const CustomersService = {
       .setOptions({ bypassTenant: true })
       .lean()
       .exec();
+
     if (user) {
-      // Tags live on the analytics profile (the User model has no tags field).
+      // Verify this user belongs to the restaurant
+      const mobile = digitsOnly(user.mobile);
+      const belongs = await customerBelongsToRestaurant(restaurantId, user, mobile);
+      if (!belongs) {
+        throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
+      }
       if (updates.tags !== undefined) {
         await CustomerProfileModel.updateOne(
-          { mobile: digitsOnly(user.mobile) },
+          { mobile },
           { $set: { tags: updates.tags } },
           { upsert: false },
         )
           .setOptions({ bypassTenant: true })
           .exec();
       }
-      const profile = await CustomerProfileModel.findOne({ mobile: digitsOnly(user.mobile) })
+      const profile = await CustomerProfileModel.findOne({ mobile })
         .setOptions({ bypassTenant: true })
         .lean()
         .exec();
       return shapeFromUser(user, profile);
     }
 
-    // Fallback: standalone loyalty/reservation profile (no login identity).
+    // Fallback: standalone profile
     const profile = await CustomerProfileModel.findById(new Types.ObjectId(id))
       .setOptions({ bypassTenant: true })
       .lean()
       .exec();
     if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
+    }
+    // Verify profile belongs to this restaurant
+    const rid = new Types.ObjectId(restaurantId);
+    const visited = (profile.restaurantsVisited || []).some(
+      (r: any) => r.toString() === restaurantId,
+    );
+    if (!visited) {
+      throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
     }
     const profileSet: Record<string, unknown> = {};
     if (updates.name !== undefined) profileSet.name = updates.name;
@@ -453,7 +567,13 @@ export const CustomersService = {
       .lean()
       .exec();
     return shapeFromUser(
-      { _id: profile._id, name: profile.name || profile.mobile, email: profile.email || '', mobile: profile.mobile, avatar: undefined },
+      {
+        _id: profile._id,
+        name: profile.name || profile.mobile,
+        email: profile.email || '',
+        mobile: profile.mobile,
+        avatar: undefined,
+      },
       updated || profile,
     );
   },
@@ -466,18 +586,24 @@ export const CustomersService = {
       .setOptions({ bypassTenant: true })
       .lean()
       .exec();
+
     if (user) {
-      // Remove the login identity AND its analytics profile so the customer fully
-      // disappears from the admin view.
+      // Verify this user belongs to the restaurant
+      const mobile = digitsOnly(user.mobile);
+      const belongs = await customerBelongsToRestaurant(restaurantId, user, mobile);
+      if (!belongs) {
+        throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
+      }
       await UserModel.deleteOne({ _id: user._id })
         .setOptions({ bypassTenant: true })
         .exec();
-      await CustomerProfileModel.deleteOne({ mobile: digitsOnly(user.mobile) })
+      await CustomerProfileModel.deleteOne({ mobile })
         .setOptions({ bypassTenant: true })
         .exec();
       return;
     }
-    // Fallback: standalone loyalty/reservation profile (no login identity).
+
+    // Fallback: standalone profile
     const profile = await CustomerProfileModel.findById(new Types.ObjectId(id))
       .setOptions({ bypassTenant: true })
       .lean()
@@ -485,8 +611,48 @@ export const CustomersService = {
     if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
+    const rid = new Types.ObjectId(restaurantId);
+    const visited = (profile.restaurantsVisited || []).some(
+      (r: any) => r.toString() === restaurantId,
+    );
+    if (!visited) {
+      throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
+    }
     await CustomerProfileModel.deleteOne({ _id: profile._id })
       .setOptions({ bypassTenant: true })
       .exec();
   },
 };
+
+/**
+ * Check whether a User (which may or may not be scoped to a restaurant)
+ * actually belongs to the given restaurant.
+ *
+ * A user belongs if:
+ *   1. User.restaurantId matches, OR
+ *   2. Their CustomerProfile (matched by mobile) has restaurantsVisited
+ *      containing the restaurantId
+ */
+async function customerBelongsToRestaurant(
+  restaurantId: string,
+  user: any,
+  mobile: string,
+): Promise<boolean> {
+  // Direct restaurantId match on the User record
+  if (user.restaurantId && user.restaurantId.toString() === restaurantId) {
+    return true;
+  }
+
+  // Check CustomerProfile restaurantsVisited
+  const profile = await CustomerProfileModel.findOne({ mobile })
+    .setOptions({ bypassTenant: true })
+    .lean()
+    .exec();
+  if (profile && Array.isArray(profile.restaurantsVisited)) {
+    return profile.restaurantsVisited.some(
+      (r: any) => r.toString() === restaurantId,
+    );
+  }
+
+  return false;
+}

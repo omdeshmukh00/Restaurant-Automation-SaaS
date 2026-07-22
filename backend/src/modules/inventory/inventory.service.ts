@@ -495,15 +495,19 @@ export class InventoryService {
       await session.commitTransaction();
       session.endSession();
 
-      for (const item of lowStockAlerts) {
+    for (const item of lowStockAlerts) {
+        const notifType = item.stock <= 0 ? 'INVENTORY_OUT_OF_STOCK' : item.stock <= item.threshold * 0.5 ? 'INVENTORY_CRITICAL_STOCK' : 'INVENTORY_LOW_STOCK';
+        const alertTitle = item.stock <= 0 ? 'Out of Stock Alert' : item.stock <= item.threshold * 0.5 ? 'Critical Stock Alert' : 'Low Stock Alert';
+        const priority = item.stock <= 0 ? NotificationPriority.URGENT : item.stock <= item.threshold * 0.5 ? NotificationPriority.URGENT : NotificationPriority.HIGH;
+
         NotificationsService.createNotification({
           restaurantId: new Types.ObjectId(restaurantId),
           recipientRole: UserRole.RESTAURANT_ADMIN,
-          title: 'Low Stock Alert',
-          message: `${item.name} has fallen below the threshold level. Current stock: ${item.stock} ${item.unit}.`,
-          type: 'LOW_STOCK_ALERT',
+          title: alertTitle,
+          message: `${item.name} has ${item.stock <= 0 ? 'run out of stock' : 'fallen below critical level'}. Current stock: ${item.stock} ${item.unit}.`,
+          type: notifType,
           category: NotificationCategory.SYSTEM,
-          priority: NotificationPriority.HIGH,
+          priority,
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         }).catch(err => {
           logger.error(`Failed to generate low stock alert for ${item.name}: ${err.message}`);

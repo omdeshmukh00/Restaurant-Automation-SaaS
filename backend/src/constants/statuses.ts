@@ -67,6 +67,7 @@ export enum CleaningStatus {
 export enum ReservationStatus {
   PENDING = 'PENDING',
   CONFIRMED = 'CONFIRMED',
+  ARRIVED = 'ARRIVED',
   CHECKED_IN = 'CHECKED_IN',
   CANCELLED = 'CANCELLED',
   NO_SHOW = 'NO_SHOW',

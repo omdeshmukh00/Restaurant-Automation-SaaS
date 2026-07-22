@@ -18,6 +18,7 @@ import { InvoiceCounterModel } from './invoice-counter.model';
 import { sendReceiptEmail } from '../../services/mail.service';
 import logger from "../../config/logger";
 import { endSession } from '../tableSessions/tableSessions.service';
+import { CustomerProfileModel } from '../analytics/customerProfile.model';
 
 export class BillingService {
   /**
@@ -275,6 +276,58 @@ export class BillingService {
    * Modifies only the Billing domain and delegates Order updates.
    * Does NOT emit sockets or close sessions directly.
    */
+  /**
+   * Update or create a CustomerProfile for the session's phone number after
+   * successful payment.  This is what powers the admin customers page stats
+   * (totalVisits, totalSpent, loyalCustomers, etc.).
+   */
+  static async updateCustomerProfileAfterPayment(
+    restaurantId: string | mongoose.Types.ObjectId,
+    sessionId: string | mongoose.Types.ObjectId,
+    paidAmount: number,
+    dbSession?: mongoose.ClientSession,
+  ): Promise<void> {
+    try {
+      const sessionDoc = await TableSessionModel.findById(sessionId).session(dbSession || null);
+      if (!sessionDoc || !sessionDoc.mobile) {
+        logger.warn('[CustomerProfile] No mobile on session, skipping profile update');
+        return;
+      }
+
+      const mobile = sessionDoc.mobile.replace(/\D/g, '');
+      if (!mobile) return;
+
+      const restId = typeof restaurantId === 'string' ? new mongoose.Types.ObjectId(restaurantId) : restaurantId;
+
+      // Upsert: increment totalVisits, totalSpent and set restaurantsVisited
+      await CustomerProfileModel.findOneAndUpdate(
+        { mobile },
+        {
+          $set: {
+            name: sessionDoc.customerName || mobile,
+            lastVisitAt: new Date(),
+            $setOnInsert: {
+              firstVisitAt: new Date(),
+              mobile,
+            },
+          },
+          $inc: {
+            totalVisits: 1,
+            totalSpent: paidAmount,
+          },
+          $addToSet: {
+            restaurantsVisited: restId,
+          },
+        },
+        { upsert: true, session: dbSession, new: true },
+      );
+
+      logger.info(`[CustomerProfile] Updated profile for mobile ${mobile}: +1 visit, +${paidAmount} spent`);
+    } catch (err) {
+      logger.error('[CustomerProfile] Failed to update profile after payment', { error: err, sessionId });
+    }
+  }
+
   static async settleSession(
     sessionId: string | mongoose.Types.ObjectId,
     dbSession?: mongoose.ClientSession,
@@ -325,6 +378,22 @@ export class BillingService {
     }
 
     await bill.save({ session: dbSession });
+
+    // 4. Update CustomerProfile for analytics (totalVisits, totalSpent).
+    // This must happen after bill save so finalAmount is the settled amount.
+    try {
+      const restId = bill.restaurantId || (await BillingModel.findById(bill._id).session(dbSession || null))?.restaurantId;
+      if (restId) {
+        await this.updateCustomerProfileAfterPayment(
+          restId,
+          sessionId,
+          bill.finalAmount,
+          dbSession,
+        );
+      }
+    } catch (err) {
+      logger.error('[Settlement] Failed to update customer profile', { error: err });
+    }
 
     return { bill, updatedOrders };
   }

@@ -12,8 +12,6 @@ import  ReportsPage  from '../features/admin/pages/ReportsPage';
 import { TableManagementPage } from '../features/admin/pages/TableManagementPage';
 import  SettingsPage from '../features/admin/pages/SettingsPage';
 import ResetPasswordPage from '../features/admin/pages/ResetPasswordPage';
-import {
-} from '../features/admin/pages/StubPages';
 
 export const adminRoutes: RouteObject[] = [
   {

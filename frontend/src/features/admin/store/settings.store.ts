@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { adminRestaurantApi } from '../api/admin.restaurants.api';
-import { adminUserApi } from '../api/admin.users.api';
+import { adminUserApi, type AdminProfile } from '../api/admin.users.api';
 import { useStaffStore } from './staff.store';
 
 export interface AdminProfileData {
@@ -260,15 +260,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   updateProfile: async (data) => {
-    const updated = await adminUserApi.updateMe(data);
-    set((s) => ({
-      admin: {
-        ...s.admin,
-        name: updated.name || s.admin.name,
-        mobile: updated.mobile || s.admin.mobile,
-      },
-      saved: 'Profile updated',
-    }));
+    const result = await adminUserApi.updateMe(data);
+
+    // Check if this was a normal profile update (returns user) or phone-change trigger (returns otpSent)
+    if ('user' in result && result.user) {
+      const updated = result.user;
+      set((s) => ({
+        admin: {
+          ...s.admin,
+          name: updated.name || s.admin.name,
+          mobile: updated.mobile || s.admin.mobile,
+        },
+        saved: 'Profile updated',
+      }));
+    } else if ('otpSent' in result && result.otpSent) {
+      // Phone change triggered — OTP sent to email, mobile not updated yet
+      // Don't update admin.mobile here, mark as pending
+      set({ saved: null });
+    }
   },
 
   updateRestaurantInfo: async (data) => {

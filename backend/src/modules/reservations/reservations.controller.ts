@@ -15,7 +15,6 @@ function resolveRestaurantId(req: Request, candidate?: unknown): string {
   throw new AppError('Restaurant context required', 403, ErrorCode.FORBIDDEN);
 }
 
-// Map database entity to match the frontend contract explicitly
 function formatReservationStatus(status: string) {
   if (!status) return 'Pending';
   return status
@@ -27,7 +26,52 @@ function formatReservationStatus(status: string) {
     .join(' ');
 }
 
+function formatDate(iso: Date | string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+function formatRelativeTime(iso: Date | string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = typeof iso === 'string' ? new Date(iso) : iso;
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffMins = Math.round(diffMs / 60000);
+  const absMins = Math.abs(diffMins);
+
+  if (absMins < 1) return 'Just now';
+  if (absMins < 60) return `${absMins} min ${diffMins >= 0 ? 'from now' : 'ago'}`;
+  const diffHours = Math.round(absMins / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ${diffMins >= 0 ? 'from now' : 'ago'}`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 function mapReservationDto(reservation: any) {
+  // Build timeline info object
+  const timeline: Record<string, { iso: string | null; relative: string | null }> = {};
+
+  // Reservation created time from _id
+  if (reservation._id) {
+    const created = new Date(reservation._id.getTimestamp ? reservation._id.getTimestamp() : reservation.createdAt || reservation._id.getTimestamp());
+    timeline.created = { iso: created.toISOString(), relative: formatRelativeTime(created) };
+  }
+
+  if (reservation.reservedAt) {
+    timeline.reserved = { iso: formatDate(reservation.reservedAt), relative: formatRelativeTime(reservation.reservedAt) };
+  }
+  if (reservation.arrivedAt) {
+    timeline.arrived = { iso: formatDate(reservation.arrivedAt), relative: formatRelativeTime(reservation.arrivedAt) };
+  }
+  if (reservation.noShowProcessedAt) {
+    timeline.noShow = { iso: formatDate(reservation.noShowProcessedAt), relative: formatRelativeTime(reservation.noShowProcessedAt) };
+  }
+  if (reservation.reservationExpiresAt) {
+    timeline.expiresAt = { iso: formatDate(reservation.reservationExpiresAt), relative: formatRelativeTime(reservation.reservationExpiresAt) };
+  }
+
   return {
     id: reservation._id?.toString() || reservation.id,
     guestName: reservation.customerName,
@@ -41,6 +85,12 @@ function mapReservationDto(reservation: any) {
     specialRequest: reservation.notes || '',
     occasion: reservation.occasion || '',
     preferredArea: reservation.preferredArea || '',
+    // Timeline fields
+    timeline,
+    reservedAt: formatDate(reservation.reservedAt),
+    arrivedAt: formatDate(reservation.arrivedAt),
+    noShowProcessedAt: formatDate(reservation.noShowProcessedAt),
+    reservationExpiresAt: formatDate(reservation.reservationExpiresAt),
   };
 }
 
@@ -56,7 +106,7 @@ export async function createReservationController(req: Request, res: Response, n
       guests: req.body.guests,
       date: req.body.date,
       slot: req.body.slot,
-      tableNumber: req.body.tableNumber, 
+      tableNumber: req.body.tableNumber,
       notes: req.body.notes,
       occasion: req.body.occasion,
       preferredArea: req.body.preferredArea,
@@ -116,12 +166,41 @@ export async function updateReservationController(req: Request, res: Response, n
   }
 }
 
+export async function arriveReservationController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.body.restaurantId ?? req.query.restaurantId);
+    const tableId = req.body.tableId;
+
+    const reservation = await ReservationsService.arriveReservation(
+      restaurantId,
+      req.params.id,
+      tableId
+    );
+
+    ok(res, { reservation: mapReservationDto(reservation) });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function markNoShowController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.body.restaurantId ?? req.query.restaurantId);
+
+    const reservation = await ReservationsService.markNoShow(
+      restaurantId,
+      req.params.id
+    );
+
+    ok(res, { reservation: mapReservationDto(reservation) });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function checkInReservationController(req: Request, res: Response, next: NextFunction) {
   try {
     const restaurantId = resolveRestaurantId(req, req.body.restaurantId ?? req.query.restaurantId);
-    // Usually the staff provides the tableId during check-in, or it's pre-assigned.
-    // If not in body, we might need to rely on existing tableId on reservation.
-    // Assuming tableId is required in body per schema.
     const tableId = req.body.tableId;
 
     const reservation = await ReservationsService.checkInReservation(
@@ -140,14 +219,14 @@ export async function getAvailabilityController(req: Request, res: Response, nex
   try {
     const restaurantId = resolveRestaurantId(req, req.query.restaurantId);
     const date = typeof req.query.date === 'string' ? req.query.date : new Date().toISOString().split('T')[0];
-    const guests = typeof req.query.guests === 'number' ? req.query.guests : 2;
+    const guests = typeof req.query.guests === 'number' ? req.query.guests : typeof req.query.guests === 'string' ? parseInt(req.query.guests, 10) : 2;
 
-    const slots = await ReservationsService.getAvailability(restaurantId, date, guests);
+    const result = await ReservationsService.getAvailability(restaurantId, date, guests);
 
-    // Frontend expects an array of slots or specific format. We align with `public.routes.ts` return format: `{ slots }`
     ok(res, {
-      slots,
-      meta: { count: slots.length },
+      slots: result.slots,
+      bookedSlots: result.bookedSlots,
+      meta: { count: result.slots.length },
     });
   } catch (error) {
     next(error);

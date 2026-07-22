@@ -12,6 +12,8 @@ import { UserModel } from '../users/users.model';
 import { UserRole } from '../../constants/roles';
 import { NotificationModel } from '../notifications/notifications.model';
 import { OrderStatus, TableStatus, UserStatus } from '../../constants/statuses';
+import { ReservationModel } from '../reservations/reservations.model';
+import { ReservationStatus } from '../../constants/statuses';
 import type { AnalyticsQueryInput } from './analytics.schema';
 
 type AnalyticsDateRange = Pick<AnalyticsQueryInput, 'from' | 'to'>;
@@ -909,6 +911,159 @@ export class AnalyticsService {
         from: filters.from ?? null,
         to: filters.to ?? null,
       },
+    };
+  }
+
+  // ── NEW: Orders Summary (total, completed, cancelled) ──────────────────
+
+  static async getOrdersAnalytics(restaurantId: string, filters: AnalyticsDateRange) {
+    const restaurantObjectId = toObjectId(restaurantId);
+    const orderMatch = {
+      restaurantId: restaurantObjectId,
+      ...buildDateRangeMatch('createdAt', filters),
+    };
+
+    const orderStats = await OrderModel.aggregate([
+      { $match: orderMatch },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          completedOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', [OrderStatus.COMPLETED, OrderStatus.PAID, OrderStatus.SERVED, OrderStatus.BILLED]] },
+                1, 0,
+              ],
+            },
+          },
+          cancelledOrders: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', [OrderStatus.CANCELLED, OrderStatus.REJECTED]] },
+                1, 0,
+              ],
+            },
+          },
+          totalRevenue: { $sum: '$finalAmount' },
+          totalTax: { $sum: '$taxAmount' },
+        },
+      },
+    ]);
+
+    const result = orderStats[0] ?? {
+      totalOrders: 0,
+      completedOrders: 0,
+      cancelledOrders: 0,
+      totalRevenue: 0,
+      totalTax: 0,
+    };
+
+    return {
+      totalOrders: result.totalOrders,
+      completedOrders: result.completedOrders,
+      cancelledOrders: result.cancelledOrders,
+      totalRevenue: result.totalRevenue,
+      totalTax: result.totalTax,
+      filters: buildFiltersResponse(filters),
+    };
+  }
+
+  // ── NEW: Top Selling Items ─────────────────────────────────────────────
+
+  static async getTopSellingItems(restaurantId: string, filters: AnalyticsDateRange, limit = 10) {
+    const restaurantObjectId = toObjectId(restaurantId);
+    const orderMatch = {
+      restaurantId: restaurantObjectId,
+      status: { $ne: OrderStatus.CANCELLED },
+      ...buildDateRangeMatch('createdAt', filters),
+    };
+
+    const items = await OrderModel.aggregate([
+      { $match: orderMatch },
+      { $unwind: '$items' },
+      {
+        $group: {
+          _id: '$items.name',
+          totalQuantity: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          orderCount: { $sum: 1 },
+        },
+      },
+      { $sort: { totalQuantity: -1 } },
+      { $limit: limit },
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        name: item._id,
+        totalQuantity: item.totalQuantity,
+        totalRevenue: item.totalRevenue,
+        orderCount: item.orderCount,
+      })),
+      filters: buildFiltersResponse(filters),
+    };
+  }
+
+  // ── NEW: Reservation Statistics ────────────────────────────────────────
+
+  static async getReservationAnalytics(restaurantId: string, filters: AnalyticsDateRange) {
+    const restaurantObjectId = toObjectId(restaurantId);
+    const reservationMatch = {
+      restaurantId: restaurantObjectId,
+      ...buildDateRangeMatch('createdAt', filters),
+    };
+
+    const reservationStats = await ReservationModel.aggregate([
+      { $match: reservationMatch },
+      {
+        $group: {
+          _id: null,
+          totalReservations: { $sum: 1 },
+          confirmedReservations: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', [ReservationStatus.CONFIRMED, ReservationStatus.ARRIVED, ReservationStatus.CHECKED_IN, ReservationStatus.COMPLETED]] },
+                1, 0,
+              ],
+            },
+          },
+          cancelledReservations: {
+            $sum: {
+              $cond: [
+                { $eq: ['$status', ReservationStatus.CANCELLED] },
+                1, 0,
+              ],
+            },
+          },
+          noShowReservations: {
+            $sum: {
+              $cond: [
+                { $eq: ['$status', ReservationStatus.NO_SHOW] },
+                1, 0,
+              ],
+            },
+          },
+          totalGuests: { $sum: '$guests' },
+        },
+      },
+    ]);
+
+    const result = reservationStats[0] ?? {
+      totalReservations: 0,
+      confirmedReservations: 0,
+      cancelledReservations: 0,
+      noShowReservations: 0,
+      totalGuests: 0,
+    };
+
+    return {
+      totalReservations: result.totalReservations,
+      confirmedReservations: result.confirmedReservations,
+      cancelledReservations: result.cancelledReservations,
+      noShowReservations: result.noShowReservations,
+      totalGuests: result.totalGuests,
+      filters: buildFiltersResponse(filters),
     };
   }
 }
