@@ -54,14 +54,24 @@ export const resetPasswordSchema = z.object({
 });
 
 export const requestOtpSchema = z.object({
-  mobile: mobileSchema,
-});
+  mobile: mobileSchema.optional(),
+  email: z.string().email('Invalid email address').toLowerCase().trim().optional(),
+  identifier: z.string().optional(),
+}).refine(
+  (data) => data.mobile || data.email || data.identifier,
+  { message: 'Either email, mobile, or identifier is required', path: ['identifier'] }
+);
 
 export const verifyOtpSchema = z.object({
-  mobile: mobileSchema,
+  mobile: mobileSchema.optional(),
+  email: z.string().email('Invalid email address').toLowerCase().trim().optional(),
+  identifier: z.string().optional(),
   otp: z.string().min(4).max(6, 'OTP must be between 4 and 6 digits'),
   name: z.string().trim().min(2).max(100).optional(),
-});
+}).refine(
+  (data) => data.mobile || data.email || data.identifier,
+  { message: 'Either email, mobile, or identifier is required', path: ['identifier'] }
+);
 
 export const verifyResetOtpSchema = z.object({
   email: z.string().email('Invalid email address').toLowerCase().trim(),

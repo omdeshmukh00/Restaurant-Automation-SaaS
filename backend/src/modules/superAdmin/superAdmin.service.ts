@@ -1030,7 +1030,13 @@ export async function getPlatformAuditLogs(filters: SuperAdminAuditLogQuery) {
   const skip = (page - 1) * limit;
 
   const [logs, total] = await Promise.all([
-    AuditLogModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    AuditLogModel.find(query)
+      .populate('restaurantId', 'name city slug logo')
+      .populate('actorId', 'name email mobile phone role')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
     AuditLogModel.countDocuments(query),
   ]);
 

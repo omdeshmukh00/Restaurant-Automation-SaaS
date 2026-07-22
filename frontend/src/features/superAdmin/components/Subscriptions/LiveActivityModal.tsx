@@ -25,9 +25,10 @@ interface LiveData {
   tables: {
     total: number;
     occupied: number;
+    reserved?: number;
     available: number;
     cleaning: number;
-    maintenance: number;
+    maintenance?: number;
     breakdown: Record<string, number>;
   };
   sessions: { active: number };
@@ -136,11 +137,15 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
   const cardBg = darkMode ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100";
 
   // Table bar percentages
+  const reservedCount = data?.tables?.reserved || data?.tables?.breakdown?.RESERVED || data?.tables?.breakdown?.Reserved || 0;
+  const maintenanceCount = data?.tables?.maintenance || data?.tables?.breakdown?.MAINTENANCE || data?.tables?.breakdown?.BLOCKED || data?.tables?.breakdown?.Blocked || 0;
+
   const tableBar = data ? {
     occupied: data.tables.total > 0 ? (data.tables.occupied / data.tables.total) * 100 : 0,
+    reserved: data.tables.total > 0 ? (reservedCount / data.tables.total) * 100 : 0,
     available: data.tables.total > 0 ? (data.tables.available / data.tables.total) * 100 : 0,
     cleaning: data.tables.total > 0 ? (data.tables.cleaning / data.tables.total) * 100 : 0,
-    maintenance: data.tables.total > 0 ? (data.tables.maintenance / data.tables.total) * 100 : 0,
+    maintenance: data.tables.total > 0 ? (maintenanceCount / data.tables.total) * 100 : 0,
   } : null;
 
   return (
@@ -293,6 +298,9 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
                     {tableBar.occupied > 0 && (
                       <div className="bg-orange-500 transition-all duration-500" style={{ width: `${tableBar.occupied}%` }} title={`Occupied: ${data.tables.occupied}`} />
                     )}
+                    {tableBar.reserved > 0 && (
+                      <div className="bg-blue-500 transition-all duration-500" style={{ width: `${tableBar.reserved}%` }} title={`Reserved: ${reservedCount}`} />
+                    )}
                     {tableBar.available > 0 && (
                       <div className="bg-emerald-500 transition-all duration-500" style={{ width: `${tableBar.available}%` }} title={`Available: ${data.tables.available}`} />
                     )}
@@ -300,22 +308,27 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
                       <div className="bg-amber-400 transition-all duration-500" style={{ width: `${tableBar.cleaning}%` }} title={`Cleaning: ${data.tables.cleaning}`} />
                     )}
                     {tableBar.maintenance > 0 && (
-                      <div className="bg-slate-400 transition-all duration-500" style={{ width: `${tableBar.maintenance}%` }} title={`Maintenance: ${data.tables.maintenance}`} />
+                      <div className="bg-slate-500 transition-all duration-500" style={{ width: `${tableBar.maintenance}%` }} title={`Blocked / Maintenance: ${maintenanceCount}`} />
                     )}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2.5">
                     <span className="flex items-center gap-1.5 text-[10px] font-semibold">
                       <span className="w-2 h-2 rounded-sm bg-orange-500" /> Occupied ({data.tables.occupied})
                     </span>
+                    {reservedCount > 0 && (
+                      <span className="flex items-center gap-1.5 text-[10px] font-semibold">
+                        <span className="w-2 h-2 rounded-sm bg-blue-500" /> Reserved ({reservedCount})
+                      </span>
+                    )}
                     <span className="flex items-center gap-1.5 text-[10px] font-semibold">
                       <span className="w-2 h-2 rounded-sm bg-emerald-500" /> Available ({data.tables.available})
                     </span>
                     <span className="flex items-center gap-1.5 text-[10px] font-semibold">
                       <span className="w-2 h-2 rounded-sm bg-amber-400" /> Cleaning ({data.tables.cleaning})
                     </span>
-                    {data.tables.maintenance > 0 && (
+                    {maintenanceCount > 0 && (
                       <span className="flex items-center gap-1.5 text-[10px] font-semibold">
-                        <span className="w-2 h-2 rounded-sm bg-slate-400" /> Maintenance ({data.tables.maintenance})
+                        <span className="w-2 h-2 rounded-sm bg-slate-500" /> Blocked ({maintenanceCount})
                       </span>
                     )}
                   </div>
