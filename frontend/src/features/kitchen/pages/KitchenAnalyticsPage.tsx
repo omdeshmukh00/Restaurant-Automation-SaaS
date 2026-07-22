@@ -1,20 +1,36 @@
-import React, { useState } from 'react';
-import { ANALYTICS_DATA } from '../store/kitchenData';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../auth/AuthProvider';
 import { Navigate } from 'react-router-dom';
+import { apiClient } from '../../../shared/services/apiClient';
 
 export default function KitchenAnalyticsPage() {
   const { user } = useAuth();
 
-  const [timeRange, setTimeRange] = useState<'today' | 'yesterday' | 'weekly'>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_analytics_time_range');
-      if (stored === 'today' || stored === 'yesterday' || stored === 'weekly') {
-        return stored;
+  const [timeRange, setTimeRange] = useState<'today' | 'yesterday' | 'weekly'>('today');
+  
+  const [metrics, setMetrics] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [popularItems, setPopularItems] = useState<any[]>([]);
+  const [stationEfficiency, setStationEfficiency] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res = await apiClient.get('/kitchen/dashboard');
+        const data = res.data?.metrics || res.data?.data?.metrics || res.data;
+        if (data) {
+          setMetrics([
+            { label: 'Active Orders', value: data.activeOrders || 0, change: 0, unit: '' },
+            { label: 'Avg ETA', value: data.avgEtaMinutes || 0, change: 0, unit: 'min' },
+            { label: 'Ready Orders', value: data.readyOrders || 0, change: 0, unit: '' },
+          ]);
+        }
+      } catch (err) {
+        console.error('Failed to load kitchen dashboard', err);
       }
-    }
-    return 'today';
-  });
+    };
+    fetchDashboard();
+  }, [timeRange]);
 
   if (user?.internal_role === 'CHEF') {
     return <Navigate to="/kitchen" replace />;
@@ -22,13 +38,11 @@ export default function KitchenAnalyticsPage() {
 
   const handleTimeRangeChange = (range: 'today' | 'yesterday' | 'weekly') => {
     setTimeRange(range);
-    localStorage.setItem('kitchen_analytics_time_range', range);
   };
 
-  const { metrics, chartData, popularItems, stationEfficiency } = ANALYTICS_DATA[timeRange];
-
   // Max value for scaling SVG chart bars
-  const maxHourlyOrders = Math.max(...chartData.map(d => d.orders));
+  const maxHourlyOrders = chartData.length > 0 ? Math.max(...chartData.map(d => d.orders)) : 10;
+
 
   return (  
     <div className="p-4 lg:p-8 h-full overflow-y-auto font-sans">

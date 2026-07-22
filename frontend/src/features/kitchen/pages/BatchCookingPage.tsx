@@ -5,8 +5,8 @@ import { createKitchenBatch, updateKitchenBatchStatus } from '../api/kitchen.api
 
 export default function BatchCookingPage() {
   const { query } = useKitchenSearch();
-  const { batches: activeBatches, suggestedBatches, refreshDashboard } = useKitchenDashboard();
-
+  const { batchesById, batchIds, suggestedBatches, refreshDashboard } = useKitchenDashboard();
+  const activeBatches = React.useMemo(() => batchIds.map(id => batchesById[id]).filter(Boolean), [batchIds, batchesById]);
   const [tab, setTab] = useState<'suggested' | 'active' | 'completed'>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('kitchen_batches_tab');

@@ -21,6 +21,9 @@ import {
   updateKitchenBatchBodySchema,
   updateMenuAvailabilityBodySchema,
   updateMenuAvailabilityParamsSchema,
+  updateJoineeBodySchema,
+  updateKitchenSettingsBodySchema,
+  updateInventoryUsageBodySchema,
 } from './kitchen.schema';
 
 const router = Router();
@@ -105,5 +108,17 @@ router.patch(
   requireKitchenRole([KitchenRole.KITCHEN_SUPERVISOR, KitchenRole.HEAD_CHEF]),
   KitchenController.resolveAlert
 );
+
+// Staff Joinees
+router.get('/staff/joinees', KitchenController.getJoinees);
+router.patch('/staff/joinees/:id', validate({ body: updateJoineeBodySchema }), KitchenController.updateJoineeStatus);
+
+// Settings
+router.get('/settings', KitchenController.getSettings);
+router.patch('/settings', validate({ body: updateKitchenSettingsBodySchema }), KitchenController.updateSettings);
+
+// Inventory Extensions
+router.patch('/inventory/:id/usage', validate({ body: updateInventoryUsageBodySchema }), KitchenController.updateInventoryUsage);
+router.patch('/inventory/:id/restock', KitchenController.restockInventory);
 
 export default router;

@@ -57,6 +57,11 @@ export async function verifyCustomerPayment(input: VerifyCustomerPaymentInput) {
   return response.data.data;
 }
 
+export async function requestCashPayment() {
+  const response = await apiClient.post<ApiResponse<any>>('/payments/customer/cash');
+  return response.data.data;
+}
+
 export async function placeCustomerOrder(specialInstructions: string = '') {
   const response = await apiClient.post<ApiResponse<any>>('/customer/orders', {
     specialInstructions,
@@ -88,5 +93,30 @@ export async function getLiveBill() {
 
 export async function requestFinalBill() {
   const response = await apiClient.post<ApiResponse<any>>('/billing/customer/bill/request');
+  return response.data.data;
+}
+
+export function getInvoicePdfUrl(billId: string): string {
+  // Uses backend route to download the PDF
+  return `${import.meta.env.VITE_API_URL || '/api/v1'}/billing/customer/bill/${billId}/receipt/pdf`;
+}
+
+export async function getLoyaltyWallet() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/loyalty');
+  return response.data.data;
+}
+
+export async function getNotifications() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/notifications');
+  return response.data.data;
+}
+
+export async function getOrderHistory() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/order-history');
+  return response.data.data;
+}
+
+export async function getReservations() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/reservations');
   return response.data.data;
 }

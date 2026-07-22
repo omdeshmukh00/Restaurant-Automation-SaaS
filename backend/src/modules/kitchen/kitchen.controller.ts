@@ -430,4 +430,102 @@ export class KitchenController {
       next(error);
     }
   }
+
+  static async getJoinees(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const { KitchenJoineeModel } = await import('./kitchenJoinee.model');
+      const joinees = await KitchenJoineeModel.find({ restaurantId }).sort({ createdAt: -1 });
+      ok(res, joinees);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateJoineeStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const { KitchenJoineeModel } = await import('./kitchenJoinee.model');
+      const joinee = await KitchenJoineeModel.findOneAndUpdate(
+        { _id: req.params.id, restaurantId },
+        { status: req.body.status },
+        { new: true }
+      );
+      if (!joinee) throw new AppError('Joinee not found', 404, ErrorCode.NOT_FOUND);
+      ok(res, joinee);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const { RestaurantModel } = await import('../restaurants/restaurants.model');
+      const restaurant = await RestaurantModel.findById(restaurantId).select('settings.kitchenSettings');
+      const settings = restaurant?.settings?.kitchenSettings || {};
+      ok(res, settings);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateSettings(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const { RestaurantModel } = await import('../restaurants/restaurants.model');
+      
+      const updateData: any = {};
+      for (const [key, value] of Object.entries(req.body)) {
+        updateData[`settings.kitchenSettings.${key}`] = value;
+      }
+      
+      const restaurant = await RestaurantModel.findByIdAndUpdate(
+        restaurantId,
+        { $set: updateData },
+        { new: true }
+      );
+      
+      ok(res, restaurant?.settings?.kitchenSettings || {});
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async updateInventoryUsage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const amount = req.body.amount || 1;
+      const { InventoryItemModel } = await import('../inventory/inventory.model');
+      const item = await InventoryItemModel.findOneAndUpdate(
+        { _id: req.params.id, restaurantId },
+        { $inc: { stock: -amount, dailyUsage: amount } },
+        { new: true }
+      );
+      if (!item) throw new AppError('Inventory item not found', 404, ErrorCode.NOT_FOUND);
+      ok(res, item);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async restockInventory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = KitchenController.getRequiredRestaurantId(req);
+      const amount = req.body.amount || 10;
+      const { InventoryItemModel } = await import('../inventory/inventory.model');
+      const item = await InventoryItemModel.findOneAndUpdate(
+        { _id: req.params.id, restaurantId },
+        { 
+          $inc: { stock: amount },
+          $set: { lastRestocked: new Date() }
+        },
+        { new: true }
+      );
+      if (!item) throw new AppError('Inventory item not found', 404, ErrorCode.NOT_FOUND);
+      ok(res, item);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

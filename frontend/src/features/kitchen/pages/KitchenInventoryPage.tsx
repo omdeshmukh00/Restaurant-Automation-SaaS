@@ -1,27 +1,80 @@
 import React, { useState, useEffect } from 'react';
-import { type InventoryItem } from '../store/kitchenData';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
-import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
+import { updateInventoryUsage, restockInventory, getKitchenInventory } from '../api/kitchen.api';
+import { useKitchenStore } from '../store/kitchen.store';
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  stock: number;
+  unit: string;
+  minStock: number;
+  lastRestocked: string;
+  status: 'ok' | 'low' | 'critical';
+  dailyUsage: number;
+}
 
 export default function KitchenInventoryPage() {
   const { query } = useKitchenSearch();
+  const { inventory, setInventory } = useKitchenStore();
+  const [loading, setLoading] = useState(false);
 
-  const { inventory, setInventory } = useKitchenDashboard();
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const [selectedCategory, setSelectedCategory] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_inventory_selected_category');
-      if (stored) return stored;
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const items = await getKitchenInventory();
+      
+      const mappedItems: InventoryItem[] = items.map((item: any) => ({
+        id: item._id || item.id,
+        name: item.name,
+        category: item.category?.name || item.category || 'General',
+        stock: item.stock || 0,
+        unit: item.unit || 'units',
+        minStock: item.threshold || 0,
+        lastRestocked: item.lastRestocked ? new Date(item.lastRestocked).toLocaleDateString() : 'N/A',
+        status: item.stock <= item.threshold ? (item.stock <= (item.threshold * 0.5) ? 'critical' : 'low') : 'ok',
+        dailyUsage: item.dailyUsage || 0
+      }));
+      
+      setInventory(mappedItems);
+    } catch (err) {
+      console.error('Failed to load inventory', err);
+    } finally {
+      setLoading(false);
     }
-    return 'All';
-  });
+  };
+
+  useEffect(() => {
+    if (inventory.length === 0) {
+      fetchInventory();
+    }
+  }, []);
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    localStorage.setItem('kitchen_inventory_selected_category', category);
   };
 
-  // Categories list derived from inventory data
+  const handleRestock = async (id: string) => {
+    try {
+      await restockInventory(id, 10);
+      await fetchInventory(); // Refresh list after restocking
+    } catch (err) {
+      console.error('Failed to restock', err);
+    }
+  };
+
+  const handleTrackUsage = async (id: string) => {
+    try {
+      await updateInventoryUsage(id, 1);
+      await fetchInventory(); // Refresh list after usage
+    } catch (err) {
+      console.error('Failed to track usage', err);
+    }
+  };
+
   const categories = ['All', ...Array.from(new Set(inventory.map(item => item.category)))];
 
   const filteredItems = inventory.filter(item => {
@@ -38,46 +91,6 @@ export default function KitchenInventoryPage() {
     }
     return true;
   });
-
-  const handleRestock = (id: string) => {
-    setInventory(prev =>
-      prev.map(item => {
-        if (item.id === id) {
-          // Boost stock to double the min stock or add a fixed amount
-          const addedStock = Math.max(item.minStock * 2 - item.stock, 10);
-          return {
-            ...item,
-            stock: item.stock + addedStock,
-            status: 'ok' as const,
-            lastRestocked: 'Just now',
-          };
-        }
-        return item;
-      })
-    );
-  };
-
-  const handleTrackUsage = (id: string) => {
-    setInventory(prev =>
-      prev.map(item => {
-        if (item.id === id && item.stock > 0) {
-          const newStock = Math.max(0, item.stock - 1);
-          let newStatus: 'ok' | 'low' | 'critical' = 'ok';
-          if (newStock <= item.minStock * 0.5) {
-            newStatus = 'critical';
-          } else if (newStock <= item.minStock) {
-            newStatus = 'low';
-          }
-          return {
-            ...item,
-            stock: newStock,
-            status: newStatus,
-          };
-        }
-        return item;
-      })
-    );
-  };
 
   // Metrics
   const totalItems = inventory.length;

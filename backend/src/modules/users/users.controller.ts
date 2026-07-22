@@ -13,6 +13,8 @@ import logger from '../../config/logger';
 
 import * as otpService from '../../services/otp.service';
 import { sendOTPEmail } from '../../services/mail.service';
+import { LoyaltyWalletModel } from '../loyalty/loyalty.model';
+import { NotificationModel } from '../notifications/notifications.model';
 
 /**
  * GET /auth/me — Get current authenticated user's profile.
@@ -156,7 +158,44 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
  */
 export const deleteAccount = asyncHandler(async (req: Request, res: Response) => {
   await userService.softDeleteUser(req.user!._id);
-  sendSuccess(res, { message: 'Account deleted successfully' });
+  sendSuccess(res, { message: 'Account scheduled for deletion' });
+});
+
+/**
+ * GET /users/me/loyalty - Get loyalty wallet and transactions for current user
+ */
+export const getLoyalty = asyncHandler(async (req: Request, res: Response) => {
+  const user = await userService.findById(req.user!._id);
+  
+  if (!user || !user.mobile) {
+    return sendSuccess(res, { wallet: null });
+  }
+
+  // Find all wallets for this mobile number
+  const wallets = await LoyaltyWalletModel.find({ mobile: user.mobile }).sort({ updatedAt: -1 }).lean();
+
+  sendSuccess(res, { wallets });
+});
+
+/**
+ * GET /users/me/notifications - Get notifications for current user
+ */
+export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
+  const user = await userService.findById(req.user!._id);
+  
+  if (!user) {
+    return sendSuccess(res, { notifications: [] });
+  }
+
+  const notifications = await NotificationModel.find({
+    $or: [
+      { 'metadata.mobile': user.mobile },
+      { 'metadata.email': user.email },
+      ...(user.mobile ? [] : [{ 'metadata.customerName': user.name }])
+    ]
+  }).sort({ createdAt: -1 }).limit(50).lean();
+
+  sendSuccess(res, { notifications });
 });
 
 /**
@@ -243,6 +282,67 @@ export const getOrderHistory = asyncHandler(async (req: Request, res: Response) 
 });
 
 /**
+ * GET /users/me/reservations/slots — Get popular time slots and their availability
+ */
+export const getReservationSlots = asyncHandler(async (req: Request, res: Response) => {
+  const { restaurantId, date, guests } = req.query;
+  if (!restaurantId || !date) {
+    throw new AppError('Missing restaurantId or date', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const { ReservationModel } = await import('../reservations/reservations.model');
+  const { TableModel } = await import('../tables/tables.model');
+  const { ReservationStatus } = await import('../../constants/statuses');
+
+  const guestCount = typeof guests === 'string' ? parseInt(guests, 10) : 2;
+
+  // Hardcoded popular slots (for frontend display)
+  const TIME_SLOTS = [
+    '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
+    '08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM',
+  ];
+
+  // Helper to parse 12h to 24h
+  const parseTimeTo24h = (time12h: string): string => {
+    const [time, modifier] = time12h.split(' ');
+    const [hoursStr, minutes] = time.split(':');
+    let hours = hoursStr;
+    if (hours === '12') hours = '00';
+    if (modifier === 'PM') hours = String(parseInt(hours, 10) + 12);
+    return `${hours.padStart(2, '0')}:${minutes}`;
+  };
+
+  // Check how many tables have capacity >= requested guests
+  const tables = await TableModel.find({ restaurantId, capacity: { $gte: guestCount } }).lean();
+  const totalSuitableTables = tables.length;
+
+  const reservations = await ReservationModel.find({
+    restaurantId,
+    date,
+    status: { $in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] }
+  }).lean();
+
+  const availability = TIME_SLOTS.map(time => {
+    const backendSlot = parseTimeTo24h(time);
+    
+    // Count how many reservations already exist for this slot (using the suitable tables)
+    // NOTE: This assumes 1 reservation = 1 table.
+    const bookings = reservations.filter((r: any) => r.slot === backendSlot).length;
+    
+    let status = 'available';
+    if (totalSuitableTables === 0 || bookings >= totalSuitableTables) {
+      status = 'unavailable';
+    } else if (totalSuitableTables - bookings <= 2) {
+      status = 'limited';
+    }
+
+    return { time, status };
+  });
+
+  sendSuccess(res, { slots: availability });
+});
+
+/**
  * GET /users/me/reservations — Get all reservations for the current customer
  */
 export const getMyReservations = asyncHandler(async (req: Request, res: Response) => {
@@ -284,7 +384,7 @@ export const createMyReservation = asyncHandler(async (req: Request, res: Respon
     date,
     slot,
     notes,
-    status: ReservationStatus.CONFIRMED,
+    status: ReservationStatus.PENDING,
   });
 
   sendSuccess(res, { reservation }, 201);

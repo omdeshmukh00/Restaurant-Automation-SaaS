@@ -29,6 +29,8 @@ export default function TableSessionPage(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [retryCount, setRetryCount] = useState(0);
+
   useEffect(() => {
     const token = searchParams.get('token');
 
@@ -63,14 +65,8 @@ export default function TableSessionPage(): JSX.Element {
       } catch (err: any) {
         if (cancelled) return;
 
-        const message =
-          err?.response?.data?.error?.message ??
-          err?.message ??
-          'Failed to initialize session. Please try scanning again.';
-
-        setError(message);
-      } finally {
-        if (!cancelled) setLoading(false);
+        setError(err instanceof Error ? err.message : 'Failed to initialize session');
+        setLoading(false);
       }
     }
 
@@ -79,7 +75,7 @@ export default function TableSessionPage(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, isPanelAuthenticated, retryCount]);
 
   // ── Loading state ──────────────────────────────────────────────────
 
@@ -112,7 +108,7 @@ export default function TableSessionPage(): JSX.Element {
           <p className="mt-3 text-sm text-slate-400 leading-relaxed">{error}</p>
         </div>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => { setError(null); setLoading(true); setRetryCount(c => c + 1); }}
           className="mt-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl transition-colors"
         >
           Try Again

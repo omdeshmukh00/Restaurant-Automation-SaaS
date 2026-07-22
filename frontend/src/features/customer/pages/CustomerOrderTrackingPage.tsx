@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import { useCustomerStore, TrackedOrder } from '../store/customer.store';
+import { useCustomerPayment } from '../hooks/useCustomerPayment';
 
 const STEPS = [
   { icon: 'assignment_turned_in', label: 'Confirmed' },
@@ -14,6 +15,7 @@ export default function CustomerOrderTrackingPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { orders, reorder, tableCode, diningSession, fetchOrders, liveBill, fetchLiveBill } = useCustomerStore();
+  const { payLiveBill, payCashAtCounter, loading, paymentStatus } = useCustomerPayment();
 
   useEffect(() => {
     fetchOrders();
@@ -362,7 +364,7 @@ export default function CustomerOrderTrackingPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left / Active Order Column */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className={(liveBill?.status === 'PAID' || liveBill?.paymentStatus === 'PAID') ? "lg:col-span-12 space-y-6" : "lg:col-span-8 space-y-6"}>
           
           {/* Past Orders Section */}
           <div className="space-y-4">
@@ -518,8 +520,9 @@ export default function CustomerOrderTrackingPage() {
         </div>
 
         {/* Right / Bill Details Column */}
-        <div className="lg:col-span-4 space-y-5">
-          {/* Active Order Item details */}
+        {!(liveBill?.status === 'PAID' || liveBill?.paymentStatus === 'PAID') && (
+          <div className="lg:col-span-4 space-y-5">
+            {/* Active Order Item details */}
           {liveBill && liveBill.orders && liveBill.orders.length > 0 && (
             <div className="bg-white dark:bg-sd-surface-container p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 rounded-2xl sd-food-card-shadow">
               <div className="flex justify-between items-center mb-5">
@@ -573,25 +576,36 @@ export default function CustomerOrderTrackingPage() {
             </div>
           )}
 
-          {/* Support / Quick Help Card */}
+          {/* Payment Section */}
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-sd-surface-variant/50 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-sd-on-surface-variant text-xl">forum</span>
-              </div>
-              <div>
-                <h4 className="text-sm font-bold font-sans text-sd-on-surface">Need help?</h4>
-                <p className="text-[10px] text-sd-on-surface-variant font-sans">Chat directly with wait staff</p>
-              </div>
+            <h4 className="text-sm font-bold font-sans text-sd-on-surface mb-4">Payment Options</h4>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={payLiveBill}
+                disabled={loading || paymentStatus === 'SUCCESS'}
+                className="w-full py-2.5 rounded-xl bg-sd-primary text-white font-bold text-sm hover:bg-sd-primary/95 transition-colors font-sans flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                <span className="material-symbols-outlined text-[18px]">credit_card</span>
+                {loading ? 'Processing...' : 'Pay Online Now'}
+              </button>
+              <button 
+                onClick={payCashAtCounter}
+                disabled={loading || paymentStatus === 'SUCCESS'}
+                className="w-full py-2.5 rounded-xl border border-sd-outline-variant text-sd-on-surface font-bold text-sm hover:bg-sd-surface-variant/50 transition-colors font-sans flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                <span className="material-symbols-outlined text-[18px]">payments</span>
+                Pay with Cash
+              </button>
             </div>
-            <button 
-              onClick={() => navigate('/customer/feedback')}
-              className="w-full py-2.5 rounded-xl border border-sd-primary text-sd-primary font-bold text-sm hover:bg-sd-primary/5 transition-colors font-sans"
-            >
-              Contact Staff
-            </button>
+            {paymentStatus === 'FAILED' && (
+              <p className="text-xs text-red-500 mt-3 text-center font-sans font-semibold">Payment failed. Please try again.</p>
+            )}
+            {paymentStatus === 'SUCCESS' && (
+              <p className="text-xs text-green-600 mt-3 text-center font-sans font-semibold">Payment successful!</p>
+            )}
           </div>
         </div>
+        )}
       </div>
 
       {/* Invoice Modal Popup */}

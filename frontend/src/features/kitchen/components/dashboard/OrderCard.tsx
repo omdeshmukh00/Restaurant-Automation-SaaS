@@ -1,5 +1,5 @@
 import React from 'react';
-import type { KitchenOrder } from '../../store/kitchenData';
+import { type UIKitchenOrder as KitchenOrder } from '../../pages/KitchenOverviewPage';
 
 interface Props {
   order: KitchenOrder;
@@ -88,7 +88,7 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
       {/* Internal Notes */}
       {order.internalNotes && order.internalNotes.length > 0 && (
         <div className="mb-3 p-2 bg-yellow-50/50 border border-yellow-200/50 rounded-lg space-y-1.5">
-          {order.internalNotes.slice(-2).map((note, idx) => (
+          {order.internalNotes.slice(-2).map((note: any, idx: number) => (
             <div key={idx} className="text-[10px] font-sans">
               <span className="font-bold text-yellow-800">{note.authorName}: </span>
               <span className="text-yellow-700">{note.content}</span>
@@ -110,7 +110,7 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
         {order.chef && (
           <>
             <span className="text-slate-300">•</span>
-            <span className="text-slate-400">{order.chef}</span>
+            <span className="text-slate-400">{order.chef.name}</span>
           </>
         )}
       </div>

@@ -230,10 +230,11 @@ export class OrdersService {
     }
 
     // 5. Calculate Dynamic ETA
+    // IMPORTANT: Do NOT run countDocuments inside the transaction to avoid WriteConflicts and high latency
     const activeOrdersCount = await OrderModel.countDocuments({
       restaurantId: restId,
       status: { $in: [OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.DELAYED] }
-    }).session(session ? session : null as any);
+    });
 
     let kitchenLoadMultiplier = 1.0;
     if (activeOrdersCount >= 20) kitchenLoadMultiplier = 1.5;
@@ -579,8 +580,11 @@ export class OrdersService {
       dbSession = null;
     }
 
+    let order: any;
+
     try {
-      const order = await OrdersService.createOrder(
+      // PHASE A: Database Operations
+      order = await OrdersService.createOrder(
         restaurantId,
         sessionId,
         PaymentStatus.PENDING,
@@ -593,17 +597,16 @@ export class OrdersService {
         recordSubscriptionUsage(restaurantId, 'monthlyOrderCount', orderUsage.monthlyOrderCount),
       ]);
 
-      if (dbSession) {
+      if (dbSession && dbSession.inTransaction()) {
         await dbSession.commitTransaction();
       }
-
-      // 7. Emit Realtime Event for Kitchen
-      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_NEW, { orderId: order._id });
-
-      return order;
     } catch (error) {
-      if (dbSession) {
-        await dbSession.abortTransaction();
+      if (dbSession && dbSession.inTransaction()) {
+        try {
+          await dbSession.abortTransaction();
+        } catch (abortErr) {
+          console.error('Failed to abort transaction:', abortErr);
+        }
       }
       throw error;
     } finally {
@@ -615,6 +618,32 @@ export class OrdersService {
         $set: { isOrdering: false },
       });
     }
+
+    // PHASE B: Post-Transaction Side Effects
+    try {
+      // 7. Emit Realtime Event for Kitchen
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_NEW, { order });
+    } catch (sideEffectError) {
+      console.error('Failed to emit SocketEvent.ORDER_NEW', sideEffectError);
+    }
+
+    try {
+      await NotificationsService.createNotification({
+        restaurantId,
+        title: 'New Order Received',
+        message: `Order #${order.orderNumber} has been placed.`,
+        category: NotificationCategory.SYSTEM,
+        priority: NotificationPriority.HIGH,
+        recipientRole: UserRole.KITCHEN_STAFF,
+        type: 'NEW_ORDER',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours
+        metadata: { orderId: order._id, link: `/kitchen/orders?orderId=${order._id}` },
+      });
+    } catch (sideEffectError) {
+      console.error('Failed to create notification', sideEffectError);
+    }
+
+    return order;
   }
 
   static async getCustomerOrders(

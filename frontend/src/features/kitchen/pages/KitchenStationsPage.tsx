@@ -1,30 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { STATIONS, type KitchenStation } from '../store/kitchenData';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
+import { getKitchenLoad } from '../api/kitchen.api';
+
+export interface KitchenStation {
+  id: string;
+  name: string;
+  type: string;
+  status: 'active' | 'idle' | 'maintenance';
+  chef: string;
+  activeOrders: number;
+  load: number;
+  currentItems: string[];
+  avgPrepTime: string;
+}
 
 export default function KitchenStationsPage() {
   const { query } = useKitchenSearch();
 
-  const [stations, setStations] = useState<KitchenStation[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_stations');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse kitchen stations", e);
-        }
-      }
-    }
-    return STATIONS;
-  });
+  const [stations, setStations] = useState<KitchenStation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [aggregateLoad, setAggregateLoad] = useState(0);
 
   const [editingStationId, setEditingStationId] = useState<string | null>(null);
   const [newChefName, setNewChefName] = useState<string>('');
 
   useEffect(() => {
-    localStorage.setItem('kitchen_stations', JSON.stringify(stations));
-  }, [stations]);
+    const fetchStations = async () => {
+      try {
+        setLoading(true);
+        const data = await getKitchenLoad();
+        
+        // Map backend stations to UI format
+        const mappedStations = data.stations.map((st: any, i: number) => ({
+          id: `STN-${i + 1}`,
+          name: st.station,
+          type: 'Kitchen Station',
+          status: st.loadPercent > 0 ? 'active' : 'idle',
+          chef: '-',
+          activeOrders: data.aggregate.activeOrdersCount,
+          load: st.loadPercent,
+          currentItems: [],
+          avgPrepTime: '-'
+        }));
+        setStations(mappedStations);
+        
+        const avg = mappedStations.length > 0 
+          ? Math.round(mappedStations.reduce((acc: number, curr: any) => acc + curr.load, 0) / mappedStations.length)
+          : 0;
+        setAggregateLoad(avg);
+      } catch (err) {
+        console.error('Failed to load stations', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStations();
+  }, []);
 
   const filteredStations = stations.filter(station => {
     if (query) {
@@ -78,9 +109,7 @@ export default function KitchenStationsPage() {
   const activeCount = stations.filter(s => s.status === 'active').length;
   const idleCount = stations.filter(s => s.status === 'idle').length;
   const maintenanceCount = stations.filter(s => s.status === 'maintenance').length;
-  const avgLoad = Math.round(
-    stations.reduce((acc, curr) => acc + curr.load, 0) / (stations.filter(s => s.status === 'active').length || 1)
-  );
+  const avgLoad = aggregateLoad;
 
   const statusColors = {
     active: 'bg-green-500',

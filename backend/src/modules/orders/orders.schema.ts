@@ -430,6 +430,8 @@ export const orderSchema = new Schema<IOrder>(
 
 // Indexes
 orderSchema.index({ restaurantId: 1 });
+orderSchema.index({ restaurantId: 1, status: 1 }); // Essential for fast ETA counts
+orderSchema.index({ restaurantId: 1, sessionId: 1, status: 1 }); // Essential for getLiveBill performance
 orderSchema.index({ customerId: 1 });
 orderSchema.index({ tableId: 1 });
 orderSchema.index({ sessionId: 1 });

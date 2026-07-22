@@ -1,10 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { POPULAR_ITEMS, type KitchenOrder as UIKitchenOrder } from '../store/kitchenData';
+export interface UIKitchenOrder {
+  id: string;
+  table: string;
+  items: Array<{ name: string; qty: number; price?: number }>;
+  status: 'new' | 'preparing' | 'ready' | 'delayed' | 'cancelled' | 'completed';
+  type: string;
+  time: string;
+  timeAgo: string;
+  progress: number;
+  serviceFlags?: { isVip?: boolean; isRush?: boolean; allergyAlert?: boolean };
+  delayMins?: number;
+  delayHistory?: any[];
+  internalNotes?: any[];
+  chef?: { name: string; avatar?: string };
+}
 import OrderCard from '../components/dashboard/OrderCard';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
 import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
 import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder, addInternalNote } from '../api/kitchen.api';
 import { apiClient } from '../../../shared/services/apiClient';
+import { POPULAR_ITEMS } from '../constants';
 import ETAModal from '../components/ETAModal';
 import MenuAvailabilityModal from '../components/MenuAvailabilityModal';
 import InternalNotesModal from '../components/InternalNotesModal';
@@ -13,7 +28,7 @@ import DelayOrderModal from '../components/DelayOrderModal';
 export default function KitchenOverviewPage() {
   const { query } = useKitchenSearch();
 
-  const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
+  const { ordersById, orderIds, refreshDashboard, executeOptimisticOrderUpdate } = useKitchenDashboard();
   const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [notesOrderId, setNotesOrderId] = useState<string | null>(null);
@@ -29,6 +44,7 @@ export default function KitchenOverviewPage() {
   }, []);
 
   const orders = React.useMemo(() => {
+    const rawOrders = orderIds.map(id => ordersById[id]).filter(Boolean);
     return rawOrders.map((bo: any): UIKitchenOrder => {
       let status: UIKitchenOrder['status'] = 'new';
       const rawStatus = String(bo.status || '').toLowerCase();
@@ -66,7 +82,7 @@ export default function KitchenOverviewPage() {
         progress: status === 'preparing' ? 50 : 0,
       };
     });
-  }, [rawOrders, now]);
+  }, [orderIds, ordersById, now]);
 
   // Load and save active tab state
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -103,35 +119,40 @@ export default function KitchenOverviewPage() {
   
   const handleEtaConfirm = async (eta: number) => {
     if (!etaOrderId) return;
-    try {
-      await acceptOrder(etaOrderId, eta);
-      await startOrder(etaOrderId);
-    } catch (e) {
-      console.error(e);
-    }
+    const id = etaOrderId;
     setEtaOrderId(null);
-    refreshDashboard();
+    await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, async () => {
+      await acceptOrder(id, eta);
+      return startOrder(id);
+    });
   };
 
-  const handleReject = async (id: string) => { await rejectOrder(id); refreshDashboard(); };
-  const handleMarkReady = async (id: string) => { await readyOrder(id); refreshDashboard(); };
+  const handleReject = async (id: string) => {
+    await executeOptimisticOrderUpdate(id, { status: 'REJECTED' }, () => rejectOrder(id));
+  };
+  const handleMarkReady = async (id: string) => {
+    await executeOptimisticOrderUpdate(id, { status: 'READY' }, () => readyOrder(id));
+  };
   const handleDelayClick = (id: string) => { setDelayModalOrderId(id); };
 
   const handleDelayConfirm = async (delayMinutes: number, reason: string) => {
     if (!delayModalOrderId) return;
-    await delayOrder(delayModalOrderId, delayMinutes, reason);
+    const id = delayModalOrderId;
     setDelayModalOrderId(null);
-    refreshDashboard();
+    await executeOptimisticOrderUpdate(id, { status: 'DELAYED' }, () => delayOrder(id, delayMinutes, reason));
   };
 
-  const handleRush = async (id: string) => { await startOrder(id); refreshDashboard(); };
+  const handleRush = async (id: string) => {
+    await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, () => startOrder(id));
+  };
   const handleRefreshFeed = () => refreshDashboard();
   const handleAddNote = (id: string) => { setNotesOrderId(id); };
 
   const handleNotesSave = async (content: string) => {
     if (!notesOrderId) return;
-    await addInternalNote(notesOrderId, content);
-    refreshDashboard();
+    const id = notesOrderId;
+    setNotesOrderId(null);
+    await executeOptimisticOrderUpdate(id, { notes: content }, () => addInternalNote(id, content));
   };
 
   const columns = [

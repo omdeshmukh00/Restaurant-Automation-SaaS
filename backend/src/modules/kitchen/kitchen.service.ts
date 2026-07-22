@@ -193,7 +193,8 @@ export class KitchenService {
   static async getStationLoad(restaurantId: string | Types.ObjectId) {
     const batches = await KitchenBatchModel.find({ restaurantId }).select('station status');
     
-    const stations = ['Hot Line', 'Cold Pass', 'Dessert'].map((station) => {
+    const uniqueStations = [...new Set(batches.map((b) => b.station).filter(Boolean))];
+    const stations = uniqueStations.map((station) => {
       const stationLoad = batches.filter((batch) => batch.station === station).length;
       return {
         station,

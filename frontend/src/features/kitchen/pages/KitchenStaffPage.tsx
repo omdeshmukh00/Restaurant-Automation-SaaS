@@ -1,10 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { STAFF, type KitchenStaff } from '../store/kitchenData';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
 import { useKitchenStore } from '../store/kitchen.store';
 import ImageCropperModal from '../../customer/components/dashboard/ImageCropperModal';
 import { useAuth } from '../../../auth/AuthProvider';
 import { Navigate } from 'react-router-dom';
+import { getKitchenPerformance, getJoinees, updateJoineeStatus } from '../api/kitchen.api';
+
+export interface KitchenStaff {
+  id: string;
+  name: string;
+  role: string;
+  status: 'on-duty' | 'off-duty' | 'on-break';
+  station: string;
+  shift: string;
+  ordersCompleted: number;
+  avgPrepTime: string;
+  rating: number;
+  avatar: string;
+  phone?: string;
+  email?: string;
+}
 
 export interface JoineeRequest {
   id: string;
@@ -17,10 +32,7 @@ export interface JoineeRequest {
   avatar?: string;
 }
 
-const SEED_JOINEES: JoineeRequest[] = [
-  { id: 'JR-01', name: 'Rohan Das', role: 'Line Cook', email: 'rohan.das@email.com', phone: '+91 99999 88888', appliedDate: '18-06-2026', status: 'pending' },
-  { id: 'JR-02', name: 'Siddharth Sen', role: 'Kitchen Assistant', email: 'sid.sen@email.com', phone: '+91 88888 77777', appliedDate: '19-06-2026', status: 'pending' },
-];
+const SEED_JOINEES: JoineeRequest[] = [];
 
 const ROLE_OPTIONS = [
   'Executive Chef',
@@ -56,34 +68,60 @@ export default function KitchenStaffPage() {
   const [activeTab, setActiveTab] = useState<'roster' | 'joinees'>('roster');
 
   // Staff State
-  const [staff, setStaff] = useState<KitchenStaff[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_staff');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse kitchen staff", e);
-        }
-      }
-    }
-    return STAFF;
-  });
+  const [staff, setStaff] = useState<KitchenStaff[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Joinee Requests State
-  const [joinees, setJoinees] = useState<JoineeRequest[]>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('kitchen_joinees');
-      if (stored) {
-        try {
-          return JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse joinees", e);
-        }
+  useEffect(() => {
+    const fetchStaff = async () => {
+      try {
+        setLoading(true);
+        const { chefs } = await getKitchenPerformance();
+        // Map backend response to UI structure temporarily
+        const mappedStaff: KitchenStaff[] = chefs.map(c => ({
+          id: c.id,
+          name: c.name,
+          role: c.role,
+          status: 'on-duty', // Missing in backend, defaulting
+          station: '-',      // Missing in backend, defaulting
+          shift: '6:00 AM - 2:00 PM', // Missing in backend, defaulting
+          ordersCompleted: c.handledOrders,
+          avgPrepTime: `${c.avgTicketMinutes} min`,
+          rating: c.completionRate * 5, // Just mapping completion rate to a 0-5 rating
+          avatar: ''
+        }));
+        setStaff(mappedStaff);
+      } catch (err) {
+        console.error('Failed to load staff performance', err);
+      } finally {
+        setLoading(false);
       }
-    }
-    return SEED_JOINEES;
-  });
+    };
+    fetchStaff();
+  }, []);
+
+  const [joinees, setJoinees] = useState<JoineeRequest[]>([]);
+
+  useEffect(() => {
+    const fetchJoinees = async () => {
+      try {
+        const data = await getJoinees();
+        const mapped = data.map((j: any) => ({
+          id: j._id,
+          name: j.name,
+          role: j.role,
+          email: j.email || '',
+          phone: j.phone || '',
+          appliedDate: new Date(j.createdAt).toLocaleDateString(),
+          status: j.status,
+          avatar: j.avatar
+        }));
+        setJoinees(mapped);
+      } catch (err) {
+        console.error('Failed to load joinees', err);
+      }
+    };
+    fetchJoinees();
+  }, []);
 
   // UI state for filters and dropdowns
   const [statusFilter, setStatusFilter] = useState<'all' | 'on-duty' | 'on-break' | 'off-duty'>('all');
@@ -123,9 +161,7 @@ export default function KitchenStaffPage() {
     localStorage.setItem('kitchen_staff', JSON.stringify(staff));
   }, [staff]);
 
-  useEffect(() => {
-    localStorage.setItem('kitchen_joinees', JSON.stringify(joinees));
-  }, [joinees]);
+
 
   if (user?.internal_role === 'CHEF') {
     return <Navigate to="/kitchen" replace />;
@@ -250,33 +286,29 @@ export default function KitchenStaffPage() {
   };
 
   // Joinee Approval Workflow
-  const handleApproveJoinee = (joinee: JoineeRequest) => {
-    const newId = `STF-${String(staff.length + 1).padStart(2, '0')}`;
-    const newChef: KitchenStaff = {
-      id: newId,
-      name: joinee.name,
-      role: joinee.role,
-      status: 'off-duty',
-      station: '-',
-      shift: '6:00 AM - 2:00 PM',
-      ordersCompleted: 0,
-      avgPrepTime: '15 min',
-      rating: 4.5,
-      avatar: joinee.avatar || '',
-      phone: joinee.phone,
-      email: joinee.email,
-    };
-
-    setStaff(prev => [...prev, newChef]);
-    setJoinees(prev => prev.filter(j => j.id !== joinee.id));
-    showToast(`Approved! ${joinee.name} added to Roster as ${joinee.role}.`);
+  const handleApproveJoinee = async (joinee: JoineeRequest) => {
+    try {
+      await updateJoineeStatus(joinee.id, 'approved');
+      setJoinees(prev => prev.filter(j => j.id !== joinee.id));
+      showToast(`Approved! ${joinee.name} added to Roster as ${joinee.role}.`);
+      // Optionally trigger staff reload here
+    } catch (err) {
+      console.error('Failed to approve joinee', err);
+      showToast('Failed to approve joinee.', 'error');
+    }
   };
 
   // Joinee Rejection Workflow
-  const handleRejectJoinee = (id: string, name: string) => {
+  const handleRejectJoinee = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to reject the application of ${name}?`)) {
-      setJoinees(prev => prev.filter(j => j.id !== id));
-      showToast(`Application of ${name} rejected.`);
+      try {
+        await updateJoineeStatus(id, 'rejected');
+        setJoinees(prev => prev.filter(j => j.id !== id));
+        showToast(`Application of ${name} rejected.`);
+      } catch (err) {
+        console.error('Failed to reject joinee', err);
+        showToast('Failed to reject joinee.', 'error');
+      }
     }
   };
 

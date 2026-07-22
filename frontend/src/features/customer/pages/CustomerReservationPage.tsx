@@ -21,16 +21,6 @@ interface Reservation {
   occasion?: string;
 }
 
-const TIME_SLOTS = [
-  { time: '06:00 PM', status: 'available' },
-  { time: '06:30 PM', status: 'available' },
-  { time: '07:00 PM', status: 'available' },
-  { time: '07:30 PM', status: 'available' },
-  { time: '08:00 PM', status: 'available' },
-  { time: '08:30 PM', status: 'limited' },
-  { time: '09:00 PM', status: 'limited' },
-  { time: '09:30 PM', status: 'available' },
-];
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 const getTomorrowStr = () => {
@@ -99,6 +89,7 @@ export default function CustomerReservationPage() {
   const [specialRequest, setSpecialRequest] = useState('');
   const [dateTab, setDateTab] = useState<'today' | 'tomorrow' | 'custom'>('today');
 
+  const [popularSlots, setPopularSlots] = useState<{time: string, status: string}[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(false);
   const [modifyingId, setModifyingId] = useState<string | null>(null);
@@ -161,6 +152,23 @@ export default function CustomerReservationPage() {
     fetchRestaurants();
     fetchReservations();
   }, [diningSession]);
+
+  const fetchSlots = async () => {
+    if (!selectedRestaurantId || !date) return;
+    try {
+      const guestCount = parseInt(guests) || 2;
+      const response = await apiClient.get(`/users/me/reservations/slots?restaurantId=${selectedRestaurantId}&date=${date}&guests=${guestCount}`);
+      if ((response.data?.success || response.data?.status === 'success') && response.data?.data?.slots) {
+        setPopularSlots(response.data.data.slots);
+      }
+    } catch (err) {
+      console.error('Failed to fetch slots', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSlots();
+  }, [selectedRestaurantId, date, guests]);
 
   const handleDateTabChange = (tab: 'today' | 'tomorrow' | 'custom') => {
     setDateTab(tab);
@@ -413,18 +421,14 @@ export default function CustomerReservationPage() {
               <div className="space-y-1.5">
                 <label htmlFor="time-select" className="text-xs font-bold text-slate-700 font-sans">Time</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
-                  <select
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px] pointer-events-none">schedule</span>
+                  <input
                     id="time-select"
-                    className="w-full h-12 pl-10 pr-4 bg-white text-slate-800 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 appearance-none text-sm font-sans shadow-sm"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                  >
-                    {TIME_SLOTS.map((t) => (
-                      <option key={t.time}>{t.time}</option>
-                    ))}
-                  </select>
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-slate-400 text-[18px]">expand_more</span>
+                    type="time"
+                    className="w-full h-12 pl-10 pr-4 bg-white text-slate-800 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm font-sans shadow-sm cursor-pointer"
+                    value={parseTimeTo24h(time)}
+                    onChange={(e) => setTime(formatTimeTo12h(e.target.value))}
+                  />
                 </div>
               </div>
 
@@ -517,23 +521,27 @@ export default function CustomerReservationPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {TIME_SLOTS.map(({ time: slotTime, status }) => {
+              {popularSlots.map(({ time: slotTime, status }) => {
                 const isSelected = time === slotTime;
                 const isLimited = status === 'limited';
+                const isUnavailable = status === 'unavailable';
                 return (
                   <button
                     key={slotTime}
                     type="button"
-                    onClick={() => setTime(slotTime)}
+                    onClick={() => { if (!isUnavailable) setTime(slotTime); }}
+                    disabled={isUnavailable}
                     className={`p-4 rounded-xl flex flex-col items-center gap-1 transition-all ${
                       isSelected
                         ? 'border-2 border-orange-500 bg-orange-50/30 shadow-md'
+                        : isUnavailable
+                        ? 'border border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70'
                         : 'border border-slate-200 bg-white hover:border-orange-500 text-slate-800'
                     }`}
                   >
-                    <span className={`text-sm font-bold font-sans ${isSelected ? 'text-orange-600' : 'text-slate-800'}`}>{slotTime}</span>
-                    <span className={`text-[10px] uppercase font-bold font-sans ${isLimited ? 'text-orange-600' : 'text-emerald-600'}`}>
-                      {isLimited ? 'Limited' : 'Available'}
+                    <span className={`text-sm font-bold font-sans ${isSelected ? 'text-orange-600' : isUnavailable ? 'text-slate-400' : 'text-slate-800'}`}>{slotTime}</span>
+                    <span className={`text-[10px] uppercase font-bold font-sans ${isUnavailable ? 'text-slate-400' : isLimited ? 'text-orange-600' : 'text-emerald-600'}`}>
+                      {isUnavailable ? 'Unavailable' : isLimited ? 'Limited' : 'Available'}
                     </span>
                   </button>
                 );
@@ -611,6 +619,7 @@ export default function CustomerReservationPage() {
                           </div>
                           <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase font-sans ${
                             res.status === 'CONFIRMED' || res.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
+                            res.status === 'PENDING' || res.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
                             res.status === 'CANCELLED' || res.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
                           }`}>{res.status}</span>
                         </div>

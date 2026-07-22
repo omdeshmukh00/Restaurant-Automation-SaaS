@@ -5,6 +5,7 @@ import { useCustomerStore } from '../store/customer.store';
 import ImageCropperModal from '../components/dashboard/ImageCropperModal';
 import { apiClient } from '../../../shared/services/apiClient';
 import { useAuth } from '../../../auth/AuthProvider';
+import { getOrderHistory, getReservations, getLoyaltyWallet, getNotifications } from '../api/customer.api';
 
 const STATS_CONFIG = [
   { icon: 'event_available', key: 'reservations', label: 'Reservations', color: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
@@ -15,7 +16,7 @@ const STATS_CONFIG = [
 
 const MENU_ITEMS = [
   { icon: 'person_outline', label: 'Personal Information', desc: 'Update your name and phone', color: 'bg-orange-50 text-orange-500 dark:bg-orange-950/20 dark:text-orange-400', key: 'profile' },
-  { icon: 'star_outline', label: 'Reward Points', desc: 'View your reward points and history', color: 'bg-purple-50 text-purple-500 dark:bg-purple-950/20 dark:text-purple-400', key: 'loyalty', badge: '450 Pts' },
+  { icon: 'star_outline', label: 'Reward Points', desc: 'View your reward points and history', color: 'bg-purple-50 text-purple-500 dark:bg-purple-950/20 dark:text-purple-400', key: 'loyalty' },
   { icon: 'confirmation_number', label: 'Offers & Coupons', desc: 'View available restaurant offers', color: 'bg-red-50 text-red-500 dark:bg-red-950/20 dark:text-red-400', key: 'offers', badge: '5 Available' },
   { icon: 'notifications_active', label: 'Notifications', desc: 'Manage your alert preferences', color: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20 dark:text-yellow-400', key: 'notifications' },
 ];
@@ -28,7 +29,14 @@ export default function CustomerProfilePage() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [themeExpanded, setThemeExpanded] = useState(false);
-  const [activeModal, setActiveModal] = useState<'profile' | 'loyalty' | 'offers' | 'notifications' | null>(null);
+  const [activeModal, setActiveModal] = useState<'profile' | 'loyalty' | 'offers' | 'notifications' | 'orders' | 'reservations' | null>(null);
+
+  // Integration States
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [reservationHistory, setReservationHistory] = useState<any[]>([]);
+  const [loyaltyWallet, setLoyaltyWallet] = useState<any>(null);
+  const [liveNotifications, setLiveNotifications] = useState<any[]>([]);
+
 
   // Zustand state and actions
   const {
@@ -589,27 +597,7 @@ export default function CustomerProfilePage() {
             </div>
           </div>
 
-          {/* Contact */}
-          <div className="space-y-3">
-            <div className="bg-sd-primary-container/5 rounded-xl p-4 border border-sd-primary-container/10 flex items-center gap-3">
-              <div className="w-9 h-9 bg-sd-primary-container text-white rounded-full flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">call</span>
-              </div>
-              <div>
-                <p className="text-xs font-bold font-sans">Need Help?</p>
-                <p className="text-[11px] text-sd-on-surface-variant font-sans">Call us at +91 98765 43210</p>
-              </div>
-            </div>
-            <div className="bg-sd-tertiary-container/5 rounded-xl p-4 border border-sd-tertiary-container/10 flex items-center gap-3">
-              <div className="w-9 h-9 bg-sd-tertiary-container text-white rounded-full flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">chat</span>
-              </div>
-              <div>
-                <p className="text-xs font-bold font-sans">Live Chat</p>
-                <p className="text-[11px] text-sd-on-surface-variant font-sans">Chat with our support team</p>
-              </div>
-            </div>
-          </div>
+
 
           {/* Logout */}
           <button
@@ -708,6 +696,21 @@ export default function CustomerProfilePage() {
                       />
                     </div>
                   </div>
+                  {liveNotifications.length > 0 && (
+                    <div className="pt-4 border-t border-sd-surface-variant/50">
+                      <h4 className="font-bold text-sd-on-surface font-sans mb-3">Recent Alerts</h4>
+                      <div className="space-y-3">
+                        {liveNotifications.map((notif, idx) => (
+                          <div key={idx} className="p-3 bg-sd-surface-container-low rounded-xl border border-sd-surface-variant/50">
+                            <p className="font-bold text-sm text-sd-on-surface">{notif.title}</p>
+                            <p className="text-xs text-sd-on-surface-variant mt-1">{notif.message}</p>
+                            <p className="text-[10px] text-sd-on-surface-variant mt-2">{new Date(notif.createdAt).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-2 flex justify-end gap-3 shrink-0">
                     <button 
                       type="button" 

@@ -129,7 +129,10 @@ export default function CustomerLayout() {
         socket.on('connect', handleReconnect);
         socket.on('order.updated', handleOrderUpdate);
         socket.on('order.new', handleNewOrder);
-        socket.on('payment.success', () => useCustomerStore.getState().fetchOrders());
+        socket.on('payment.success', () => {
+          useCustomerStore.getState().fetchOrders();
+          useCustomerStore.getState().fetchLiveBill();
+        });
         
         socket.on('order.accepted', (data: any) => {
           if (data?.order) useCustomerStore.getState().upsertOrderFromSocket(data.order);

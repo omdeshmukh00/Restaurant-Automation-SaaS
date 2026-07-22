@@ -8,6 +8,7 @@ export interface KitchenOrder {
   quantity: number;
   notes?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface KitchenBatch {
@@ -17,6 +18,7 @@ export interface KitchenBatch {
   orders: string[]; // Order IDs included in this batch
   status: 'PENDING' | 'PREPARING' | 'READY';
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface KitchenLoad {
@@ -28,9 +30,23 @@ export interface KitchenLoad {
 }
 
 export interface KitchenPerformance {
-  avgPrepTime: string;
-  efficiency: string;
-  completedToday: number;
+  aggregates: {
+    avgPrepTime: string;
+    efficiency: string;
+    completedToday: number;
+    averagePreparationTime: number;
+    ordersCompleted: number;
+    delayedOrders: number;
+  };
+  chefs: Array<{
+    id: string;
+    name: string;
+    role: string;
+    handledOrders: number;
+    completedKitchenFlow: number;
+    avgTicketMinutes: number;
+    completionRate: number;
+  }>;
 }
 
 // API calls
@@ -97,18 +113,21 @@ export const updateKitchenBatchStatus = async (id: string, status: string): Prom
 
 
 
-export const getKitchenPerformance = async (): Promise<KitchenPerformance & { averagePreparationTime: number, ordersCompleted: number, delayedOrders: number }> => {
+export const getKitchenPerformance = async (): Promise<KitchenPerformance> => {
   const res = await apiClient.get('/kitchen/performance');
   const chefs = res.data?.data?.chefs || [];
   
   if (!chefs.length) {
     return {
-      avgPrepTime: '0 min',
-      efficiency: '0%',
-      completedToday: 0,
-      averagePreparationTime: 0,
-      ordersCompleted: 0,
-      delayedOrders: 0
+      aggregates: {
+        avgPrepTime: '0 min',
+        efficiency: '0%',
+        completedToday: 0,
+        averagePreparationTime: 0,
+        ordersCompleted: 0,
+        delayedOrders: 0
+      },
+      chefs: []
     };
   }
 
@@ -131,12 +150,15 @@ export const getKitchenPerformance = async (): Promise<KitchenPerformance & { av
   const delayed = Math.max(0, totalHandled - totalCompleted);
 
   return {
-    avgPrepTime: `${avgPrep} min`,
-    efficiency: `${efficiency}%`,
-    completedToday: totalCompleted,
-    averagePreparationTime: avgPrep,
-    ordersCompleted: totalCompleted,
-    delayedOrders: delayed
+    aggregates: {
+      avgPrepTime: `${avgPrep} min`,
+      efficiency: `${efficiency}%`,
+      completedToday: totalCompleted,
+      averagePreparationTime: avgPrep,
+      ordersCompleted: totalCompleted,
+      delayedOrders: delayed
+    },
+    chefs
   };
 };
 
@@ -163,4 +185,39 @@ export const getAlerts = async (): Promise<any[]> => {
 export const resolveAlert = async (id: string): Promise<any> => {
   const res = await apiClient.patch(`/kitchen/alerts/${id}/resolve`);
   return res.data?.data || res.data;
+};
+
+export const getKitchenInventory = async (): Promise<any[]> => {
+  const res = await apiClient.get('/kitchen/inventory');
+  return res.data?.items || res.data?.data?.items || [];
+};
+
+export const updateInventoryUsage = async (id: string, amount: number): Promise<any> => {
+  const res = await apiClient.patch(`/kitchen/inventory/${id}/usage`, { amount });
+  return res.data?.data || res.data;
+};
+
+export const restockInventory = async (id: string, amount: number): Promise<any> => {
+  const res = await apiClient.patch(`/kitchen/inventory/${id}/restock`, { amount });
+  return res.data?.data || res.data;
+};
+
+export const getJoinees = async (): Promise<any[]> => {
+  const res = await apiClient.get('/kitchen/staff/joinees');
+  return res.data?.data || res.data || [];
+};
+
+export const updateJoineeStatus = async (id: string, status: 'approved' | 'rejected'): Promise<any> => {
+  const res = await apiClient.patch(`/kitchen/staff/joinees/${id}`, { status });
+  return res.data?.data || res.data;
+};
+
+export const getKitchenSettings = async (): Promise<any> => {
+  const res = await apiClient.get('/kitchen/settings');
+  return res.data?.data || res.data || {};
+};
+
+export const updateKitchenSettings = async (settings: any): Promise<any> => {
+  const res = await apiClient.patch('/kitchen/settings', settings);
+  return res.data?.data || res.data || {};
 };

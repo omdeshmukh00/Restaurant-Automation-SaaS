@@ -134,6 +134,43 @@ const DEFAULT_LOYALTY_HISTORY: LoyaltyHistory[] = [
   { id: 'h3', points: 400, type: 'earn', description: 'Earned from Order #ORD-2840', date: '3 days ago' }
 ];
 
+export type LiveBill = {
+  _id: string | null;
+  invoiceNumber: string | null;
+  status: string;
+  paymentStatus: string;
+  subtotal: number;
+  taxAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  outstandingBalance: number;
+  session: DiningSession;
+  orders: TrackedOrder[];
+  serviceCharge: number;
+  financialSummary: {
+    grossTotal: number;
+    tax: number;
+    discount: number;
+    paymentsApplied: number;
+    outstandingBalance: number;
+  };
+};
+
+export function isValidLiveBill(value: any): value is LiveBill {
+  if (!value || typeof value !== 'object') return false;
+  if (typeof value.status !== 'string') return false;
+  if (typeof value.paymentStatus !== 'string') return false;
+  if (typeof value.subtotal !== 'number') return false;
+  if (typeof value.taxAmount !== 'number') return false;
+  if (typeof value.serviceCharge !== 'number') return false;
+  if (typeof value.discountAmount !== 'number') return false;
+  if (typeof value.finalAmount !== 'number') return false;
+  if (typeof value.outstandingBalance !== 'number') return false;
+  if (!Array.isArray(value.orders)) return false;
+  if (!value.financialSummary || typeof value.financialSummary !== 'object') return false;
+  return true;
+}
+
 type CustomerStore = {
   tableCode: string;
   category: string;
@@ -141,13 +178,14 @@ type CustomerStore = {
   vegOnly: boolean;
   cart: CustomerCartItem[];
   favourites: number[];
+  menuItems: any[];
   orders: TrackedOrder[];
   serviceRequests: ServiceRequestItem[];
 
   // Dining Session State
   diningSession: DiningSession;
   lastActivity: number | null;
-  liveBill: any | null;
+  liveBill: LiveBill | null;
 
   // Profile Features State
   profile: CustomerProfile;
@@ -173,6 +211,7 @@ type CustomerStore = {
   upsertOrderFromSocket: (order: any) => void;
   updateOrderStatusFromSocket: (orderId: string, status: string) => void;
   fetchLiveBill: () => Promise<void>;
+  fetchMenu: () => Promise<void>;
 
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
@@ -255,6 +294,7 @@ export const useCustomerStore = create<CustomerStore>()(
       vegOnly: false,
       cart: [],
       favourites: [],
+      menuItems: [],
       orders: [],
       serviceRequests: [],
       diningSession: null,
@@ -299,6 +339,19 @@ export const useCustomerStore = create<CustomerStore>()(
           }
         } catch (err) {
           console.error('Failed to fetch customer orders', err);
+        }
+      },
+      fetchMenu: async () => {
+        try {
+          const { diningSession } = get();
+          if (!diningSession) return;
+          const res = await apiClient.get(`/public/menu?restaurantId=${diningSession.restaurantId}`);
+          const data = res.data?.data || res.data;
+          if (data && data.menuItems) {
+            set({ menuItems: data.menuItems });
+          }
+        } catch (err) {
+          console.error('Failed to fetch menu', err);
         }
       },
       upsertOrderFromSocket: (orderPayload: any) => {
@@ -585,6 +638,13 @@ export const useCustomerStore = create<CustomerStore>()(
     }),
     {
       name: 'restohub-customer-store',
+      merge: (persistedState: any, currentState) => {
+        const nextState = { ...currentState, ...persistedState };
+        if (nextState.liveBill && !isValidLiveBill(nextState.liveBill)) {
+          nextState.liveBill = null;
+        }
+        return nextState;
+      },
     }
   )
 );

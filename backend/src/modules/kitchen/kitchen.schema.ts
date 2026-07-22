@@ -46,3 +46,19 @@ export const updateMenuAvailabilityParamsSchema = z.object({
 export const updateMenuAvailabilityBodySchema = z.object({
   availabilityStatus: z.nativeEnum(ItemAvailabilityStatus),
 });
+
+export const updateJoineeBodySchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+});
+
+export const updateKitchenSettingsBodySchema = z.object({
+  generalSettings: z.any().optional(),
+  notificationSettings: z.any().optional(),
+  displaySettings: z.any().optional(),
+  autoRules: z.any().optional(),
+  prepTimes: z.any().optional(),
+});
+
+export const updateInventoryUsageBodySchema = z.object({
+  amount: z.number().positive(),
+});
