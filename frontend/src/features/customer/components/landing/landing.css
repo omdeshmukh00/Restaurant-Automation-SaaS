@@ -623,3 +623,130 @@ html {
   box-shadow: 0 0 8px rgba(255, 107, 26, 0.05);
 }
 
+/* ─── Dark Theme Overrides for Landing / Customer Pages ─── */
+.dark,
+.dark body,
+.dark .landing-page-container,
+.dark .landing-font-inter {
+  background-color: #0B0B0C !important;
+  color: #E5E7EB !important;
+}
+
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6,
+.dark .text-slate-900,
+.dark [style*="color: #222222"],
+.dark [style*="color: rgb(34, 34, 34)"],
+.dark [style*="color: '#222222'"] {
+  color: #FFFFFF !important;
+}
+
+.dark p,
+.dark .text-slate-600,
+.dark [style*="color: #666666"],
+.dark [style*="color: rgb(102, 102, 102)"] {
+  color: #9CA3AF !important;
+}
+
+.dark p[style*="color: #888888"],
+.dark span[style*="color: #888888"],
+.dark span[style*="color: #999999"],
+.dark svg[style*="color: #999999"] {
+  color: #6B7280 !important;
+}
+
+/* Sections/Divs with hardcoded white background */
+.dark div[style*="background-color: #FFFFFF"],
+.dark div[style*="background-color: rgb(255, 255, 255)"],
+.dark div[style*="background-color: white"],
+.dark section[style*="background-color: #FFFFFF"],
+.dark section[style*="background-color: rgb(255, 255, 255)"],
+.dark section[style*="background-color: white"] {
+  background-color: #121214 !important;
+  border-color: #27272A !important;
+}
+
+/* CuisineExplorer chip background */
+.dark button[style*="background-color: #FFFFFF"],
+.dark button[style*="background-color: rgb(255, 255, 255)"],
+.dark button[style*="background-color: white"] {
+  background-color: #1F1F22 !important;
+  color: #E5E7EB !important;
+  border-color: #27272A !important;
+}
+
+.dark button[style*="background-color: #FFFFFF"]:hover,
+.dark button[style*="background-color: rgb(255, 255, 255)"]:hover {
+  border-color: #FF6B1A !important;
+  background-color: #27272A !important;
+}
+
+/* Pricing Page and Offers Page light background overrides */
+.dark main[style*="background-color: #FFF8F3"],
+.dark .min-h-screen[style*="background: #FFF8F3"],
+.dark div[style*="background: #FFF8F3"],
+.dark div[style*="background-color: #FFF8F3"],
+.dark div[style*="background: rgb(255, 248, 243)"],
+.dark div[style*="background-color: rgb(255, 248, 243)"] {
+  background-color: #0B0B0C !important;
+  background: #0B0B0C !important;
+}
+
+/* Sticky filter/tab bars */
+.dark div[style*="background: rgba(255, 248, 243, 0.95)"],
+.dark div[style*="background: rgba(255,248,243,0.95)"],
+.dark div[style*="background: rgba(255, 248, 243, 0.9)"] {
+  background-color: rgba(18, 18, 20, 0.95) !important;
+  border-bottom-color: rgba(255, 107, 26, 0.15) !important;
+}
+
+/* Pricing cards, blog cards, etc. */
+.dark .bg-white,
+.dark div[style*="background-color: #white"],
+.dark div[style*="background-color: white"] {
+  background-color: #121214 !important;
+  border-color: #27272A !important;
+}
+
+/* Form inputs and reservation widget */
+.dark div[style*="background-color: rgba(255, 255, 255, 0.97)"],
+.dark div[style*="background-color: rgba(255,255,255,0.97)"] {
+  background-color: rgba(18, 18, 20, 0.97) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+}
+
+.dark select,
+.dark input {
+  color: #FFFFFF !important;
+  background-color: #1F1F22 !important;
+  border-color: #27272A !important;
+}
+
+.dark select option {
+  background-color: #121214 !important;
+  color: #FFFFFF !important;
+}
+
+/* Scroll buttons */
+.dark button[style*="background-color: #FFFFFF"],
+.dark button[style*="background-color: rgb(255, 255, 255)"] {
+  background-color: #1F1F22 !important;
+  border-color: #27272A !important;
+  color: #FFFFFF !important;
+}
+
+.dark svg[style*="color: #999999"],
+.dark svg[style*="color: rgb(153, 153, 153)"] {
+  color: #71717A !important;
+}
+
+.dark div[style*="border-top: 1px solid #E5E7EB"],
+.dark div[style*="border-top: 1px solid rgb(229, 231, 235)"] {
+  border-top-color: #27272A !important;
+}
+
+

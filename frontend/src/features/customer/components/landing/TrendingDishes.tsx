@@ -1,22 +1,33 @@
-import React from 'react';
-import { Star, Clock, Plus } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Star, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Dish {
-  id: number;
+  id: number | string;
   name: string;
   price: number;
-  rating: number;
+  rating?: number;
   prepTime: string;
   image: string;
+  isVeg?: boolean;
+  restaurantName?: string;
+  description?: string;
 }
 
+const CLOCHE_FALLBACK = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+    <rect width="100" height="100" fill="#f8fafc" rx="16"/>
+    <g fill="none" stroke="#000000" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M50 24c0-4.5-3-8-7.5-8s-7.5 3.5-7.5 8" transform="translate(7.5, 0)"/>
+      <path d="M22 68c0-22 12.5-36 28-36s28 14 28 36"/>
+      <path d="M16 68h68"/>
+      <path d="M20 68c0 4 5 7 10 7h40c5 0 10-3 10-7"/>
+    </g>
+  </svg>
+`);
+
 const DISHES: Dish[] = [
-  { id: 1, name: 'Margherita Pizza', price: 349, rating: 4.5, prepTime: '20 min', image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=400&auto=format' },
-  { id: 2, name: 'Butter Chicken', price: 399, rating: 4.8, prepTime: '25 min', image: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=400&auto=format' },
-  { id: 3, name: 'Veg Biryani', price: 299, rating: 4.6, prepTime: '30 min', image: 'https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=400&auto=format' },
-  { id: 4, name: 'Classic Burger', price: 249, rating: 4.4, prepTime: '15 min', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format' },
-  { id: 5, name: 'Caesar Salad', price: 199, rating: 4.3, prepTime: '10 min', image: 'https://images.unsplash.com/photo-1550304943-4f24f54ddde9?w=400&auto=format' },
-  { id: 6, name: 'Chocolate Lava Cake', price: 249, rating: 4.7, prepTime: '20 min', image: 'https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=400&auto=format' },
+  
 ];
 
 const MARQUEE_TEXT = '✦ POPULAR  ✦ TRENDING  ✦ BEST SELLER  ✦ CHEF SPECIAL  ✦ MUST TRY  ✦ TOP RATED  ✦ SIGNATURE  ✦ FAN FAVORITE  ';
@@ -24,6 +35,7 @@ const MARQUEE_TEXT = '✦ POPULAR  ✦ TRENDING  ✦ BEST SELLER  ✦ CHEF SPECI
 interface TrendingDishesProps {
   onLoginOpen: () => void;
   dishes?: any[];
+  isLoading?: boolean;
 }
 
 function MarqueeStrip({ reverse = false }: { reverse?: boolean }) {
@@ -35,7 +47,6 @@ function MarqueeStrip({ reverse = false }: { reverse?: boolean }) {
       }}
     >
       <div className={reverse ? 'landing-marquee-content-reverse' : 'landing-marquee-content'}>
-        {/* Duplicate the text 4 times for seamless loop */}
         {[0, 1, 2, 3].map((i) => (
           <span
             key={i}
@@ -55,17 +66,32 @@ function MarqueeStrip({ reverse = false }: { reverse?: boolean }) {
   );
 }
 
-export default function TrendingDishes({ onLoginOpen, dishes }: TrendingDishesProps) {
+export default function TrendingDishes({ onLoginOpen, dishes, isLoading = false }: TrendingDishesProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const scrollRow = (dir: 'left' | 'right') => {
+    if (rowRef.current) {
+      rowRef.current.scrollBy({ left: dir === 'left' ? -350 : 350, behavior: 'smooth' });
+    }
+  };
+
   const mapBackendDishes = (items: any[]): Dish[] => {
     return items.map((d, idx) => {
-      const fallbackImage = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format';
+      const fallbackImage = CLOCHE_FALLBACK;
+      const isImgUrlValid = d.image && d.image.trim().length > 5 && !d.image.includes('dummy');
       return {
         id: d._id || d.id,
         name: d.name,
         price: d.price,
-        rating: d.rating || parseFloat((4.2 + (d.price % 8) / 10).toFixed(1)),
+        rating: d.rating || undefined,
         prepTime: d.preparationTime ? `${d.preparationTime} min` : '15 min',
-        image: d.image || fallbackImage
+        image: isImgUrlValid ? d.image : fallbackImage,
+        isVeg: d.isVeg !== undefined ? !!d.isVeg : idx % 2 === 0,
+        restaurantName: d.restaurantId && typeof d.restaurantId === 'object' && d.restaurantId.name
+          ? d.restaurantId.name
+          : 'Amber Table',
+        description: d.description || ''
       };
     });
   };
@@ -74,14 +100,15 @@ export default function TrendingDishes({ onLoginOpen, dishes }: TrendingDishesPr
     ? mapBackendDishes(dishes)
     : DISHES;
 
+  const handleViewAllDishes = () => {
+    navigate('/dishes');
+  };
+
   return (
     <section className="py-0">
-      {/* Top Marquee Strip */}
       <MarqueeStrip />
 
-      {/* Main Content */}
-      <div className="py-12 sm:py-16 relative overflow-hidden" style={{ backgroundColor: '#F0FFF4' }}>
-        {/* 2D Illustrated BG Objects */}
+      <div className="py-12 sm:py-16 relative overflow-hidden bg-emerald-50/20 dark:bg-neutral-950">
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {[
             { emoji: '🥬', top: '10%', left: '4%', size: 55, rotate: -12 },
@@ -107,7 +134,6 @@ export default function TrendingDishes({ onLoginOpen, dishes }: TrendingDishesPr
           ))}
         </div>
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 relative z-10">
-          {/* Header */}
           <div className="flex items-end justify-between mb-8">
             <div>
               <h2
@@ -120,25 +146,76 @@ export default function TrendingDishes({ onLoginOpen, dishes }: TrendingDishesPr
                 Most loved dishes by our customers
               </p>
             </div>
-            <button
-              onClick={onLoginOpen}
-              className="hidden sm:flex items-center gap-1 text-[14px] font-semibold transition-colors duration-150 landing-btn-premium px-4 py-2"
-              style={{ color: '#FF6B1A', borderRadius: '10px' }}
-            >
-              View All Dishes →
-            </button>
+            
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => scrollRow('left')}
+                  className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-805 text-slate-800 dark:text-neutral-200 hover:border-orange-500/50 shadow-sm"
+                  aria-label="Scroll dishes left"
+                >
+                  <ChevronLeft className="w-[16px] h-[16px]" />
+                </button>
+                <button
+                  onClick={() => scrollRow('right')}
+                  className="w-[34px] h-[34px] rounded-full flex items-center justify-center transition-all duration-150 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-805 text-slate-800 dark:text-neutral-200 hover:border-orange-500/50 shadow-sm"
+                  aria-label="Scroll dishes right"
+                >
+                  <ChevronRight className="w-[16px] h-[16px]" />
+                </button>
+              </div>
+
+              <button
+                onClick={handleViewAllDishes}
+                className="hidden sm:flex items-center gap-1 text-[14px] font-semibold transition-colors duration-150 landing-btn-premium px-4 py-2"
+                style={{ color: '#FF6B1A', borderRadius: '10px' }}
+              >
+                View All Dishes →
+              </button>
+            </div>
           </div>
 
-          {/* Dishes Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
-            {displayDishes.map((dish) => (
-              <DishCard key={dish.id} dish={dish} onLoginOpen={onLoginOpen} />
-            ))}
+          <div
+            ref={rowRef}
+            className="flex gap-6 overflow-x-auto landing-hide-scrollbar pb-4"
+            style={{ scrollSnapType: 'x mandatory' }}
+          >
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="min-w-[280px] sm:min-w-[310px] lg:min-w-[330px] flex-shrink-0"
+                  style={{ scrollSnapAlign: 'start' }}
+                >
+                  <div className="animate-pulse flex flex-col bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden h-[450px]" style={{ borderRadius: '20px' }}>
+                    <div className="h-[200px] bg-slate-200 dark:bg-neutral-800 w-full" />
+                    <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="h-5 bg-slate-200 dark:bg-neutral-800 rounded-md w-3/4 mb-3" />
+                        <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded-md w-1/4 mb-3" />
+                        <div className="h-12 bg-slate-200 dark:bg-neutral-800 rounded-md w-full mb-3" />
+                        <div className="h-6 bg-slate-200 dark:bg-neutral-800 rounded-md w-20" />
+                      </div>
+                      <div className="h-4 bg-slate-200 dark:bg-neutral-800 rounded-md w-24 mt-4 pt-3" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              displayDishes.map((dish) => (
+                <div
+                  key={dish.id}
+                  className="min-w-[280px] sm:min-w-[310px] lg:min-w-[330px] flex-shrink-0"
+                  style={{ scrollSnapAlign: 'start' }}
+                >
+                  <DishCard dish={dish} onLoginOpen={onLoginOpen} />
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
 
-      {/* Bottom Marquee Strip — reverse direction */}
       <MarqueeStrip reverse />
     </section>
   );
@@ -147,72 +224,99 @@ export default function TrendingDishes({ onLoginOpen, dishes }: TrendingDishesPr
 function DishCard({ dish, onLoginOpen }: { dish: Dish; onLoginOpen: () => void }) {
   return (
     <div
-      className="landing-card-hover landing-shiny flex flex-col bg-white overflow-hidden"
+      onClick={onLoginOpen}
+      className="landing-card-hover landing-shiny flex flex-col bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden cursor-pointer hover:border-orange-500/50 transition-all duration-300 h-[450px]"
       style={{
         borderRadius: '20px',
-        border: '1px solid #E5E7EB',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
     >
-      {/* Image */}
-      <div className="relative h-[140px] sm:h-[160px] overflow-hidden landing-img-overlay-wrap">
+      {/* Image container */}
+      <div className="relative h-[200px] overflow-hidden landing-img-overlay-wrap bg-slate-50 dark:bg-neutral-950 flex items-center justify-center shrink-0">
         <img
           src={dish.image}
           alt={dish.name}
-          className="landing-img-professional w-full h-full object-cover"
+          className="landing-img-professional w-full h-full object-cover animate-fadeIn"
           loading="lazy"
-        />
-        {/* Rating Badge */}
-        <div
-          className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 z-10"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.92)',
-            backdropFilter: 'blur(4px)',
-            borderRadius: '8px',
+          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+            e.currentTarget.src = CLOCHE_FALLBACK;
           }}
+        />
+
+        {/* Veg/Non-Veg Logo */}
+        <div
+          className="absolute top-3 left-3 flex items-center justify-center p-0.5 z-10 bg-white/95 backdrop-blur-[2px] shadow-sm"
+          style={{
+            borderRadius: '4px',
+            border: `1.5px solid ${dish.isVeg ? '#38A169' : '#A52A2A'}`,
+            width: '18px',
+            height: '18px',
+          }}
+          title={dish.isVeg ? 'Vegetarian' : 'Non-Vegetarian'}
         >
-          <Star className="w-[12px] h-[12px]" style={{ color: '#FF6B1A', fill: '#FF6B1A' }} />
-          <span className="text-[12px] font-bold" style={{ color: '#222222' }}>
-            {dish.rating}
-          </span>
+          {dish.isVeg ? (
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{
+                backgroundColor: '#38A169',
+              }}
+            />
+          ) : (
+            <span
+              className="w-2 h-2"
+              style={{
+                backgroundColor: '#A52A2A',
+                clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              }}
+            />
+          )}
         </div>
+
+        {/* Rating Badge */}
+        {dish.rating && (
+          <div
+            className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 z-10"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.92)',
+              backdropFilter: 'blur(4px)',
+              borderRadius: '8px',
+            }}
+          >
+            <Star className="w-[12px] h-[12px]" style={{ color: '#FF6B1A', fill: '#FF6B1A' }} />
+            <span className="text-[12px] font-bold" style={{ color: '#222222' }}>
+              {dish.rating}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content */}
-      <div className="p-3 sm:p-4 flex-1 flex flex-col relative">
-        <h4 className="text-[14px] sm:text-[15px] font-semibold truncate" style={{ color: '#222222' }}>
-          {dish.name}
-        </h4>
+      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between relative dark:bg-neutral-900">
+        <div>
+          <h4 className="text-[16px] sm:text-[17px] font-bold truncate text-slate-800 dark:text-neutral-100">
+            {dish.name}
+          </h4>
 
-        <p className="text-[16px] sm:text-[18px] font-bold mt-1" style={{ color: '#FF6B1A' }}>
-          ₹{dish.price}
-        </p>
+          {/* Restaurant Name */}
+          <p className="text-[11px] font-semibold text-orange-500 uppercase tracking-wider mt-1">
+            {dish.restaurantName || 'Amber Table'}
+          </p>
 
-        <div className="flex items-center gap-1 mt-1.5 text-[12px]" style={{ color: '#666666' }}>
-          <Clock className="w-[12px] h-[12px]" style={{ color: '#999999' }} />
-          <span>{dish.prepTime}</span>
+          {/* Description */}
+          {dish.description && (
+            <p className="text-[12px] text-slate-500 dark:text-neutral-400 mt-2 line-clamp-3 leading-relaxed">
+              {dish.description}
+            </p>
+          )}
+
+          <p className="text-[18px] sm:text-[20px] font-extrabold mt-3 text-slate-900 dark:text-orange-400" style={{ color: '#FF6B1A' }}>
+            ₹{dish.price}
+          </p>
         </div>
 
-        {/* Quick Add Button */}
-        <button
-          onClick={onLoginOpen}
-          className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 w-[34px] h-[34px] sm:w-[36px] sm:h-[36px] rounded-full flex items-center justify-center text-white transition-all duration-150 landing-btn-press"
-          style={{
-            backgroundColor: '#FF6B1A',
-            boxShadow: '0 2px 8px rgba(255,107,26,0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#E65A0A';
-            e.currentTarget.style.transform = 'scale(1.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#FF6B1A';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-          aria-label={`Add ${dish.name} to cart`}
-        >
-          <Plus className="w-[18px] h-[18px]" />
-        </button>
+        <div className="flex items-center gap-1 mt-4 pt-3 border-t border-slate-100 dark:border-neutral-800 text-[12px] text-slate-500 dark:text-neutral-400">
+          <Clock className="w-[13px] h-[13px]" />
+          <span>{dish.prepTime}</span>
+        </div>
       </div>
     </div>
   );

@@ -39,6 +39,7 @@ const DEFAULT_FORM: NewRestaurantForm = {
   longitude: null,
   googleMapsUrl: "",
   message: "",
+  isVeg: "both",
 };
 
 export default function Restaurant() {

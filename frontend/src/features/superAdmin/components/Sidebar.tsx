@@ -211,14 +211,17 @@ export default function Sidebar({
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <img
-              src={
-                user?.avatar ||
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&h=60&q=80"
-              }
-              alt="profile"
-              className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-orange-500/20"
-            />
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt="profile"
+                className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-orange-500/20"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-orange-500 text-white font-bold flex items-center justify-center text-xs shrink-0 ring-2 ring-orange-500/20">
+                {(user?.name || "Graphura").charAt(0).toUpperCase()}
+              </div>
+            )}
             {!isCollapsed && (
               <div className="text-left min-w-0 truncate">
                 <p className="text-xs font-bold truncate leading-tight">

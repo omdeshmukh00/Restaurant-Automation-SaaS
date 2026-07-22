@@ -44,4 +44,6 @@ export interface NewRestaurantForm {
   longitude?: number | null;
   googleMapsUrl?: string;
   message?: string;
+  isVeg?: string;
+  coverImage?: string;
 }

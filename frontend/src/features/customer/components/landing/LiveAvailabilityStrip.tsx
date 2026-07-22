@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Gift, Star, Armchair, Utensils, Timer, ClipboardCheck, QrCode } from 'lucide-react';
 
 interface StatItem {
   value: number;
@@ -6,18 +7,9 @@ interface StatItem {
   prefix?: string;
   label: string;
   isLive?: boolean;
-  emoji: string;
+  icon: React.ElementType;
   accent: string;
 }
-
-const STATS: StatItem[] = [
-  { value: 120, suffix: '+', label: 'Tables Available Now', isLive: true, emoji: '🪑', accent: '#4CAF50' },
-  { value: 85, suffix: '', label: 'Restaurants Open', isLive: true, emoji: '🍽️', accent: '#FF6B1A' },
-  { value: 15, suffix: ' min', prefix: '~', label: 'Average Wait Time', emoji: '⏱️', accent: '#2196F3' },
-  { value: 340, suffix: '+', label: 'Reservations Today', emoji: '📋', accent: '#9C27B0' },
-  { value: 50, suffix: '+', label: 'Offers Running', isLive: true, emoji: '🎁', accent: '#E91E63' },
-  { value: 4.8, suffix: '★', label: 'Average Rating', emoji: '⭐', accent: '#FF9800' },
-];
 
 function useCountUp(target: number, duration: number, trigger: boolean) {
   const [count, setCount] = useState(0);
@@ -57,13 +49,13 @@ export default function LiveAvailabilityStrip({ stats }: LiveAvailabilityStripPr
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const displayStats = [
-    { value: stats?.tablesAvailable ?? 120, suffix: '+', label: 'Tables Available Now', isLive: true, emoji: '🪑', accent: '#4CAF50' },
-    { value: stats?.restaurantsOpen ?? 85, suffix: '', label: 'Restaurants Open', isLive: true, emoji: '🍽️', accent: '#FF6B1A' },
-    { value: stats?.averageWaitTime ?? 15, suffix: ' min', prefix: '~', label: 'Average Wait Time', emoji: '⏱️', accent: '#2196F3' },
-    { value: stats?.reservationsToday ?? 340, suffix: '+', label: 'Reservations Today', emoji: '📋', accent: '#9C27B0' },
-    { value: stats?.offersRunning ?? 50, suffix: '+', label: 'Offers Running', isLive: true, emoji: '🎁', accent: '#E91E63' },
-    { value: stats?.averageRating ?? 4.8, suffix: '★', label: 'Average Rating', emoji: '⭐', accent: '#FF9800' },
+  const displayStats: StatItem[] = [
+    { value: stats?.offersRunning ?? 2, suffix: '+', label: 'Offers Running', isLive: true, icon: Gift, accent: '#EC4899' },
+    { value: stats?.averageRating ?? 4.8, suffix: '★', label: 'Average Rating', isLive: false, icon: Star, accent: '#EAB308' },
+    { value: stats?.tablesAvailable ?? 4, suffix: '+', label: 'Tables Available Now', isLive: true, icon: Armchair, accent: '#22C55E' },
+    { value: stats?.restaurantsOpen ?? 13, suffix: '', label: 'Restaurants Open', isLive: true, icon: Utensils, accent: '#F97316' },
+    { value: stats?.averageWaitTime ?? 15, suffix: ' min', prefix: '~', label: 'Average Wait Time', isLive: false, icon: Timer, accent: '#3B82F6' },
+    { value: stats?.reservationsToday ?? 340, suffix: '+', label: 'Reservations Today', isLive: false, icon: ClipboardCheck, accent: '#A855F7' },
   ];
 
   useEffect(() => {
@@ -82,22 +74,32 @@ export default function LiveAvailabilityStrip({ stats }: LiveAvailabilityStripPr
     return () => observer.disconnect();
   }, []);
 
-  // Duplicate stats for seamless marquee
+  // Duplicate stats for seamless continuous marquee loop
   const allStats = [...displayStats, ...displayStats];
 
   return (
     <section
       ref={ref}
-      className="py-6 sm:py-8 landing-marquee"
+      className="py-4 sm:py-5 landing-marquee relative overflow-hidden select-none"
       style={{
-        background: 'linear-gradient(135deg, #0F0F0F 0%, #1A1008 50%, #0F0F0F 100%)',
+        background: 'linear-gradient(135deg, #0A0A0A 0%, #17110C 50%, #0A0A0A 100%)',
         borderTop: '1px solid rgba(255,107,26,0.15)',
         borderBottom: '1px solid rgba(255,107,26,0.15)',
       }}
     >
-      <div className="landing-marquee-content">
+      <div className="landing-marquee-content flex items-center gap-4">
         {allStats.map((stat, idx) => (
-          <StampCard key={`${stat.label}-${idx}`} stat={stat} isVisible={isVisible} delay={idx % displayStats.length} />
+          <React.Fragment key={`${stat.label}-${idx}`}>
+            <StampCard stat={stat} isVisible={isVisible} delay={idx % displayStats.length} />
+            {idx === displayStats.length - 1 && (
+              <div className="mx-2 shrink-0">
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-xs shadow-lg shadow-orange-500/20">
+                  <QrCode className="w-4 h-4" />
+                  <span className="tracking-wider uppercase text-[10px]">SCAN QR</span>
+                </div>
+              </div>
+            )}
+          </React.Fragment>
         ))}
       </div>
     </section>
@@ -106,46 +108,44 @@ export default function LiveAvailabilityStrip({ stats }: LiveAvailabilityStripPr
 
 function StampCard({ stat, isVisible, delay }: { stat: StatItem; isVisible: boolean; delay: number }) {
   const count = useCountUp(stat.value, 1500, isVisible);
+  const Icon = stat.icon;
 
   return (
     <div
-      className={`landing-stamp-float mx-4 sm:mx-6 shrink-0 flex items-center gap-3 px-5 py-3.5`}
+      className="landing-stamp-float mx-2 shrink-0 flex items-center gap-3 px-4 py-3 border border-white/10 rounded-2xl bg-neutral-900/80 backdrop-blur-md shadow-sm transition-all hover:border-white/20"
       style={{
-        borderRadius: '16px',
-        background: 'rgba(255,255,255,0.05)',
-        border: `1px solid rgba(255,255,255,0.08)`,
-        backdropFilter: 'blur(8px)',
-        animationDelay: `${delay * 0.5}s`,
-        minWidth: '200px',
+        animationDelay: `${delay * 0.3}s`,
+        minWidth: '190px',
       }}
     >
-      {/* Emoji Badge */}
+      {/* Icon Container */}
       <div
-        className="w-[42px] h-[42px] rounded-[12px] flex items-center justify-center shrink-0 text-[20px]"
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
         style={{
-          background: `${stat.accent}15`,
-          border: `1px solid ${stat.accent}30`,
+          backgroundColor: `${stat.accent}18`,
+          border: `1px solid ${stat.accent}35`,
+          color: stat.accent,
         }}
       >
-        {stat.emoji}
+        <Icon className="w-5 h-5" />
       </div>
 
       <div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {stat.isLive && (
             <span
-              className="landing-pulse-dot w-[6px] h-[6px] rounded-full shrink-0"
+              className="w-2 h-2 rounded-full shrink-0 animate-pulse"
               style={{ backgroundColor: stat.accent }}
             />
           )}
           <span
-            className="text-[24px] sm:text-[28px] font-bold tabular-nums"
+            className="text-base sm:text-lg font-black tracking-tight tabular-nums"
             style={{ color: stat.accent }}
           >
             {stat.prefix || ''}{count}{stat.suffix}
           </span>
         </div>
-        <span className="text-[12px] font-medium block mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        <span className="text-[11px] font-medium text-neutral-400 block -mt-0.5 whitespace-nowrap">
           {stat.label}
         </span>
       </div>

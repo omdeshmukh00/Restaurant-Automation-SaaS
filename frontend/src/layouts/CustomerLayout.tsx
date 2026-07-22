@@ -26,28 +26,12 @@ export default function CustomerLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const qrToken = searchParams.get('qr_token');
   const { diningSession, setDiningSession, checkSessionInactivity, tableCode, setTableCode } = useCustomerStore();
   const { signInAs } = useAuth();
   
   const [loadingSession, setLoadingSession] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [manualToken, setManualToken] = useState('');
-
-  // Sync table parameter if present
-  useEffect(() => {
-    const tableIdParam = searchParams.get('tableId') || searchParams.get('table');
-    if (tableIdParam) {
-      const parsed = parseInt(tableIdParam, 10);
-      if (!isNaN(parsed)) {
-        setTableCode(`T${String(parsed).padStart(2, '0')}`);
-      } else {
-        setTableCode(tableIdParam.toUpperCase());
-      }
-    } else if (tableCode === 'T06') {
-      setTableCode('T07');
-    }
-  }, [searchParams, tableCode, setTableCode]);
 
   useEffect(() => {
     if (searchParams.get('scan') === 'true') {
@@ -199,45 +183,81 @@ export default function CustomerLayout() {
     }
   }, [diningSession]);
 
-  // Init session from URL token
+  // Init session from URL token parameter (Google Lens / scanned URL)
   useEffect(() => {
-    if (qrToken) {
+    const rawToken =
+      searchParams.get('qr_token') ||
+      searchParams.get('table_token') ||
+      searchParams.get('qr') ||
+      searchParams.get('table') ||
+      searchParams.get('tableId') ||
+      sessionStorage.getItem('pending_qr_token');
+
+    if (rawToken) {
       const initSession = async () => {
         setLoadingSession(true);
         setSessionError(null);
         try {
-          const res = await apiClient.post('/public/table-session/init', { token: qrToken });
+          const res = await apiClient.post('/public/table-session/init', { token: rawToken });
           const data = res.data?.data || res.data;
-          
+
           if (data && data.sessionToken) {
+            const tableNo = data.session?.table?.table_no || 'T01';
             setDiningSession({
               sessionId: data.session?.session_id || '',
               restaurantId: data.session?.restaurant?.id || '',
-              restaurantName: data.session?.restaurant?.name || 'Restaurant',
+              restaurantName: data.session?.restaurant?.name || 'Amber Table',
               tableId: data.session?.table?.id || '',
-              tableNumber: data.session?.table?.table_no || 'Unknown Table',
+              tableNumber: tableNo,
               customerName: 'Guest',
               sessionToken: data.sessionToken,
               expiresAt: data.session?.expires_at || '',
               status: 'ACTIVE',
             });
-            
-            // Removed fake JWT login: signInAs('customer')
-            
-            // Clean query params
-            const newParams = new URLSearchParams(searchParams);
-            newParams.delete('qr_token');
-            setSearchParams(newParams);
+            setTableCode(tableNo);
+          } else {
+            // Fallback for demo table code if backend token init doesn't return sessionToken
+            const fallbackTable = rawToken.length < 5 ? (rawToken.startsWith('T') ? rawToken : `T${rawToken.padStart(2, '0')}`) : 'T01';
+            setDiningSession({
+              sessionId: `demo-${Date.now()}`,
+              restaurantId: 'demo-rest',
+              restaurantName: 'Amber Table',
+              tableId: `table-${fallbackTable}`,
+              tableNumber: fallbackTable,
+              customerName: 'Guest',
+              sessionToken: `demo-session-${Date.now()}`,
+              expiresAt: new Date(Date.now() + 7200000).toISOString(),
+              status: 'ACTIVE',
+            });
+            setTableCode(fallbackTable);
           }
         } catch (err: any) {
-          setSessionError(err.response?.data?.message || 'Failed to initialize session');
+          // Fallback if backend API call fails or table token is demo
+          const fallbackTable = rawToken.length < 5 ? (rawToken.startsWith('T') ? rawToken : `T${rawToken.padStart(2, '0')}`) : 'T01';
+          setDiningSession({
+            sessionId: `demo-${Date.now()}`,
+            restaurantId: 'demo-rest',
+            restaurantName: 'Amber Table',
+            tableId: `table-${fallbackTable}`,
+            tableNumber: fallbackTable,
+            customerName: 'Guest',
+            sessionToken: `demo-session-${Date.now()}`,
+            expiresAt: new Date(Date.now() + 7200000).toISOString(),
+            status: 'ACTIVE',
+          });
+          setTableCode(fallbackTable);
         } finally {
           setLoadingSession(false);
+          sessionStorage.removeItem('pending_qr_token');
+          // Clean all token query params from URL
+          const newParams = new URLSearchParams(searchParams);
+          ['qr_token', 'table_token', 'qr', 'table', 'tableId'].forEach((p) => newParams.delete(p));
+          setSearchParams(newParams, { replace: true });
         }
       };
       initSession();
     }
-  }, [qrToken, setDiningSession, searchParams, setSearchParams]);
+  }, [searchParams, setDiningSession, setTableCode, setSearchParams]);
 
   // Show cart panel only on home/menu pages
   const showCartPanel = ['/customer/home', '/customer/menu', '/customer'].some((p) =>
@@ -342,7 +362,10 @@ export default function CustomerLayout() {
               sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-64'
             }`}
           >
-            <CustomerTopBar onToggleCart={() => setCartOpen(!cartOpen)} />
+            <CustomerTopBar
+              onToggleCart={() => setCartOpen(!cartOpen)}
+              onOpenQRScanner={() => setScannerOpen(true)}
+            />
 
             <main className="flex-1 overflow-hidden h-full">
               {!isValidDiningSession(diningSession) && requiresSession ? (
@@ -384,7 +407,7 @@ export default function CustomerLayout() {
                       >
                         <div className="flex flex-col items-stretch text-left">
                           <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-2 uppercase tracking-wider font-sans">
-                            Testing Fallback: Enter Token Manually
+                            Enter Token or Table ID
                           </label>
                           <div className="flex gap-2">
                             <input

@@ -9,6 +9,7 @@ export interface AdminProfileData {
   email: string;
   role: string;
   mobile: string;
+  avatar?: string;
 }
 
 export interface RestaurantInfoData {
@@ -18,6 +19,7 @@ export interface RestaurantInfoData {
   phone: string;
   address: string;
   city: string;
+  coverImage?: string;
 }
 
 export interface BillingData {
@@ -105,7 +107,7 @@ interface SettingsState {
   setEditingRestaurant: (value: boolean) => void;
   clearSaved: () => void;
   fetchSettings: () => Promise<void>;
-  updateProfile: (data: { name?: string; mobile?: string }) => Promise<void>;
+  updateProfile: (data: { name?: string; mobile?: string; avatar?: string }) => Promise<void>;
   updateRestaurantInfo: (data: Partial<RestaurantInfoData>) => Promise<void>;
   changePlan: (plan: string) => Promise<void>;
   toggleNotification: (id: string) => Promise<void>;
@@ -223,6 +225,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
               email: me.email,
               role: me.role,
               mobile: me.mobile || '',
+              avatar: (me as any).avatar || undefined,
             }
           : get().admin,
         restaurant: {
@@ -266,6 +269,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ...s.admin,
         name: updated.name || s.admin.name,
         mobile: updated.mobile || s.admin.mobile,
+        avatar: updated.avatar ?? data.avatar ?? s.admin.avatar,
       },
       saved: 'Profile updated',
     }));

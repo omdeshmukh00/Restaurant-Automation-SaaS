@@ -36,6 +36,7 @@ export interface MenuItem {
   categoryName: string;
   image: string;
   isVeg: boolean;
+  isSpicy: boolean;
   isAvailable: boolean;
   isHidden: boolean;
   enabled: boolean;
@@ -49,6 +50,7 @@ export interface ItemCreateInput {
   price: number;
   categoryId: string;
   isVeg: boolean;
+  isSpicy?: boolean;
   isAvailable?: boolean;
   stockQuantity?: number;
   image?: string;
@@ -60,6 +62,7 @@ export type ItemUpdateInput = Partial<{
   price: number;
   categoryId: string;
   isVeg: boolean;
+  isSpicy: boolean;
   isAvailable: boolean;
   isHidden: boolean;
   stockQuantity: number;
@@ -77,6 +80,7 @@ interface RawItem {
   categoryId?: string | { toString(): string };
   image?: string;
   isVeg?: boolean;
+  isSpicy?: boolean;
   isAvailable?: boolean;
   isHidden?: boolean;
   stockQuantity?: number;
@@ -134,6 +138,7 @@ function mapItem(raw: RawItem, categoryName = ''): MenuItem {
     categoryName,
     image: resolveImage(raw.image),
     isVeg: !!raw.isVeg,
+    isSpicy: !!raw.isSpicy,
     isAvailable,
     isHidden,
     enabled: !isHidden,

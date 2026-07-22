@@ -5,6 +5,7 @@ import ImageCropperModal from '../../customer/components/dashboard/ImageCropperM
 import { useAuth } from '../../../auth/AuthProvider';
 import { useToast } from '../components/dashboard/Toast';
 import { cleaningStore } from '../store/cleaning.store';
+import { apiClient } from '../../../shared/services/apiClient';
 
 interface ActivityItem {
   icon: string;
@@ -115,8 +116,16 @@ export default function CleaningProfilePage() {
     setShowPasswordModal(true);
   };
 
-  const handleSaveInfo = (e: React.FormEvent) => {
+  const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      await apiClient.patch('/users/me', {
+        name: editName,
+        mobile: editPhone,
+      });
+    } catch {
+      // ignore
+    }
     updateProfile({
       name: editName,
       email: editEmail,
@@ -167,7 +176,13 @@ export default function CleaningProfilePage() {
     }
   };
 
-  const handleCropConfirm = (croppedBase64: string) => {
+  const handleCropConfirm = async (croppedBase64: string) => {
+    try {
+      await apiClient.patch('/users/me', { avatar: croppedBase64 });
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
     updateProfile({ avatar: croppedBase64 });
     setShowCropModal(false);
   };

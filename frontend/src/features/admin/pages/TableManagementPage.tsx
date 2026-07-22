@@ -124,15 +124,15 @@ export function TableManagementPage(): JSX.Element {
 
       {/* ── Main Content ─────────────────────────────────────────────────── */}
       <div className="flex flex-col xl:flex-row gap-5 items-start">
-        {/* Left – main view */}
+        {/* Left – main table view block */}
         <div className="w-full xl:flex-1 xl:min-w-0 space-y-5">
           {viewMode === 'floor-map' && <FloorMap />}
           {viewMode === 'grid' && <TableGrid />}
           {viewMode === 'list' && <TableList />}
         </div>
 
-        {/* Right – detail + occupancy summary */}
-        <div className="w-full xl:w-72 xl:flex-shrink-0 space-y-4">
+        {/* Right – detail + occupancy summary sticky panel block */}
+        <div className="w-full xl:w-80 xl:flex-shrink-0 space-y-4 xl:sticky xl:top-[76px] xl:max-h-[calc(100vh-92px)] xl:overflow-y-auto pr-1 sd-custom-scrollbar">
           {selectedTableId !== null ? (
             <TableDetailPanel />
           ) : (

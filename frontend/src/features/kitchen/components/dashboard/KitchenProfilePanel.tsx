@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useKitchenStore, KitchenProfile } from '../../store/kitchen.store';
 import ImageCropperModal from '../../../customer/components/dashboard/ImageCropperModal';
 import { useAuth } from '../../../../auth/AuthProvider';
+import { apiClient } from '../../../../shared/services/apiClient';
 
 interface Props {
   isOpen: boolean;
@@ -100,13 +101,19 @@ export default function KitchenProfilePanel({ isOpen, onClose }: Props) {
     showToast('Profile photo cropped successfully!');
   };
 
-  const handleResetAvatar = () => {
+  const handleResetAvatar = async () => {
     setAvatar('');
     setAvatarMenuOpen(false);
+    try {
+      await apiClient.patch('/users/me', { avatar: null });
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: '' } }));
     showToast('Reset to default initials.');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -124,6 +131,18 @@ export default function KitchenProfilePanel({ isOpen, onClose }: Props) {
       showToast('Please enter a valid email address', 'error');
       return;
     }
+
+    try {
+      await apiClient.patch('/users/me', {
+        name,
+        avatar,
+        mobile: phone,
+      });
+    } catch {
+      // Fall back to local store update
+    }
+
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { name, avatar, mobile: phone } }));
 
     updateProfile({
       name,

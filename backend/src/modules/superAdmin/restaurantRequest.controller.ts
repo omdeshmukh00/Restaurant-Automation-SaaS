@@ -34,6 +34,8 @@ export const createPartnerRequestSchema = z.object({
   longitude: z.number(),
   googleMapsUrl: z.string().trim().optional(),
   message: z.string().trim().optional(),
+  isVeg: z.enum(['veg', 'non-veg', 'both']).optional().default('both'),
+  coverImage: z.string().trim().optional(),
 
   // Razorpay payment details (optional, only for paid plans)
   razorpay_order_id: z.string().optional(),
@@ -166,6 +168,8 @@ export async function submitPartnerRequest(req: Request, res: Response, next: Ne
         longitude: parsed.longitude,
         googleMapsUrl: parsed.googleMapsUrl || undefined,
         message: parsed.message,
+        isVeg: parsed.isVeg,
+        coverImage: parsed.coverImage || undefined,
         status: 'PENDING_PAYMENT',
         submittedAt: new Date(),
         // payment info
@@ -206,6 +210,8 @@ export async function submitPartnerRequest(req: Request, res: Response, next: Ne
       longitude: parsed.longitude,
       googleMapsUrl: parsed.googleMapsUrl || undefined,
       message: parsed.message,
+      isVeg: parsed.isVeg,
+      coverImage: parsed.coverImage || undefined,
       status: 'APPLICATION_PENDING',
       submittedAt: new Date(),
     });

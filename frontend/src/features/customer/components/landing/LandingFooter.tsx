@@ -6,9 +6,7 @@ const FOOTER_LINKS = {
     { label: 'Home', href: '/' },
     { label: 'Restaurants', href: '/customer/restaurants' },
     { label: 'Reservations', href: '#reservations' },
-    { label: 'Queue Status', href: '#queue' },
     { label: 'Offers', href: '/customer/offers' },
-    { label: 'My Orders', href: '#orders' },
   ],
   support: [
     { label: 'Help Center', href: '#help' },
@@ -160,7 +158,7 @@ export default function LandingFooter(): JSX.Element {
 
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-5">
-            <div className="flex items-center gap-2.5">
+            <a href="/customer/home" className="flex items-center gap-2.5 cursor-pointer">
               <div
                 className="w-[38px] h-[38px] rounded-full flex items-center justify-center"
                 style={{ backgroundColor: '#FF6B1A' }}
@@ -170,7 +168,7 @@ export default function LandingFooter(): JSX.Element {
               <span className="font-bold text-[22px] tracking-tight text-white">
                 Resto<span style={{ color: '#FF6B1A' }}>Hub</span>
               </span>
-            </div>
+            </a>
             <p className="text-[14px] leading-relaxed max-w-[280px]" style={{ color: 'rgba(255,255,255,0.45)' }}>
               The next-generation restaurant discovery &amp; digital dining platform. From QR ordering to live table availability — all in one place.
             </p>

@@ -40,6 +40,7 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
   const [stock, setStock] = useState('');
   const [category, setCategory] = useState('');
   const [isVeg, setIsVeg] = useState(false);
+  const [isSpicy, setIsSpicy] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
@@ -98,6 +99,7 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
         price: Number(price) || 0,
         categoryId: category,
         isVeg,
+        isSpicy,
         isAvailable,
         stockQuantity: stockNum,
         image: imageUrl || undefined,
@@ -216,6 +218,23 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                   isAvailable ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/50">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">🌶️ Extra Spicy</span>
+            <button
+              type="button"
+              onClick={() => setIsSpicy((v) => !v)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isSpicy ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isSpicy ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>

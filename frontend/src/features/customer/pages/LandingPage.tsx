@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QrCode } from 'lucide-react';
 import { apiClient } from '../../../shared/services/apiClient';
+import { landingCache } from '../../../shared/utils/landingCache';
+import QRScannerModal from '../components/dashboard/QRScannerModal';
 import {
   LandingNavbar,
   HeroSection,
@@ -20,14 +22,17 @@ import '../components/landing/landing.css';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const cachedData = landingCache.getLandingData();
   const [landingData, setLandingData] = useState<{
     restaurants?: any[];
     dishes?: any[];
     offers?: any[];
     stats?: any;
     cuisines?: string[];
-  }>({});
+  }>(cachedData || {});
   const [selectedCuisine, setSelectedCuisine] = useState<string>('All');
+  const [isLoading, setIsLoading] = useState(!cachedData);
 
   const openLogin = (targetPath?: string) => {
     if (targetPath) {
@@ -158,14 +163,27 @@ export default function LandingPage() {
 
   useEffect(() => {
     let active = true;
+    const cached = landingCache.getLandingData();
+    if (cached) {
+      setLandingData(cached);
+      setIsLoading(false);
+    }
     const fetchData = async () => {
       try {
+        if (!cached) {
+          setIsLoading(true);
+        }
         const response = await apiClient.get('/public/landing/data');
         if (active && (response.data?.success || response.data?.status === 'success') && response.data?.data) {
           setLandingData(response.data.data);
+          landingCache.setLandingData(response.data.data);
         }
       } catch (err) {
         console.error('Failed to fetch landing page data', err);
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
       }
     };
     fetchData();
@@ -175,14 +193,14 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="landing-page-container min-h-screen bg-neutral-50 font-sans relative overflow-hidden">
+    <div className="landing-page-container min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-100 transition-colors duration-300 font-sans relative overflow-hidden">
       <LandingNavbar onLoginOpen={openLogin} />
       
       <HeroSection onLoginOpen={openLogin} restaurants={landingData.restaurants} />
       
       <LiveAvailabilityStrip stats={landingData.stats} />
       
-      <div style={{ backgroundColor: '#FFFFFF' }}>
+      <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
         <CuisineExplorer
           cuisines={landingData.cuisines}
           activeCuisine={selectedCuisine}
@@ -190,29 +208,26 @@ export default function LandingPage() {
         />
       </div>
 
-      <div style={{ backgroundColor: '#FFFFFF' }}>
+      <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
         <TrendingRestaurants
           onLoginOpen={openLogin}
           restaurants={landingData.restaurants}
           selectedCuisine={selectedCuisine}
+          isLoading={isLoading}
         />
       </div>
 
-      <TrendingDishes onLoginOpen={openLogin} dishes={landingData.dishes} />
-      
-
+      <TrendingDishes onLoginOpen={openLogin} dishes={landingData.dishes} isLoading={isLoading} />
       
       <OffersDeals offers={landingData.offers} />
       
-      <div style={{ backgroundColor: '#FFFFFF' }}>
+      <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
         <DigitalDiningJourney />
       </div>
       
       <WhyChooseSection />
       
-
-      
-      <div style={{ backgroundColor: '#FFFFFF' }}>
+      <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
         <BlogSection />
       </div>
       
@@ -237,7 +252,7 @@ export default function LandingPage() {
               e.preventDefault();
               return;
             }
-            navigate('/customer/home?scan=true');
+            setScannerOpen(true);
           }}
           className="group flex flex-col items-center gap-2 p-4 transition-all duration-300 hover:scale-105 active:scale-95 cursor-grab active:cursor-grabbing"
           style={{
@@ -281,7 +296,7 @@ export default function LandingPage() {
               e.preventDefault();
               return;
             }
-            navigate('/customer/home?scan=true');
+            setScannerOpen(true);
           }}
           className="flex items-center justify-center w-[60px] h-[60px] transition-all duration-300 cursor-grab active:cursor-grabbing"
           style={{
@@ -297,6 +312,16 @@ export default function LandingPage() {
           <QrCode className="w-[26px] h-[26px]" style={{ color: '#FF6B1A' }} />
         </button>
       </div>
+
+      {/* QR Code Scanner Modal */}
+      <QRScannerModal
+        isOpen={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScanSuccess={(cleanId) => {
+          setScannerOpen(false);
+          navigate(`/customer/home?qr_token=${cleanId}`);
+        }}
+      />
     </div>
   );
 }
