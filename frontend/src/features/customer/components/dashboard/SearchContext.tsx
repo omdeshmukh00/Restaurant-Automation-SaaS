@@ -50,27 +50,40 @@ interface SearchContextType {
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 export function SearchProvider({ children }: { children: React.ReactNode }) {
-  const { menuItems: storeMenuItems, fetchMenu, diningSession } = useCustomerStore();
+  const { menuItems: storeMenuItems, categories: storeCategories, fetchMenu, diningSession } = useCustomerStore();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Recommended');
   const [vegOnly, setVegOnly] = useState(false);
   const [spicyOnly, setSpicyOnly] = useState(false);
 
+  const categoryLookup = useMemo(() => {
+    const map = new Map<string, string>();
+    (storeCategories || []).forEach((cat: any) => {
+      map.set(cat._id?.toString() || cat.id?.toString(), cat.name || '');
+      map.set((cat.name || '').toLowerCase(), cat.name || '');
+    });
+    return map;
+  }, [storeCategories]);
+
   const menuItems = useMemo(() => {
-    return storeMenuItems.map((item: any) => ({
-      id: item._id || item.id,
-      name: item.name,
-      price: item.price,
-      image: item.image || '',
-      description: item.description || '',
-      category: item.categoryId?.name || item.category || 'Main',
-      rating: item.rating || 4.5,
-      reviews: item.reviews || 0,
-      isVeg: item.isVeg,
-      isSpicy: item.isSpicy,
-    }));
-  }, [storeMenuItems]);
+    return storeMenuItems.map((item: any) => {
+      const catId = item.categoryId?._id?.toString() || item.categoryId?.toString() || '';
+      const catName = categoryLookup.get(catId) || item.categoryId?.name || item.category || 'Main';
+      return {
+        id: item._id || item.id,
+        name: item.name,
+        price: item.price,
+        image: item.image || '',
+        description: item.description || '',
+        category: catName,
+        rating: item.rating || 4.5,
+        reviews: item.reviews || 0,
+        isVeg: item.isVeg,
+        isSpicy: item.isSpicy,
+      };
+    });
+  }, [storeMenuItems, categoryLookup]);
 
   const categories = useMemo(() => {
     const cats = new Set(menuItems.map(m => m.category));
@@ -85,7 +98,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchMenu();
-  }, [fetchMenu]);
+  }, [fetchMenu, diningSession]);
 
   useEffect(() => {
     const socket = getSocket();
