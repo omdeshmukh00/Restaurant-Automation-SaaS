@@ -39,7 +39,7 @@ export default function CustomerOrderTrackingPage() {
   // Find past orders (status in Served, Completed)
   const pastOrders = orders.filter(o => o.status === 'Served' || o.status === 'Completed');
 
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 10000);
     return () => clearInterval(interval);

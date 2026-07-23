@@ -12,12 +12,6 @@ export default function MenuAvailabilityModal({ isOpen, onClose }: MenuAvailabil
   const [loading, setLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchItems();
-    }
-  }, [isOpen, search]);
-
   const fetchItems = async () => {
     setLoading(true);
     try {
@@ -29,6 +23,12 @@ export default function MenuAvailabilityModal({ isOpen, onClose }: MenuAvailabil
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchItems();
+    }
+  }, [isOpen, search]);
 
   const handleUpdate = async (id: string, status: 'AVAILABLE' | 'OUT_OF_STOCK' | 'TEMPORARILY_UNAVAILABLE') => {
     setUpdatingId(id);

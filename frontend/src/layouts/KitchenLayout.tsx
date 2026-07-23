@@ -58,14 +58,14 @@ export default function KitchenLayout(): JSX.Element {
 
     const socket = getSocket();
     
-    const handleOrderUpsert = (payload: any, ack?: Function) => {
+    const handleOrderUpsert = (payload: any, ack?: (res: any) => void) => {
       // payload could be { order, _version } or just order
       const order = payload.order || payload;
       useKitchenStore.getState().upsertOrder(order);
       if (typeof ack === 'function') ack({ status: 'ok' });
     };
 
-    const handleBatchUpsert = (payload: any, ack?: Function) => {
+    const handleBatchUpsert = (payload: any, ack?: (res: any) => void) => {
       const batch = payload.batch || payload;
       useKitchenStore.getState().upsertBatch(batch);
       if (typeof ack === 'function') ack({ status: 'ok' });
