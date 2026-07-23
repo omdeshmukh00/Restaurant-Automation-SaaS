@@ -1,9 +1,11 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { useSettingsStore } from '../../store/settings.store';
 
 export function TeamCard(): JSX.Element {
   const { team } = useSettingsStore();
+  const navigate = useNavigate();
 
   const rows = [
     { label: 'Total Team Members', value: team.totalMembers, bold: true },
@@ -38,7 +40,10 @@ export function TeamCard(): JSX.Element {
       </div>
 
       <div className="mt-5 flex justify-end">
-        <button className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors">
+        <button
+          onClick={() => navigate('/admin/staff')}
+          className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors"
+        >
           Manage Team
         </button>
       </div>

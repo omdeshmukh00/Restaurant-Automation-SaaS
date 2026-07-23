@@ -31,7 +31,7 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
           <div>
             <h2 className="text-base font-bold text-gray-900 dark:text-white">{order.id}</h2>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{order.time} · {order.date}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{order.timeClock} · {order.date}</p>
           </div>
           <div className="flex items-center gap-3">
             <OrderStatusBadge status={order.status} />

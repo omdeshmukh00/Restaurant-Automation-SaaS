@@ -210,7 +210,7 @@ export class OrdersController {
       action:       AuditAction.ORDER_REORDERED,
       metadata: {
         tableId:         session.tableId,
-        originalOrderId: id,           // the order being reordered from
+        originalOrderId: id,
         newOrderId:      order._id.toString(),
         itemCount:       order.items?.length ?? 0,
         totalAmount:     order.totalAmount,
@@ -437,17 +437,16 @@ export class OrdersController {
 
       const { id } = req.params;
       const order = await OrdersService.pickFood(restaurantId, id, req.user?.id);
-      
-      void logAudit(req, {
-      entityType: AuditEntity.ORDER,
-      entityId:   order._id.toString(),
-      action:     AuditAction.ORDER_PICKED,
-      metadata: {
-        pickedBy: req.user?.id,
-        tableId:  order.tableId,
-      },
-    });
 
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId:   order._id.toString(),
+        action:     AuditAction.ORDER_PICKED,
+        metadata: {
+          pickedBy: req.user?.id,
+          tableId:  order.tableId,
+        },
+      });
 
       ok(res, { order });
     } catch (error) {
@@ -464,14 +463,14 @@ export class OrdersController {
       const order = await OrdersService.markServed(restaurantId, id, req.user?.id);
 
       void logAudit(req, {
-      entityType: AuditEntity.ORDER,
-      entityId:   order._id.toString(),
-      action:     AuditAction.ORDER_SERVED,
-      metadata: {
-        servedBy: req.user?.id,
-        tableId:  order.tableId,
-      },
-    });
+        entityType: AuditEntity.ORDER,
+        entityId:   order._id.toString(),
+        action:     AuditAction.ORDER_SERVED,
+        metadata: {
+          servedBy: req.user?.id,
+          tableId:  order.tableId,
+        },
+      });
 
       ok(res, { order });
     } catch (error) {
@@ -486,23 +485,23 @@ export class OrdersController {
 
       const { id } = req.params;
       const order = await OrdersService.markCompleted(
-      restaurantId,
-      id,
-      req.user?.id,
-    );
-// Credit loyalty points automatically
-await LoyaltyService.creditPoints(order);
+        restaurantId,
+        id,
+        req.user?.id,
+      );
+      // Credit loyalty points automatically
+      await LoyaltyService.creditPoints(order);
 
-void logAudit(req, {
-      entityType: AuditEntity.ORDER,
-      entityId:   order._id.toString(),
-      action:     AuditAction.ORDER_COMPLETED,
-      metadata: {
-        completedBy:  req.user?.id,
-        tableId:      order.tableId,
-        totalAmount:  order.totalAmount,
-      },
-    });
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId:   order._id.toString(),
+        action:     AuditAction.ORDER_COMPLETED,
+        metadata: {
+          completedBy:  req.user?.id,
+          tableId:      order.tableId,
+          totalAmount:  order.totalAmount,
+        },
+      });
 
       ok(res, { order });
     } catch (error) {
@@ -534,12 +533,12 @@ void logAudit(req, {
 
       if (offerId) {
         offer = await OfferModel.findOne({ _id: offerId, restaurantId, active: true });
-        if (offer) discountPercent = offer.discountPercent;
+        if (offer) discountPercent = offer.discountValue;
       } else if (offerCode) {
         const codeUpper = String(offerCode).trim().toUpperCase();
-        offer = await OfferModel.findOne({ code: codeUpper, restaurantId, active: true });
+        offer = await OfferModel.findOne({ promoCode: codeUpper, restaurantId, active: true });
         if (offer) {
-          discountPercent = offer.discountPercent;
+          discountPercent = offer.discountValue;
         } else {
           // Standard waiter coupon fallback codes
           const defaultOffers: Record<string, number> = {
@@ -579,7 +578,7 @@ void logAudit(req, {
         entityId: order._id.toString(),
         action: AuditAction.ORDER_OFFER_APPLIED,
         metadata: {
-          appliedOfferCode: offerCode || offer?.code,
+          appliedOfferCode: offerCode || offer?.promoCode,
           discountAmount,
           finalAmount: order.finalAmount,
           assistedByWaiter: req.user?.id,
@@ -645,7 +644,7 @@ void logAudit(req, {
 
       const pointsBalance = wallet?.pointsBalance ?? (session ? 1250 : 0);
       const lifetimePoints = wallet?.lifetimePoints ?? pointsBalance;
-      
+
       let tier = wallet?.tier || LoyaltyTier.BRONZE;
       if (!wallet && session) {
         if (lifetimePoints >= 2500) tier = LoyaltyTier.PLATINUM;

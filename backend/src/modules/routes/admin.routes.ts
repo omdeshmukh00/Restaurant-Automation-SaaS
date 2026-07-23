@@ -32,6 +32,7 @@ import {
 } from '../tables/tables.schema';
 import analyticsRouter from '../analytics/analytics.routes';
 import auditLogsRouter from '../auditLogs/auditLogs.routes';
+import settlementRouter from '../settlement/settlement.routes';
 import { updateRestaurantSettingsSchema } from '../restaurants/restaurants.schema';
 import inventoryRouter from '../inventory/inventory.routes';
 import loyaltyRouter from '../loyalty/loyalty.routes';
@@ -80,3 +81,4 @@ adminRouter.use('/inventory', inventoryRouter);
 adminRouter.use('/suppliers', supplierRouter);
 adminRouter.use('/analytics', analyticsRouter);
 adminRouter.use('/audit-logs', auditLogsRouter);
+adminRouter.use('/settlements', settlementRouter);

@@ -229,6 +229,7 @@ export class OrdersService {
       throw new AppError('Table session not found', 404, ErrorCode.NOT_FOUND);
     }
 
+    // 5. Create Order — include customer name from the session
     // 5. Calculate Dynamic ETA
     // IMPORTANT: Do NOT run countDocuments inside the transaction to avoid WriteConflicts and high latency
     const activeOrdersCount = await OrderModel.countDocuments({
@@ -251,6 +252,7 @@ export class OrdersService {
       tableId: sessionDoc.tableId,
       sessionId: sessId,
       orderNumber,
+      customerName: sessionDoc.customerName || 'Guest',
       items: orderItems,
       totalAmount: cart.subtotal,
       taxAmount: cart.tax,
@@ -373,6 +375,31 @@ export class OrdersService {
       OrderModel.countDocuments(query),
     ]);
 
+    // Backfill customerName from the table session for orders where it is
+    // missing (legacy data that predates the customerName field).  This is a
+    // one-shot bulk lookup — only sessions whose orders lack a name are read.
+    const emptyNameOrders = orders.filter((o) => !o.customerName);
+    if (emptyNameOrders.length > 0) {
+      const sessionIds = emptyNameOrders
+        .map((o) => o.sessionId)
+        .filter((id): id is mongoose.Types.ObjectId => !!id);
+      if (sessionIds.length > 0) {
+        const sessions = await TableSessionModel.find(
+          { _id: { $in: sessionIds } },
+          { customerName: 1 },
+        ).lean();
+        const nameBySession = new Map(
+          sessions.map((s) => [s._id.toString(), s.customerName]),
+        );
+        for (const order of orders) {
+          if (!order.customerName && order.sessionId) {
+            const name = nameBySession.get(order.sessionId.toString());
+            if (name) order.customerName = name;
+          }
+        }
+      }
+    }
+
     return {
       orders,
       pagination: {
@@ -394,6 +421,15 @@ export class OrdersService {
     if (!order) {
       throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
     }
+
+    // Backfill customerName from the table session if missing (legacy data)
+    if (!order.customerName && order.sessionId) {
+      const session = await TableSessionModel.findById(order.sessionId, { customerName: 1 }).lean();
+      if (session?.customerName) {
+        order.customerName = session.customerName;
+      }
+    }
+
     return order;
   }
 
@@ -600,6 +636,38 @@ export class OrdersService {
       if (dbSession && dbSession.inTransaction()) {
         await dbSession.commitTransaction();
       }
+
+      // 7. Emit Realtime Event for Kitchen
+      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_NEW, { orderId: order._id });
+
+      // 8. Notify admin about new order
+      const orderTotal = order.finalAmount ?? order.totalAmount ?? 0;
+      const largeOrderThreshold = 5000; // configurable threshold for large-value order
+      const isLargeValue = orderTotal >= largeOrderThreshold;
+
+      if (isLargeValue) {
+        NotificationsService.createNotification({
+          restaurantId,
+          recipientRole: UserRole.RESTAURANT_ADMIN,
+          title: 'Large Value Order',
+          message: `Order #${order.orderNumber} placed for ₹${orderTotal.toFixed(2)}.`,
+          type: 'ORDER_LARGE_VALUE',
+          entityId: order._id.toString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        }).catch(() => {});
+      } else {
+        NotificationsService.createNotification({
+          restaurantId,
+          recipientRole: UserRole.RESTAURANT_ADMIN,
+          title: 'New Order Placed',
+          message: `Order #${order.orderNumber} has been placed for table. Total: ₹${orderTotal.toFixed(2)}.`,
+          type: 'ORDER_NEW',
+          entityId: order._id.toString(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        }).catch(() => {});
+      }
+
+      return order;
     } catch (error) {
       if (dbSession && dbSession.inTransaction()) {
         try {
@@ -705,11 +773,16 @@ export class OrdersService {
     const orderNumber = `ORD-${timestamp}-${randomChars}`;
     const orderUsage = await enforceOrderLimits(restaurantId);
 
+    // Fetch session to get current customer name
+    const sessionDoc = await TableSessionModel.findById(sessionId);
+    const customerName = sessionDoc?.customerName || original.customerName || 'Guest';
+
     const order = await OrderModel.create({
       restaurantId,
       tableId,
       sessionId,
       orderNumber,
+      customerName,
       items: original.items,
       totalAmount: original.totalAmount,
       taxAmount: original.taxAmount,
@@ -757,6 +830,17 @@ export class OrdersService {
     socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
     socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
     socketService.emitToSession(sessionId.toString(), 'order.cancelled', { order });
+
+    // Notify admin about cancelled order
+    NotificationsService.createNotification({
+      restaurantId,
+      recipientRole: UserRole.RESTAURANT_ADMIN,
+      title: 'Order Cancelled',
+      message: `Order #${order.orderNumber} has been cancelled by the customer.`,
+      type: 'ORDER_CANCELLED',
+      entityId: order._id.toString(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    }).catch(() => {});
 
     return order;
   }

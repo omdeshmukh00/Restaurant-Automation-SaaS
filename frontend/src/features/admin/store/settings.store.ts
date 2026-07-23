@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { adminRestaurantApi } from '../api/admin.restaurants.api';
-import { adminUserApi } from '../api/admin.users.api';
+import { adminUserApi, type AdminProfile } from '../api/admin.users.api';
 import { useStaffStore } from './staff.store';
 
 export interface AdminProfileData {
@@ -28,8 +28,8 @@ export interface BillingData {
   cycle: string;
   nextBillingDate: string;
   amount: string;
+  status?: string;
   paymentMethod: string;
-  cardLast4: string;
 }
 
 export interface TeamData {
@@ -129,8 +129,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     cycle: '—',
     nextBillingDate: 'Not available',
     amount: '—',
-    paymentMethod: 'Not connected',
-    cardLast4: '—',
+    status: 'free',
+    paymentMethod: 'Free',
   },
   team: { totalMembers: 0, managers: 0, kitchenStaff: 0, serviceStaff: 0 },
   notifications: [
@@ -225,7 +225,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
               email: me.email,
               role: me.role,
               mobile: me.mobile || '',
-              avatar: (me as any).avatar || undefined,
             }
           : get().admin,
         restaurant: {
@@ -242,8 +241,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           cycle: billingSummary?.cycle ?? '—',
           nextBillingDate: billingSummary?.nextBillingDate ?? 'Not available',
           amount: billingSummary?.amount ?? '—',
-          paymentMethod: 'Not connected',
-          cardLast4: '—',
+          status: billingSummary?.status ?? 'free',
+          paymentMethod: billingSummary?.paymentMethod ?? 'Free',
         },
         team: {
           totalMembers: members.length,
@@ -263,16 +262,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   updateProfile: async (data) => {
-    const updated = await adminUserApi.updateMe(data);
-    set((s) => ({
-      admin: {
-        ...s.admin,
-        name: updated.name || s.admin.name,
-        mobile: updated.mobile || s.admin.mobile,
-        avatar: updated.avatar ?? data.avatar ?? s.admin.avatar,
-      },
-      saved: 'Profile updated',
-    }));
+    const result = await adminUserApi.updateMe(data);
+
+    // Check if this was a normal profile update (returns user) or phone-change trigger (returns otpSent)
+    if ('user' in result && result.user) {
+      const updated = result.user;
+      set((s) => ({
+        admin: {
+          ...s.admin,
+          name: updated.name || s.admin.name,
+          mobile: updated.mobile || s.admin.mobile,
+        },
+        saved: 'Profile updated',
+      }));
+    } else if ('otpSent' in result && result.otpSent) {
+      // Phone change triggered — OTP sent to email, mobile not updated yet
+      // Don't update admin.mobile here, mark as pending
+      set({ saved: null });
+    }
   },
 
   updateRestaurantInfo: async (data) => {

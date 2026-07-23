@@ -108,13 +108,41 @@ export async function processSubscriptionLifecycle() {
     const msUntilExpiry = subscription.currentPeriodEnd.getTime() - now.getTime();
     const daysUntilExpiry = Math.ceil(msUntilExpiry / (24 * 60 * 60 * 1000));
 
-    if (daysUntilExpiry === 7 || daysUntilExpiry === 3 || daysUntilExpiry === 1) {
+    if (daysUntilExpiry === 7) {
       await notify(
         subscription.restaurantId,
-        'Subscription renewal reminder',
-        `Your ${subscription.plan} subscription renews in ${daysUntilExpiry} day(s).`,
-        'SUBSCRIPTION_RENEWAL_REMINDER',
+        'Subscription Expiring Soon',
+        `Your ${subscription.plan} subscription will expire in 7 days. Please renew to avoid service interruption.`,
+        'SUBSCRIPTION_EXPIRING_SOON',
       );
+    } else if (daysUntilExpiry === 3) {
+      await notify(
+        subscription.restaurantId,
+        'Subscription Expiring Soon',
+        `Your ${subscription.plan} subscription will expire in 3 days. Renew now to keep your restaurant running.`,
+        'SUBSCRIPTION_EXPIRING_SOON',
+      );
+    } else if (daysUntilExpiry === 1) {
+      await notify(
+        subscription.restaurantId,
+        'Subscription Expiring Tomorrow',
+        `Your ${subscription.plan} subscription expires tomorrow. Immediate renewal required.`,
+        'SUBSCRIPTION_EXPIRING_SOON',
+      );
+    }
+
+    // Trial ending notification
+    if (subscription.isTrial && subscription.trialEndsAt) {
+      const msUntilTrialEnd = subscription.trialEndsAt.getTime() - now.getTime();
+      const daysUntilTrialEnd = Math.ceil(msUntilTrialEnd / (24 * 60 * 60 * 1000));
+      if (daysUntilTrialEnd === 3 || daysUntilTrialEnd === 1) {
+        await notify(
+          subscription.restaurantId,
+          'Trial Ending Soon',
+          `Your free trial of the ${subscription.plan} plan ends in ${daysUntilTrialEnd} day(s). Subscribe to continue using all features.`,
+          'SUBSCRIPTION_TRIAL_ENDING',
+        );
+      }
     }
 
     if (subscription.currentPeriodEnd > now) {

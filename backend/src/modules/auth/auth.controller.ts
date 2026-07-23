@@ -14,6 +14,7 @@ import { sendSuccess } from '../../utils/response';
 import * as authService from './auth.service';
 import { getMe } from '../users/users.controller';
 import { UserModel } from '../users/users.model';
+import { socketService } from '../../sockets/socket.service';
 import { logAudit, logAuditRaw, extractRealIp } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import { generateSecureToken } from '../../utils/crypto';
@@ -447,6 +448,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     });
 
     logger.info(`Customer registered dynamically via OTP: ${identifier}`);
+    socketService.broadcast('customer:created', { id: user._id.toString() });
   } else {
     if (isEmail) {
       user.isEmailVerified = true;

@@ -11,6 +11,9 @@ import {
   getTableUtilizationAnalytics,
   getSubscriptionUsageAnalytics,
   getReceiptAnalytics,
+  getOrdersAnalyticsEndpoint,
+  getTopSellingItemsEndpoint,
+  getReservationAnalyticsEndpoint,
 } from './analytics.controller';
 import {
   getEmailSummary,
@@ -33,6 +36,11 @@ router.get('/customer-retention', validate({ query: analyticsQuerySchema }), get
 // Legacy aliases retained to avoid breaking existing integrations while the team shifts to the updated PDF contract.
 router.get('/overview', validate({ query: analyticsQuerySchema }), getOverviewAnalytics);
 router.get('/tables', validate({ query: analyticsQuerySchema }), getTableUtilizationAnalytics);
+
+// Reports analytics endpoints
+router.get('/orders', validate({ query: analyticsQuerySchema }), getOrdersAnalyticsEndpoint);
+router.get('/top-items', validate({ query: analyticsQuerySchema }), getTopSellingItemsEndpoint);
+router.get('/reservations', validate({ query: analyticsQuerySchema }), getReservationAnalyticsEndpoint);
 
 // Admin / Dashboard analytics
 const adminRoles = [UserRole.RESTAURANT_ADMIN, UserRole.SUPER_ADMIN];

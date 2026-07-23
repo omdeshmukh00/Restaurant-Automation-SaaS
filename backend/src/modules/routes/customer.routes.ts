@@ -5,17 +5,19 @@ import { ok } from '../../utils/responses';
 import { endSession } from '../tableSessions/tableSessions.service';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
 import { FeedbackModel } from '../feedback/feedback.model';
-import { OfferModel } from '../offers/offers.model';
+
 import { StaffRequestModel } from '../staff/staffRequest.model';
+import { ReservationModel } from '../reservations/reservations.model';
+import { ReservationsService } from '../reservations/reservations.service';
 import { Priority, RequestStatus, RequestType, TableStatus } from '../../constants/statuses';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { feedbackBodySchema } from './customer.schema';
+import { OffersController } from '../offers/offers.controller';
+import { z } from 'zod';
 // import { getActiveLoyaltyRule } from '../loyalty/loyalty.service';
 
 export const customerRouter = Router();
-
-
 
 customerRouter.use(requireSession);
 
@@ -201,17 +203,65 @@ customerRouter.get('/loyalty', async (req, res, next) => {
   }
 });
 */
-customerRouter.get('/offers', async (req, res, next) => {
+customerRouter.get('/offers', OffersController.getActiveOffers);
+
+const customerReservationBodySchema = z.object({
+  customerName: z.string().trim().optional(),
+  mobile: z.string().trim().optional(),
+  guests: z.coerce.number().int().min(1).optional(),
+  date: z.string().min(1),
+  slot: z.string().min(1),
+  tableNumber: z.string().optional(),
+  notes: z.string().optional(),
+  occasion: z.string().optional(),
+  preferredArea: z.string().optional(),
+  status: z.enum(['PENDING', 'CONFIRMED', 'CHECKED_IN', 'CANCELLED', 'NO_SHOW', 'COMPLETED']).optional(),
+});
+
+// Customer creates a reservation for their own table session.
+customerRouter.post(
+  '/reservations',
+  validate({ body: customerReservationBodySchema }),
+  async (req, res, next) => {
+    try {
+      const session = req.tableSession!;
+
+      const reservation = await ReservationsService.createReservation({
+        restaurantId: session.restaurantId.toString(),
+        customerName: (req.body.customerName && req.body.customerName.trim()) || session.customerName,
+        mobile: (req.body.mobile && req.body.mobile.trim()) || (session.mobile && session.mobile.trim()) || '',
+        guests: Number(req.body.guests) || 1,
+        date: req.body.date,
+        slot: req.body.slot,
+        tableNumber: req.body.tableNumber,
+        notes: req.body.notes,
+        occasion: req.body.occasion,
+        preferredArea: req.body.preferredArea,
+        status: req.body.status as any || undefined,
+        sessionId: session._id.toString(),
+      });
+
+      ok(res, { reservation }, 201);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Customer lists their own reservations.
+customerRouter.get('/reservations', async (req, res, next) => {
   try {
-    const offers = await OfferModel.find({
+    const reservations = await ReservationModel.find({
       restaurantId: req.tableSession!.restaurantId,
-      active: true,
-    }).sort({ createdAt: -1 });
+      sessionId: req.tableSession!._id,
+    })
+      .sort({ date: 1, slot: 1 })
+      .lean();
 
     ok(res, {
-      offers,
+      reservations,
       meta: {
-        count: offers.length,
+        count: reservations.length,
       },
     });
   } catch (error) {
@@ -219,21 +269,53 @@ customerRouter.get('/offers', async (req, res, next) => {
   }
 });
 
-customerRouter.get('/offers/eligibility', async (req, res, next) => {
+// Customer updates their own reservation (same-session ownership enforced).
+customerRouter.patch('/reservations/:id', async (req, res, next) => {
   try {
-    const offers = await OfferModel.find({
-      restaurantId: req.tableSession!.restaurantId,
-      active: true,
-    }).select('_id');
-
-    const eligibleOfferIds = offers.map((offer) => offer._id.toString());
-
-    ok(res, {
-      eligibleOfferIds,
-      meta: {
-        count: eligibleOfferIds.length,
+    const updated = await ReservationsService.updateReservation(
+      req.tableSession!.restaurantId.toString(),
+      req.params.id,
+      {
+        guests: req.body.guests,
+        date: req.body.date,
+        slot: req.body.slot,
+        notes: req.body.notes,
+        occasion: req.body.occasion,
+        preferredArea: req.body.preferredArea,
+        status: req.body.status,
       },
-    });
+    );
+
+    // Verify the reservation belongs to this session.
+    if (updated.sessionId?.toString() !== req.tableSession!._id.toString()) {
+      throw new AppError('Reservation not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    ok(res, { reservation: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Customer cancels their own reservation.
+customerRouter.post('/reservations/:id/cancel', async (req, res, next) => {
+  try {
+    const reservation = await ReservationModel.findOne({
+      _id: req.params.id,
+      restaurantId: req.tableSession!.restaurantId,
+    }).lean();
+
+    if (!reservation || reservation.sessionId?.toString() !== req.tableSession!._id.toString()) {
+      throw new AppError('Reservation not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    const updated = await ReservationsService.updateReservation(
+      req.tableSession!.restaurantId.toString(),
+      req.params.id,
+      { status: 'CANCELLED' as any },
+    );
+
+    ok(res, { reservation: updated });
   } catch (error) {
     next(error);
   }

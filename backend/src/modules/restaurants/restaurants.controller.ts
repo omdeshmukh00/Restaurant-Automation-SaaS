@@ -12,6 +12,8 @@ import { logAudit } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import * as SubscriptionService from '../subscriptions/subscriptions.service';
 import { PlatformPlanModel } from '../superAdmin/superAdmin.model';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../../constants/roles';
 
 async function resolveRestaurantIdForRequest(req: Request): Promise<string> {
   const fromToken = req.user?.restaurantId?.toString();
@@ -97,6 +99,13 @@ export const getRestaurantSettingsController = asyncHandler(async (req: Request,
       coverImage: restaurant.coverImage ?? '',
     },
     settings: restaurant.settings ?? {},
+    gst: {
+      gstEnabled: restaurant.gstEnabled ?? false,
+      gstNumber: restaurant.gstNumber ?? '',
+      legalBusinessName: restaurant.legalBusinessName ?? '',
+      defaultGSTPercentage: restaurant.defaultGSTPercentage ?? 0,
+      invoicePrefix: restaurant.invoicePrefix ?? '',
+    },
     billing,
   });
 });
@@ -104,8 +113,14 @@ export const getRestaurantSettingsController = asyncHandler(async (req: Request,
 async function buildBillingSummary(
   restaurantId: string,
   fallbackPlan: string,
-): Promise<{ plan: string; cycle: string; nextBillingDate: string; amount: string; currency: string } | null> {
-  let subscription: { plan: string; billingCycle: string; nextBillingDate?: Date | null; status: string } | null = null;
+): Promise<{ plan: string; status: string; cycle: string; nextBillingDate: string; amount: string; currency: string; paymentMethod: string } | null> {
+  let subscription: {
+    plan: string;
+    billingCycle: string;
+    nextBillingDate?: Date | null;
+    status: string;
+    paymentProvider?: string;
+  } | null = null;
   try {
     subscription = (await SubscriptionService.getCurrentSubscription(restaurantId)) as any;
   } catch {
@@ -114,6 +129,17 @@ async function buildBillingSummary(
 
   const plan = subscription?.plan ?? fallbackPlan ?? 'Free';
   const cycle = subscription?.billingCycle ?? 'monthly';
+  const status = subscription?.status ?? (subscription ? 'active' : 'free');
+
+  const providerLabels: Record<string, string> = {
+    razorpay: 'Razorpay',
+    stripe: 'Stripe',
+    manual: 'Manual',
+    mock: 'Super Admin',
+  };
+  const paymentMethod = subscription?.paymentProvider
+    ? providerLabels[subscription.paymentProvider] ?? subscription.paymentProvider
+    : 'Free';
 
   let amount = '—';
   let currency = 'INR';
@@ -138,14 +164,14 @@ async function buildBillingSummary(
       })
     : 'Not available';
 
-  return { plan, cycle, nextBillingDate, amount, currency };
+  return { plan, status, cycle, nextBillingDate, amount, currency, paymentMethod };
 }
 
 export const updateRestaurantSettingsController = asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const restaurant = await findRestaurantForRequest(req);
 
   // ── Top-level restaurant fields (distinct from the `settings` sub-object) ──
-  const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan', 'coverImage'] as const;
+  const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan', 'gstEnabled', 'gstNumber', 'legalBusinessName', 'defaultGSTPercentage', 'invoicePrefix','coverImage'] as const;
   const topLevel: Record<string, unknown> = {};
   for (const field of TOP_LEVEL_FIELDS) {
     if (req.body[field] !== undefined) {
@@ -199,6 +225,18 @@ export const updateRestaurantSettingsController = asyncHandler(async (req: Reque
     restaurantId: restaurant.id,
     settings: restaurant.settings,
   });
+
+  // Notify admin about settings update
+  NotificationsService.createNotification({
+    restaurantId: restaurant.id,
+    recipientRole: UserRole.RESTAURANT_ADMIN,
+    title: 'Restaurant Settings Updated',
+    message: `Restaurant settings have been modified.`,
+    type: 'RESTAURANT_SETTINGS_MODIFIED',
+    actionUrl: '/admin/settings',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  }).catch(() => {});
+
   void logAudit(req, {
     entityType: AuditEntity.RESTAURANT,
     entityId:   restaurant.id.toString(),
@@ -239,6 +277,17 @@ export const updateRestaurantProfileController = asyncHandler(async (req: Reques
   }
 
   await restaurant.save();
+
+  // Notify admin about restaurant profile update
+  NotificationsService.createNotification({
+    restaurantId: restaurant.id,
+    recipientRole: UserRole.RESTAURANT_ADMIN,
+    title: 'Restaurant Profile Updated',
+    message: `Restaurant profile has been updated successfully.`,
+    type: 'RESTAURANT_PROFILE_UPDATED',
+    actionUrl: '/admin/settings',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  }).catch(() => {});
 
   ok(res, {
     message: 'Profile updated successfully',

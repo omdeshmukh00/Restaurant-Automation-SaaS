@@ -13,8 +13,6 @@ import logger from '../../config/logger';
 
 import * as otpService from '../../services/otp.service';
 import { sendOTPEmail } from '../../services/mail.service';
-import { LoyaltyWalletModel } from '../loyalty/loyalty.model';
-import { NotificationModel } from '../notifications/notifications.model';
 
 /**
  * GET /auth/me — Get current authenticated user's profile.
@@ -57,69 +55,90 @@ export const requestProfileOtp = asyncHandler(async (req: Request, res: Response
 });
 
 /**
- * POST /users/me/request-mobile-otp — Send mobile verification OTP for phone updates.
- */
-export const requestMobileOtp = asyncHandler(async (req: Request, res: Response) => {
-  const { mobile } = req.body;
-  if (!mobile) {
-    throw new AppError('Mobile number is required', 400, ErrorCode.INVALID_REQUEST);
-  }
-
-  const { otp, expiresAt } = await otpService.createOTP(mobile, 'mobile');
-
-  console.log("\n-----------------------------------------");
-  console.log(`[CleanServe Security] SMS OTP sent to ${mobile} is: ${otp}`);
-  console.log("-----------------------------------------\n");
-
-  const responseData: any = {
-    otpSent: true,
-    otpExpiresAt: expiresAt,
-    otpExpiresIn: 300,
-    otp,
-  };
-
-  sendSuccess(res, responseData);
-});
-
-/**
  * PATCH /users/me — Update current user's profile.
+ *
+ * If the request includes a new `mobile` value, the phone number is NOT
+ * updated immediately. Instead it is stored as `pendingPhone` and an OTP
+ * is sent to the user's registered email. The caller must subsequently
+ * call POST /users/me/verify-phone with the OTP to finalise the change.
+ *
+ * If the request does NOT include `mobile`, fields update normally.
  */
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { otp, mobileOtp, ...updates } = req.body;
+  const { mobile, ...otherUpdates } = req.body;
+  const userId = req.user!._id;
+  const userEmail = req.user?.email;
 
-  // 1. If OTP (email OTP) is provided, verify it against the registered email
-  if (otp) {
-    const userEmail = req.user?.email;
+  // If a new phone is provided, store as pending and trigger OTP
+  if (mobile) {
     if (!userEmail) {
-      throw new AppError('No registered email found to verify OTP', 400, ErrorCode.INVALID_REQUEST);
+      throw new AppError('No registered email found for OTP verification', 400, ErrorCode.INVALID_REQUEST);
     }
-    await otpService.verifyOTP(userEmail, 'email', otp);
-  }
 
-  // 2. Check if mobile number is changing
-  const currentMobile = (req.user as any)?.mobile || '';
-  const newMobile = updates.mobile || '';
-  const isMobileChanging = Boolean(newMobile) && normalizeMobile(newMobile) !== normalizeMobile(currentMobile);
-
-  // If mobile is changing and email OTP was NOT provided, require mobileOtp
-  if (isMobileChanging && !otp) {
-    if (!mobileOtp) {
-      throw new AppError('Mobile OTP or Email OTP verification is required to update phone number.', 400, ErrorCode.INVALID_REQUEST);
+    // Store other non-phone updates immediately
+    if (Object.keys(otherUpdates).length > 0) {
+      await userService.updateProfile(userId, otherUpdates);
     }
-    await otpService.verifyOTP(newMobile, 'mobile', mobileOtp);
+
+    // Save the pending phone number
+    await userService.setPendingPhone(userId, mobile);
+
+    // Generate and send OTP to the registered email
+    const { otp: otpCode } = await otpService.createOTP(userEmail, 'email');
+
+    // Import sendOTPEmail already at top of file via mail.service
+    sendOTPEmail(userEmail, otpCode).catch((err) => {
+      logger.error('Failed to send phone change OTP email', err);
+    });
+
+    logger.warn(`[Phone Change OTP] Email=${userEmail} OTP=${otpCode}`);
+
+    sendSuccess(res, {
+      message: 'OTP sent to your registered email. Please verify to complete phone number change.',
+      pendingPhone: mobile,
+      otpSent: true,
+      otpExpiresIn: 300, // 5 minutes
+    });
+    return;
   }
 
-  if (updates.mobile) {
-    updates.mobile = normalizeMobile(updates.mobile);
-  }
-
-  const user = await userService.updateProfile(req.user!._id, updates);
-
+  // Standard update without phone change
+  const user = await userService.updateProfile(userId, req.body);
   if (!user) {
     throw new AppError('User not found', 404, ErrorCode.NOT_FOUND);
   }
-
   sendSuccess(res, { user });
+});
+
+/**
+ * POST /users/me/verify-phone — Verify OTP and finalise pending phone number change.
+ */
+export const verifyPhoneOtp = asyncHandler(async (req: Request, res: Response) => {
+  const { otp } = req.body;
+  const userId = req.user!._id;
+
+  if (!otp) {
+    throw new AppError('OTP is required', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  const userEmail = req.user?.email;
+  if (!userEmail) {
+    throw new AppError('No registered email found', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  // Verify the OTP
+  await otpService.verifyOTP(userEmail, 'email', otp);
+
+  // Apply the pending phone number
+  const updatedUser = await userService.applyPendingPhone(userId);
+  if (!updatedUser) {
+    throw new AppError('No pending phone number found to verify', 400, ErrorCode.INVALID_REQUEST);
+  }
+
+  sendSuccess(res, {
+    message: 'Phone number updated successfully.',
+    user: updatedUser,
+  });
 });
 
 /**
@@ -167,44 +186,7 @@ export const changePassword = asyncHandler(async (req: Request, res: Response) =
  */
 export const deleteAccount = asyncHandler(async (req: Request, res: Response) => {
   await userService.softDeleteUser(req.user!._id);
-  sendSuccess(res, { message: 'Account scheduled for deletion' });
-});
-
-/**
- * GET /users/me/loyalty - Get loyalty wallet and transactions for current user
- */
-export const getLoyalty = asyncHandler(async (req: Request, res: Response) => {
-  const user = await userService.findById(req.user!._id);
-  
-  if (!user || !user.mobile) {
-    return sendSuccess(res, { wallet: null });
-  }
-
-  // Find all wallets for this mobile number
-  const wallets = await LoyaltyWalletModel.find({ mobile: user.mobile }).sort({ updatedAt: -1 }).lean();
-
-  sendSuccess(res, { wallets });
-});
-
-/**
- * GET /users/me/notifications - Get notifications for current user
- */
-export const getNotifications = asyncHandler(async (req: Request, res: Response) => {
-  const user = await userService.findById(req.user!._id);
-  
-  if (!user) {
-    return sendSuccess(res, { notifications: [] });
-  }
-
-  const notifications = await NotificationModel.find({
-    $or: [
-      { 'metadata.mobile': user.mobile },
-      { 'metadata.email': user.email },
-      ...(user.mobile ? [] : [{ 'metadata.customerName': user.name }])
-    ]
-  }).sort({ createdAt: -1 }).limit(50).lean();
-
-  sendSuccess(res, { notifications });
+  sendSuccess(res, { message: 'Account deleted successfully' });
 });
 
 /**
@@ -291,67 +273,6 @@ export const getOrderHistory = asyncHandler(async (req: Request, res: Response) 
 });
 
 /**
- * GET /users/me/reservations/slots — Get popular time slots and their availability
- */
-export const getReservationSlots = asyncHandler(async (req: Request, res: Response) => {
-  const { restaurantId, date, guests } = req.query;
-  if (!restaurantId || !date) {
-    throw new AppError('Missing restaurantId or date', 400, ErrorCode.INVALID_REQUEST);
-  }
-
-  const { ReservationModel } = await import('../reservations/reservations.model');
-  const { TableModel } = await import('../tables/tables.model');
-  const { ReservationStatus } = await import('../../constants/statuses');
-
-  const guestCount = typeof guests === 'string' ? parseInt(guests, 10) : 2;
-
-  // Hardcoded popular slots (for frontend display)
-  const TIME_SLOTS = [
-    '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
-    '08:00 PM', '08:30 PM', '09:00 PM', '09:30 PM',
-  ];
-
-  // Helper to parse 12h to 24h
-  const parseTimeTo24h = (time12h: string): string => {
-    const [time, modifier] = time12h.split(' ');
-    const [hoursStr, minutes] = time.split(':');
-    let hours = hoursStr;
-    if (hours === '12') hours = '00';
-    if (modifier === 'PM') hours = String(parseInt(hours, 10) + 12);
-    return `${hours.padStart(2, '0')}:${minutes}`;
-  };
-
-  // Check how many tables have capacity >= requested guests
-  const tables = await TableModel.find({ restaurantId, capacity: { $gte: guestCount } }).lean();
-  const totalSuitableTables = tables.length;
-
-  const reservations = await ReservationModel.find({
-    restaurantId,
-    date,
-    status: { $in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] }
-  }).lean();
-
-  const availability = TIME_SLOTS.map(time => {
-    const backendSlot = parseTimeTo24h(time);
-    
-    // Count how many reservations already exist for this slot (using the suitable tables)
-    // NOTE: This assumes 1 reservation = 1 table.
-    const bookings = reservations.filter((r: any) => r.slot === backendSlot).length;
-    
-    let status = 'available';
-    if (totalSuitableTables === 0 || bookings >= totalSuitableTables) {
-      status = 'unavailable';
-    } else if (totalSuitableTables - bookings <= 2) {
-      status = 'limited';
-    }
-
-    return { time, status };
-  });
-
-  sendSuccess(res, { slots: availability });
-});
-
-/**
  * GET /users/me/reservations — Get all reservations for the current customer
  */
 export const getMyReservations = asyncHandler(async (req: Request, res: Response) => {
@@ -393,7 +314,7 @@ export const createMyReservation = asyncHandler(async (req: Request, res: Respon
     date,
     slot,
     notes,
-    status: ReservationStatus.PENDING,
+    status: ReservationStatus.CONFIRMED,
   });
 
   sendSuccess(res, { reservation }, 201);
@@ -410,18 +331,22 @@ export const updateMyReservation = asyncHandler(async (req: Request, res: Respon
   }
 
   const { ReservationModel } = await import('../reservations/reservations.model');
+  const { ReservationsService } = await import('../reservations/reservations.service');
   const { id } = req.params;
   const updates = req.body;
 
-  const reservation = await ReservationModel.findOneAndUpdate(
-    { _id: id, mobile: user.mobile },
-    updates,
-    { new: true }
-  ).lean();
-
-  if (!reservation) {
+  // Verify the reservation belongs to this user
+  const existing = await ReservationModel.findOne({ _id: id, mobile: user.mobile }).lean();
+  if (!existing) {
     throw new AppError('Reservation not found or unauthorized', 404, ErrorCode.NOT_FOUND);
   }
+
+  // Route through the service for proper conflict detection and status transitions
+  const reservation = await ReservationsService.updateReservation(
+    existing.restaurantId.toString(),
+    id,
+    updates,
+  );
 
   sendSuccess(res, { reservation });
 });

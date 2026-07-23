@@ -3,6 +3,7 @@ import { ErrorCode } from '../../constants/errors';
 import { AppError } from '../../utils/AppError';
 import { ok } from '../../utils/responses';
 import { CustomersService } from './customers.service';
+import { socketService } from '../../sockets/socket.service';
 
 function resolveRestaurantId(req: Request, candidate?: unknown): string {
   if (req.user?.restaurantId) {
@@ -73,6 +74,7 @@ export async function deleteCustomerController(req: Request, res: Response, next
   try {
     const restaurantId = resolveRestaurantId(req, (req.query as any).restaurantId);
     await CustomersService.deleteCustomer(restaurantId, req.params.id);
+    socketService.broadcast('customer:deleted', { id: req.params.id });
     ok(res, { success: true });
   } catch (err) {
     next(err);

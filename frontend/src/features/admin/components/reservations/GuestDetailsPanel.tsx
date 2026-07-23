@@ -114,29 +114,27 @@ function EditModal({ guest, onClose, onSave }: EditModalProps) {
   });
   const [saved, setSaved] = useState(false);
 
-  const { tables, fetchTables } = useTablesStore();
+  const { tables } = useTablesStore();
 
   const handleSave = async () => {
     try {
-    console.log("EditModal Save");
-    await onSave({
-    name: form.name.trim(),
-    phone: form.phone.trim(),
-    email: form.email.trim(),
-    time: form.time,
-    guests: form.guests,
-    tableNumber: form.tableNumber,
-    specialRequest: form.specialRequest.trim() || undefined,
-    occasion: form.occasion.trim() || undefined,
-    status: form.status as ReservationStatus,
-});
-console.log("Save completed");
-setSaved(true);
-setTimeout(onClose, 800);
- } catch (err) {
-    console.error("SAVE FAILED", err);
-  }
-};
+      await onSave({
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        time: form.time,
+        guests: form.guests,
+        tableNumber: form.tableNumber,
+        specialRequest: form.specialRequest.trim() || undefined,
+        occasion: form.occasion.trim() || undefined,
+        status: form.status as ReservationStatus,
+      });
+      setSaved(true);
+      setTimeout(onClose, 800);
+    } catch (err) {
+      console.error('SAVE FAILED', err);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -187,10 +185,7 @@ setTimeout(onClose, 800);
               { label: 'Occasion (optional)', field: 'occasion', type: 'text' },
             ].map(({ label, field, type }) => (
               <div key={field}>
-                <label
-                  htmlFor={`edit-${field}`}
-                  className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1"
-                >
+                <label htmlFor={`edit-${field}`} className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
                   {label}
                 </label>
                 <input
@@ -242,10 +237,7 @@ setTimeout(onClose, 800);
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label
-                  htmlFor="edit-guests"
-                  className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1"
-                >
+                <label htmlFor="edit-guests" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
                   Guests
                 </label>
                 <input
@@ -259,10 +251,7 @@ setTimeout(onClose, 800);
                 />
               </div>
               <div>
-                <label
-                  htmlFor="edit-table"
-                  className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1"
-                >
+                <label htmlFor="edit-table" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
                   Table
                 </label>
                 <select
@@ -272,30 +261,22 @@ setTimeout(onClose, 800);
                   className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 text-gray-800 dark:text-gray-100 transition-all"
                 >
                   {tables.map((table) => (
-                    <option
-                        key={table.id}
-                        value={table.label}
-                    >
-                        {table.label}
+                    <option key={table.id} value={table.label}>
+                      {table.label}
                     </option>
-                ))}
+                  ))}
                 </select>
               </div>
             </div>
 
             <div>
-              <label
-                htmlFor="edit-status"
-                className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1"
-              >
+              <label htmlFor="edit-status" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
                 Status
               </label>
               <select
                 id="edit-status"
                 value={form.status}
-                onChange={(e) =>
-                  setForm((p) => ({ ...p, status: e.target.value as ReservationStatus }))
-                }
+                onChange={(e) => setForm((p) => ({ ...p, status: e.target.value as ReservationStatus }))}
                 className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-orange-100 text-gray-800 dark:text-gray-100 transition-all"
               >
                 {(['Confirmed', 'Pending', 'Cancelled', 'Checked In'] as ReservationStatus[]).map((s) => (
@@ -307,10 +288,7 @@ setTimeout(onClose, 800);
             </div>
 
             <div>
-              <label
-                htmlFor="edit-specialRequest"
-                className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1"
-              >
+              <label htmlFor="edit-specialRequest" className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
                 Special Request
               </label>
               <textarea
@@ -407,7 +385,6 @@ function HistoryModal({ guest, onClose }: HistoryModalProps) {
         aria-modal="true"
         aria-labelledby="history-title"
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-3">
             <div
@@ -416,10 +393,7 @@ function HistoryModal({ guest, onClose }: HistoryModalProps) {
               {guest.avatar}
             </div>
             <div>
-              <h2
-                id="history-title"
-                className="text-sm sm:text-base font-bold text-gray-900 dark:text-white"
-              >
+              <h2 id="history-title" className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">
                 {guest.name}
               </h2>
               <p className="text-xs text-gray-400 dark:text-gray-500">Visit History</p>
@@ -434,7 +408,6 @@ function HistoryModal({ guest, onClose }: HistoryModalProps) {
           </button>
         </div>
 
-        {/* Stats bar */}
         <div className="grid grid-cols-3 gap-px bg-gray-100 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-800">
           {[
             { label: 'Total Visits', value: String(history.length || 1) },
@@ -461,11 +434,10 @@ function HistoryModal({ guest, onClose }: HistoryModalProps) {
           ))}
         </div>
 
-        {/* History list */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {loading ? (
             <div className="text-center py-8 sm:py-10">
-              <p className="text-sm text-gray-400 dark:text-gray-500">Loading visit history…</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">Loading visit history...</p>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-8 sm:py-10">
@@ -528,13 +500,12 @@ export function GuestDetailsPanel(): JSX.Element {
 
   const handleSaveEdits = async (updates: Partial<Reservation>) => {
     if (!selectedGuest) return;
-
     try {
-        await updateReservation(selectedGuest.id, updates);
+      await updateReservation(selectedGuest.id, updates);
     } catch (error) {
-        console.error(error);
+      console.error(error);
     }
-};
+  };
 
   const handleQuickStatus = async (status: ReservationStatus) => {
     if (!selectedGuest) return;
@@ -613,6 +584,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   { icon: <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: format12h(selectedGuest.time) },
                   { icon: <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `${selectedGuest.guests} Guests` },
                   { icon: <Utensils className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-400" />, text: `Table ${selectedGuest.tableNumber}` },
+                  { icon: <span className="text-sm sm:text-base">📍</span>, text: selectedGuest.preferredArea ? `Area: ${selectedGuest.preferredArea}` : 'Area: No preference' },
                 ].map(({ icon, text }, idx) => (
                   <div key={idx} className="flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                     {icon}
@@ -628,6 +600,51 @@ export function GuestDetailsPanel(): JSX.Element {
               </div>
             </div>
 
+            {/* Reservation Timeline */}
+            {selectedGuest.timeline && (
+              <div>
+                <p className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide">
+                  Timeline
+                </p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
+                    <span>Reservation Time: <strong className="text-gray-700 dark:text-gray-300">{format12h(selectedGuest.time)}</strong></span>
+                  </div>
+                  {selectedGuest.timeline.created?.relative && (
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
+                      <span>Booked: {selectedGuest.timeline.created.relative}</span>
+                    </div>
+                  )}
+                  {selectedGuest.timeline.reserved?.relative && (
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                      <span>Table Reserved: {selectedGuest.timeline.reserved.relative}</span>
+                    </div>
+                  )}
+                  {selectedGuest.timeline.arrived?.relative && (
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                      <span>Arrived: {selectedGuest.timeline.arrived.relative}</span>
+                    </div>
+                  )}
+                  {selectedGuest.timeline.noShow?.relative && (
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />
+                      <span>No Show: {selectedGuest.timeline.noShow.relative}</span>
+                    </div>
+                  )}
+                  {selectedGuest.timeline.expiresAt?.relative && selectedGuest.status === 'Confirmed' && (
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs text-amber-600 dark:text-amber-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                      <span>Arrival window expires: {selectedGuest.timeline.expiresAt.relative}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Quick status actions */}
             <div className="space-y-1.5">
               <p className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
@@ -640,7 +657,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   onClick={() => handleQuickStatus('Confirmed')}
                   className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-green-500 hover:bg-green-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {pendingStatus === 'Confirmed' ? 'Updating…' : 'Confirm'}
+                  {pendingStatus === 'Confirmed' ? 'Updating...' : 'Confirm'}
                 </button>
                 <button
                   type="button"
@@ -648,7 +665,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   onClick={() => handleQuickStatus('Checked In')}
                   className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {pendingStatus === 'Checked In' ? 'Updating…' : 'Check In'}
+                  {pendingStatus === 'Checked In' ? 'Updating...' : 'Check In'}
                 </button>
                 <button
                   type="button"
@@ -656,7 +673,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   onClick={() => handleQuickStatus('Cancelled')}
                   className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {pendingStatus === 'Cancelled' ? 'Updating…' : 'Cancel'}
+                  {pendingStatus === 'Cancelled' ? 'Updating...' : 'Cancel'}
                 </button>
                 <button
                   type="button"
@@ -664,7 +681,7 @@ export function GuestDetailsPanel(): JSX.Element {
                   onClick={() => handleQuickStatus('No Show')}
                   className="flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-white bg-gray-500 hover:bg-gray-600 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {pendingStatus === 'No Show' ? 'Updating…' : 'No Show'}
+                  {pendingStatus === 'No Show' ? 'Updating...' : 'No Show'}
                 </button>
               </div>
             </div>

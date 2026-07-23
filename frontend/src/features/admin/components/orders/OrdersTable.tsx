@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Order } from '../../store/orders.store';
-import { formatTimeAgo } from '../../store/orders.store';
 import { PaymentBadge } from './PaymentBadge';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderActionMenu } from './OrderActionMenu';
@@ -123,7 +122,10 @@ export function OrdersTable({ orders }: OrdersTableProps) {
                   <StaffCell order={order} />
                 </td>
                 <td className="px-2 sm:px-4 py-3 hidden md:table-cell">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatTimeAgo(order.timeRaw)}</span>
+                  <div className="flex flex-col whitespace-nowrap">
+                    <span className="text-sm text-gray-700 dark:text-gray-200">{order.timeClock}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{order.date}</span>
+                  </div>
                 </td>
                 <td className="px-2 sm:px-4 py-3 pr-3 sm:pr-5">
                   <OrderActionMenu order={order} />

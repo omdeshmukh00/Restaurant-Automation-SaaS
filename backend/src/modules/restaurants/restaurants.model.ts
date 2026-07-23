@@ -53,7 +53,11 @@ export interface IRestaurant extends Document {
   state: string;
   country: string;
   pinCode: string;
+  gstEnabled: boolean;
   gstNumber?: string;
+  legalBusinessName?: string;
+  defaultGSTPercentage: number;
+  invoicePrefix?: string;
   branches: number;
   expectedMonthlyOrders: number;
   latitude: number;
@@ -159,7 +163,11 @@ const restaurantSchema = new Schema<IRestaurant>(
     state: { type: String, trim: true },
     country: { type: String, trim: true },
     pinCode: { type: String, trim: true },
+    gstEnabled: { type: Boolean, default: false },
     gstNumber: { type: String, trim: true },
+    legalBusinessName: { type: String, trim: true, default: '' },
+    defaultGSTPercentage: { type: Number, default: 0, min: 0, max: 100 },
+    invoicePrefix: { type: String, trim: true, default: '' },
     branches: { type: Number, required: true, default: 1 },
     expectedMonthlyOrders: { type: Number, required: true, default: 0 },
     latitude: { type: Number, required: true, default: 0 },

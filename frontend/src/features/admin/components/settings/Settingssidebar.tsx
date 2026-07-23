@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   User, Store, CreditCard, Users, Bell,
-  Plug, Shield, HardDrive, Settings2,
+  Settings2,
 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settings.store';
 
@@ -11,9 +11,6 @@ const sections = [
   { id: 'billing',        label: 'Billing & Subscription',  icon: CreditCard },
   { id: 'team',           label: 'Team & Permissions',      icon: Users },
   { id: 'notifications',  label: 'Notification Preferences',icon: Bell },
-  { id: 'integrations',   label: 'Integrations',            icon: Plug },
-  { id: 'security',       label: 'Security',                icon: Shield },
-  { id: 'backup',         label: 'Backup & Export',         icon: HardDrive },
   { id: 'system',         label: 'System Preferences',      icon: Settings2 },
 ];
 
