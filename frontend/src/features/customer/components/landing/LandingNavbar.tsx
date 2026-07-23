@@ -149,6 +149,25 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
           {/* Right Actions */}
           <div className="flex items-center gap-3">
 
+            {/* Theme Toggle Switch */}
+            <button
+              onClick={toggleTheme}
+              className="flex w-[40px] h-[40px] rounded-full items-center justify-center transition-all duration-150 landing-focus-ring relative cursor-pointer hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                color: '#FFFFFF',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+              aria-label="Toggle theme"
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-[18px] h-[18px] text-amber-400 animate-fadeIn" />
+              ) : (
+                <Moon className="w-[18px] h-[18px] text-slate-200 animate-fadeIn" />
+              )}
+            </button>
+
             {/* Notifications Icon with Interactive Dropdown */}
             <div className="relative">
               <button
@@ -441,7 +460,22 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
             })}
           </nav>
 
-          <div className="px-8 pb-8 shrink-0">
+          <div className="px-8 pb-8 shrink-0 space-y-3">
+            {/* Theme Toggle in Mobile Menu */}
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-between w-full py-3 px-4 rounded-xl text-white font-medium cursor-pointer transition-colors"
+              style={{ backgroundColor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
+            >
+              <span className="flex items-center gap-2.5 text-sm font-sans">
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-200" />}
+                <span>Theme</span>
+              </span>
+              <span className="text-xs font-bold text-orange-400 font-sans uppercase tracking-wider">
+                {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+              </span>
+            </button>
+
             {isCustomerAuth ? (
               <div className="flex flex-col gap-2.5">
                 <button

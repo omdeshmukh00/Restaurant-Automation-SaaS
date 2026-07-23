@@ -5,6 +5,7 @@ import { useSearch } from './SearchContext';
 import { useCustomerStore } from '../../store/customer.store';
 import { useAuth } from '../../../../auth/AuthProvider';
 import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
+import { useTheme } from '../../../../app/providers/ThemeProvider';
 
 interface Props {
   onToggleCart: () => void;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props) {
+  const { theme, toggleTheme } = useTheme();
   const { settings } = usePlatformSettingsGuard();
   const platformName = settings?.platformName || "Smart Dining";
   const { itemCount } = useCart();
@@ -310,6 +312,18 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
             </>
           )}
         </div>
+
+        {/* Theme Toggle Switch */}
+        <button
+          onClick={toggleTheme}
+          className="w-10 h-10 bg-sd-surface-container-low border border-sd-outline-variant hover:border-sd-primary rounded-full flex items-center justify-center text-sd-on-surface hover:text-sd-primary transition-all shrink-0 cursor-pointer shadow-sm"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          aria-label="Toggle Theme"
+        >
+          <span className="material-symbols-outlined text-[20px]">
+            {theme === 'dark' ? 'light_mode' : 'dark_mode'}
+          </span>
+        </button>
 
         {isAuthenticated && (
           <button

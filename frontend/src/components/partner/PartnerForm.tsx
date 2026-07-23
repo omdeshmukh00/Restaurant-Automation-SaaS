@@ -291,8 +291,6 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
 
       if (nextEmpty) {
         nextEmpty.focus();
-      } else {
-        handleSubmit(e);
       }
     }
   };

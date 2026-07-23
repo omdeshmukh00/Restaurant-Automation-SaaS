@@ -82,6 +82,12 @@ export const rejectRestaurantRequest = asyncHandler(async (req: Request, res: Re
   ok(res, { success: true, request: result });
 });
 
+export const deleteRestaurantRequest = asyncHandler(async (req: Request, res: Response) => {
+  const result = await superAdminService.deleteRestaurantRequest(req.params.id);
+  socketService.emitToSuperAdmin('restaurant_request_deleted', { id: req.params.id });
+  ok(res, { success: true, ...result });
+});
+
 import { getPlatformSettings } from './platformSettings.model';
 
 export const getPlatformSettingsController = asyncHandler(async (req: Request, res: Response) => {

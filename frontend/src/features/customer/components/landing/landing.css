@@ -688,6 +688,10 @@ html {
 /* Pricing Page and Offers Page light background overrides */
 .dark main[style*="background-color: #FFF8F3"],
 .dark .min-h-screen[style*="background: #FFF8F3"],
+.dark section[style*="background-color: #FFF8F3"],
+.dark section[style*="background-color: #F8F8F8"],
+.dark section[style*="background: #FFF8F3"],
+.dark section[style*="background: #F8F8F8"],
 .dark div[style*="background: #FFF8F3"],
 .dark div[style*="background-color: #FFF8F3"],
 .dark div[style*="background: rgb(255, 248, 243)"],
@@ -717,18 +721,47 @@ html {
 .dark div[style*="background-color: rgba(255,255,255,0.97)"] {
   background-color: rgba(18, 18, 20, 0.97) !important;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Fix useless light borders on input and select wrapper containers in dark mode */
+.dark div[style*="border: 1px solid #E5E7EB"],
+.dark div[style*="border:1px solid #E5E7EB"],
+.dark div[style*="border: 1px solid rgb(229, 231, 235)"],
+.dark button[style*="border: 1px solid #E5E7EB"],
+.dark button[style*="border:1px solid #E5E7EB"] {
+  border-color: #27272A !important;
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+.dark div[style*="border: 1px solid #E5E7EB"]:focus-within,
+.dark div[style*="border:1px solid #E5E7EB"]:focus-within {
+  border-color: #FF6B1A !important;
 }
 
 .dark select,
 .dark input {
   color: #FFFFFF !important;
-  background-color: #1F1F22 !important;
-  border-color: #27272A !important;
+  background-color: transparent !important;
+  border-color: transparent !important;
 }
 
 .dark select option {
-  background-color: #121214 !important;
+  background-color: #18181B !important;
   color: #FFFFFF !important;
+}
+
+/* Locate Restaurant button dark mode fix */
+.dark button[class*="bg-[#F9FAFB]"] {
+  background-color: #1F1F22 !important;
+  color: #F3F4F6 !important;
+  border-color: #27272A !important;
+}
+
+.dark button[class*="bg-[#F9FAFB]"]:hover {
+  background-color: #27272A !important;
+  color: #FF6B1A !important;
+  border-color: #FF6B1A !important;
 }
 
 /* Scroll buttons */

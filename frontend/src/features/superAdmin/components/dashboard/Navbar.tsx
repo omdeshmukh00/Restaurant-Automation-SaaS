@@ -656,8 +656,8 @@ export default function Navbar({
                   </div>
                 )}
                 <div className="hidden lg:block text-left leading-none">
-                  <h4 className="font-semibold text-xs">{user?.name || "Mr. Souvik"}</h4>
-                  <p className="text-[10px] text-slate-400">Global Admin</p>
+                  <h4 className="font-semibold text-xs font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>{user?.name || "Mr. Souvik"}</h4>
+                  <p className="text-[10px] text-slate-400 font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>Global Admin</p>
                 </div>
                 <ChevronDown
                   size={14}

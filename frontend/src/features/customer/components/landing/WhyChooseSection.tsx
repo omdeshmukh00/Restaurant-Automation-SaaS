@@ -40,20 +40,16 @@ export default function WhyChooseSection() {
 
   return (
     <section
-      className="py-16 sm:py-20 relative overflow-hidden"
-      style={{ backgroundColor: '#F8F8F8' }}
+      className="py-16 sm:py-20 relative overflow-hidden bg-[#F8F8F8] dark:bg-[#0B0B0C] transition-colors duration-300"
       ref={ref}
     >
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 relative z-10">
         {/* Header */}
         <div className="text-center mb-14">
-          <h2
-            className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold"
-            style={{ color: '#222222' }}
-          >
+          <h2 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold text-slate-900 dark:text-white">
             Why Choose <span style={{ color: '#FF6B1A' }}>RestoHub</span>
           </h2>
-          <p className="text-[15px] mt-2 max-w-[480px] mx-auto" style={{ color: '#666666' }}>
+          <p className="text-[15px] mt-2 max-w-[480px] mx-auto text-slate-600 dark:text-neutral-400">
             Everything you need for the perfect dining experience
           </p>
         </div>
@@ -98,15 +94,13 @@ export default function WhyChooseSection() {
               return (
                 <div
                   key={feature.title}
-                  className={`absolute landing-shiny landing-stamp-float ${
+                  className={`absolute landing-shiny landing-stamp-float bg-white dark:bg-[#121214] border border-slate-200 dark:border-neutral-800/80 ${
                     isVisible ? 'landing-serve-left is-served' : 'landing-serve-left'
                   }`}
                   style={{
                     ...pos,
                     width: '250px',
                     borderRadius: '18px',
-                    background: '#FFFFFF',
-                    border: '1px solid #E5E7EB',
                     boxShadow: '0 6px 24px rgba(0,0,0,0.07)',
                     padding: '16px 18px',
                     animationDelay: `${idx * 0.6}s`,
@@ -118,7 +112,7 @@ export default function WhyChooseSection() {
                     e.currentTarget.style.transform = 'translateY(-4px)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#E5E7EB';
+                    e.currentTarget.style.borderColor = '';
                     e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.07)';
                     e.currentTarget.style.transform = '';
                   }}
@@ -131,10 +125,10 @@ export default function WhyChooseSection() {
                       <Icon className="w-[20px] h-[20px]" style={{ color: feature.accent }} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-[14px] font-bold" style={{ color: '#222222' }}>
+                      <h4 className="text-[14px] font-bold text-slate-900 dark:text-white">
                         {feature.title}
                       </h4>
-                      <p className="text-[12px] mt-1 leading-snug" style={{ color: '#888888' }}>
+                      <p className="text-[12px] mt-1 leading-snug text-slate-500 dark:text-neutral-400">
                         {feature.desc}
                       </p>
                     </div>
@@ -216,15 +210,13 @@ export default function WhyChooseSection() {
               return (
                 <div
                   key={feature.title}
-                  className={`absolute landing-shiny landing-stamp-float ${
+                  className={`absolute landing-shiny landing-stamp-float bg-white dark:bg-[#121214] border border-slate-200 dark:border-neutral-800/80 ${
                     isVisible ? 'landing-serve-right is-served' : 'landing-serve-right'
                   }`}
                   style={{
                     ...pos,
                     width: '250px',
                     borderRadius: '18px',
-                    background: '#FFFFFF',
-                    border: '1px solid #E5E7EB',
                     boxShadow: '0 6px 24px rgba(0,0,0,0.07)',
                     padding: '16px 18px',
                     animationDelay: `${(idx + 2) * 0.6}s`,
@@ -236,7 +228,7 @@ export default function WhyChooseSection() {
                     e.currentTarget.style.transform = 'translateY(-4px)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#E5E7EB';
+                    e.currentTarget.style.borderColor = '';
                     e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.07)';
                     e.currentTarget.style.transform = '';
                   }}
@@ -249,10 +241,10 @@ export default function WhyChooseSection() {
                       <Icon className="w-[20px] h-[20px]" style={{ color: feature.accent }} />
                     </div>
                     <div className="min-w-0">
-                      <h4 className="text-[14px] font-bold" style={{ color: '#222222' }}>
+                      <h4 className="text-[14px] font-bold text-slate-900 dark:text-white">
                         {feature.title}
                       </h4>
-                      <p className="text-[12px] mt-1 leading-snug" style={{ color: '#888888' }}>
+                      <p className="text-[12px] mt-1 leading-snug text-slate-500 dark:text-neutral-400">
                         {feature.desc}
                       </p>
                     </div>
@@ -275,12 +267,11 @@ export default function WhyChooseSection() {
             return (
               <div
                 key={feature.title}
-                className={`landing-card-hover landing-shiny bg-white p-5 ${
+                className={`landing-card-hover landing-shiny bg-white dark:bg-[#121214] border border-slate-200 dark:border-neutral-800 p-5 ${
                   fromLeft ? 'landing-serve-left' : 'landing-serve-right'
                 } ${isVisible ? 'is-served' : ''}`}
                 style={{
                   borderRadius: '18px',
-                  border: '1px solid #E5E7EB',
                   boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
                   animationDelay: `${idx * 100}ms`,
                 }}
@@ -293,10 +284,10 @@ export default function WhyChooseSection() {
                     <Icon className="w-[20px] h-[20px]" style={{ color: feature.accent }} />
                   </div>
                   <div>
-                    <h4 className="text-[15px] font-bold" style={{ color: '#222222' }}>
+                    <h4 className="text-[15px] font-bold text-slate-900 dark:text-white">
                       {feature.title}
                     </h4>
-                    <p className="text-[13px] mt-1 leading-relaxed" style={{ color: '#888888' }}>
+                    <p className="text-[13px] mt-1 leading-relaxed text-slate-500 dark:text-neutral-400">
                       {feature.desc}
                     </p>
                   </div>

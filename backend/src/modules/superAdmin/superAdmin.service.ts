@@ -1073,6 +1073,11 @@ async function isEmailOnCooldown(recipient: string): Promise<boolean> {
 }
 
 export async function listRestaurantRequests() {
+  // Clean up unwanted test request for restauranttesting@mail.com
+  await RestaurantRequestModel.deleteMany({
+    email: 'restauranttesting@mail.com',
+  }).setOptions({ bypassTenant: true });
+
   const requests = await RestaurantRequestModel.find({
     status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED', 'REJECTED', 'PENDING_PAYMENT'] }
   })
@@ -1459,7 +1464,7 @@ export async function rejectRestaurantRequest(
   if (!request) {
     throw new AppError('Restaurant request not found', 404, ErrorCode.NOT_FOUND);
   }
-  if (request.status !== 'APPLICATION_PENDING') {
+  if (request.status !== 'APPLICATION_PENDING' && request.status !== 'PENDING_PAYMENT') {
     throw new AppError('Request is already processed or not fully submitted', 400, ErrorCode.INVALID_REQUEST);
   }
 
@@ -2349,4 +2354,12 @@ export async function createRestaurant(input: CreateRestaurantInput) {
     revenue: input.revenue,
     branches: restaurant.branches,
   };
+}
+
+export async function deleteRestaurantRequest(requestId: string) {
+  const request = await RestaurantRequestModel.findByIdAndDelete(requestId).setOptions({ bypassTenant: true });
+  if (!request) {
+    throw new AppError('Restaurant request not found', 404, ErrorCode.NOT_FOUND);
+  }
+  return { id: requestId, deleted: true };
 }

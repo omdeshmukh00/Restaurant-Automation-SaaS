@@ -4,6 +4,8 @@ import { Copy, Check, Tag, Sparkles, Clock, Percent } from 'lucide-react';
 import '../components/landing/landing.css';
 import { LandingNavbar, LandingFooter } from '../components/landing';
 
+import { landingCache } from '../../../shared/utils/landingCache';
+
 // Module-level constant — called once at module load, not during render.
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const NEW_CUTOFF = Date.now() - SEVEN_DAYS_MS;
@@ -27,25 +29,49 @@ interface ApiOffer {
 const CATEGORIES = ['All', 'Food', 'Beverages', 'New', 'Limited Time'];
 
 export default function OffersPage() {
-  const [offers, setOffers] = useState<ApiOffer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [offers, setOffers] = useState<ApiOffer[]>(() => {
+    const cached = landingCache.getOffers();
+    return cached || [];
+  });
+  const [loading, setLoading] = useState(() => {
+    const cached = landingCache.getOffers();
+    return !cached || cached.length === 0;
+  });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const navigate = useNavigate();
 
   useEffect(() => {
+    const cached = landingCache.getOffers();
+    let active = true;
+
     const fetchOffers = async () => {
       try {
+        if (!cached || cached.length === 0) {
+          setLoading(true);
+        }
         const { apiClient } = await import('../../../shared/services/apiClient');
         const res = await apiClient.get('/public/landing/data');
-        setOffers(res.data.data.offers || []);
+        if (active && res.data?.data?.offers) {
+          const freshOffers = res.data.data.offers;
+          setOffers(freshOffers);
+          landingCache.setOffers(freshOffers);
+        }
       } catch {
-        setOffers([]);
+        if (active && (!cached || cached.length === 0)) {
+          setOffers([]);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
     fetchOffers();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const filteredOffers = activeCategory === 'All' ? offers : offers.filter(o => {
@@ -76,57 +102,56 @@ export default function OffersPage() {
       <div className="h-[72px] shrink-0" />
 
       {/* Hero section */}
-      <section
-        className="relative py-16 sm:py-20 overflow-hidden"
-        style={{
-          background: `linear-gradient(135deg, rgba(255,240,225,0.93) 0%, rgba(255,232,214,0.95) 100%), url('https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1400&auto=format&fit=crop')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
+      <section className="relative py-8 sm:py-10 overflow-hidden bg-gradient-to-br from-[#FFF5EC] via-[#FFF0E2] to-[#FFE8D6] dark:from-[#121214] dark:via-[#18181B] dark:to-[#09090B] transition-colors duration-300">
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {[
-            { emoji: '🎁', top: '8%', left: '5%', size: 52, rotate: -15, delay: 0 },
-            { emoji: '🏷️', top: '60%', right: '6%', size: 48, rotate: 12, delay: 1 },
-            { emoji: '💰', top: '20%', right: '10%', size: 44, rotate: -10, delay: 0.5 },
-            { emoji: '🎉', bottom: '12%', left: '8%', size: 50, rotate: 8, delay: 1.5 },
+            { emoji: '🍕', top: '10%', left: '4%', size: 44, rotate: -15, delay: 0 },
+            { emoji: '🍔', top: '50%', left: '3%', size: 40, rotate: 8, delay: 0.8 },
+            { emoji: '☕', bottom: '15%', left: '8%', size: 36, rotate: -10, delay: 1.8 },
+            { emoji: '🎁', top: '12%', left: '22%', size: 38, rotate: -8, delay: 0.3 },
+            { emoji: '🍽️', top: '50%', right: '4%', size: 42, rotate: 12, delay: 1.2 },
+            { emoji: '🍴', top: '12%', right: '8%', size: 38, rotate: 20, delay: 0.5 },
+            { emoji: '🧁', bottom: '15%', right: '10%', size: 36, rotate: -20, delay: 1.5 },
+            { emoji: '🏷️', top: '15%', right: '22%', size: 36, rotate: -8, delay: 0.3 },
+            { emoji: '💰', bottom: '25%', left: '25%', size: 34, rotate: 10, delay: 1.1 },
+            { emoji: '🎉', bottom: '25%', right: '25%', size: 36, rotate: -12, delay: 1.4 },
           ].map((item, i) => (
             <div
               key={i}
-              className="absolute select-none landing-stamp-float"
+              className="absolute select-none landing-bg-particle"
               style={{
                 top: item.top, left: item.left, right: (item as any).right, bottom: (item as any).bottom,
                 fontSize: `${item.size}px`,
                 transform: `rotate(${item.rotate}deg)`,
-                opacity: 0.06,
+                opacity: 0.15,
                 animationDelay: `${item.delay}s`,
               }}
             >{item.emoji}</div>
           ))}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full landing-glow-orb" style={{ background: 'radial-gradient(circle, rgba(255,107,26,0.08) 0%, transparent 70%)' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] rounded-full landing-glow-orb" style={{ background: 'radial-gradient(circle, rgba(255,107,26,0.12) 0%, transparent 70%)' }} />
         </div>
 
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 relative z-10 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-5" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.15), rgba(255,107,26,0.06))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.25)' }}>
-            <Sparkles className="w-[15px] h-[15px]" style={{ color: '#FF6B1A' }} />
-            <span className="text-[12px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>Exclusive Deals</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 mb-3" style={{ background: 'linear-gradient(135deg, rgba(255,107,26,0.15), rgba(255,107,26,0.06))', borderRadius: '999px', border: '1px solid rgba(255,107,26,0.25)' }}>
+            <Sparkles className="w-[14px] h-[14px]" style={{ color: '#FF6B1A' }} />
+            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: '#FF6B1A' }}>Exclusive Deals</span>
           </div>
-          <h1 className="text-[32px] sm:text-[42px] lg:text-[56px] font-bold landing-font-hero leading-[1.1]" style={{ color: '#222222' }}>
-            Offers & <span className="italic" style={{ color: '#FF6B1A' }}>Deals</span>
+          <h1 className="text-[28px] sm:text-[36px] lg:text-[42px] font-bold landing-font-hero leading-[1.1] text-slate-900 dark:text-white">
+            Offers & <span className="italic text-[#FF6B1A]">Deals</span>
           </h1>
-          <p className="text-[15px] sm:text-[17px] mt-3 max-w-[500px] mx-auto" style={{ color: '#666666' }}>
+          <p className="text-[14px] sm:text-[15px] mt-2 max-w-[500px] mx-auto text-slate-600 dark:text-neutral-400">
             Save more with our exclusive restaurant deals and discount codes
           </p>
 
-          <div className="flex items-center justify-center gap-6 sm:gap-10 mt-8">
+          <div className="flex items-center justify-center gap-6 sm:gap-10 mt-5">
             {[
               { value: loading ? '...' : `${offers.length}+`, label: 'Active Offers' },
               { value: '40%', label: 'Max Savings' },
               { value: '100+', label: 'Restaurants' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
-                <div className="text-[22px] sm:text-[28px] font-bold" style={{ color: '#FF6B1A' }}>{stat.value}</div>
-                <div className="text-[11px] uppercase tracking-wider mt-0.5" style={{ color: '#888888' }}>{stat.label}</div>
+                <div className="text-[20px] sm:text-[24px] font-bold" style={{ color: '#FF6B1A' }}>{stat.value}</div>
+                <div className="text-[11px] uppercase tracking-wider mt-0.5 text-slate-500 dark:text-neutral-400">{stat.label}</div>
               </div>
             ))}
           </div>

@@ -80,10 +80,10 @@ export async function submitPartnerRequest(req: Request, res: Response, next: Ne
     const parsed = createPartnerRequestSchema.parse(req.body);
     const emailLower = parsed.email.toLowerCase();
 
-    // 1. Prevent duplicate email applications (APPLICATION_PENDING, APPLICATION_APPROVED, PENDING_PAYMENT)
+    // 1. Prevent duplicate email applications (APPLICATION_PENDING, APPLICATION_APPROVED)
     const existingEmailReq = await RestaurantRequestModel.findOne({
       email: emailLower,
-      status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED', 'PENDING_PAYMENT'] },
+      status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED'] },
     }).setOptions({ bypassTenant: true });
 
     if (existingEmailReq) {
@@ -108,10 +108,10 @@ export async function submitPartnerRequest(req: Request, res: Response, next: Ne
       throw new AppError('This email already has an existing application.', 400, ErrorCode.CONFLICT);
     }
 
-    // 2. Prevent duplicate phone number applications (APPLICATION_PENDING, APPLICATION_APPROVED, PENDING_PAYMENT)
+    // 2. Prevent duplicate phone number applications (APPLICATION_PENDING, APPLICATION_APPROVED)
     const existingPhoneReq = await RestaurantRequestModel.findOne({
       phone: parsed.phone,
-      status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED', 'PENDING_PAYMENT'] },
+      status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED'] },
     }).setOptions({ bypassTenant: true });
 
     if (existingPhoneReq) {
@@ -135,6 +135,12 @@ export async function submitPartnerRequest(req: Request, res: Response, next: Ne
     if (existingPhoneUser) {
       throw new AppError('This phone number is already registered.', 400, ErrorCode.CONFLICT);
     }
+
+    // Remove any previous uncompleted PENDING_PAYMENT requests for this email or phone
+    await RestaurantRequestModel.deleteMany({
+      $or: [{ email: emailLower }, { phone: parsed.phone }],
+      status: 'PENDING_PAYMENT',
+    }).setOptions({ bypassTenant: true });
 
     // 3. Load Global Settings and check for application processing fee
     const settings = await getPlatformSettings();
