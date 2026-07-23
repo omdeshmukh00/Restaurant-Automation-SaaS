@@ -5,6 +5,7 @@ import { useCustomerStore, TrackedOrder } from '../store/customer.store';
 import { useCustomerPayment } from '../hooks/useCustomerPayment';
 import { useCart } from '../components/dashboard/CartContext';
 import { getInvoicePdfUrl } from '../api/customer.api';
+import { PaymentHistoryCard } from '../components/PaymentHistoryCard';
 
 const STEPS = [
   { icon: 'assignment_turned_in', label: 'Confirmed' },
@@ -232,15 +233,19 @@ export default function CustomerOrderTrackingPage() {
                   <span className="text-sd-on-surface-variant">Time</span>
                   <span className="font-bold text-sd-on-surface">{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
-                <div className="flex justify-between items-center mb-3 text-sm">
-                  <span className="text-sd-on-surface-variant">Payment Method</span>
-                  <span className="font-bold text-sd-on-surface">{(liveBill as any)?.paymentMethod || 'Online'}</span>
-                </div>
                 <div className="flex justify-between items-center pt-3 border-t border-sd-surface-variant text-base">
-                  <span className="font-bold text-sd-on-surface">Amount Paid</span>
+                  <span className="font-bold text-sd-on-surface">Total Billed</span>
                   <span className="font-bold text-sd-primary">₹{Number(liveBill?.finalAmount || 0).toFixed(2)}</span>
                 </div>
               </div>
+
+              {liveBill?.payments && liveBill.payments.length > 0 && (
+                <PaymentHistoryCard 
+                  payments={liveBill.payments} 
+                  amountPaid={liveBill.amountPaid || 0} 
+                  className="w-full max-w-sm mb-6 text-left shadow-none"
+                />
+              )}
 
               <button 
                 onClick={downloadInvoice}

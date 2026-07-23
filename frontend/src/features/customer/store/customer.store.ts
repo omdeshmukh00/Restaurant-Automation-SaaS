@@ -143,7 +143,9 @@ export type LiveBill = {
   taxAmount: number;
   discountAmount: number;
   finalAmount: number;
+  amountPaid: number;
   outstandingBalance: number;
+  payments?: any[];
   session: DiningSession;
   orders: TrackedOrder[];
   serviceCharge: number;
@@ -165,6 +167,7 @@ export function isValidLiveBill(value: any): value is LiveBill {
   if (typeof value.serviceCharge !== 'number') return false;
   if (typeof value.discountAmount !== 'number') return false;
   if (typeof value.finalAmount !== 'number') return false;
+  if (typeof value.amountPaid !== 'number') return false;
   if (typeof value.outstandingBalance !== 'number') return false;
   if (!Array.isArray(value.orders)) return false;
   if (!value.financialSummary || typeof value.financialSummary !== 'object') return false;

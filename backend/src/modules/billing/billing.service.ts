@@ -59,8 +59,10 @@ export class BillingService {
       taxAmount,
       serviceCharge,
       discountAmount,
-      finalAmount: Math.max(0, outstandingBalance),
+      finalAmount: grossTotal - discountAmount,
       outstandingBalance: Math.max(0, outstandingBalance),
+      amountPaid: paymentsApplied,
+      payments: payments || [],
       financialSummary: {
         grossTotal,
         tax: taxAmount,
