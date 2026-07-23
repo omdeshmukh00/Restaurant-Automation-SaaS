@@ -571,9 +571,9 @@ export default function CustomerCheckoutPage() {
                           
                           <div>
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 if (canAfford) {
-                                  const ok = claimOffer(offer.id);
+                                  const ok = await claimOffer(offer.id);
                                   if (ok) {
                                     setCouponSuccess(`Successfully unlocked "${offer.title}"!`);
                                     setCouponError('');

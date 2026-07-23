@@ -9,6 +9,7 @@ export interface AdminProfileData {
   email: string;
   role: string;
   mobile: string;
+  avatar?: string;
 }
 
 export interface RestaurantInfoData {
@@ -18,6 +19,7 @@ export interface RestaurantInfoData {
   phone: string;
   address: string;
   city: string;
+  coverImage?: string;
 }
 
 export interface BillingData {
@@ -105,7 +107,7 @@ interface SettingsState {
   setEditingRestaurant: (value: boolean) => void;
   clearSaved: () => void;
   fetchSettings: () => Promise<void>;
-  updateProfile: (data: { name?: string; mobile?: string }) => Promise<void>;
+  updateProfile: (data: { name?: string; mobile?: string; avatar?: string }) => Promise<void>;
   updateRestaurantInfo: (data: Partial<RestaurantInfoData>) => Promise<void>;
   changePlan: (plan: string) => Promise<void>;
   toggleNotification: (id: string) => Promise<void>;

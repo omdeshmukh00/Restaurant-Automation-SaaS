@@ -265,8 +265,8 @@ export default function CustomerProfilePage() {
   };
 
   // Handle Redeem Coupon Points
-  const handleRedeemCoupon = (offerId: string, title: string) => {
-    const success = claimOffer(offerId);
+  const handleRedeemCoupon = async (offerId: string, title: string) => {
+    const success = await claimOffer(offerId);
     if (success) {
       showToast(`Successfully unlocked "${title}"!`);
     } else {
