@@ -15,6 +15,7 @@ import {
   kitchenOrdersQuerySchema,
 } from '../kitchen/kitchen.schema';
 import { OrdersController } from '../orders/orders.controller';
+import { KitchenController } from '../kitchen/kitchen.controller';
 import {
   orderIdParamsSchema,
   acceptOrderBodySchema,
@@ -91,6 +92,10 @@ kitchenRouter.get('/batches', async (req, res, next) => {
     next(error);
   }
 });
+
+kitchenRouter.get('/batches/suggestions', KitchenController.getSuggestedBatches);
+kitchenRouter.get('/alerts', requireKitchenRole([KitchenRole.KITCHEN_SUPERVISOR, KitchenRole.HEAD_CHEF]), KitchenController.getAlerts);
+kitchenRouter.patch('/alerts/:id/resolve', KitchenController.resolveAlert);
 
 kitchenRouter.get('/batches/:id', validate({ params: kitchenBatchParamsSchema }), async (req, res, next) => {
   try {

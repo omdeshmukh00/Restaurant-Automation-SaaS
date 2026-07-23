@@ -46,6 +46,7 @@ export type ServiceRequestItem = {
 export type TrackedOrder = {
   id: string;
   items: string;
+  structuredItems?: { id: string; name: string; qty: number; price: number; total: number }[];
   total: number;
   status: 'Placed' | 'Preparing' | 'Ready' | 'Served' | 'Completed';
   eta: string;
@@ -54,6 +55,7 @@ export type TrackedOrder = {
   preparingStartedAt?: string;
   readyAt?: string;
   servedAt?: string;
+  updatedAt?: string;
 };
 
 export type CustomerNotification = {
@@ -132,6 +134,46 @@ const DEFAULT_LOYALTY_HISTORY: LoyaltyHistory[] = [
   { id: 'h3', points: 400, type: 'earn', description: 'Earned from Order #ORD-2840', date: '3 days ago' }
 ];
 
+export type LiveBill = {
+  _id: string | null;
+  invoiceNumber: string | null;
+  status: string;
+  paymentStatus: string;
+  subtotal: number;
+  taxAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  amountPaid: number;
+  outstandingBalance: number;
+  payments?: any[];
+  session: DiningSession;
+  orders: TrackedOrder[];
+  serviceCharge: number;
+  financialSummary: {
+    grossTotal: number;
+    tax: number;
+    discount: number;
+    paymentsApplied: number;
+    outstandingBalance: number;
+  };
+};
+
+export function isValidLiveBill(value: any): value is LiveBill {
+  if (!value || typeof value !== 'object') return false;
+  if (typeof value.status !== 'string') return false;
+  if (typeof value.paymentStatus !== 'string') return false;
+  if (typeof value.subtotal !== 'number') return false;
+  if (typeof value.taxAmount !== 'number') return false;
+  if (typeof value.serviceCharge !== 'number') return false;
+  if (typeof value.discountAmount !== 'number') return false;
+  if (typeof value.finalAmount !== 'number') return false;
+  if (typeof value.amountPaid !== 'number') return false;
+  if (typeof value.outstandingBalance !== 'number') return false;
+  if (!Array.isArray(value.orders)) return false;
+  if (!value.financialSummary || typeof value.financialSummary !== 'object') return false;
+  return true;
+}
+
 type CustomerStore = {
   tableCode: string;
   category: string;
@@ -139,13 +181,14 @@ type CustomerStore = {
   vegOnly: boolean;
   cart: CustomerCartItem[];
   favourites: number[];
+  menuItems: any[];
   orders: TrackedOrder[];
   serviceRequests: ServiceRequestItem[];
 
   // Dining Session State
   diningSession: DiningSession;
   lastActivity: number | null;
-  liveBill: any | null;
+  liveBill: LiveBill | null;
 
   // Profile Features State
   profile: CustomerProfile;
@@ -161,14 +204,17 @@ type CustomerStore = {
 
   toggleFavourite: (id: number) => void;
 
-  reorder: (order: TrackedOrder) => void;
+  // Removed fake reorder from store
   requestService: (request: ServiceRequestItem) => void;
 
   assignRandomTable: () => void;
   setTableCode: (code: string) => void;
   addOrder: (order: TrackedOrder) => void;
   fetchOrders: () => Promise<void>;
+  upsertOrderFromSocket: (order: any) => void;
+  updateOrderStatusFromSocket: (orderId: string, status: string) => void;
   fetchLiveBill: () => Promise<void>;
+  fetchMenu: () => Promise<void>;
 
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
@@ -207,9 +253,40 @@ function mapBackendOrderStatusToFrontend(status: string): TrackedOrder['status']
       return 'Served';
     case 'COMPLETED':
       return 'Completed';
+    case 'CANCELLED':
+    case 'REJECTED':
+      // Frontend doesn't explicitly have a cancelled step in the UI yet, map to Placed or add it if needed
+      // Currently, they just shouldn't be in the active list.
+      return 'Placed';
     default:
       return 'Placed';
   }
+}
+
+export function mapBackendOrderToTrackedOrder(o: any): TrackedOrder {
+  const itemsStr = o.items?.map((i: any) => `${i.name} x${i.quantity}`).join(', ') || '';
+  const structuredItems = o.items?.map((i: any) => ({
+    id: i.menuItemId || i.id || '',
+    name: i.name,
+    qty: i.quantity,
+    price: i.price,
+    total: i.totalPrice || (i.price * i.quantity)
+  })) || [];
+  
+  return {
+    id: o.orderNumber || o._id,
+    items: itemsStr,
+    structuredItems: structuredItems,
+    total: o.finalAmount || o.totalAmount || 0,
+    status: mapBackendOrderStatusToFrontend(o.status),
+    eta: o.estimatedPreparationTime ? `${o.estimatedPreparationTime} min` : '15 min',
+    date: new Date(o.createdAt).toLocaleString('en-IN'),
+    createdAt: o.createdAt,
+    preparingStartedAt: o.preparingStartedAt,
+    readyAt: o.readyAt,
+    servedAt: o.servedAt,
+    updatedAt: o.updatedAt,
+  };
 }
 
 export const useCustomerStore = create<CustomerStore>()(
@@ -221,6 +298,7 @@ export const useCustomerStore = create<CustomerStore>()(
       vegOnly: false,
       cart: [],
       favourites: [],
+      menuItems: [],
       orders: [],
       serviceRequests: [],
       diningSession: null,
@@ -260,26 +338,79 @@ export const useCustomerStore = create<CustomerStore>()(
           const res = await apiClient.get('/customer/orders');
           const data = res.data?.data || res.data;
           if (data && data.orders) {
-            const mapped: TrackedOrder[] = data.orders.map((o: any) => {
-              const itemsStr = o.items.map((i: any) => `${i.name} x${i.quantity}`).join(', ');
-              return {
-                id: o.orderNumber || o._id,
-                items: itemsStr,
-                total: o.finalAmount || o.totalAmount,
-                status: mapBackendOrderStatusToFrontend(o.status),
-                eta: o.preparationTime ? `${o.preparationTime} min` : '15 min',
-                date: new Date(o.createdAt).toLocaleString('en-IN'),
-                createdAt: o.createdAt,
-                preparingStartedAt: o.preparingStartedAt,
-                readyAt: o.readyAt,
-                servedAt: o.servedAt,
-              };
-            });
+            const mapped: TrackedOrder[] = data.orders.map(mapBackendOrderToTrackedOrder);
             set({ orders: mapped });
           }
         } catch (err) {
           console.error('Failed to fetch customer orders', err);
         }
+      },
+      fetchMenu: async () => {
+        try {
+          const { diningSession } = get();
+          if (!diningSession) return;
+          const res = await apiClient.get(`/public/menu?restaurantId=${diningSession.restaurantId}`);
+          const data = res.data?.data || res.data;
+          if (data && data.menuItems) {
+            set({ menuItems: data.menuItems });
+          }
+        } catch (err) {
+          console.error('Failed to fetch menu', err);
+        }
+      },
+      upsertOrderFromSocket: (orderPayload: any) => {
+        set((state) => {
+          const newOrder = mapBackendOrderToTrackedOrder(orderPayload);
+          const existingOrder = state.orders.find(o => o.id === newOrder.id);
+          
+          if (existingOrder) {
+            // Idempotency / Stale event protection
+            if (newOrder.updatedAt && existingOrder.updatedAt) {
+              const newTime = new Date(newOrder.updatedAt).getTime();
+              const oldTime = new Date(existingOrder.updatedAt).getTime();
+              if (newTime < oldTime) return state; // Ignore stale event
+            }
+          }
+
+          const nextOrders = existingOrder 
+            ? state.orders.map(o => o.id === newOrder.id ? newOrder : o)
+            : [newOrder, ...state.orders];
+
+          // Priority for Active Workflow Sorting
+          const statusRank: Record<string, number> = {
+            'Placed': 3,
+            'Preparing': 2,
+            'Ready': 1,
+            'Served': 4,
+            'Completed': 5
+          };
+
+          nextOrders.sort((a, b) => {
+            const rankA = statusRank[a.status] ?? 99;
+            const rankB = statusRank[b.status] ?? 99;
+            
+            if (rankA !== rankB) return rankA - rankB;
+            
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeB - timeA;
+          });
+
+          return { orders: nextOrders };
+        });
+      },
+      updateOrderStatusFromSocket: (orderId: string, status: string) => {
+        set((state) => {
+          const mappedStatus = mapBackendOrderStatusToFrontend(status);
+          return {
+            orders: state.orders.map(o => {
+              if (o.id === orderId || o.id === `ORD-${orderId}` || orderId.endsWith(o.id) || o.id.endsWith(orderId)) {
+                return { ...o, status: mappedStatus };
+              }
+              return o;
+            })
+          };
+        });
       },
       fetchLiveBill: async () => {
         try {
@@ -290,54 +421,7 @@ export const useCustomerStore = create<CustomerStore>()(
           console.error('Failed to fetch live bill', err);
         }
       },
-      reorder: (order) => {
-        get().recordActivity();
-        const orderId = `#ORD-${Math.floor(3000 + Math.random() * 6000)}`;
-        const now = new Date();
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const formattedDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}, ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
-        const newOrder: TrackedOrder = {
-          ...order,
-          id: orderId,
-          status: 'Placed',
-          eta: '18 min',
-          date: formattedDate,
-        };
-
-        const pointsEarned = Math.floor(newOrder.total / 10);
-
-        set((state) => {
-          const updatedHistory = pointsEarned > 0 ? [
-            {
-              id: `h-${Date.now()}`,
-              points: pointsEarned,
-              type: 'earn' as const,
-              description: `Points earned from Reorder ${orderId}`,
-              date: 'Just now',
-            },
-            ...state.loyaltyHistory
-          ] : state.loyaltyHistory;
-
-          const updatedNotifications = [
-            {
-              id: `n-${Date.now()}`,
-              title: 'Reordered items! 🍽️',
-              message: `Your reorder ${orderId} was placed. You earned ${pointsEarned} reward points!`,
-              timestamp: 'Just now',
-              read: false,
-              type: 'order' as const,
-            },
-            ...state.notifications
-          ];
-
-          return {
-            orders: [newOrder, ...state.orders],
-            loyaltyPoints: state.loyaltyPoints + pointsEarned,
-            loyaltyHistory: updatedHistory,
-            notifications: updatedNotifications,
-          };
-        });
-      },
+      // Fake reorder logic has been removed and replaced by CartContext reorderItems
       requestService: (request) => {
         get().recordActivity();
         set((state) => ({ serviceRequests: [{ ...request, id: `${request.id}-${Date.now()}` }, ...state.serviceRequests] }));
@@ -358,19 +442,7 @@ export const useCustomerStore = create<CustomerStore>()(
           disconnectSocket();
           connectSocket();
 
-          const socket = getSocket();
-          if (socket) {
-            const handleOrderUpdate = () => {
-              get().fetchOrders();
-              get().fetchLiveBill();
-            };
-            socket.on('order.updated', handleOrderUpdate);
-            socket.on('order.new', handleOrderUpdate);
-            socket.on('payment.success', handleOrderUpdate);
-            socket.on('session.closed', () => {
-              get().clearDiningSession();
-            });
-          }
+          // Socket bindings are handled by CustomerLayout.tsx to ensure proper cleanup
         } else {
           localStorage.removeItem('x-session-token');
           set({
@@ -523,6 +595,13 @@ export const useCustomerStore = create<CustomerStore>()(
     }),
     {
       name: 'restohub-customer-store',
+      merge: (persistedState: any, currentState) => {
+        const nextState = { ...currentState, ...persistedState };
+        if (nextState.liveBill && !isValidLiveBill(nextState.liveBill)) {
+          nextState.liveBill = null;
+        }
+        return nextState;
+      },
     }
   )
 );

@@ -34,6 +34,10 @@ export const SocketEvent = {
 
   // ── Staff events ──────────────────────────────────────────────────────
   STAFF_REQUEST_NEW: 'staff:request-new',
+  STAFF_REQUEST_ACCEPTED: 'staff.request.accepted',
+  STAFF_REQUEST_COMPLETED: 'staff.request.completed',
+  STAFF_WAITER_ASSIGNED: 'staff.table.waiter_assigned',
+  STAFF_TICKET_CREATED: 'staff.ticket.created',
 
   // ── Billing events ────────────────────────────────────────────────────
   BILL_REQUESTED: 'bill.requested',
@@ -56,6 +60,8 @@ export const SocketEvent = {
 
   // ── QR events ─────────────────────────────────────────────────────────
   QR_REGENERATED: 'qr.regenerated',
+  // ── Menu events ───────────────────────────────────────────────────────
+  MENU_UPDATED: 'menu.updated',
 } as const;
 
 export type SocketEventType = typeof SocketEvent[keyof typeof SocketEvent];

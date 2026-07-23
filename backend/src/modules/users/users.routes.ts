@@ -18,8 +18,20 @@ router.get('/me', userController.getMe);
 // POST /users/me/request-otp — Send profile/password change OTP
 router.post('/me/request-otp', userController.requestProfileOtp);
 
+// POST /users/me/request-mobile-otp — Send mobile verification OTP
+router.post('/me/request-mobile-otp', userController.requestMobileOtp);
+
 // GET /users/me/order-history — Get past paid bills for the current customer
 router.get('/me/order-history', userController.getOrderHistory);
+
+// GET /users/me/loyalty - Get loyalty wallet and transactions for current customer
+router.get('/me/loyalty', userController.getLoyalty);
+
+// GET /users/me/notifications - Get notifications for current customer
+router.get('/me/notifications', userController.getNotifications);
+
+// GET /users/me/reservations/slots — Get dynamic popular time slots
+router.get('/me/reservations/slots', userController.getReservationSlots);
 
 // GET /users/me/reservations — Get all customer reservations
 router.get('/me/reservations', userController.getMyReservations);

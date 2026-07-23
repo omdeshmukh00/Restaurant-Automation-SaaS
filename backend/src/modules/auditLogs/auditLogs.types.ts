@@ -41,6 +41,7 @@ export enum AuditAction {
   ORDER_SERVED          = 'ORDER_SERVED',
   ORDER_COMPLETED       = 'ORDER_COMPLETED',
   ORDER_DELETED         = 'ORDER_DELETED',
+  ORDER_OFFER_APPLIED   = 'ORDER_OFFER_APPLIED',
 
   // Kitchen
   KITCHEN_ORDER_ACCEPTED = 'KITCHEN_ORDER_ACCEPTED',
@@ -48,6 +49,8 @@ export enum AuditAction {
   KITCHEN_ORDER_READY    = 'KITCHEN_ORDER_READY',
   KITCHEN_ORDER_DELAYED  = 'KITCHEN_ORDER_DELAYED',
   KITCHEN_ORDER_REJECTED = 'KITCHEN_ORDER_REJECTED',
+  KITCHEN_ORDER_NOTE_ADDED = 'KITCHEN_ORDER_NOTE_ADDED',
+  KITCHEN_ALERT_RESOLVED = 'KITCHEN_ALERT_RESOLVED',
 
   // Payments
   PAYMENT_CREATED       = 'PAYMENT_CREATED',
@@ -114,7 +117,9 @@ export interface CreateAuditLogInput {
   actorRole:    string;
   restaurantId?: string | null;
   entityType:   AuditEntity;
-  entityId:     string;
+  entityId?:    string | null;
+  externalEntityId?: string | null;
+  provider?:    string;
   action:       AuditAction;
   metadata?:    Record<string, unknown>;
   ipAddress?:   string;

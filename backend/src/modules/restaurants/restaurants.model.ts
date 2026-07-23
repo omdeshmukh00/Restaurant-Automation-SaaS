@@ -26,6 +26,13 @@ type RestaurantSettings = {
   floors?: { name: string; number: number }[];
   sections?: string[];
   integrations?: Record<string, { connected: boolean }>;
+  kitchenSettings?: {
+    generalSettings?: any;
+    notificationSettings?: any;
+    displaySettings?: any;
+    autoRules?: any;
+    prepTimes?: any;
+  };
 };
 
 export interface IRestaurant extends Document {

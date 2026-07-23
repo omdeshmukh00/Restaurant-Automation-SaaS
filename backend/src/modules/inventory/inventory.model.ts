@@ -13,6 +13,8 @@ export interface IInventoryItem extends Document {
   supplierId?: Types.ObjectId;
   imageEmoji?: string;
   description?: string;
+  dailyUsage: number;
+  lastRestocked?: Date;
   deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +34,8 @@ const inventoryItemSchema = new Schema<IInventoryItem>(
     supplierId: { type: Schema.Types.ObjectId, ref: 'Supplier' },
     imageEmoji: { type: String, trim: true },
     description: { type: String, trim: true },
+    dailyUsage: { type: Number, default: 0, min: 0 },
+    lastRestocked: { type: Date },
     deletedAt: { type: Date },
   },
   {

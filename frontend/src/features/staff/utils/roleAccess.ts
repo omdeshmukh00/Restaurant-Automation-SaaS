@@ -1,13 +1,10 @@
-// src/features/staff/utils/roleAccess.ts
-
 export const ROLE_ACCESS: Record<string, string[]> = {
   'Waiter': [
-    '/staff',
+    '/staff/tables',
     '/staff/orders',
-    '/staff/menu',
     '/staff/food-ready',
     '/staff/requests',
-    '/staff/tables',
+    '/staff/menu',
     '/staff/profile',
     '/staff/settings'
   ],
@@ -39,26 +36,26 @@ export const ROLE_ACCESS: Record<string, string[]> = {
 };
 
 export function getRolePermissions(role: string): string[] {
-  const normalized = (role || '').toLowerCase();
+  const normalized = (role || '').toLowerCase().replace(/_/g, ' ');
   
-  if (normalized.includes('supervisor')) {
+  if (normalized.includes('supervisor') || normalized.includes('manager') || normalized.includes('admin')) {
     return ROLE_ACCESS['Floor Supervisor'];
   }
   
-  if (normalized.includes('waiter')) {
+  if (normalized.includes('waiter') || normalized.includes('service')) {
     return ROLE_ACCESS['Waiter'];
   }
   
-  if (normalized.includes('floor') || normalized.includes('staff')) {
+  if (normalized.includes('floor') || normalized.includes('cleaning') || normalized.includes('staff')) {
     return ROLE_ACCESS['Floor Staff'];
   }
   
-  // Default fallback for safety (e.g. if role is undefined or doesn't match standard roles)
+  // Default fallback for safety
   return ROLE_ACCESS['Waiter'];
 }
 
 export function isPathAllowed(role: string, pathname: string): boolean {
   const allowed = getRolePermissions(role);
   const normPath = pathname.replace(/\/$/, '');
-  return allowed.includes(normPath);
+  return allowed.some(p => normPath === p || normPath.startsWith(p + '/'));
 }

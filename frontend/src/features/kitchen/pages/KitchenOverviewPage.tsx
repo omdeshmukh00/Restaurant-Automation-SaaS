@@ -1,17 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { POPULAR_ITEMS, type KitchenOrder as UIKitchenOrder } from '../store/kitchenData';
+export interface UIKitchenOrder {
+  id: string;
+  table: string;
+  items: Array<{ name: string; qty: number; price?: number }>;
+  status: 'new' | 'preparing' | 'ready' | 'delayed' | 'cancelled' | 'completed';
+  type: string;
+  time: string;
+  timeAgo: string;
+  progress: number;
+  serviceFlags?: { isVip?: boolean; isRush?: boolean; allergyAlert?: boolean };
+  delayMins?: number;
+  delayHistory?: any[];
+  internalNotes?: any[];
+  chef?: { name: string; avatar?: string };
+}
 import OrderCard from '../components/dashboard/OrderCard';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
 import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
-import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder } from '../api/kitchen.api';
+import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder, addInternalNote } from '../api/kitchen.api';
 import { apiClient } from '../../../shared/services/apiClient';
+import { POPULAR_ITEMS } from '../constants';
 import ETAModal from '../components/ETAModal';
+import MenuAvailabilityModal from '../components/MenuAvailabilityModal';
+import InternalNotesModal from '../components/InternalNotesModal';
+import DelayOrderModal from '../components/DelayOrderModal';
 
 export default function KitchenOverviewPage() {
   const { query } = useKitchenSearch();
 
-  const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
+  const { ordersById, orderIds, refreshDashboard, executeOptimisticOrderUpdate } = useKitchenDashboard();
   const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+  const [notesOrderId, setNotesOrderId] = useState<string | null>(null);
+  const [delayModalOrderId, setDelayModalOrderId] = useState<string | null>(null);
 
   const [now, setNow] = useState(() => Date.now());
 
@@ -23,6 +44,7 @@ export default function KitchenOverviewPage() {
   }, []);
 
   const orders = React.useMemo(() => {
+    const rawOrders = orderIds.map(id => ordersById[id]).filter(Boolean);
     return rawOrders.map((bo: any): UIKitchenOrder => {
       let status: UIKitchenOrder['status'] = 'new';
       const rawStatus = String(bo.status || '').toLowerCase();
@@ -60,7 +82,7 @@ export default function KitchenOverviewPage() {
         progress: status === 'preparing' ? 50 : 0,
       };
     });
-  }, [rawOrders, now]);
+  }, [orderIds, ordersById, now]);
 
   // Load and save active tab state
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -97,21 +119,41 @@ export default function KitchenOverviewPage() {
   
   const handleEtaConfirm = async (eta: number) => {
     if (!etaOrderId) return;
-    try {
-      await acceptOrder(etaOrderId, eta);
-      await startOrder(etaOrderId);
-    } catch (e) {
-      console.error(e);
-    }
+    const id = etaOrderId;
     setEtaOrderId(null);
-    refreshDashboard();
+    await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, async () => {
+      await acceptOrder(id, eta);
+      return startOrder(id);
+    });
   };
 
-  const handleReject = async (id: string) => { await rejectOrder(id); refreshDashboard(); };
-  const handleMarkReady = async (id: string) => { await readyOrder(id); refreshDashboard(); };
-  const handleDelay = async (id: string) => { await delayOrder(id); refreshDashboard(); };
-  const handleRush = async (id: string) => { await startOrder(id); refreshDashboard(); };
+  const handleReject = async (id: string) => {
+    await executeOptimisticOrderUpdate(id, { status: 'REJECTED' }, () => rejectOrder(id));
+  };
+  const handleMarkReady = async (id: string) => {
+    await executeOptimisticOrderUpdate(id, { status: 'READY' }, () => readyOrder(id));
+  };
+  const handleDelayClick = (id: string) => { setDelayModalOrderId(id); };
+
+  const handleDelayConfirm = async (delayMinutes: number, reason: string) => {
+    if (!delayModalOrderId) return;
+    const id = delayModalOrderId;
+    setDelayModalOrderId(null);
+    await executeOptimisticOrderUpdate(id, { status: 'DELAYED' }, () => delayOrder(id, delayMinutes, reason));
+  };
+
+  const handleRush = async (id: string) => {
+    await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, () => startOrder(id));
+  };
   const handleRefreshFeed = () => refreshDashboard();
+  const handleAddNote = (id: string) => { setNotesOrderId(id); };
+
+  const handleNotesSave = async (content: string) => {
+    if (!notesOrderId) return;
+    const id = notesOrderId;
+    setNotesOrderId(null);
+    await executeOptimisticOrderUpdate(id, { notes: content }, () => addInternalNote(id, content));
+  };
 
   const columns = [
     { title: 'NEW ORDERS', icon: 'assignment', count: newOrders.length, color: 'blue', items: newOrders },
@@ -188,7 +230,7 @@ export default function KitchenOverviewPage() {
               {/* Cards */}
               <div className="space-y-4 overflow-y-auto pr-1 flex-1" style={{ maxHeight: 'calc(100vh - 250px)' }}>
                 {(expandedColumns[title] ? items : items.slice(0, 3)).map(order => (
-                  <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelay} onPickup={() => {}} onRush={handleRush} />
+                  <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelayClick} onPickup={() => {}} onRush={handleRush} onAddNote={handleAddNote} />
                 ))}
                 {items.length > 3 && (
                   <button onClick={() => toggleColumnExpand(title)} className={`w-full text-center py-2 ${c.text} font-bold text-xs font-sans bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors`}>
@@ -218,6 +260,10 @@ export default function KitchenOverviewPage() {
               <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 font-sans">Quick Chef Controls</h3>
             </div>
             <div className="space-y-3">
+              <button onClick={() => setIsMenuModalOpen(true)} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
+                <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
+                Menu Availability
+              </button>
               <button onClick={handleRefreshFeed} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Refresh Feed
@@ -283,9 +329,28 @@ export default function KitchenOverviewPage() {
 
       <ETAModal
         isOpen={!!etaOrderId}
-        orderId={etaOrderId}
-        onConfirm={handleEtaConfirm}
         onCancel={() => setEtaOrderId(null)}
+        onConfirm={handleEtaConfirm}
+        orderId={etaOrderId || ''}
+      />
+      
+      <InternalNotesModal
+        isOpen={!!notesOrderId}
+        onClose={() => setNotesOrderId(null)}
+        onSave={handleNotesSave}
+        orderId={notesOrderId || ''}
+      />
+
+      <DelayOrderModal
+        isOpen={!!delayModalOrderId}
+        onClose={() => setDelayModalOrderId(null)}
+        onConfirm={handleDelayConfirm}
+        orderId={delayModalOrderId || ''}
+      />
+
+      <MenuAvailabilityModal
+        isOpen={isMenuModalOpen}
+        onClose={() => setIsMenuModalOpen(false)}
       />
     </div>
   );

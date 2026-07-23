@@ -4,7 +4,6 @@ import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleani
 import { connectSocket, getSocket } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
 
-// Hum yahan temporary interface bana rahe hain taaki TypeScript error na de
 interface ProcessedTask extends UrgentTask {
   rawStatus: string;
   rawPriority: string;
@@ -12,6 +11,10 @@ interface ProcessedTask extends UrgentTask {
   area?: string;
   section?: string;
   floor?: number;
+  assignedStaffId?: string | { _id: string; name: string } | null;
+  isPaused?: boolean;
+  isDeepCleaning?: boolean;
+  queueWaitingCount?: number;
 }
 
 export function useCleaning() {
@@ -97,7 +100,6 @@ export function useCleaning() {
         displayStatus = 'Available';
         badgeColor = '#22c55e';
         badgeBg = 'rgba(34,197,94,0.15)';
-        
         rawStatus = 'VERIFIED';
       }
 
@@ -117,14 +119,21 @@ export function useCleaning() {
         area: task.area,
         section: task.section,
         floor: task.floor,
+        assignedStaffId: (task as any).assignedStaffId,
+        isPaused: (task as any).isPaused,
+        isDeepCleaning: (task as any).isDeepCleaning,
+        queueWaitingCount: (task as any).queueWaitingCount,
       } as ProcessedTask;
     });
 
-    const priorityWeight: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
+    const priorityWeight: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
     const sortedTasks = [...processedTasks].sort((a: ProcessedTask, b: ProcessedTask) => {
       if (a.rawStatus === 'REQUESTED' && b.rawStatus !== 'REQUESTED') return -1;
       if (a.rawStatus !== 'REQUESTED' && b.rawStatus === 'REQUESTED') return 1;
+      if ((b.queueWaitingCount || 0) !== (a.queueWaitingCount || 0)) {
+        return (b.queueWaitingCount || 0) - (a.queueWaitingCount || 0);
+      }
       return (priorityWeight[b.rawPriority] || 0) - (priorityWeight[a.rawPriority] || 0);
     });
 
@@ -134,21 +143,93 @@ export function useCleaning() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await cleaningAPI.getTasks();
-      if (res.success && res.data?.tasks) {
-        cleaningStore.syncTasks(res.data.tasks);
+      const [tasksRes, tablesRes] = await Promise.all([
+        cleaningAPI.getTasks(),
+        cleaningAPI.getTables(),
+      ]);
+
+      if (tablesRes.success && Array.isArray(tablesRes.data)) {
+        const mappedTables = tablesRes.data.map((table: any) => {
+          const activeTask = tasksRes.success && Array.isArray(tasksRes.data?.tasks)
+            ? tasksRes.data.tasks.find((task: any) => String(task.tableDetails?._id || task.tableId) === String(table._id))
+            : null;
+
+          let status = 'Available';
+          let progress = 0;
+          const taskId = activeTask?._id;
+
+          if (activeTask) {
+            if (activeTask.status === 'IN_PROGRESS') {
+              status = 'In Progress';
+              progress = 45;
+            } else if (activeTask.status === 'COMPLETED') {
+              status = 'Ready for Inspection';
+            } else {
+              status = 'Needs Cleaning';
+            }
+          } else {
+            const tableStatusUpper = (table.status || '').toUpperCase();
+            if (['OCCUPIED', 'BILL_PENDING', 'PAYMENT_PENDING', 'PAID', 'ORDERING', 'FOOD_SERVED'].includes(tableStatusUpper)) {
+              status = 'Occupied';
+            } else if (tableStatusUpper === 'RESERVED') {
+              status = 'Reserved';
+            } else if (['DIRTY', 'NEEDS_CLEANING'].includes(tableStatusUpper)) {
+              status = 'Needs Cleaning';
+            } else {
+              status = 'Available';
+            }
+          }
+
+          let priority = 'Medium';
+          if (activeTask?.priority === 'HIGH') priority = 'High';
+          else if (activeTask?.priority === 'LOW') priority = 'Low';
+
+          let assignedTo = null;
+          if (activeTask?.assignedStaffId) {
+            const staff = activeTask.assignedStaffId as any;
+            assignedTo = {
+              name: staff.name || 'Staff Member',
+              avatar: staff.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(staff.name || 'Staff')}`,
+            };
+          }
+
+          return {
+            id: `Table ${table.tableNumber ?? 1}`,
+            area: table.section || 'Dining Area A',
+            seats: Number(table.capacity || 4),
+            status: status as any,
+            priority: priority as any,
+            timeAgo: activeTask?.createdAt ? new Date(activeTask.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Just Now',
+            assignedTo,
+            progress,
+            taskId,
+            floor: table.floor || 1,
+            section: table.section || 'Main',
+          };
+        });
+
+        cleaningStore.syncTasks([]);
+        cleaningStore.syncAllTables(mappedTables);
       }
 
-      const staffRes = await apiClient.get<{ success: boolean; data: any[] }>('/admin/staff');
-      if (staffRes.data?.success && Array.isArray(staffRes.data.data)) {
-        const apiMembers = staffRes.data.data.map((m: any) => ({
-          id: String(m._id || m.id),
-          name: m.name || 'Cleaning Staff',
-          role: m.role || 'Cleaning Staff',
-          area: m.assignedArea || 'Dining Area A',
-          phone: m.phone || '+91 98000 00000',
-          avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
-        }));
+      const staffRes = await apiClient.get<{ success: boolean; data: { staff: any[] } }>('/admin/staff?role=cleaning-staff');
+      if (staffRes.data?.success && Array.isArray(staffRes.data.data?.staff)) {
+        const apiMembers = staffRes.data.data.staff.map((m: any) => {
+          let displayRole = 'Cleaning Staff';
+          if (m.cleaning_role === 'HOUSEKEEPING') displayRole = 'Housekeeper';
+          else if (m.cleaning_role === 'CLEANING_SUPERVISOR') displayRole = 'Cleaning Supervisor';
+          else if (m.role === 'cleaning-staff') displayRole = 'Cleaning Staff';
+          else displayRole = m.role || 'Cleaning Staff';
+
+          return {
+            id: String(m._id || m.id),
+            name: m.name || 'Cleaning Staff',
+            role: displayRole,
+            area: m.assignedArea || 'Dining Area A',
+            phone: m.mobile || m.phone || '+91 98000 00000',
+            avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
+          };
+        });
         if (apiMembers.length > 0) {
           cleaningStore.setStaffMembers(apiMembers);
         }
@@ -160,8 +241,6 @@ export function useCleaning() {
     }
   }, []);
 
-
-// Pehla Effect
   useEffect(() => {
     const timer = setTimeout(() => processAndSyncData(), 0);
     const unsubscribe = cleaningStore.subscribe(() => {
@@ -171,13 +250,12 @@ export function useCleaning() {
       clearTimeout(timer);
       unsubscribe();
     };
-  }, [processAndSyncData]); // <--- Yahan 'processAndSyncData' daal diya
+  }, [processAndSyncData]);
 
-  // Dusra Effect
   useEffect(() => {
     const timer = setTimeout(() => loadDashboard(), 0);
     return () => clearTimeout(timer);
-  }, [loadDashboard]); // <--- Yahan 'loadDashboard' daal diya
+  }, [loadDashboard]);
 
   // Socket sync effect
   useEffect(() => {
@@ -189,11 +267,19 @@ export function useCleaning() {
       };
       socket.on('cleaning.started', handleSync);
       socket.on('cleaning.completed', handleSync);
+      socket.on('cleaning.issue.reported', handleSync);
+      socket.on('cleaning.task.assigned', handleSync);
+      socket.on('cleaning.task.paused', handleSync);
+      socket.on('cleaning.task.deepclean', handleSync);
       socket.on('table.status.changed', handleSync);
 
       return () => {
         socket.off('cleaning.started', handleSync);
         socket.off('cleaning.completed', handleSync);
+        socket.off('cleaning.issue.reported', handleSync);
+        socket.off('cleaning.task.assigned', handleSync);
+        socket.off('cleaning.task.paused', handleSync);
+        socket.off('cleaning.task.deepclean', handleSync);
         socket.off('table.status.changed', handleSync);
       };
     }
@@ -209,16 +295,47 @@ export function useCleaning() {
     urgentTasks,
     staffMembers,
     addStaffMember: async (member: any) => {
-      cleaningStore.addStaffMember(member);
       try {
-        await apiClient.post('/admin/staff', {
+        const sanitizedMobile = (member.phone || '').replace(/[^\d]/g, '').slice(0, 10).padEnd(10, '0');
+        const email = `${member.name.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now().toString().slice(-6)}@ambertable.com`;
+        
+        const apiRole = 'cleaning-staff';
+        let cleaningRole = 'CLEANING_STAFF';
+        if (member.role === 'Housekeeper') {
+          cleaningRole = 'HOUSEKEEPING';
+        } else if (member.role === 'Hygiene Auditor' || member.role === 'Cleaning Supervisor') {
+          cleaningRole = 'CLEANING_SUPERVISOR';
+        }
+
+        const res = await apiClient.post<{ success: boolean; data: { staff: any } }>('/admin/staff', {
           name: member.name,
-          phone: member.phone,
-          role: member.role || 'service-staff',
+          email,
+          mobile: sanitizedMobile,
+          role: apiRole,
+          cleaning_role: cleaningRole,
           assignedArea: member.area,
         });
+
+        if (res.data?.success && res.data.data?.staff) {
+          const m = res.data.data.staff;
+          let displayRole = 'Cleaning Staff';
+          if (m.cleaning_role === 'HOUSEKEEPING') displayRole = 'Housekeeper';
+          else if (m.cleaning_role === 'CLEANING_SUPERVISOR') displayRole = 'Cleaning Supervisor';
+
+          cleaningStore.addStaffMember({
+            id: String(m._id || m.id),
+            name: m.name,
+            role: displayRole,
+            area: m.assignedArea || 'Dining Area A',
+            phone: m.mobile || '+91 98000 00000',
+            avatar: m.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(m.name || 'Staff')}`,
+          });
+        }
+        await loadDashboard();
       } catch (e) {
         console.warn('Failed to post staff member to backend', e);
+        // Fallback
+        cleaningStore.addStaffMember(member);
       }
     },
     removeStaffMember: async (id: string) => {
@@ -236,33 +353,100 @@ export function useCleaning() {
     loading,
     error,
     profile,
-    updateProfile: async (updated: Partial<StaffProfile>) => {
+    updateProfile: async (updated: Partial<StaffProfile> & { mobileOtp?: string }) => {
       cleaningStore.updateProfile(updated);
       try {
         const { profileAPI } = await import('../api/profile.api');
         await profileAPI.updateProfile({
           name: updated.name,
-          phone: updated.phone,
+          mobile: updated.phone,
+          mobileOtp: updated.mobileOtp,
         } as any);
       } catch (e) {
         console.error('Failed to sync profile changes with backend', e);
+      }
+    },
+    requestMobileOtp: async (mobile: string) => {
+      try {
+        const { profileAPI } = await import('../api/profile.api');
+        return await profileAPI.requestMobileOtp(mobile);
+      } catch (e) {
+        console.error('Failed to request mobile OTP', e);
+        return { success: false, error: 'Failed to request OTP' };
       }
     },
     assignTask: async (taskId: string) => {
       await cleaningAPI.startTask(taskId);
       await loadDashboard();
     },
+    assignTaskToStaff: async (taskId: string, staffId?: string | null) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      if (staffId) {
+        const staff = cleaningStore.staffMembers.find(s => s.id === staffId);
+        const staffName = staff ? staff.name : 'Staff Member';
+        cleaningStore.addActivity(`Assigned ${staffName} to ${label}`, area, 'assignment', 'blue');
+      } else {
+        cleaningStore.addActivity(`Unassigned staff from ${label}`, area, 'person_remove', 'blue');
+      }
+      await cleaningAPI.assignTask(taskId, staffId);
+      await loadDashboard();
+    },
     startTask: async (taskId: string) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Started cleaning ${label}`, area, 'timer', 'orange');
       await cleaningAPI.startTask(taskId);
       await loadDashboard();
     },
     completeTask: async (taskId: string) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Completed cleaning ${label}`, area, 'check_circle', 'green');
       await cleaningAPI.completeTask(taskId);
       await loadDashboard();
     },
     verifyTask: async (taskId: string) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Verified & approved ${label}`, area, 'verified', 'purple');
       await cleaningAPI.verifyTask(taskId);
       await loadDashboard();
+    },
+    pauseTask: async (taskId: string, isPaused?: boolean) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(isPaused ? `Paused cleaning ${label}` : `Resumed cleaning ${label}`, area, 'pause', 'orange');
+      await cleaningAPI.pauseTask(taskId, isPaused);
+      await loadDashboard();
+    },
+    triggerDeepClean: async (taskId: string, isDeepCleaning?: boolean) => {
+      const table = cleaningStore.tables.find(t => t.taskId === taskId || t.id === taskId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      cleaningStore.addActivity(`Triggered deep clean for ${label}`, area, 'cleaning_services', 'purple');
+      await cleaningAPI.triggerDeepClean(taskId, isDeepCleaning);
+      await loadDashboard();
+    },
+    reportMaintenanceIssue: async (data: {
+      tableId: string;
+      issueType: string;
+      description: string;
+      severity?: string;
+    }) => {
+      const table = cleaningStore.tables.find(t => t.id === data.tableId);
+      const label = table ? table.id : 'Table';
+      const area = table ? table.area : 'Dining Area A';
+      const desc = data.issueType ? data.issueType.replace(/_/g, ' ') : 'Maintenance issue';
+      cleaningStore.addActivity(`Reported maintenance for ${label}`, desc, 'warning', 'orange');
+      const res = await cleaningAPI.reportMaintenanceIssue(data);
+      await loadDashboard();
+      return res;
     },
     reportIssue: (taskId: string, issue: string) => cleaningStore.reportMaintenance(taskId, issue),
     refresh: loadDashboard,

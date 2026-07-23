@@ -52,25 +52,49 @@ export default function KitchenLayout(): JSX.Element {
     };
     window.addEventListener('resize', handleResize);
     
-    // Initial fetch on mount
+    // Initial fetch on mount is handled by connect event below if socket connects.
+    // We still fetch once initially in case socket is already connected.
     void refreshDashboard();
 
-    connectSocket();
     const socket = getSocket();
+    
+    const handleOrderUpsert = (payload: any, ack?: (res: any) => void) => {
+      // payload could be { order, _version } or just order
+      const order = payload.order || payload;
+      useKitchenStore.getState().upsertOrder(order);
+      if (typeof ack === 'function') ack({ status: 'ok' });
+    };
+
+    const handleBatchUpsert = (payload: any, ack?: (res: any) => void) => {
+      const batch = payload.batch || payload;
+      useKitchenStore.getState().upsertBatch(batch);
+      if (typeof ack === 'function') ack({ status: 'ok' });
+    };
+
     if (socket) {
-      socket.on('order.created', scheduleRefresh);
-      socket.on('order.updated', scheduleRefresh);
-      socket.on('order.ready', scheduleRefresh);
-      socket.on('kitchen:batch-updated', scheduleRefresh);
+      socket.on('connect', refreshDashboard);
+      socket.on('reconnect', refreshDashboard);
+      socket.on('order.created', handleOrderUpsert);
+      socket.on('order.updated', handleOrderUpsert);
+      socket.on('order.ready', handleOrderUpsert);
+      socket.on('order.served', handleOrderUpsert);
+      socket.on('order.cancelled', handleOrderUpsert);
+      socket.on('order.deleted', scheduleRefresh); // deleted might need a full refresh or custom store logic
+      socket.on('kitchen:batch-updated', handleBatchUpsert);
     }
 
     return () => {
       window.removeEventListener('resize', handleResize);
       if (socket) {
-        socket.off('order.created', scheduleRefresh);
-        socket.off('order.updated', scheduleRefresh);
-        socket.off('order.ready', scheduleRefresh);
-        socket.off('kitchen:batch-updated', scheduleRefresh);
+        socket.off('connect', refreshDashboard);
+        socket.off('reconnect', refreshDashboard);
+        socket.off('order.created', handleOrderUpsert);
+        socket.off('order.updated', handleOrderUpsert);
+        socket.off('order.ready', handleOrderUpsert);
+        socket.off('order.served', handleOrderUpsert);
+        socket.off('order.cancelled', handleOrderUpsert);
+        socket.off('order.deleted', scheduleRefresh);
+        socket.off('kitchen:batch-updated', handleBatchUpsert);
       }
     };
   }, []);

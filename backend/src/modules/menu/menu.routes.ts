@@ -93,6 +93,7 @@ router.get(
 |--------------------------------------------------------------------------
 */
 const adminRoles = [UserRole.RESTAURANT_ADMIN, UserRole.SUPER_ADMIN];
+const menuRoles = [UserRole.RESTAURANT_ADMIN, UserRole.SUPER_ADMIN, UserRole.SERVICE_STAFF, UserRole.KITCHEN_STAFF];
 
 // CATEGORIES
 router.post(
@@ -106,7 +107,7 @@ router.post(
 router.get(
   '/admin/menu/categories',
   requireAuth,
-  roleGuard(...adminRoles),
+  roleGuard(...menuRoles),
   MenuController.getAdminCategories
 );
 
@@ -121,7 +122,7 @@ router.patch(
 router.get(
   '/admin/menu/categories/:id',
   requireAuth,
-  roleGuard(...adminRoles),
+  roleGuard(...menuRoles),
   validate({ params: idParamSchema }),
   MenuController.getAdminCategoryById
 );
@@ -155,7 +156,7 @@ router.patch(
 router.post(
   '/admin/menu/items',
   requireAuth,
-  roleGuard(...adminRoles),
+  roleGuard(...menuRoles),
   validate({ body: createItemSchema }),
   MenuController.createItem
 );
@@ -163,7 +164,7 @@ router.post(
 router.get(
   '/admin/menu/items',
   requireAuth,
-  roleGuard(...adminRoles),
+  roleGuard(...menuRoles),
   MenuController.getAdminItems
 );
 

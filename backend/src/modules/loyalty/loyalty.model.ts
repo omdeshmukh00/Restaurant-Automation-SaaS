@@ -18,6 +18,14 @@ export interface ILoyaltyWallet extends Document {
 
   tier: LoyaltyTier;
 
+  transactions: Array<{
+    type: 'EARNED' | 'REDEEMED';
+    points: number;
+    description: string;
+    orderId?: Types.ObjectId;
+    date: Date;
+  }>;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,6 +83,16 @@ const loyaltyWalletSchema = new Schema<ILoyaltyWallet>(
       enum: Object.values(LoyaltyTier),
       default: LoyaltyTier.BRONZE,
     },
+
+    transactions: [
+      {
+        type: { type: String, enum: ['EARNED', 'REDEEMED'], required: true },
+        points: { type: Number, required: true },
+        description: { type: String, required: true },
+        orderId: { type: Schema.Types.ObjectId, ref: 'Order' },
+        date: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { buildPaginationMeta } from '../../utils/pagination';
 import { socketService } from '../../sockets/socket.service';
+import { ItemAvailabilityStatus } from '../../constants/statuses';
 
 export class MenuService {
   /*
@@ -45,7 +46,27 @@ export class MenuService {
     if (options.activeOnly) query.isActive = true;
     if (options.excludeHidden) query.isHidden = false;
 
-    return Category.find(query).sort({ displayOrder: 1 });
+    let categories = await Category.find(query).sort({ displayOrder: 1 });
+    if (categories.length === 0 && !options.activeOnly && !options.excludeHidden) {
+      const defaultCats = [
+        { name: 'Starters', description: 'Appetizers and quick bites', displayOrder: 1 },
+        { name: 'Mains', description: 'Main course dishes', displayOrder: 2 },
+        { name: 'Desserts', description: 'Sweets and desserts', displayOrder: 3 },
+        { name: 'Beverages', description: 'Drinks and beverages', displayOrder: 4 },
+      ];
+
+      for (const cat of defaultCats) {
+        await Category.create({
+          ...cat,
+          restaurantId,
+          isActive: true,
+          isHidden: false,
+        });
+      }
+      categories = await Category.find(query).sort({ displayOrder: 1 });
+    }
+
+    return categories;
   }
 
   static async getCategoryById(
@@ -130,8 +151,27 @@ export class MenuService {
     data: Partial<IMenuItem>,
     userId: string | Types.ObjectId
   ): Promise<IMenuItem> {
-    // Validate category exists
-    await this.getCategoryById(restaurantId, data.categoryId as Types.ObjectId);
+    let category = null;
+    if (data.categoryId) {
+      category = await Category.findOne({ _id: data.categoryId, restaurantId });
+    }
+
+    if (!category) {
+      category = await Category.findOne({ restaurantId }).sort({ displayOrder: 1 });
+      if (!category) {
+        category = await Category.create({
+          name: 'General',
+          description: 'General Menu Items',
+          restaurantId,
+          displayOrder: 1,
+          isActive: true,
+          isHidden: false,
+          createdBy: userId,
+          updatedBy: userId,
+        });
+      }
+      data.categoryId = category._id;
+    }
 
     const lastItem = await MenuItem.findOne({ restaurantId, categoryId: data.categoryId })
       .sort({ displayOrder: -1 })
@@ -321,6 +361,34 @@ export class MenuService {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
     socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
+    return item;
+  }
+
+  static async updateItemAvailabilityStatus(
+    restaurantId: string | Types.ObjectId,
+    itemId: string | Types.ObjectId,
+    availabilityStatus: ItemAvailabilityStatus,
+    userId: string | Types.ObjectId
+  ): Promise<IMenuItem> {
+    const isAvailable = availabilityStatus === ItemAvailabilityStatus.AVAILABLE;
+
+    const item = await MenuItem.findOneAndUpdate(
+      { _id: itemId, restaurantId },
+      { $set: { availabilityStatus, isAvailable, updatedBy: userId } },
+      { new: true }
+    );
+
+    if (!item) {
+      throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
+    }
+    
+    socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { 
+      menuItemId: item._id,
+      availabilityStatus: item.availabilityStatus,
+      isAvailable: item.isAvailable,
+      updatedAt: item.updatedAt
+    });
+    
     return item;
   }
 

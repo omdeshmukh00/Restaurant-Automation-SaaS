@@ -64,12 +64,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
     }, 500);
   };
 
-  const handleSimulateScan = () => {
-    setScanned(true);
-    setTimeout(() => {
-      onScanSuccess('T07'); // Default mock table
-    }, 800);
-  };
+
 
   const handleRetryScan = () => {
     setScanned(false);
@@ -311,6 +306,18 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
             <p className="text-xs text-white/70 font-sans text-center mt-6 max-w-xs px-4">
               Point your camera at the Smart Dining QR code placed on your table.
             </p>
+
+            <div className="flex flex-col gap-2.5 mt-4 w-full px-4 items-center">
+
+
+              {/* Manual Entry Fallback Button */}
+              <button
+                onClick={() => setShowManualInput(true)}
+                className="text-xs text-sd-primary-container hover:underline font-semibold font-sans mt-1"
+              >
+                Enter Table ID Manually
+              </button>
+            </div>
           </div>
         )}
       </div>

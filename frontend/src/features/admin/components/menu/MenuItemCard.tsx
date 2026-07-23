@@ -10,60 +10,63 @@ const FALLBACK_IMG =
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70" viewBox="0 0 70 70">' +
-      '<rect width="70" height="70" rx="8" fill="#f3f4f6"/>' +
-      '<g fill="none" stroke="#9ca3af" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
-      '<circle cx="35" cy="29" r="12"/>' +
-      '<path d="M22 52c0-7 5.4-12 13-12s13 5 13 12"/>' +
-      '</g></svg>',
+    '<rect width="70" height="70" rx="8" fill="#f3f4f6"/>' +
+    '<g fill="none" stroke="#9ca3af" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="35" cy="29" r="12"/>' +
+    '<path d="M22 52c0-7 5.4-12 13-12s13 5 13 12"/>' +
+    '</g></svg>',
   );
 
 export function MenuItemCard({ item }: Props): JSX.Element {
   const { toggleItemEnabled, updateItem, deleteItem, categories } = useMenuStore();
 
-  const [showMenu,   setShowMenu]   = useState(false);
-  const [showEdit,   setShowEdit]   = useState(false);
-  const [editName,   setEditName]   = useState(item.name);
-  const [editDesc,   setEditDesc]   = useState(item.description);
-  const [editPrice,  setEditPrice]  = useState(String(item.price));
-  const [editStock,  setEditStock]  = useState(String(item.stockQuantity));
+  const [showMenu, setShowMenu] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editName, setEditName] = useState(item.name);
+  const [editDesc, setEditDesc] = useState(item.description);
+  const [editPrice, setEditPrice] = useState(String(item.price));
+  const [editStock, setEditStock] = useState(String(item.stockQuantity));
   const [editAvailable, setEditAvailable] = useState(item.isAvailable);
   const [editVeg, setEditVeg] = useState(item.isVeg);
+  const [editComplexity, setEditComplexity] = useState(String(item.preparationComplexity || 1));
   const [editSpicy, setEditSpicy] = useState(item.isSpicy);
-  const [editCat,    setEditCat]    = useState(item.categoryId);
+  const [editCat, setEditCat] = useState(item.categoryId);
   const [confirmDel, setConfirmDel] = useState(false);
 
   const validCategories = categories.filter((c) => c.id !== 'all');
 
   const stockIcon =
     item.status === 'Out of Stock' ? <PackageOpen className="w-3.5 h-3.5 text-red-400" /> :
-    item.status === 'Low Stock'    ? <TrendingDown className="w-3.5 h-3.5 text-amber-400" /> :
-                                     <PackageOpen className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />;
+      item.status === 'Low Stock' ? <TrendingDown className="w-3.5 h-3.5 text-amber-400" /> :
+        <PackageOpen className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" />;
 
   const stockLabel =
     item.status === 'Out of Stock' ? 'Out of Stock' :
-    item.status === 'Low Stock'    ? `Low Stock (${item.stockQuantity})` :
-                                     `In Stock (${item.stockQuantity})`;
+      item.status === 'Low Stock' ? `Low Stock (${item.stockQuantity})` :
+        `In Stock (${item.stockQuantity})`;
 
   const stockLabelClass =
     item.status === 'Out of Stock' ? 'text-red-400' :
-    item.status === 'Low Stock'    ? 'text-amber-500 dark:text-amber-400' :
-                                     'text-gray-400 dark:text-gray-500';
+      item.status === 'Low Stock' ? 'text-amber-500 dark:text-amber-400' :
+        'text-gray-400 dark:text-gray-500';
 
   const saveEdit = () => {
     updateItem(item.id, {
-      name:          editName.trim() || item.name,
-      description:   editDesc.trim(),
-      price:         parseFloat(editPrice) || item.price,
+      name: editName.trim() || item.name,
+      description: editDesc.trim(),
+      price: parseFloat(editPrice) || item.price,
       stockQuantity: parseInt(editStock, 10) || 0,
-      isAvailable:   editAvailable,
-      isVeg:         editVeg,
-      isSpicy:       editSpicy,
-      categoryId:    editCat,
+      isAvailable: editAvailable,
+      isVeg: editVeg,
+      preparationComplexity: parseInt(editComplexity, 10) || 1,
+      isSpicy: editSpicy,
+      categoryId: editCat,
     });
     setShowEdit(false);
   };
 
   const inputClass = 'w-full px-2.5 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 outline-none focus:ring-2 focus:ring-orange-100 dark:focus:ring-orange-900/40 focus:border-orange-300 dark:focus:border-orange-700 placeholder:text-gray-400 transition-all';
+
 
   return (
     <>
@@ -71,14 +74,12 @@ export function MenuItemCard({ item }: Props): JSX.Element {
         {/* Toggle */}
         <button
           onClick={() => toggleItemEnabled(item.id)}
-          className={`absolute top-3 right-3 w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
-            item.enabled ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-700'
-          }`}
+          className={`absolute top-3 right-3 w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${item.enabled ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-700'
+            }`}
           title={item.enabled ? 'Disable item' : 'Enable item'}
         >
-          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
-            item.enabled ? 'left-[22px]' : 'left-0.5'
-          }`} />
+          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${item.enabled ? 'left-[22px]' : 'left-0.5'
+            }`} />
         </button>
 
         {/* Actions menu —
@@ -152,7 +153,7 @@ export function MenuItemCard({ item }: Props): JSX.Element {
       {showEdit && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40 animate-fade-in">
           {/* Backdrop click listener */}
-          <button 
+          <button
             type="button"
             onClick={() => setShowEdit(false)}
             className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none"
@@ -165,7 +166,7 @@ export function MenuItemCard({ item }: Props): JSX.Element {
             >
               <X className="w-4 h-4" />
             </button>
-            
+
             <div>
               <h3 className="text-base font-bold text-gray-800 dark:text-gray-100">Edit Menu Item</h3>
               <p className="text-xs text-gray-400 dark:text-gray-550 mt-0.5">Modify the details of {item.name}</p>
@@ -218,6 +219,11 @@ export function MenuItemCard({ item }: Props): JSX.Element {
                 </button>
               </div>
 
+              <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 dark:border-gray-700 dark:bg-gray-850 gap-2">
+                <span className="text-xs font-semibold text-gray-650 dark:text-gray-300">Complexity (1-10)</span>
+                <input value={editComplexity} onChange={(e) => setEditComplexity(e.target.value)} type="number" min="1" max="10" className={`${inputClass} w-16 text-center`} />
+              </div>
+
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase mb-1">Category</label>
                 <select value={editCat} onChange={(e) => setEditCat(e.target.value)} className={inputClass}>
@@ -238,7 +244,7 @@ export function MenuItemCard({ item }: Props): JSX.Element {
       {confirmDel && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40 animate-fade-in">
           {/* Backdrop click listener */}
-          <button 
+          <button
             type="button"
             onClick={() => setConfirmDel(false)}
             className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none"

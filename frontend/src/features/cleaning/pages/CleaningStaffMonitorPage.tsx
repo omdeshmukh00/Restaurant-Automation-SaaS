@@ -23,6 +23,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { type CleaningStaffMember } from '../store/cleaning.store';
+import { useTranslation } from '../hooks/useTranslation';
 
 const ROLES = ['Cleaning Staff', 'Senior Cleaner', 'Hygiene Auditor', 'Housekeeper'];
 const AREAS = ['Dining Area A', 'Dining Area B', 'Terrace Area', 'Kitchen Sanitizing', 'Main Washrooms', 'Store Room'];
@@ -34,6 +35,7 @@ interface AddStaffModalProps {
 }
 
 function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
+  const { t } = useTranslation();
   const { addStaffMember } = useCleaning();
   const [form, setForm] = useState({
     name: '',
@@ -88,14 +90,14 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
         className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-800"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-850">
-          <h3 className="font-extrabold text-slate-800 dark:text-white font-sans text-base">Add Cleaning Employee</h3>
+          <h3 className="font-extrabold text-slate-800 dark:text-white font-sans text-base">{t('addCleaner')}</h3>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           <div>
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <User className="w-3.5 h-3.5" /> Full Name *
+              <User className="w-3.5 h-3.5" /> {t('fullName')} *
             </label>
             <input
               type="text"
@@ -111,7 +113,7 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
 
           <div>
             <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <Phone className="w-3.5 h-3.5" /> Phone Number *
+              <Phone className="w-3.5 h-3.5" /> {t('phone')} *
             </label>
             <input
               type="text"
@@ -128,7 +130,7 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
-                <Building2 className="w-3.5 h-3.5" /> Assigned Role
+                <Building2 className="w-3.5 h-3.5" /> {t('role')}
               </label>
               <div className="relative">
                 <select
@@ -137,7 +139,7 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
                   className="w-full appearance-none px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-800 dark:text-white"
                 >
                   {ROLES.map((r) => (
-                    <option key={r} value={r}>{r}</option>
+                    <option key={r} value={r}>{t(r)}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -146,7 +148,7 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
 
             <div>
               <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mb-1.5">
-                Primary Cleaning Area
+                {t('cleaningZoneArea')}
               </label>
               <div className="relative">
                 <select
@@ -155,7 +157,7 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
                   className="w-full appearance-none px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-800 dark:text-white"
                 >
                   {AREAS.map((a) => (
-                    <option key={a} value={a}>{a}</option>
+                    <option key={a} value={a}>{t(a)}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
@@ -182,13 +184,13 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps) {
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={handleSubmit}
             className="px-4 py-2 text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl transition-colors shadow-sm"
           >
-            Save Employee
+            {t('saveEmployee')}
           </button>
         </div>
       </motion.div>
@@ -204,6 +206,7 @@ interface ReportModalProps {
 }
 
 function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState('Poor Sanitation Standards');
   const [comments, setComments] = useState('');
   const [loading, setLoading] = useState(false);
@@ -237,22 +240,22 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
       >
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h3 className="font-extrabold text-slate-800 dark:text-white font-sans text-base">Report Hygiene Violation</h3>
-            <p className="text-xs text-slate-400 font-sans mt-0.5">Submit a performance or hygiene report to the Admin.</p>
+            <h3 className="font-extrabold text-slate-800 dark:text-white font-sans text-base">{t('reportIssue')}</h3>
+            <p className="text-xs text-slate-400 font-sans mt-0.5">{t('reportIssueDesc')}</p>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-650 rounded-lg"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="space-y-4">
           <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800">
-            <p className="text-xs text-slate-400">Subject Employee</p>
+            <p className="text-xs text-slate-400">{t('staffMember')}</p>
             <p className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-0.5">{member.name}</p>
-            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-400">{member.role} • {member.area}</p>
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-400">{t(member.role)} • {t(member.area)}</p>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-              Violation / Incident Reason
+              {t('reason')}
             </label>
             <div className="relative">
               <select
@@ -260,11 +263,11 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full appearance-none px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none text-slate-800 dark:text-white"
               >
-                <option value="Poor Sanitation Standards">Poor Sanitation Standards</option>
-                <option value="Missed Cleaning Tasks">Missed Cleaning Tasks / Checklist Violation</option>
-                <option value="Delayed Response to Urgent Cleanup">Delayed Response to Urgent Cleanup</option>
-                <option value="Unprofessional Behavior">Unprofessional Behavior</option>
-                <option value="Other / Miscellaneous">Other / Miscellaneous</option>
+                <option value="Poor Sanitation Standards">{t('Poor Sanitation Standards')}</option>
+                <option value="Missed Cleaning Tasks">{t('Missed Cleaning Tasks')}</option>
+                <option value="Delayed Response to Urgent Cleanup">{t('Delayed Response to Urgent Cleanup')}</option>
+                <option value="Unprofessional Behavior">{t('Unprofessional Behavior')}</option>
+                <option value="Other / Miscellaneous">{t('Other / Miscellaneous')}</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
@@ -272,7 +275,7 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-              Explanation & Incidents Details
+              {t('incidentDetails')}
             </label>
             <textarea
               rows={4}
@@ -290,14 +293,14 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
             disabled={loading}
             className="flex-1 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={handleReport}
             disabled={loading || !comments.trim()}
             className="flex-1 py-2 text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition-colors disabled:opacity-50"
           >
-            {loading ? 'Submitting...' : 'Submit Report'}
+            {loading ? t('submitting') : t('submitReport')}
           </button>
         </div>
       </motion.div>
@@ -307,7 +310,8 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps) {
 
 // ── Main Page Component ───────────────────────────────────────────────────
 export default function CleaningStaffMonitorPage() {
-  const { staffMembers, removeStaffMember } = useCleaning();
+  const { t } = useTranslation();
+  const { staffMembers, removeStaffMember, urgentTasks, assignTaskToStaff } = useCleaning();
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [activeReportMember, setActiveReportMember] = useState<CleaningStaffMember | null>(null);
@@ -371,15 +375,15 @@ export default function CleaningStaffMonitorPage() {
       {/* Top Banner / Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 font-sans tracking-tight">Supervisor Staff Monitor</h2>
-          <p className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">Track shifts, assign cleaning zones, and manage employee files.</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 font-sans tracking-tight">{t('supervisorStaffMonitor')}</h2>
+          <p className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">{t('supervisorStaffMonitorDesc')}</p>
         </div>
 
         <button
           onClick={() => setIsAddOpen(true)}
           className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all shadow-sm shadow-orange-500/15 active:scale-95 cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Add Cleaner
+          <Plus className="w-4 h-4" /> {t('addCleaner')}
         </button>
       </div>
 
@@ -396,10 +400,10 @@ export default function CleaningStaffMonitorPage() {
           >
             <div>
               <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-bold font-sans">
-                {card.label}
+                {t(card.label)}
               </p>
               <p className={`text-2xl font-bold font-sans mt-1.5 ${card.color}`}>{card.value}</p>
-              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-sans">{card.sub}</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-sans">{t(card.sub)}</p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
               {card.icon}
@@ -423,7 +427,7 @@ export default function CleaningStaffMonitorPage() {
             />
           </div>
           <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 font-sans">
-            Showing {filteredMembers.length} of {totalStaff} cleaners
+            {t('Showing')} {filteredMembers.length} {t('of')} {totalStaff} {t('cleaners')}
           </div>
         </div>
 
@@ -432,12 +436,12 @@ export default function CleaningStaffMonitorPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
-                <th className="px-6 py-4 font-sans">Staff Member</th>
-                <th className="px-6 py-4 font-sans">Cleaning Zone / Area</th>
-                <th className="px-6 py-4 font-sans">Contact Details</th>
-                <th className="px-6 py-4 font-sans">Duty Status</th>
-                <th className="px-6 py-4 font-sans">Sanitation Rating</th>
-                <th className="px-6 py-4 text-right font-sans">Actions</th>
+                <th className="px-6 py-4 font-sans">{t('staffMember')}</th>
+                <th className="px-6 py-4 font-sans">{t('cleaningZoneArea')}</th>
+                <th className="px-6 py-4 font-sans">{t('contactDetails')}</th>
+                <th className="px-6 py-4 font-sans">{t('dutyStatus')}</th>
+                <th className="px-6 py-4 font-sans">{t('sanitationRating')}</th>
+                <th className="px-6 py-4 text-right font-sans">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800/80">
@@ -448,7 +452,7 @@ export default function CleaningStaffMonitorPage() {
                 // Deterministic indicators for demonstration
                 const score = m.id === 'STF-001' ? '4.8' : m.id === 'STF-002' ? '4.9' : '4.6';
                 const statusColor = m.id === 'STF-003' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' : 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400';
-                const statusLabel = m.id === 'STF-003' ? 'On Break' : 'On Duty';
+                const statusLabel = m.id === 'STF-003' ? t('onBreak') : t('onDuty');
 
                 return (
                   <tr
@@ -465,14 +469,14 @@ export default function CleaningStaffMonitorPage() {
                             {m.name}
                           </p>
                           <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-sans">
-                            {m.role} • {m.id}
+                            {t(m.role)} • {m.id}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-350 font-sans">
-                        {m.area}
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-355 font-sans">
+                        {t(m.area)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -526,12 +530,93 @@ export default function CleaningStaffMonitorPage() {
               {filteredMembers.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-slate-400 dark:text-slate-500 text-xs font-sans">
-                    No cleaning staff members match your search criteria.
+                    {t('noStaffFound')}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Supervisor Task Assignment & Dispatch Control Panel */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">
+              {t('supervisorTaskAssignment')}
+            </h3>
+            <p className="text-xs text-slate-400 font-sans mt-0.5">
+              {t('supervisorTaskDesc')}
+            </p>
+          </div>
+          <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-orange-500/10 text-orange-500 font-sans">
+            {urgentTasks.length} {t('activeTasks')}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {urgentTasks.slice(0, 6).map((task) => {
+            const assignedStaffName =
+              typeof task.assignedStaffId === 'object' && task.assignedStaffId
+                ? (task.assignedStaffId as any).name
+                : staffMembers.find((s) => s.id === task.assignedStaffId)?.name || 'Unassigned';
+
+            const rawTitle = task.title || (task.tableNumber ? `Table ${task.tableNumber}` : task.id);
+            const formattedTitle = rawTitle.toLowerCase().startsWith('table ')
+              ? `${t('tableNo')} ${rawTitle.replace(/^table\s*/i, '')}`
+              : t(rawTitle);
+
+            return (
+              <div
+                key={task.id}
+                className="p-4 rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
+                      {formattedTitle}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-semibold">{t(task.subtitle || 'routineTurnover')}</p>
+                  </div>
+                  <span
+                    className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full ${
+                      task.priority === 'High' || task.priority === 'REQUESTED'
+                        ? 'bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400'
+                        : 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400'
+                    }`}
+                  >
+                    {t(task.priority)}
+                  </span>
+                </div>
+
+                {task.queueWaitingCount ? (
+                  <p className="text-[11px] font-bold text-red-500 flex items-center gap-1">
+                    <span>👥</span> {task.queueWaitingCount} {t('waitingInQueue')}
+                  </p>
+                ) : null}
+
+                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t('assignedTo')}</span>
+                  <select
+                    value={typeof task.assignedStaffId === 'string' ? task.assignedStaffId : (task.assignedStaffId as any)?._id || ''}
+                    onChange={async (e) => {
+                      await assignTaskToStaff(task.id, e.target.value || null);
+                      triggerToast('success', `Task assigned to staff member.`);
+                    }}
+                    className="text-xs font-bold px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none text-slate-700 dark:text-slate-200"
+                  >
+                    <option value="">{assignedStaffName !== 'Unassigned' ? assignedStaffName : t('assignStaffEllipsis')}</option>
+                    {staffMembers.map((sm) => (
+                      <option key={sm.id} value={sm.id}>
+                        {sm.name} ({t(sm.area)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -17,9 +17,6 @@ import {
   createRazorpayRefund,
 } from '../../services/razorpay.service';
 import { env } from '../../config/env';
-import { TableSessionModel } from '../tableSessions/tableSessions.model';
-import { TableModel } from '../tables/tables.model';
-import { TableStatus } from '../../constants/statuses';
 import { socketService } from '../../sockets/socket.service';
 import { SocketEvent } from '../../constants/events';
 import { logger } from '../../config/logger';
@@ -30,18 +27,6 @@ function toObjectId(value: string): mongoose.Types.ObjectId {
   }
 
   return new mongoose.Types.ObjectId(value);
-}
-
-function mapVerificationStatus(status?: VerifyPaymentInput['simulateStatus']): BillingPaymentStatus | undefined {
-  if (!status) {
-    return undefined;
-  }
-
-  if (status === 'COMPLETED' || status === 'PAID') {
-    return undefined;
-  }
-
-  return status as BillingPaymentStatus;
 }
 
 function buildPaymentFilter(restaurantId: string, query: ListPaymentsQuery) {
@@ -176,118 +161,118 @@ export class PaymentsService {
       razorpay_signature: string;
     },
   ) {
-    const isRazorpayEnabled = !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
-
-    // 1. Razorpay signature verification
-    if (razorpayFields && isRazorpayEnabled) {
-      const isValid = verifyRazorpaySignature(razorpayFields);
-      if (!isValid) {
-        throw new AppError(
-          'Payment signature verification failed. Possible tampered request.',
-          400,
-          ErrorCode.PAYMENT_FAILED,
-        );
-      }
-    }
-
-    // 2. Fetch payment record
-    const paymentRecord = await PaymentModel.findOne({
-      restaurantId: toObjectId(restaurantId),
-      sessionId: toObjectId(sessionId),
-      $or: [
-        { providerPaymentId: paymentId },
-        { razorpayOrderId: paymentId },
-        { _id: mongoose.Types.ObjectId.isValid(paymentId) ? toObjectId(paymentId) : null },
-      ],
-    });
-
-    if (!paymentRecord) {
-      throw new AppError('Payment record not found', 404, ErrorCode.NOT_FOUND);
-    }
-
-    // 3. Idempotency Check
-    if (paymentRecord.status === PaymentStatus.COMPLETED) {
-      return {
-        success: true,
-        payment: paymentRecord,
-      };
-    }
-
-    if (simulateStatus === 'FAILED' || paymentId.includes('fail')) {
-      paymentRecord.status = PaymentStatus.FAILED as any;
-      paymentRecord.failureReason = 'Simulated payment failure';
-      await paymentRecord.save();
-      throw new AppError('Payment processing failed.', 400, ErrorCode.PAYMENT_FAILED);
-    }
-
-    const isCartCheckout = paymentRecord.metadata?.isCartCheckout === true;
-    
-    // Ensure bill exists for dine-and-pay-later model before starting transaction
-    if (!isCartCheckout) {
-      const { BillingModel } = await import('../billing/billing.model');
-      const existingBill = await BillingModel.findOne({ sessionId: toObjectId(sessionId) });
-      if (!existingBill) {
-        const { BillingService } = await import('../billing/billing.service');
-        await BillingService.requestFinalBill(restaurantId, sessionId);
-      }
-    }
-
-    // 4. Wrap the rest in transaction
-    let dbSession: mongoose.ClientSession | null = null;
     try {
-      dbSession = await mongoose.startSession();
-      dbSession.startTransaction();
-    } catch (e) {
-      dbSession = null;
-    }
+      const isRazorpayEnabled = !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET);
 
-    const executeVerification = async (session: mongoose.ClientSession | null) => {
-      const options = session ? { session } : undefined;
-
-      // Update payment record details
-      paymentRecord.status = PaymentStatus.COMPLETED as any;
-      paymentRecord.verifiedAt = new Date();
-      if (razorpayFields) {
-        paymentRecord.razorpayPaymentId = razorpayFields.razorpay_payment_id;
-        paymentRecord.razorpaySignature = razorpayFields.razorpay_signature;
-        paymentRecord.providerPaymentId = razorpayFields.razorpay_payment_id;
+      // 1. Razorpay signature verification
+      if (razorpayFields && isRazorpayEnabled) {
+        const isValid = verifyRazorpaySignature(razorpayFields);
+        if (!isValid) {
+          throw new AppError(
+            'Payment signature verification failed. Possible tampered request.',
+            400,
+            ErrorCode.PAYMENT_FAILED,
+          );
+        }
       }
-      await paymentRecord.save(options);
 
-      if (isCartCheckout) {
-        // Delegate order creation inside transaction
-        const { OrdersService } = await import('../orders/orders.service');
-        const createdOrder = await OrdersService.createOrder(
-          restaurantId,
-          sessionId,
-          'PAID',
-          session
-        );
+      // 2. Fetch payment record
+      const paymentRecord = await PaymentModel.findOne({
+        restaurantId: toObjectId(restaurantId),
+        sessionId: toObjectId(sessionId),
+        $or: [
+          { providerPaymentId: paymentId },
+          { razorpayOrderId: paymentId },
+          { _id: mongoose.Types.ObjectId.isValid(paymentId) ? toObjectId(paymentId) : null },
+        ],
+      });
 
-        // Link order and payment
-        paymentRecord.orderId = createdOrder._id;
+      if (!paymentRecord) {
+        throw new AppError('Payment record not found', 404, ErrorCode.NOT_FOUND);
+      }
+
+      // 3. Idempotency Check
+      if (paymentRecord.status === PaymentStatus.COMPLETED) {
+        return {
+          success: true,
+          payment: paymentRecord,
+        };
+      }
+
+      if (simulateStatus === 'FAILED' || paymentId.includes('fail')) {
+        paymentRecord.status = PaymentStatus.FAILED as any;
+        paymentRecord.failureReason = 'Simulated payment failure';
+        await paymentRecord.save();
+        throw new AppError('Payment processing failed.', 400, ErrorCode.PAYMENT_FAILED);
+      }
+
+      const isCartCheckout = paymentRecord.metadata?.isCartCheckout === true;
+      
+      // Ensure bill exists for dine-and-pay-later model before starting transaction
+      if (!isCartCheckout) {
+        const { BillingModel } = await import('../billing/billing.model');
+        const existingBill = await BillingModel.findOne({ sessionId: toObjectId(sessionId) });
+        if (!existingBill) {
+          const { BillingService } = await import('../billing/billing.service');
+          await BillingService.requestFinalBill(restaurantId, sessionId);
+        }
+      }
+
+      // 4. Wrap the rest in transaction
+      let dbSession: mongoose.ClientSession | null = null;
+      try {
+        dbSession = await mongoose.startSession();
+        dbSession.startTransaction();
+      } catch (e) {
+        dbSession = null;
+      }
+
+      const executeVerification = async (session: mongoose.ClientSession | null) => {
+        const options = session ? { session } : undefined;
+
+        // Update payment record details
+        paymentRecord.status = PaymentStatus.COMPLETED as any;
+        paymentRecord.verifiedAt = new Date();
+        if (razorpayFields) {
+          paymentRecord.razorpayPaymentId = razorpayFields.razorpay_payment_id;
+          paymentRecord.razorpaySignature = razorpayFields.razorpay_signature;
+          paymentRecord.providerPaymentId = razorpayFields.razorpay_payment_id;
+        }
         await paymentRecord.save(options);
 
-        return {
-          success: true,
-          payment: paymentRecord,
-          order: createdOrder,
-        };
-      } else {
-        // Dine-and-pay-later model: verify final bill
-        const { BillingService } = await import('../billing/billing.service');
-        const { bill, updatedOrders } = await BillingService.settleSession(sessionId, session || undefined);
+        if (isCartCheckout) {
+          // Delegate order creation inside transaction
+          const { OrdersService } = await import('../orders/orders.service');
+          const createdOrder = await OrdersService.createOrder(
+            restaurantId,
+            sessionId,
+            'PAID',
+            session
+          );
 
-        return {
-          success: true,
-          bill,
-          updatedOrders,
-          payment: paymentRecord,
-        };
-      }
-    };
+          // Link order and payment
+          paymentRecord.orderId = createdOrder._id;
+          await paymentRecord.save(options);
 
-    try {
+          return {
+            success: true,
+            payment: paymentRecord,
+            order: createdOrder,
+          };
+        } else {
+          // Dine-and-pay-later model: verify final bill
+          const { BillingService } = await import('../billing/billing.service');
+          const { bill, updatedOrders } = await BillingService.settleSession(sessionId, session || undefined);
+
+          return {
+            success: true,
+            bill,
+            updatedOrders,
+            payment: paymentRecord,
+          };
+        }
+      };
+
       let result;
       try {
         result = await executeVerification(dbSession);
@@ -322,7 +307,35 @@ export class PaymentsService {
         await this.processPostPaidSideEffects(restaurantId, sessionId, result.bill, result.updatedOrders || []);
       }
       return result;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 11000 || error.code === 112) {
+        logger.warn('Concurrent verification detected. Waiting to check if payment completes...', { paymentId });
+        
+        // Poll for up to 5 seconds for the webhook to finish processing
+        let checkPayment = null;
+        for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          checkPayment = await PaymentModel.findOne({
+            $or: [
+              { providerPaymentId: paymentId },
+              { razorpayOrderId: paymentId },
+              { _id: mongoose.Types.ObjectId.isValid(paymentId) ? toObjectId(paymentId) : null },
+            ],
+          });
+          
+          if (checkPayment?.status === PaymentStatus.COMPLETED) {
+            logger.info('Concurrent request recovered gracefully (payment was COMPLETED).');
+            const { BillingModel } = await import('../billing/billing.model');
+            const bill = await BillingModel.findOne({ sessionId: toObjectId(sessionId) });
+            return {
+              success: true,
+              payment: checkPayment,
+              ...(bill ? { bill } : {})
+            };
+          }
+        }
+      }
       logger.error('Failed to verify customer payment', { error });
       throw error;
     }
@@ -890,19 +903,19 @@ export class PaymentsService {
     if (!payment) return { received: true }; // not our payment — ignore
 
     if (eventType === 'payment.captured') {
-      payment.razorpayPaymentId = rzpPaymentId;
-      payment.providerPaymentId = rzpPaymentId;
-      payment.status = 'COMPLETED' as any;
-      payment.verifiedAt = new Date();
-      await payment.save();
-
-      // Mark bill and orders as paid
+      // Delegate settlement completely to idempotent verifyCustomerPayment
       if (payment.sessionId) {
-        await BillingService.verifyPayment(
+        await PaymentsService.verifyCustomerPayment(
           payment.restaurantId.toString(),
           payment.sessionId.toString(),
-          rzpOrderId,
+          rzpOrderId
         );
+      } else {
+        payment.razorpayPaymentId = rzpPaymentId;
+        payment.providerPaymentId = rzpPaymentId;
+        payment.status = 'COMPLETED' as any;
+        payment.verifiedAt = new Date();
+        await payment.save();
       }
     }
 
@@ -949,7 +962,7 @@ export class PaymentsService {
       throw new AppError('Payment cannot be verified automatically', 400, ErrorCode.INVALID_REQUEST);
     }
 
-    await BillingService.verifyPayment(
+    await PaymentsService.verifyCustomerPayment(
       restaurantId,
       payment.sessionId.toString(),
       payment.providerPaymentId,

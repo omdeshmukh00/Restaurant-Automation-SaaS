@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { SETTINGS_SECTIONS } from '../store/kitchenData';
+import React, { useState, useEffect } from 'react';
+import { SETTINGS_SECTIONS, type SettingsSection } from '../constants';
 import { useTheme } from '../../../app/providers/ThemeProvider';
+import { getKitchenSettings, updateKitchenSettings } from '../api/kitchen.api';
 
 export default function KitchenSettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -47,16 +48,42 @@ export default function KitchenSettingsPage() {
     dessert: 10,
   });
 
-  const handleSave = (e: React.FormEvent) => {
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await getKitchenSettings();
+        if (settings.general) setGeneralSettings(settings.general);
+        if (settings.notifications) setNotificationSettings(settings.notifications);
+        if (settings.display) setDisplaySettings(settings.display);
+        if (settings.autoRules) setAutoRules(settings.autoRules);
+        if (settings.prepTimes) setPrepTimes(settings.prepTimes);
+      } catch (err) {
+        console.error('Failed to load kitchen settings', err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setSaveSuccess(false);
 
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      await updateKitchenSettings({
+        general: generalSettings,
+        notifications: notificationSettings,
+        display: displaySettings,
+        autoRules: autoRules,
+        prepTimes: prepTimes,
+      });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    }, 800);
+    } catch (err) {
+      console.error('Failed to save settings', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

@@ -3,13 +3,14 @@ import { useCleaning } from '../hooks/usecleaning';
 import { useCleaningSearch } from '../components/dashboard/CleaningSearchContext';
 import { cleaningStore, CleaningStaffMember } from '../store/cleaning.store';
 import { useToast } from '../components/dashboard/Toast';
+import { useTranslation } from '../hooks/useTranslation';
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface TableRow {
   id: string;
   area: string;
   seats: number;
-  status: 'Pending' | 'In Progress' | 'Completed' | 'Done' | '--';
+  status: string;
   priority: 'High' | 'Medium' | 'Low';
   lastCleaned: string;
   assignedTo: { name: string; avatar: string } | null;
@@ -31,6 +32,7 @@ interface TableTask {
 }
 
 export default function CleaningTablesPage() {
+  const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -51,6 +53,7 @@ export default function CleaningTablesPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigningTableId, setAssigningTableId] = useState<string | null>(null);
+  const [assigningTableLabel, setAssigningTableLabel] = useState<string | null>(null);
   const [staffList, setStaffList] = useState<CleaningStaffMember[]>(cleaningStore.staffMembers);
 
   const [tableList, setTableList] = useState(cleaningStore.tables);
@@ -93,7 +96,7 @@ export default function CleaningTablesPage() {
   const priorityRef = useRef<HTMLDivElement>(null);
   const rowsRef = useRef<HTMLDivElement>(null);
 
-  const { urgentTasks, startTask, completeTask, verifyTask } = useCleaning();
+  const { urgentTasks, startTask, completeTask, verifyTask, assignTaskToStaff } = useCleaning();
   const safeTasks: TableTask[] = (urgentTasks || []) as unknown as TableTask[];
 
   useEffect(() => {
@@ -109,22 +112,15 @@ export default function CleaningTablesPage() {
   }, []);
 
   const tables: TableRow[] = tableList.map((t) => {
-    let displayStatus: 'Pending' | 'In Progress' | 'Completed' | 'Done' | '--' = 'Pending';
-    if (t.status === 'Needs Cleaning' || t.status === 'Cleaning Requested') displayStatus = 'Pending';
-    if (t.status === 'In Progress') displayStatus = 'In Progress';
-    if (t.status === 'Ready for Inspection') displayStatus = 'Completed';
-    if (t.status === 'Done') displayStatus = 'Done';
-    if (t.status === '--') displayStatus = '--';
-
     return {
       id: t.id,
       area: t.area,
       seats: t.seats,
-      status: displayStatus,
+      status: t.status,
       priority: t.priority,
       lastCleaned: t.timeAgo,
       assignedTo: t.assignedTo || null,
-      rawId: t.id,
+      rawId: t.taskId || t.id,
     };
   });
 
@@ -158,16 +154,19 @@ export default function CleaningTablesPage() {
     setShowAddModal(false);
   };
 
-  const handleToggleStatus = (rawId: string, currentStatus: string) => {
-    if (currentStatus === 'Pending') {
-      cleaningStore.startCleaning(rawId);
-      showToast(`Started cleaning Table ${rawId}.`, 'success');
+  const handleToggleStatus = async (rawId: string, currentStatus: string) => {
+    const tableObj = tableList.find(t => t.id === rawId || t.taskId === rawId);
+    const taskId = tableObj?.taskId || rawId;
+
+    if (currentStatus === 'Needs Cleaning') {
+      await startTask(taskId);
+      showToast(`Started cleaning ${tableObj?.id || rawId}.`, 'success');
     } else if (currentStatus === 'In Progress') {
-      cleaningStore.updateProgress(rawId);
-      showToast(`Progress updated for Table ${rawId}.`, 'info');
-    } else if (currentStatus === 'Completed') {
-      cleaningStore.completeInspection(rawId);
-      showToast(`Table ${rawId} inspection complete.`, 'success');
+      await completeTask(taskId);
+      showToast(`Finished cleaning ${tableObj?.id || rawId}. Sent for inspection.`, 'success');
+    } else if (currentStatus === 'Ready for Inspection') {
+      await verifyTask(taskId);
+      showToast(`Table ${tableObj?.id || rawId} verified as Available.`, 'success');
     }
   };
 
@@ -200,19 +199,33 @@ export default function CleaningTablesPage() {
     setOpenMenuId(null);
   };
 
-  const handleAssignStaff = (member: CleaningStaffMember) => {
+  const handleAssignStaff = async (member: CleaningStaffMember) => {
     if (!assigningTableId) return;
-    cleaningStore.assignTableStaff(assigningTableId, { name: member.name, avatar: member.avatar });
-    showToast(`${member.name} assigned to Table ${assigningTableId}.`, 'success');
-    setShowAssignModal(false);
-    setAssigningTableId(null);
-    setOpenMenuId(null);
+    const tableObj = tableList.find(t => t.id === assigningTableId || t.taskId === assigningTableId);
+    const taskId = tableObj?.taskId || assigningTableId;
+
+    try {
+      await assignTaskToStaff(taskId, member.id);
+      showToast(`${member.name} assigned to ${tableObj?.id || assigningTableId}.`, 'success');
+      setShowAssignModal(false);
+      setAssigningTableId(null);
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error('Failed to assign staff', err);
+    }
   };
 
-  const handleUnassignStaff = (tableId: string) => {
-    cleaningStore.assignTableStaff(tableId, null);
-    showToast(`Staff unassigned from Table ${tableId}.`, 'info');
-    setOpenMenuId(null);
+  const handleUnassignStaff = async (tableId: string) => {
+    const tableObj = tableList.find(t => t.id === tableId || t.taskId === tableId);
+    const taskId = tableObj?.taskId || tableId;
+
+    try {
+      await assignTaskToStaff(taskId, null);
+      showToast(`Staff unassigned from ${tableObj?.id || tableId}.`, 'info');
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error('Failed to unassign staff', err);
+    }
   };
 
   const handleExportData = () => {
@@ -269,7 +282,7 @@ export default function CleaningTablesPage() {
               {totalTables}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">
-              Total Tables
+              {t('totalTables')}
             </p>
           </div>
         </div>
@@ -282,7 +295,7 @@ export default function CleaningTablesPage() {
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
               {totalInProgress}
             </h3>
-            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">In Progress</p>
+            <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">{t('inProgress')}</p>
           </div>
         </div>
 
@@ -295,7 +308,7 @@ export default function CleaningTablesPage() {
               {totalCleanedToday}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">
-              Cleaned Today
+              {t('cleanedToday')}
             </p>
           </div>
         </div>
@@ -309,7 +322,7 @@ export default function CleaningTablesPage() {
               {totalHighPriority}
             </h3>
             <p className="text-xs text-slate-400 dark:text-slate-400 mt-1 font-sans">
-              High Priority
+              {t('highPriority')}
             </p>
           </div>
         </div>
@@ -344,7 +357,7 @@ export default function CleaningTablesPage() {
                 }}
                 className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
               >
-                <span>{statusFilter}</span>
+                <span>{t(statusFilter)}</span>
                 <span className="material-symbols-outlined text-sm text-slate-400">
                   keyboard_arrow_down
                 </span>
@@ -366,7 +379,7 @@ export default function CleaningTablesPage() {
                           : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                       }`}
                     >
-                      {st}
+                      {t(st)}
                     </button>
                   ))}
                 </div>
@@ -384,7 +397,7 @@ export default function CleaningTablesPage() {
                 }}
                 className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
               >
-                <span>{priorityFilter}</span>
+                <span>{t(priorityFilter)}</span>
                 <span className="material-symbols-outlined text-sm text-slate-400">
                   keyboard_arrow_down
                 </span>
@@ -406,7 +419,7 @@ export default function CleaningTablesPage() {
                           : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
                       }`}
                     >
-                      {pr}
+                      {t(pr)}
                     </button>
                   ))}
                 </div>
@@ -421,14 +434,14 @@ export default function CleaningTablesPage() {
               className="flex items-center gap-2 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">download</span>
-              Export
+              {t('export')}
             </button>
             <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-xl text-xs font-sans font-bold hover:bg-orange-600 transition-all shadow-md shadow-orange-500/10 active:scale-95 cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">add</span>
-              Add Table
+              {t('addTable')}
             </button>
           </div>
         </div>
@@ -438,14 +451,14 @@ export default function CleaningTablesPage() {
           <table className="w-full text-left border-collapse font-sans text-xs">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 font-bold">
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Table ID</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Area</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Seats</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Priority</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('tableNo')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('area')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('seats')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('status')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('priority')}</th>
                 <th className="px-6 py-4 font-bold uppercase tracking-wider">Last Cleaned</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider">Assigned To</th>
-                <th className="px-6 py-4 font-bold uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider">{t('assignedTo')}</th>
+                <th className="px-6 py-4 font-bold uppercase tracking-wider text-right">{t('actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -477,8 +490,8 @@ export default function CleaningTablesPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-slate-500 dark:text-slate-450 font-semibold">
-                      {row.area}
+                    <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold">
+                      {t(row.area)}
                     </td>
                     <td className="px-6 py-4 font-extrabold text-slate-850 dark:text-slate-300">
                       {row.seats}
@@ -487,16 +500,18 @@ export default function CleaningTablesPage() {
                       <button
                         onClick={() => handleToggleStatus(row.rawId, row.status)}
                         className={`px-3 py-1 rounded-full font-bold text-[10px] uppercase tracking-wider border cursor-pointer transition-colors duration-150 ${
-                          row.status === 'Completed' || row.status === 'Done'
+                          row.status === 'Available' || row.status === 'Done'
                             ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/30'
                             : row.status === 'In Progress'
                               ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/30'
-                              : row.status === '--'
-                                ? 'bg-slate-100 text-slate-500 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
-                                : 'bg-orange-500/10 text-orange-500 border-orange-200 dark:bg-slate-800 dark:text-orange-400'
+                              : row.status === 'Ready for Inspection'
+                                ? 'bg-purple-50 text-purple-750 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400 dark:border-purple-900/30'
+                                : row.status === 'Occupied' || row.status === 'Reserved'
+                                  ? 'bg-red-50 text-red-650 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30'
+                                  : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-slate-800 dark:text-orange-400'
                         }`}
                       >
-                        {row.status}
+                        {t(row.status.toLowerCase().replace(/\s+/g, ''))}
                       </button>
                     </td>
                     <td className="px-6 py-4">
@@ -509,7 +524,7 @@ export default function CleaningTablesPage() {
                               : 'bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400'
                         }`}
                       >
-                        {row.priority}
+                        {t(row.priority.toLowerCase())}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-455 font-semibold">
@@ -551,17 +566,43 @@ export default function CleaningTablesPage() {
 
                       {/* Dropdown Menu */}
                       {openMenuId === row.rawId && (
-                        <div className="absolute right-0 top-12 w-48 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1 font-sans">
+                        <div className="absolute right-0 top-12 w-48 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-2xl z-[999] p-1 font-sans text-left">
+                          {(row.status === 'Needs Cleaning' || row.status === 'Pending') && (
+                            <button
+                              onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">play_arrow</span>
+                              Start Cleaning
+                            </button>
+                          )}
+                          {row.status === 'In Progress' && (
+                            <button
+                              onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">done</span>
+                              Mark Complete
+                            </button>
+                          )}
+                          {row.status === 'Ready for Inspection' && (
+                            <button
+                              onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">verified</span>
+                              Verify & Approve
+                            </button>
+                          )}
+                          {row.status !== 'Needs Cleaning' && row.status !== 'Pending' && row.status !== 'In Progress' && row.status !== 'Ready for Inspection' && (
+                            <div className="px-3 py-2 text-xs font-semibold text-slate-400 dark:text-slate-500 italic">
+                              No Active Cleaning Task
+                            </div>
+                          )}
+                          <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
                           <button
-                            onClick={() => { handleToggleStatus(row.rawId, row.status); setOpenMenuId(null); }}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/20 rounded-lg flex items-center gap-2"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">play_arrow</span>
-                            {row.status === 'Pending' ? 'Start Cleaning' : row.status === 'In Progress' ? 'Update Progress' : 'Mark Complete'}
-                          </button>
-                          <button
-                            onClick={() => { setAssigningTableId(row.rawId); setOpenMenuId(null); setShowAssignModal(true); }}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2"
+                            onClick={() => { setAssigningTableId(row.rawId); setAssigningTableLabel(row.id); setOpenMenuId(null); setShowAssignModal(true); }}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg flex items-center gap-2 cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[15px]">person_add</span>
                             Assign Staff
@@ -569,27 +610,12 @@ export default function CleaningTablesPage() {
                           {row.assignedTo && (
                             <button
                               onClick={() => handleUnassignStaff(row.rawId)}
-                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2"
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2 cursor-pointer"
                             >
                               <span className="material-symbols-outlined text-[15px]">person_remove</span>
                               Unassign Staff
                             </button>
                           )}
-                          <div className="my-1 border-t border-slate-100 dark:border-slate-700" />
-                          <button
-                            onClick={() => handleOpenEditModal(row)}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">edit</span>
-                            Edit Table
-                          </button>
-                          <button
-                            onClick={() => { setDeleteConfirmId(row.rawId); setOpenMenuId(null); }}
-                            className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg flex items-center gap-2"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">delete</span>
-                            Delete Table
-                          </button>
                         </div>
                       )}
                     </td>
@@ -603,8 +629,8 @@ export default function CleaningTablesPage() {
         {/* Table Footer / Pagination Panels */}
         <div className="px-6 py-4 flex flex-col sm:flex-row gap-4 items-center justify-between bg-white dark:bg-sd-surface-container border-t border-slate-100 dark:border-slate-800 relative z-30">
           <p className="text-slate-400 dark:text-slate-455 font-bold">
-            Showing {indexOfFirstRow + 1} to {Math.min(indexOfLastRow, filteredTables.length)} of{' '}
-            {totalTables} tables
+            {t('Showing')} {indexOfFirstRow + 1} {t('to')} {Math.min(indexOfLastRow, filteredTables.length)} {t('of')}{' '}
+            {totalTables} {t('tables')}
           </p>
           <div className="flex flex-wrap items-center gap-4">
             {/* 💥 Custom HTML Pagination Active Layout Links Control Block */}
@@ -643,7 +669,7 @@ export default function CleaningTablesPage() {
 
             {/* 💥 FIXED: Custom dropup layout list component for rows menu logic (Orange theme highlight applied!) */}
             <div className="flex items-center gap-2" ref={rowsRef}>
-              <span className="text-slate-400 dark:text-slate-455 font-bold">Rows per page:</span>
+              <span className="text-slate-400 dark:text-slate-455 font-bold">{t('rowsPerPage')}:</span>
               <div className="relative">
                 <button
                   type="button"
@@ -911,7 +937,7 @@ export default function CleaningTablesPage() {
       {showAssignModal && assigningTableId && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm font-sans">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1">Assign Staff to Table {assigningTableId}</h3>
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1">Assign Staff to {assigningTableLabel}</h3>
             <p className="text-[11px] text-slate-400 mb-4">Select a team member to assign to this table.</p>
             {staffList.length === 0 ? (
               <div className="text-center py-8 text-slate-400">

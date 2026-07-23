@@ -169,7 +169,8 @@ export class BillingController {
       const { paymentId, simulateStatus } = req.body;
       if (!paymentId) throw new AppError("Payment ID is required", 400, ErrorCode.VALIDATION_ERROR);
 
-      const data = await BillingService.verifyPayment(session.restaurantId.toString(), session._id.toString(), paymentId, simulateStatus);
+      const { PaymentsService } = await import('../payments/payments.service');
+      const data = await PaymentsService.verifyCustomerPayment(session.restaurantId.toString(), session._id.toString(), paymentId, simulateStatus);
 
       return res.status(200).json({
         success: true,

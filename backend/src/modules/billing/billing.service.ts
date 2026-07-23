@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { BillingModel } from './billing.model';
 import { OrderModel } from '../orders/orders.model';
-import { BillStatus, PaymentMethod, PaymentStatus as BillingPaymentStatus } from './billing.schema';
+import { BillStatus, PaymentStatus as BillingPaymentStatus } from './billing.schema';
 import { PaymentStatus } from '../../constants/statuses';
 import { TableModel } from '../tables/tables.model';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
@@ -14,80 +14,55 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '../../constants/roles';
 import { NotificationCategory, NotificationPriority } from '../notifications/notifications.schema';
 import { PaymentModel } from '../payments/payments.model';
-import { InvoiceCounterModel } from './invoice-counter.model';
 import { sendReceiptEmail } from '../../services/mail.service';
 import logger from "../../config/logger";
 import { endSession } from '../tableSessions/tableSessions.service';
 
 export class BillingService {
   /**
-   * Generates a live bill based on current orders for a session.
+   * Single Canonical DTO Builder for Live Bill
    */
-  static async getLiveBill(restaurantId: string, sessionId: string) {
-    const orders = await OrderModel.find({
-      restaurantId,
-      sessionId,
-      status: { $ne: OrderStatus.CANCELLED }
-    });
-
-    const payments = await PaymentModel.find({
-      restaurantId,
-      sessionId,
-      status: PaymentStatus.COMPLETED
-    });
-
-    const session = await TableSessionModel.findById(sessionId);
-
-    if ((!orders || orders.length === 0) && (!payments || payments.length === 0)) {
-      return {
-        session,
-        orders: [],
-        subtotal: 0,
-        taxAmount: 0,
-        discountAmount: 0,
-        serviceCharge: 0,
-        finalAmount: 0,
-        financialSummary: {
-          grossTotal: 0,
-          tax: 0,
-          discount: 0,
-          paymentsApplied: 0,
-          outstandingBalance: 0
-        }
-      };
-    }
-
+  private static buildLiveBillDTO(
+    bill: any,
+    session: any,
+    orders: any[],
+    payments: any[],
+    serviceChargeEnabled: boolean
+  ) {
     let subtotal = 0;
     let taxAmount = 0;
     let discountAmount = 0;
     let paymentsApplied = 0;
 
-    orders.forEach(order => {
+    (orders || []).forEach(order => {
       subtotal += order.totalAmount;
       taxAmount += order.taxAmount;
       discountAmount += order.discountAmount;
     });
 
-    payments.forEach(payment => {
+    (payments || []).forEach(payment => {
       paymentsApplied += payment.amount;
     });
 
-    // Fetch service charge configuration dynamically from restaurant settings
-    const restaurant = await RestaurantModel.findById(restaurantId);
-    const serviceChargeEnabled = restaurant?.settings?.serviceChargeEnabled ?? true;
-    const serviceCharge = serviceChargeEnabled ? subtotal * 0.05 : 0;
-
+    const serviceCharge = serviceChargeEnabled && subtotal > 0 ? subtotal * 0.05 : 0;
     const grossTotal = subtotal + taxAmount + serviceCharge;
     const outstandingBalance = (grossTotal - discountAmount) - paymentsApplied;
 
     return {
-      session,
-      orders,
+      _id: bill?._id?.toString() || null,
+      status: bill?.status || BillStatus.DRAFT,
+      paymentStatus: bill?.paymentStatus || PaymentStatus.PENDING,
+      invoiceNumber: bill?.invoiceNumber || null,
+      session: session || null,
+      orders: orders || [],
       subtotal,
       taxAmount,
       serviceCharge,
       discountAmount,
-      finalAmount: Math.max(0, outstandingBalance),
+      finalAmount: grossTotal - discountAmount,
+      outstandingBalance: Math.max(0, outstandingBalance),
+      amountPaid: paymentsApplied,
+      payments: payments || [],
       financialSummary: {
         grossTotal,
         tax: taxAmount,
@@ -96,6 +71,31 @@ export class BillingService {
         outstandingBalance: Math.max(0, outstandingBalance)
       }
     };
+  }
+
+  /**
+   * Generates a live bill based on current orders for a session.
+   */
+  static async getLiveBill(restaurantId: string, sessionId: string) {
+    const [orders, payments, session, bill, restaurant] = await Promise.all([
+      OrderModel.find({
+        restaurantId,
+        sessionId,
+        status: { $ne: OrderStatus.CANCELLED }
+      }),
+      PaymentModel.find({
+        restaurantId,
+        sessionId,
+        status: PaymentStatus.COMPLETED
+      }),
+      TableSessionModel.findById(sessionId),
+      BillingModel.findOne({ restaurantId, sessionId }),
+      RestaurantModel.findById(restaurantId)
+    ]);
+
+    const serviceChargeEnabled = restaurant?.settings?.serviceChargeEnabled ?? true;
+
+    return this.buildLiveBillDTO(bill, session, orders, payments, serviceChargeEnabled);
   }
 
   /**
@@ -161,25 +161,45 @@ export class BillingService {
 
       await bill.save();
     } else {
-      bill = await BillingModel.create({
-        restaurantId,
-        sessionId,
-        orderIds,
-        subtotal: liveBill.subtotal,
-        taxAmount: liveBill.taxAmount,
-        serviceCharge: liveBill.serviceCharge,
-        discountAmount: liveBill.financialSummary.discount,
-        grossTotal: liveBill.financialSummary.grossTotal,
-        paymentsApplied: liveBill.financialSummary.paymentsApplied,
-        outstandingBalance: liveBill.financialSummary.outstandingBalance,
-        finalAmount: liveBill.financialSummary.outstandingBalance,
-        status: BillStatus.GENERATED,
-        requestedAt: new Date(),
-        customerEmail,
-        wantsReceipt: wantsReceipt || false,
-        customerName: session?.customerName,
-        customerPhone: session?.mobile,
-      });
+      try {
+        bill = await BillingModel.create({
+          restaurantId,
+          sessionId,
+          orderIds,
+          subtotal: liveBill.subtotal,
+          taxAmount: liveBill.taxAmount,
+          serviceCharge: liveBill.serviceCharge,
+          discountAmount: liveBill.financialSummary.discount,
+          grossTotal: liveBill.financialSummary.grossTotal,
+          paymentsApplied: liveBill.financialSummary.paymentsApplied,
+          outstandingBalance: liveBill.financialSummary.outstandingBalance,
+          finalAmount: liveBill.financialSummary.outstandingBalance,
+          status: BillStatus.GENERATED,
+          requestedAt: new Date(),
+          customerEmail,
+          wantsReceipt: wantsReceipt || false,
+          customerName: session?.customerName,
+          customerPhone: session?.mobile,
+        });
+      } catch (err: any) {
+        if (err.name === 'MongoServerError' && err.code === 11000) {
+          // Bill was created concurrently. Because of replication lag or transaction visibility,
+          // we may need to retry fetching it slightly.
+          let retries = 3;
+          while (retries > 0) {
+            bill = await BillingModel.findOne({ restaurantId, sessionId });
+            if (bill) break;
+            
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 150)); // wait 150ms and retry
+            }
+          }
+          if (!bill) throw err;
+        } else {
+          throw err;
+        }
+      }
     }
 
     // Transition table status to BILL_PENDING and session to PAYMENT_PENDING
@@ -279,7 +299,10 @@ export class BillingService {
     sessionId: string | mongoose.Types.ObjectId,
     dbSession?: mongoose.ClientSession,
   ) {
-    const bill = await BillingModel.findOne({ sessionId }).session(dbSession || null);
+    const mongoose = await import('mongoose');
+    const safeSessionId = typeof sessionId === 'string' ? new mongoose.Types.ObjectId(sessionId) : sessionId;
+    
+    const bill = await BillingModel.findOne({ sessionId: safeSessionId }).session(dbSession || null);
     if (!bill) {
       throw new AppError('Bill not found for this session.', 404, ErrorCode.NOT_FOUND);
     }
@@ -301,13 +324,31 @@ export class BillingService {
     if (!bill.invoiceNumber) {
       const currentYear = new Date().getFullYear();
       const { InvoiceCounterModel } = await import('./invoice-counter.model');
-      const counter = await InvoiceCounterModel.findOneAndUpdate(
-        { year: currentYear },
-        { $inc: { sequence: 1 } },
-        { new: true, upsert: true, session: dbSession }
-      );
-      const sequenceStr = String(counter.sequence).padStart(6, '0');
-      bill.invoiceNumber = `INV-${currentYear}-${sequenceStr}`;
+      
+      let counter;
+      try {
+        counter = await InvoiceCounterModel.findOneAndUpdate(
+          { year: currentYear },
+          { $inc: { sequence: 1 } },
+          { new: true, upsert: true }
+        );
+      } catch (err: any) {
+        if (err.code === 11000) {
+          // If created concurrently, retry without upsert
+          counter = await InvoiceCounterModel.findOneAndUpdate(
+            { year: currentYear },
+            { $inc: { sequence: 1 } },
+            { new: true }
+          );
+        } else {
+          throw err;
+        }
+      }
+      
+      if (counter) {
+        const sequenceStr = String(counter.sequence).padStart(6, '0');
+        bill.invoiceNumber = `INV-${currentYear}-${sequenceStr}`;
+      }
     }
 
     // 3. Automatically store customerId if a matching user exists
@@ -329,136 +370,7 @@ export class BillingService {
     return { bill, updatedOrders };
   }
 
-  static async verifyPayment(restaurantId: string, sessionId: string, paymentId: string, simulateStatus?: BillingPaymentStatus) {
-    const bill = await BillingModel.findOne({ restaurantId, sessionId });
-    if (!bill) {
-      throw new AppError('Bill not found.', 404, ErrorCode.NOT_FOUND);
-    }
 
-    // Idempotency check
-    if (bill.paymentId === paymentId && bill.status === BillStatus.PAID && bill.paymentStatus === BillingPaymentStatus.PAID) {
-      return bill; // Already processed
-    }
-
-    if (bill.paymentId !== paymentId) {
-      throw new AppError('Invalid payment ID.', 400, ErrorCode.VALIDATION_ERROR);
-    }
-
-    // Find the corresponding PaymentModel record
-    const payment = await PaymentModel.findOne({
-      restaurantId: bill.restaurantId,
-      sessionId: bill.sessionId,
-      status: PaymentStatus.PENDING,
-    });
-
-    // Mock failure behavior
-    if (simulateStatus === BillingPaymentStatus.FAILED || paymentId.includes('fail')) {
-      bill.paymentStatus = BillingPaymentStatus.FAILED;
-      bill.status = BillStatus.FAILED;
-      await bill.save();
-
-      if (payment) {
-        payment.status = PaymentStatus.FAILED as any;
-        await payment.save();
-      }
-
-      throw new AppError('Payment processing failed.', 400, ErrorCode.PAYMENT_FAILED);
-    }
-
-    // Mock expired behavior
-    if (simulateStatus === BillingPaymentStatus.EXPIRED) {
-      bill.paymentStatus = BillingPaymentStatus.EXPIRED;
-      bill.status = BillStatus.DRAFT; // Revert to a pre-payment state
-      await bill.save();
-
-      if (payment) {
-        payment.status = 'FAILED' as any;
-        await payment.save();
-      }
-
-      throw new AppError('Payment session expired.', 400, ErrorCode.PAYMENT_FAILED);
-    }
-
-    // Mock pending behavior (doing nothing and waiting)
-    if (simulateStatus === BillingPaymentStatus.PENDING) {
-      return bill;
-    }
-
-    // Execute domain settlement
-    const { bill: updatedBill, updatedOrders } = await this.settleSession(sessionId);
-
-    if (payment) {
-      payment.status = 'COMPLETED' as any;
-      payment.verifiedAt = new Date();
-      await payment.save();
-    }
-
-    const { socketService } = await import('../../sockets/socket.service');
-    const { SocketEvent } = await import('../../constants/events');
-
-    for (const order of updatedOrders) {
-      socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
-      socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
-    }
-
-    // Emit bill.paid to restaurant and session
-    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.PAYMENT_CONFIRMED, { billId: updatedBill._id, sessionId });
-    socketService.emitToSession(sessionId.toString(), 'payment.success', { billId: updatedBill._id });
-
-    // Send HTML Receipt Email
-    if (bill.customerEmail && bill.wantsReceipt) {
-      try {
-        const restaurant = await RestaurantModel.findById(restaurantId).lean();
-        const restaurantName = restaurant?.name || 'Our Restaurant';
-        const orderItems = updatedOrders.flatMap(o => o.items);
-
-        await sendReceiptEmail(updatedBill.customerEmail as string, {
-          restaurantName,
-          invoiceNumber: updatedBill.invoiceNumber || '',
-          customerName: updatedBill.customerName || 'Guest',
-          customerPhone: updatedBill.customerPhone || '',
-          orderItems,
-          subtotal: updatedBill.subtotal,
-          taxAmount: updatedBill.taxAmount + (updatedBill.serviceCharge || 0),
-          totalAmount: updatedBill.finalAmount,
-          paymentMethod: updatedBill.paymentMethod || 'ONLINE',
-          paymentDate: updatedBill.paidAt ? updatedBill.paidAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-        });
-
-        updatedBill.receiptEmailedAt = new Date();
-        await updatedBill.save();
-      } catch (error) {
-        logger.error('Failed to send receipt email', { error, billId: bill._id });
-      }
-    }
-
-    // Trigger persistent notification targeting CUSTOMER
-    try {
-      await NotificationsService.createNotification({
-        restaurantId: new mongoose.Types.ObjectId(restaurantId),
-        tableSessionId: new mongoose.Types.ObjectId(sessionId),
-        recipientRole: UserRole.CUSTOMER,
-        title: 'Payment Successful',
-        message: `Your payment of INR ${updatedBill.finalAmount} was verified successfully.`,
-        type: 'PAYMENT_SUCCESS',
-        category: NotificationCategory.SYSTEM,
-        priority: NotificationPriority.HIGH,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      });
-    } catch (notifError) {
-      logger.error('Failed to trigger payment success notification:', notifError);
-    }
-
-    // Stock deduction is now handled by OrdersService.startCooking() during the kitchen workflow.
-
-    try {
-      await endSession(sessionId, restaurantId, 'Bill paid successfully');
-    } catch (error) {
-      logger.error(`Failed to close session ${sessionId} after payment:`, error);
-    }
-
-    return updatedBill;
-  }
 
   static async getPaymentStatus(restaurantId: string, sessionId: string, paymentId: string) {
     const bill = await BillingModel.findOne({ restaurantId, sessionId, paymentId });
