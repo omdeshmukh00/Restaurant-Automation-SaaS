@@ -2,7 +2,6 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ok } from '../../utils/responses';
 import { OffersService } from './offers.service';
-import { OfferModel } from './offers.model';
 import { parsePagination } from '../../utils/pagination';
 import { logAudit } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';

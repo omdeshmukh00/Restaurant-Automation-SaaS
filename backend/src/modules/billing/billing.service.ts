@@ -10,13 +10,8 @@ import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { OfferModel } from '../offers/offers.model';
 import { RestaurantModel } from '../restaurants/restaurants.model';
-import { NotificationsService } from '../notifications/notifications.service';
-import { UserRole } from '../../constants/roles';
-import { NotificationCategory, NotificationPriority } from '../notifications/notifications.schema';
 import { PaymentModel } from '../payments/payments.model';
-import { sendReceiptEmail } from '../../services/mail.service';
 import logger from "../../config/logger";
-import { endSession } from '../tableSessions/tableSessions.service';
 import { CustomerProfileModel } from '../analytics/customerProfile.model';
 
 export class BillingService {

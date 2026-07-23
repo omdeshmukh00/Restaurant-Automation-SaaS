@@ -4,6 +4,10 @@ import { Copy, Check, Tag, Sparkles, Clock, Percent } from 'lucide-react';
 import '../components/landing/landing.css';
 import { LandingNavbar, LandingFooter } from '../components/landing';
 
+// Module-level constant — called once at module load, not during render.
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const NEW_CUTOFF = Date.now() - SEVEN_DAYS_MS;
+
 interface ApiOffer {
   _id: string;
   title: string;
@@ -33,11 +37,9 @@ export default function OffersPage() {
     const fetchOffers = async () => {
       try {
         const { apiClient } = await import('../../../shared/services/apiClient');
-        // Use landing/data which returns all active offers across restaurants
         const res = await apiClient.get('/public/landing/data');
         setOffers(res.data.data.offers || []);
       } catch {
-        // Silently fail - offers are non-critical
         setOffers([]);
       } finally {
         setLoading(false);
@@ -50,7 +52,7 @@ export default function OffersPage() {
     if (activeCategory === 'Limited Time') return o.status === 'ACTIVE';
     if (activeCategory === 'Food') return o.discountType === 'PERCENTAGE';
     if (activeCategory === 'Beverages') return o.title?.toLowerCase().includes('drink') || o.title?.toLowerCase().includes('beverage');
-    if (activeCategory === 'New') return new Date(o.startDate) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    if (activeCategory === 'New') return new Date(o.startDate) > new Date(NEW_CUTOFF);
     return true;
   });
 

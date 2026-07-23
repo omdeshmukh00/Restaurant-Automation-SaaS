@@ -65,7 +65,7 @@ export const requestProfileOtp = asyncHandler(async (req: Request, res: Response
  * If the request does NOT include `mobile`, fields update normally.
  */
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
-  const { otp, mobile, ...otherUpdates } = req.body;
+  const { mobile, ...otherUpdates } = req.body;
   const userId = req.user!._id;
   const userEmail = req.user?.email;
 

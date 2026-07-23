@@ -2,7 +2,6 @@ import { Types } from 'mongoose';
 import { KitchenAlertModel } from './kitchen-alert.model';
 import { KitchenAlertType, KitchenAlertStatus } from './kitchen-alert.schema';
 import { socketService } from '../../sockets/socket.service';
-import { SocketEvent } from '../../constants/events';
 
 export class KitchenAlertService {
   /**

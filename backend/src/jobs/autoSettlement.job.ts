@@ -4,7 +4,6 @@
 import cron from 'node-cron';
 import { SettlementService } from '../modules/settlement/settlement.service';
 import { logger } from '../config/logger';
-import { env } from '../config/env';
 
 /**
  * Starts the auto-settlement cron job.

@@ -15,7 +15,6 @@ import { socketService } from '../../sockets/socket.service';
 import { SocketEvent } from '../../constants/events';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '../../constants/roles';
-import { NotificationCategory, NotificationPriority } from '../notifications/notifications.schema';
 
 /**
  * Computes a unique table-slot lock key.

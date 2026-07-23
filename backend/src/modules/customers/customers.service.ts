@@ -513,7 +513,6 @@ export const CustomersService = {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
     // Verify profile belongs to this restaurant
-    const rid = new Types.ObjectId(restaurantId);
     const visited = (profile.restaurantsVisited || []).some(
       (r: any) => r.toString() === restaurantId,
     );
@@ -674,7 +673,6 @@ export const CustomersService = {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
     // Verify profile belongs to this restaurant
-    const rid = new Types.ObjectId(restaurantId);
     const visited = (profile.restaurantsVisited || []).some(
       (r: any) => r.toString() === restaurantId,
     );
@@ -737,7 +735,6 @@ export const CustomersService = {
     if (!profile) {
       throw new AppError('Customer not found', 404, ErrorCode.NOT_FOUND);
     }
-    const rid = new Types.ObjectId(restaurantId);
     const visited = (profile.restaurantsVisited || []).some(
       (r: any) => r.toString() === restaurantId,
     );

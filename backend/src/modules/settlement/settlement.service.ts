@@ -12,7 +12,6 @@ import { getPlatformSettings } from '../superAdmin/platformSettings.model';
 import { logger } from '../../config/logger';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '../../constants/roles';
-import { NotificationCategory, NotificationPriority } from '../notifications/notifications.schema';
 
 function toObjectId(value: string | Types.ObjectId): Types.ObjectId {
   return typeof value === 'string' ? new mongoose.Types.ObjectId(value) : value;
