@@ -273,44 +273,40 @@ export class PaymentsService {
         }
       };
 
+      let result;
       try {
-        let result;
-        try {
-          result = await executeVerification(dbSession);
-          if (dbSession) {
-            await dbSession.commitTransaction();
-          }
-        } catch (err: any) {
-          if (dbSession) {
-            await dbSession.abortTransaction();
-          }
-          if (err.name === 'MongoServerError' && err.message.includes('Transaction numbers')) {
-            logger.warn('[Mongoose Transaction Fallback] Retrying verifyCustomerPayment without transaction.');
-            result = await executeVerification(null);
-          } else {
-            throw err;
-          }
-        } finally {
-          if (dbSession) {
-            dbSession.endSession();
-          }
+        result = await executeVerification(dbSession);
+        if (dbSession) {
+          await dbSession.commitTransaction();
         }
-        
-        // Emit Socket.IO event AFTER the transaction has been safely committed to the database.
-        // This prevents ghost orders appearing in the Kitchen POS if the transaction rolls back.
-        if (result?.order) {
-          socketService.emitToRestaurant(restaurantId, SocketEvent.ORDER_NEW, { orderId: result.order._id });
-          socketService.emitToSession(sessionId, 'order.new', { order: result.order });
+      } catch (err: any) {
+        if (dbSession) {
+          await dbSession.abortTransaction();
         }
-
-        // POST-PAID SIDE EFFECTS (only if bill exists, meaning it was a post-paid settlement)
-        if (result?.bill) {
-          await this.processPostPaidSideEffects(restaurantId, sessionId, result.bill, result.updatedOrders || []);
+        if (err.name === 'MongoServerError' && err.message.includes('Transaction numbers')) {
+          logger.warn('[Mongoose Transaction Fallback] Retrying verifyCustomerPayment without transaction.');
+          result = await executeVerification(null);
+        } else {
+          throw err;
         }
-        return result;
-      } catch (error) {
-        throw error;
+      } finally {
+        if (dbSession) {
+          dbSession.endSession();
+        }
       }
+      
+      // Emit Socket.IO event AFTER the transaction has been safely committed to the database.
+      // This prevents ghost orders appearing in the Kitchen POS if the transaction rolls back.
+      if (result?.order) {
+        socketService.emitToRestaurant(restaurantId, SocketEvent.ORDER_NEW, { orderId: result.order._id });
+        socketService.emitToSession(sessionId, 'order.new', { order: result.order });
+      }
+
+      // POST-PAID SIDE EFFECTS (only if bill exists, meaning it was a post-paid settlement)
+      if (result?.bill) {
+        await this.processPostPaidSideEffects(restaurantId, sessionId, result.bill, result.updatedOrders || []);
+      }
+      return result;
     } catch (error: any) {
       if (error.code === 11000 || error.code === 112) {
         logger.warn('Concurrent verification detected. Waiting to check if payment completes...', { paymentId });
