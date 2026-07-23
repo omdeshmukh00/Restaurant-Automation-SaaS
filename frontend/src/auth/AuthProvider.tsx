@@ -64,6 +64,7 @@ type AuthContextValue = {
   switchPanel: (panel: Panel) => void;
 
   setUser: (user: AuthUser | null) => void;
+  updateUser: (fields: Partial<AuthUser>) => void;
   setAccessTokenState: (token: string | null) => void;
 };
 
@@ -350,9 +351,20 @@ export function AuthProvider({ children }: PropsWithChildren): JSX.Element {
 
     initSession();
   }, [switchPanel]);
-  // ── Sync reactive tokenStore modifications ─────────────────────────
+  // ── Sync reactive tokenStore modifications & user updates ─────────
   useEffect(() => {
-    return addTokenListener((panel, token) => {
+    const handleUserUpdated = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setUserState((prev) => {
+        if (!prev) return null;
+        const next = { ...prev, ...detail };
+        setStoredUser(next.panel, next as any);
+        return next;
+      });
+    };
+    window.addEventListener('ra-user-updated', handleUserUpdated);
+
+    const removeTokenListener = addTokenListener((panel, token) => {
       if (panel === activePanel) {
         setAccessTokenStateRaw(token);
         if (!token) {
@@ -365,7 +377,22 @@ export function AuthProvider({ children }: PropsWithChildren): JSX.Element {
         }
       }
     });
+
+    return () => {
+      window.removeEventListener('ra-user-updated', handleUserUpdated);
+      removeTokenListener();
+    };
   }, [activePanel]);
+
+  const updateUser = useCallback((fields: Partial<AuthUser>) => {
+    setUserState((prev) => {
+      if (!prev) return null;
+      const next = { ...prev, ...fields };
+      setStoredUser(next.panel, next as any);
+      return next;
+    });
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: fields }));
+  }, []);
 
   // ── Panel introspection ───────────────────────────────────────────
 
@@ -512,6 +539,7 @@ export function AuthProvider({ children }: PropsWithChildren): JSX.Element {
     switchPanel,
 
     setUser: setUserState,
+    updateUser,
     setAccessTokenState: setAccessTokenStateRaw,
   };
 

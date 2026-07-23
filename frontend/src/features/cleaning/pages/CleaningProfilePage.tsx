@@ -6,6 +6,7 @@ import { useAuth } from '../../../auth/AuthProvider';
 import { useToast } from '../components/dashboard/Toast';
 import { cleaningStore } from '../store/cleaning.store';
 import { useTranslation } from '../hooks/useTranslation';
+import { apiClient } from '../../../shared/services/apiClient';
 
 interface ActivityItem {
   icon: string;
@@ -155,6 +156,16 @@ export default function CleaningProfilePage() {
     }
 
     try {
+      try {
+        await apiClient.patch('/users/me', {
+          name: editName,
+          mobile: editPhone,
+        });
+      } catch {
+        // ignore
+      }
+      window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { name: editName, mobile: editPhone } }));
+
       await updateProfile({
         name: editName,
         email: editEmail,
@@ -210,7 +221,13 @@ export default function CleaningProfilePage() {
     }
   };
 
-  const handleCropConfirm = (croppedBase64: string) => {
+  const handleCropConfirm = async (croppedBase64: string) => {
+    try {
+      await apiClient.patch('/users/me', { avatar: croppedBase64 });
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
     updateProfile({ avatar: croppedBase64 });
     setShowCropModal(false);
   };
@@ -358,7 +375,8 @@ export default function CleaningProfilePage() {
                 </div>
               </div>
             </div>
-          </section>          {/* Performance Summary */}
+          </section>
+          {/* Performance Summary */}
           <section className="col-span-12 lg:col-span-5 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('performanceSummary')}</h3>
@@ -447,7 +465,8 @@ export default function CleaningProfilePage() {
                   </div>
                   <span className="material-symbols-outlined text-slate-450 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
                 </button>
-              ))}              <button
+              ))}
+              <button
                 onClick={() => navigate('/cleaning/settings')}
                 className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group font-sans text-xs text-left cursor-pointer"
               >

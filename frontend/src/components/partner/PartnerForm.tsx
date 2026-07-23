@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Building2, AlertCircle, CheckCircle, RefreshCw, ShieldAlert, Layout, CreditCard, X } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Building2, AlertCircle, CheckCircle, RefreshCw, ShieldAlert, Layout, CreditCard, X, Camera, ImageIcon } from 'lucide-react';
 import LocationPicker from './LocationPicker';
 import PaymentDialog from './PaymentDialog';
 import { apiClient } from '../../shared/services/apiClient';
@@ -21,6 +21,7 @@ interface FormData {
   branches: number;
   expectedMonthlyOrders: number;
   message: string;
+  isVeg: string;
 }
 
 const initialFormData: FormData = {
@@ -39,6 +40,7 @@ const initialFormData: FormData = {
   branches: 1,
   expectedMonthlyOrders: 500,
   message: '',
+  isVeg: '',
 };
 
 interface PlatformSettings {
@@ -123,6 +125,35 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
       sessionStorage.removeItem('partner_longitude');
     }
   }, [longitude]);
+
+  // Cover Image State
+  const [coverImagePreview, setCoverImagePreview] = useState<string | null>(() => {
+    return sessionStorage.getItem('partner_cover_image') || null;
+  });
+  const coverImageRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (coverImagePreview) {
+      sessionStorage.setItem('partner_cover_image', coverImagePreview);
+    } else {
+      sessionStorage.removeItem('partner_cover_image');
+    }
+  }, [coverImagePreview]);
+
+  const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setFormError('Image must be under 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCoverImagePreview(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Validation States
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -211,8 +242,13 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
     }
 
     if (!formData.cuisine.trim()) tempErrors.cuisine = 'Cuisine type is required';
+    if (!formData.isVeg) tempErrors.isVeg = 'Vegetarian type is required';
     if (formData.branches <= 0) tempErrors.branches = 'Must have at least 1 branch';
     if (formData.expectedMonthlyOrders < 0) tempErrors.expectedMonthlyOrders = 'Cannot be negative';
+
+    if (!coverImagePreview) {
+      tempErrors.coverImage = 'Restaurant cover image is required';
+    }
 
     if (latitude === null || longitude === null) {
       tempErrors.location = 'Geolocation coordinates are required.';
@@ -287,6 +323,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
         phone: fullPhoneNumber,
         latitude,
         longitude,
+        coverImage: coverImagePreview || undefined,
       });
 
       const data = response.data?.data;
@@ -603,11 +640,11 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
             />
           </div>
 
-          {/* Row 6: Cuisine, Number of Branches, Expected Orders */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                Cuisine / Cuisine Type <span className="text-orange-500">*</span>
+          {/* Row 6: Cuisine, Vegetarian Type, Number of Branches, Expected Orders */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="flex flex-col justify-between">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+                <span>Cuisine / Cuisine Type <span className="text-orange-500">*</span></span>
               </label>
               <input
                 type="text"
@@ -616,20 +653,44 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 required
                 placeholder="e.g. Multi-Cuisine, Italian, Cafe"
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-500 transition-colors"
+                className={`w-full h-10 bg-white border ${
+                  errors.cuisine ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-orange-500'
+                } rounded-xl px-4 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-colors`}
               />
               {errors.cuisine && <p className="text-[10px] text-red-500 mt-1">{errors.cuisine}</p>}
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                Number of Branches <span className="text-orange-500">*</span>
+            <div className="flex flex-col justify-between">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+                <span>Vegetarian Type <span className="text-orange-500">*</span></span>
+              </label>
+              <select
+                name="isVeg"
+                value={formData.isVeg}
+                onChange={handleInputChange}
+                className={`w-full h-10 bg-white border ${
+                  errors.isVeg ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-orange-500'
+                } rounded-xl px-2.5 py-2 text-xs ${
+                  formData.isVeg ? 'text-slate-800' : 'text-slate-400'
+                } focus:outline-none cursor-pointer`}
+              >
+                <option value="" disabled hidden>Select Mode</option>
+                <option value="both" className="text-slate-800">Veg &amp; Non-Veg</option>
+                <option value="veg" className="text-slate-800">Pure Veg</option>
+                <option value="non-veg" className="text-slate-800">Non-Veg Only</option>
+              </select>
+              {errors.isVeg && <p className="text-[10px] text-red-500 mt-1">{errors.isVeg}</p>}
+            </div>
+
+            <div className="flex flex-col justify-between">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+                <span>Number of Branches <span className="text-orange-500">*</span></span>
               </label>
               <select
                 name="branches"
                 value={formData.branches}
                 onChange={handleInputChange}
-                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-orange-500"
+                className="w-full h-10 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-orange-500 cursor-pointer"
               >
                 <option value="1">1</option>
                 <option value="3">2 - 5</option>
@@ -638,15 +699,15 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
               </select>
             </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                Expected Monthly Orders <span className="text-orange-500">*</span>
+            <div className="flex flex-col justify-between">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+                <span>Expected Monthly Orders <span className="text-orange-500">*</span></span>
               </label>
               <select
                 name="expectedMonthlyOrders"
                 value={formData.expectedMonthlyOrders}
                 onChange={handleInputChange}
-                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-orange-500"
+                className="w-full h-10 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-orange-500 cursor-pointer"
               >
                 <option value="500">Under 500</option>
                 <option value="2000">500 - 2,000</option>
@@ -654,6 +715,50 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 <option value="10000">5,000+</option>
               </select>
             </div>
+          </div>
+
+          {/* Row 6.5: Restaurant Cover Image (Mandatory) */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+              Restaurant Cover Image <span className="text-orange-500">*</span>
+            </label>
+            <div className="flex items-center gap-4">
+              {coverImagePreview ? (
+                <div className="relative group w-24 h-16 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0">
+                  <img src={coverImagePreview} alt="Cover" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => coverImageRef.current?.click()}
+                      className="p-1 bg-white/90 rounded-full text-slate-700 hover:bg-white mr-1"
+                    >
+                      <Camera className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setCoverImagePreview(null); if (coverImageRef.current) coverImageRef.current.value = ''; }}
+                      className="p-1 bg-white/90 rounded-full text-red-600 hover:bg-white"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => coverImageRef.current?.click()}
+                  className={`w-24 h-16 rounded-xl border-2 border-dashed ${
+                    errors.coverImage ? 'border-red-400 bg-red-50' : 'border-slate-300 hover:border-orange-400 bg-slate-50 hover:bg-orange-50'
+                  } flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer flex-shrink-0`}
+                >
+                  <Camera className="w-4 h-4 text-slate-400" />
+                  <span className="text-[8px] font-semibold text-slate-400">Add Photo</span>
+                </button>
+              )}
+              <p className="text-[10px] text-slate-400 leading-relaxed font-sans">Upload a cover image for your restaurant. Max 2MB. JPG, PNG, or WebP.</p>
+            </div>
+            {errors.coverImage && <p className="text-[10px] text-red-500 mt-1 font-medium">{errors.coverImage}</p>}
+            <input ref={coverImageRef} type="file" accept="image/*" className="hidden" onChange={handleCoverImageSelect} />
           </div>
 
           {/* Row 7: Geolocation details */}

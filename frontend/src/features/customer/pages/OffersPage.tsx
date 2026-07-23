@@ -49,7 +49,7 @@ export default function OffersPage() {
   };
 
   return (
-    <div className="min-h-screen landing-font-inter flex flex-col justify-between" style={{ background: '#FFF8F3', color: '#222222' }}>
+    <div className="min-h-screen landing-font-inter flex flex-col justify-between bg-[#FFF8F3] dark:bg-neutral-950 text-slate-800 dark:text-neutral-100 transition-colors duration-300">
       <LandingNavbar onLoginOpen={openLogin} />
       
       {/* Spacer for Navbar */}
@@ -121,7 +121,7 @@ export default function OffersPage() {
       </section>
 
       {/* ── Category Tabs ────────────────────────────── */}
-      <div className="sticky top-[64px] z-40" style={{ background: 'rgba(255,248,243,0.95)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,107,26,0.08)' }}>
+      <div className="sticky top-[64px] z-40 bg-[#FFF8F3]/95 dark:bg-neutral-950/95 backdrop-blur-md border-b border-slate-200 dark:border-neutral-800 transition-colors duration-300">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-3 flex items-center gap-2.5 overflow-x-auto landing-hide-scrollbar">
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat;
@@ -129,14 +129,13 @@ export default function OffersPage() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className="whitespace-nowrap px-4 py-2 text-[13px] font-semibold shrink-0 transition-all duration-150"
-                style={{
-                  borderRadius: '999px',
-                  border: `1px solid ${isActive ? '#FF6B1A' : '#E5E7EB'}`,
-                  backgroundColor: isActive ? '#FF6B1A' : '#FFFFFF',
-                  color: isActive ? '#FFFFFF' : '#666666',
-                  boxShadow: isActive ? '0 2px 12px rgba(255,107,26,0.3)' : 'none',
-                }}
+                className="whitespace-nowrap px-4 py-2 text-[13px] font-semibold shrink-0 transition-all duration-150 rounded-full border bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-850 text-slate-600 dark:text-neutral-300 hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A]"
+                style={isActive ? {
+                  borderColor: '#FF6B1A',
+                  backgroundColor: '#FF6B1A',
+                  color: '#FFFFFF',
+                  boxShadow: '0 2px 12px rgba(255,107,26,0.3)',
+                } : undefined}
               >
                 {cat}
               </button>

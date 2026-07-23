@@ -40,6 +40,11 @@ export const updateRestaurantSettingsSchema = z.object({
     .trim()
     .optional(),
 
+  coverImage: z
+    .string()
+    .trim()
+    .optional(),
+
   plan: z
     .enum(['Free', 'Standard', 'Premium', 'Enterprise'])
     .optional(),

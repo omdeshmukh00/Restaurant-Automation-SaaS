@@ -8,9 +8,10 @@ import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSe
 
 interface Props {
   onToggleCart: () => void;
+  onOpenQRScanner?: () => void;
 }
 
-export default function CustomerTopBar({ onToggleCart }: Props) {
+export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props) {
   const { settings } = usePlatformSettingsGuard();
   const platformName = settings?.platformName || "Smart Dining";
   const { itemCount } = useCart();
@@ -97,10 +98,12 @@ export default function CustomerTopBar({ onToggleCart }: Props) {
           <div className="flex items-center gap-2 text-[10px] text-sd-on-surface-variant font-sans mt-0.5">
             <span className="flex items-center gap-0.5">
               <span className="material-symbols-outlined text-[11px] text-sd-primary">location_on</span>
-              <span>{diningSession?.restaurantName || 'Indiranagar'}</span>
+              <span>{diningSession?.restaurantName || 'Amber Table'}</span>
             </span>
             <span>•</span>
-            <span className="font-semibold text-sd-secondary dark:text-sd-secondary-container bg-sd-secondary-container/10 dark:bg-sd-secondary-container/20 px-1.5 py-0.2 rounded">{diningSession?.tableNumber || tableCode}</span>
+            <span className="font-semibold text-sd-secondary dark:text-sd-secondary-container bg-sd-secondary-container/10 dark:bg-sd-secondary-container/20 px-1.5 py-0.2 rounded font-sans">
+              {diningSession?.tableNumber || tableCode}
+            </span>
           </div>
         </div>
 

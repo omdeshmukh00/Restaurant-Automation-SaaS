@@ -37,7 +37,9 @@ export async function createCustomerPaymentController(req: Request, res: Respons
       actorRole:    'CUSTOMER',
       restaurantId: session.restaurantId.toString(),
       entityType:   AuditEntity.PAYMENT,
-      entityId: data.payment?._id?.toString() || data.paymentId,
+      entityId:     data.payment?._id?.toString() || null,
+      externalEntityId: data.paymentId,
+      provider:     data.provider === 'razorpay' ? 'razorpay' : 'internal',
       action:       AuditAction.PAYMENT_CREATED,
       metadata: {
         method,
@@ -80,7 +82,9 @@ export async function verifyCustomerPaymentController(req: Request, res: Respons
       actorRole:    'CUSTOMER',
       restaurantId: session.restaurantId.toString(),
       entityType:   AuditEntity.PAYMENT,
-      entityId:     req.body.paymentId,
+      entityId:     data.payment?._id?.toString() || null,
+      externalEntityId: req.body.paymentId,
+      provider:     razorpayFields ? 'razorpay' : 'internal',
       action:       AuditAction.PAYMENT_VERIFIED,
       metadata: {
         simulateStatus: req.body.simulateStatus,

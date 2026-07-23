@@ -17,7 +17,7 @@ export class CartService {
   ): Promise<ICart> {
     let cart = await Cart.findOne({ restaurantId, sessionId }).populate({
       path: 'items.menuItem',
-      select: 'name price discountPrice image isVeg isAvailable',
+      select: 'name price discountPrice image isVeg isSpicy isAvailable',
     });
 
     if (!cart) {
@@ -152,7 +152,7 @@ export class CartService {
     
     await cart.populate({
       path: 'items.menuItem',
-      select: 'name price discountPrice image isVeg isAvailable',
+      select: 'name price discountPrice image isVeg isSpicy isAvailable',
     });
 
     return this.formatCartResponse(cart);
@@ -184,7 +184,7 @@ export class CartService {
 
     await cart.populate({
       path: 'items.menuItem',
-      select: 'name price discountPrice image isVeg isAvailable',
+      select: 'name price discountPrice image isVeg isSpicy isAvailable',
     });
 
     return this.formatCartResponse(cart);
@@ -209,7 +209,7 @@ export class CartService {
 
     await cart.populate({
       path: 'items.menuItem',
-      select: 'name price discountPrice image isVeg isAvailable',
+      select: 'name price discountPrice image isVeg isSpicy isAvailable',
     });
 
     return this.formatCartResponse(cart);

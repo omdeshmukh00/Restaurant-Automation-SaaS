@@ -71,6 +71,8 @@ export interface IRestaurant extends Document {
   tags?: string[];
   joinedDate?: Date;
   isDeleted?: boolean;
+  coverImage?: string;
+  isVeg: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -175,6 +177,8 @@ const restaurantSchema = new Schema<IRestaurant>(
     tags: { type: [String], default: [] },
     joinedDate: { type: Date, default: Date.now },
     isDeleted: { type: Boolean, default: false, index: true },
+    coverImage: { type: String, trim: true, default: null },
+    isVeg: { type: String, enum: ['veg', 'non-veg', 'both'], default: 'both' },
     location_url: {
       type: String,
       trim: true,

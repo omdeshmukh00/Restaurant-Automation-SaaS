@@ -79,6 +79,8 @@ export async function logAudit(
     restaurantId: payload.restaurantId ?? (req as any).user?.restaurantId?.toString(),
     entityType:   payload.entityType,
     entityId:     payload.entityId,
+    externalEntityId: payload.externalEntityId,
+    provider:     payload.provider,
     action:       payload.action,
     metadata:     payload.metadata ?? {},
     ipAddress:    payload.ipAddress ?? extractRealIp(req),

@@ -46,7 +46,7 @@ export type ServiceRequestItem = {
 export type TrackedOrder = {
   id: string;
   items: string;
-  structuredItems?: { name: string; qty: number; price: number; total: number }[];
+  structuredItems?: { id: string; name: string; qty: number; price: number; total: number }[];
   total: number;
   status: 'Placed' | 'Preparing' | 'Ready' | 'Served' | 'Completed';
   eta: string;
@@ -201,7 +201,7 @@ type CustomerStore = {
 
   toggleFavourite: (id: number) => void;
 
-  reorder: (order: TrackedOrder) => void;
+  // Removed fake reorder from store
   requestService: (request: ServiceRequestItem) => void;
 
   assignRandomTable: () => void;
@@ -263,6 +263,7 @@ function mapBackendOrderStatusToFrontend(status: string): TrackedOrder['status']
 export function mapBackendOrderToTrackedOrder(o: any): TrackedOrder {
   const itemsStr = o.items?.map((i: any) => `${i.name} x${i.quantity}`).join(', ') || '';
   const structuredItems = o.items?.map((i: any) => ({
+    id: i.menuItemId || i.id || '',
     name: i.name,
     qty: i.quantity,
     price: i.price,
@@ -417,54 +418,7 @@ export const useCustomerStore = create<CustomerStore>()(
           console.error('Failed to fetch live bill', err);
         }
       },
-      reorder: (order) => {
-        get().recordActivity();
-        const orderId = `#ORD-${Math.floor(3000 + Math.random() * 6000)}`;
-        const now = new Date();
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const formattedDate = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}, ${String(now.getHours() % 12 || 12).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} ${now.getHours() >= 12 ? 'PM' : 'AM'}`;
-        const newOrder: TrackedOrder = {
-          ...order,
-          id: orderId,
-          status: 'Placed',
-          eta: '18 min',
-          date: formattedDate,
-        };
-
-        const pointsEarned = Math.floor(newOrder.total / 10);
-
-        set((state) => {
-          const updatedHistory = pointsEarned > 0 ? [
-            {
-              id: `h-${Date.now()}`,
-              points: pointsEarned,
-              type: 'earn' as const,
-              description: `Points earned from Reorder ${orderId}`,
-              date: 'Just now',
-            },
-            ...state.loyaltyHistory
-          ] : state.loyaltyHistory;
-
-          const updatedNotifications = [
-            {
-              id: `n-${Date.now()}`,
-              title: 'Reordered items! 🍽️',
-              message: `Your reorder ${orderId} was placed. You earned ${pointsEarned} reward points!`,
-              timestamp: 'Just now',
-              read: false,
-              type: 'order' as const,
-            },
-            ...state.notifications
-          ];
-
-          return {
-            orders: [newOrder, ...state.orders],
-            loyaltyPoints: state.loyaltyPoints + pointsEarned,
-            loyaltyHistory: updatedHistory,
-            notifications: updatedNotifications,
-          };
-        });
-      },
+      // Fake reorder logic has been removed and replaced by CartContext reorderItems
       requestService: (request) => {
         get().recordActivity();
         set((state) => ({ serviceRequests: [{ ...request, id: `${request.id}-${Date.now()}` }, ...state.serviceRequests] }));

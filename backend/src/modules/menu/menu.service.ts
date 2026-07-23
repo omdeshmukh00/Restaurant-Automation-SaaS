@@ -232,8 +232,7 @@ export class MenuService {
       }
     }
     if (query.vegOnly) dbQuery.isVeg = true;
-    if (query.spicy === true) dbQuery.spiceLevel = { $gt: 0 };
-    if (query.spicy === false) dbQuery.spiceLevel = { $in: [0, null] };
+    if (query.spicy === true) dbQuery.isSpicy = true;
     if (query.availableOnly) dbQuery.isAvailable = true;
     if (query.popularOnly) dbQuery.tags = { $in: ['popular'] };
     if (query.recommendedOnly) dbQuery.tags = { $in: ['recommended'] };

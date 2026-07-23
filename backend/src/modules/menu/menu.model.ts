@@ -45,6 +45,7 @@ export interface IMenuItem extends Document {
   image?: string;
   images?: string[];
   isVeg: boolean;
+  isSpicy: boolean;
   isAvailable: boolean;
   availabilityStatus?: string;
   isHidden: boolean;
@@ -76,6 +77,7 @@ const MenuItemSchema = new Schema<IMenuItem>(
     image: { type: String, trim: true },
     images: [{ type: String, trim: true }],
     isVeg: { type: Boolean, default: false },
+    isSpicy: { type: Boolean, default: false },
     isAvailable: { type: Boolean, default: true },
     availabilityStatus: { type: String, enum: ['AVAILABLE', 'OUT_OF_STOCK', 'TEMPORARILY_UNAVAILABLE'] },
     isHidden: { type: Boolean, default: false },

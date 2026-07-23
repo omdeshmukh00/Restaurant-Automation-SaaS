@@ -16,6 +16,7 @@ import { RestaurantModel } from '../restaurants/restaurants.model';
 import { OfferModel } from '../offers/offers.model';
 import { TableModel } from '../tables/tables.model';
 import { ReservationModel } from '../reservations/reservations.model';
+import { OrderModel } from '../orders/orders.model';
 import { RestaurantStatus, TableStatus, ReservationStatus } from '../../constants/statuses';
 import { ok } from '../../utils/responses';
 import { AppError } from '../../utils/AppError';
@@ -113,7 +114,7 @@ publicRouter.get('/menu', async (req, res, next) => {
 // Returns active restaurants, dishes, offers, and live stats for the landing page
 publicRouter.get('/landing/data', async (req, res, next) => {
   try {
-    const restaurants = await RestaurantModel.find({
+    const rawRestaurants = await RestaurantModel.find({
       status: {
         $in: [
           RestaurantStatus.ACTIVE,
@@ -124,7 +125,63 @@ publicRouter.get('/landing/data', async (req, res, next) => {
       },
     }).lean();
     const offers = await OfferModel.find({ active: true }).lean();
-    const dishes = await MenuItem.find().limit(12).lean();
+
+    // Fetch tables & menu items to calculate actual available tables and avg wait times
+    const [tables, allMenuItems] = await Promise.all([
+      TableModel.find({ isActive: true }).lean(),
+      MenuItem.find({ isHidden: false }).lean(),
+    ]);
+
+    const restaurants = rawRestaurants.map((r) => {
+      const restaurantTables = tables.filter((t) => t.restaurantId.toString() === r._id.toString());
+      const availableTablesCount = restaurantTables.filter((t) => t.status === TableStatus.AVAILABLE).length;
+      
+      const restaurantDishes = allMenuItems.filter((m) => m.restaurantId.toString() === r._id.toString());
+      const avgPrepTime = restaurantDishes.length > 0
+        ? Math.round(restaurantDishes.reduce((sum, d) => sum + (d.preparationTime || 15), 0) / restaurantDishes.length)
+        : 15;
+
+      return {
+        ...r,
+        availableTablesCount,
+        totalTablesCount: restaurantTables.length,
+        avgWaitTime: avgPrepTime,
+      };
+    });
+    
+    // Fetch popular dishes based on order history if present
+    let dishes: any[] = [];
+    try {
+      const popularItems = await OrderModel.aggregate([
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: '$items.menuItemId',
+            count: { $sum: '$items.quantity' },
+          },
+        },
+        { $sort: { count: -1 } },
+        { $limit: 12 },
+      ]);
+
+      if (popularItems && popularItems.length > 0) {
+        const itemIds = popularItems.map(item => item._id);
+        dishes = await MenuItem.find({ _id: { $in: itemIds } })
+          .populate('restaurantId', 'name')
+          .lean();
+
+        // Sort dishes in the order of frequency
+        dishes.sort((a, b) => {
+          return itemIds.indexOf(a._id.toString()) - itemIds.indexOf(b._id.toString());
+        });
+      }
+    } catch (err) {
+      console.error('Failed to aggregate popular dishes from order history:', err);
+    }
+
+    if (!dishes || dishes.length === 0) {
+      dishes = await MenuItem.find().populate('restaurantId', 'name').limit(12).lean();
+    }
 
     const cuisinesSet = new Set<string>();
     restaurants.forEach((r) => {
@@ -155,10 +212,10 @@ publicRouter.get('/landing/data', async (req, res, next) => {
       dishes,
       cuisines,
       stats: {
-        tablesAvailable: totalTablesAvailable || 120,
-        restaurantsOpen: totalActiveRestaurants || 85,
+        tablesAvailable: totalTablesAvailable || 4,
+        restaurantsOpen: totalActiveRestaurants || 13,
         reservationsToday: reservationsTodayCount || 340,
-        offersRunning: offersCount || 50,
+        offersRunning: offersCount || 2,
         averageWaitTime: 15,
         averageRating: 4.8
       }
@@ -230,4 +287,18 @@ publicRouter.get('/plans', async (_req, res, next) => {
     next(error);
   }
 });
+
+// ── GET /api/v1/public/dishes ─────────────────────────────────────────
+// Returns all active/available dishes across all restaurants
+publicRouter.get('/dishes', async (req, res, next) => {
+  try {
+    const dishes = await MenuItem.find({ isHidden: false })
+      .populate('restaurantId', 'name')
+      .lean();
+    ok(res, { dishes });
+  } catch (error) {
+    next(error);
+  }
+});
+
 

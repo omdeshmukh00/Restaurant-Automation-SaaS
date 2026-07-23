@@ -119,12 +119,16 @@ function ProfileCard({ darkMode, onClose }: ProfileCardProps) {
       <div className="relative px-4 pb-3">
         <div className="flex items-end justify-between -mt-8 mb-3">
           <div className="relative">
-            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white dark:border-slate-950 shadow-md">
-              <img
-                src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"}
-                alt={user?.name || "Mr. Souvik"}
-                className="w-full h-full object-cover"
-              />
+            <div className="w-16 h-16 rounded-full overflow-hidden border-4 border-white dark:border-slate-950 shadow-md bg-orange-500 flex items-center justify-center text-white font-bold text-xl">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user?.name || "Admin"}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                (user?.name || "Admin").charAt(0).toUpperCase()
+              )}
             </div>
             <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white dark:border-slate-950" />
           </div>
@@ -640,11 +644,17 @@ export default function Navbar({
                 aria-expanded={profileDropdownOpen}
                 aria-label="Open profile menu"
               >
-                <img
-                  src={user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&h=100&q=80"}
-                  alt="profile"
-                  className="w-7 h-7 rounded-full object-cover"
-                />
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt="profile"
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-orange-500 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                    {(user?.name || "Admin").charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div className="hidden lg:block text-left leading-none">
                   <h4 className="font-semibold text-xs">{user?.name || "Mr. Souvik"}</h4>
                   <p className="text-[10px] text-slate-400">Global Admin</p>

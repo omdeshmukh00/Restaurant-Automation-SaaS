@@ -168,6 +168,7 @@ export const registerRestaurantSchema = z.object({
   message: z.string().trim().optional().nullable(),
   plan: z.string().trim().min(1, 'Plan is required'),
   status: z.enum(['Active', 'Trial', 'Inactive']),
+  isVeg: z.enum(['veg', 'non-veg', 'both']).optional().default('both'),
 });
 
 export type RegisterRestaurantInput = z.infer<typeof registerRestaurantSchema>;
@@ -182,6 +183,8 @@ export const createRestaurantSchema = z.object({
   status: z.enum(['Active', 'Trial', 'Inactive']).optional().default('Trial'),
   branches: z.number().int().min(1).optional().default(1),
   revenue: z.string().optional().default('₹0'),
+  isVeg: z.enum(['veg', 'non-veg', 'both']).optional().default('both'),
+  coverImage: z.string().trim().optional(),
 });
 
 export type CreateRestaurantInput = z.infer<typeof createRestaurantSchema>;

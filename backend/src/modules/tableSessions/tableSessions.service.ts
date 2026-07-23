@@ -89,16 +89,16 @@ export async function validateSession(token: string, allowClosed = false): Promi
   }
 
   // Idle timeout check (5 minutes, bypassed if order placed)
-  const { OrderModel } = await import('../orders/orders.model');
-  const { OrderStatus } = await import('../../constants/statuses');
-  const hasOrders = await OrderModel.exists({
-    sessionId: session._id,
-    status: { $ne: OrderStatus.CANCELLED }
-  });
+  const idleLimit = 5 * 60_000; // 5 minutes
+  if (Date.now() - session.lastActivityAt.getTime() > idleLimit) {
+    const { OrderModel } = await import('../orders/orders.model');
+    const { OrderStatus } = await import('../../constants/statuses');
+    const hasOrders = await OrderModel.exists({
+      sessionId: session._id,
+      status: { $ne: OrderStatus.CANCELLED }
+    });
 
-  if (!hasOrders) {
-    const idleLimit = 5 * 60_000; // 5 minutes
-    if (Date.now() - session.lastActivityAt.getTime() > idleLimit) {
+    if (!hasOrders) {
       session.status = SessionStatus.EXPIRED;
       await session.save();
       await updateTableStatus(session.tableId.toString(), TableStatus.NEEDS_CLEANING, session.restaurantId.toString());

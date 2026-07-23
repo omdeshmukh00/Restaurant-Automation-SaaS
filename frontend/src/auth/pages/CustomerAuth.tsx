@@ -40,17 +40,10 @@ const CustomerAuth: React.FC = () => {
   ];
 
   useEffect(() => {
-    const saved = localStorage.getItem('customerOtpExpiresAt');
-    if (saved) {
-      const remaining = Math.max(0, Math.floor((new Date(saved).getTime() - new Date().getTime()) / 1000));
-      if (remaining > 0) {
-        setOtpExpiresAt(saved);
-        setCountdown(remaining);
-        setOtpSent(true);
-      } else {
-        localStorage.removeItem('customerOtpExpiresAt');
-      }
-    }
+    localStorage.removeItem('customerOtpExpiresAt');
+    setOtpSent(false);
+    setOtpExpiresAt(null);
+    setCountdown(0);
   }, []);
 
   useEffect(() => {
@@ -188,7 +181,17 @@ const CustomerAuth: React.FC = () => {
 
       setSuccess('Logged in successfully!');
       setTimeout(() => {
-        if (tableToken) {
+        const pendingQrToken =
+          searchParams.get('qr_token') ||
+          searchParams.get('table_token') ||
+          searchParams.get('qr') ||
+          searchParams.get('table') ||
+          sessionStorage.getItem('pending_qr_token');
+
+        if (pendingQrToken) {
+          sessionStorage.removeItem('pending_qr_token');
+          navigate(`/customer/home?qr_token=${pendingQrToken}`, { replace: true });
+        } else if (tableToken) {
           navigate(`/table?token=${tableToken}`, { replace: true });
         } else {
           navigate(from, { replace: true });
@@ -211,10 +214,20 @@ const CustomerAuth: React.FC = () => {
   };
 
   const handleGuestContinue = () => {
-    if (tableToken) {
+    const pendingQrToken =
+      searchParams.get('qr_token') ||
+      searchParams.get('table_token') ||
+      searchParams.get('qr') ||
+      searchParams.get('table') ||
+      sessionStorage.getItem('pending_qr_token');
+
+    if (pendingQrToken) {
+      sessionStorage.removeItem('pending_qr_token');
+      navigate(`/customer/home?qr_token=${pendingQrToken}`, { replace: true });
+    } else if (tableToken) {
       navigate(`/table?token=${tableToken}`, { replace: true });
     } else {
-      navigate('/customer?scan=true', { replace: true });
+      navigate('/customer/home', { replace: true });
     }
   };
 
@@ -243,13 +256,31 @@ const CustomerAuth: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Mobile Input */}
-        <div className={otpSent ? 'opacity-50 pointer-events-none' : ''}>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 mb-1 font-sans">
-                Enter Mobile Number
-              </label>
-              <p className="text-xs text-slate-400 dark:text-zinc-500 mb-3 font-sans">
-                We will send you a 4-digit OTP
-              </p>
+        <div className={otpSent ? 'opacity-60' : ''}>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 font-sans">
+              Enter Mobile Number
+            </label>
+            {otpSent && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp(['', '', '', '']);
+                  setError(null);
+                  setOtpExpiresAt(null);
+                  setCountdown(0);
+                  localStorage.removeItem('customerOtpExpiresAt');
+                }}
+                className="text-xs font-semibold text-orange-500 hover:text-orange-600 font-sans cursor-pointer underline"
+              >
+                Change Number
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 dark:text-zinc-500 mb-3 font-sans">
+            We will send you a 4-digit OTP
+          </p>
 
               <div className="flex items-stretch border border-slate-200 dark:border-zinc-700 rounded-2xl overflow-hidden focus-within:border-orange-500 focus-within:ring-1 focus-within:ring-orange-500 transition-all duration-200">
                 {/* Country selector */}

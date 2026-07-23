@@ -15,7 +15,8 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'quantity' | 'cartItemId'>) => void;
+  addItem: (item: { id: string; name?: string; price?: number; image?: string; description?: string }, quantity?: number, skipFetch?: boolean) => Promise<boolean>;
+  reorderItems: (items: { id: string; name: string; qty: number }[]) => Promise<{ success: number; failed: number }>;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -68,15 +69,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     fetchCart();
   }, [fetchCart]);
 
-  const addItem = useCallback(async (item: Omit<CartItem, 'quantity' | 'cartItemId'>) => {
+  const addItem = useCallback(async (item: { id: string; name?: string }, quantity = 1, skipFetch = false) => {
     try {
-      await apiClient.post('/customer/cart/items', { menuItem: item.id, quantity: 1 });
-      await fetchCart();
+      await apiClient.post('/customer/cart/items', { menuItem: item.id, quantity });
+      if (!skipFetch) {
+        await fetchCart();
+      }
       useCustomerStore.getState().recordActivity();
+      return true;
     } catch (err) {
       console.error('Failed to add item', err);
+      return false;
     }
   }, [fetchCart]);
+
+  const reorderItems = useCallback(async (itemsToReorder: { id: string; name: string; qty: number }[]) => {
+    let success = 0;
+    let failed = 0;
+    
+    for (const item of itemsToReorder) {
+      if (!item.id) {
+        failed++;
+        continue;
+      }
+      const added = await addItem({ id: item.id, name: item.name }, item.qty, true);
+      if (added) success++;
+      else failed++;
+    }
+    
+    // Batch refresh only once
+    await fetchCart();
+    await useCustomerStore.getState().fetchLiveBill();
+    
+    return { success, failed };
+  }, [addItem, fetchCart]);
 
   const removeItem = useCallback(async (id: string) => {
     const existing = items.find((i) => i.id === id);
@@ -159,6 +185,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     () => ({
       items,
       addItem,
+      reorderItems,
       removeItem,
       updateQuantity,
       clearCart,
@@ -172,7 +199,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       appliedCoupon,
       setAppliedCoupon,
     }),
-    [items, addItem, removeItem, updateQuantity, clearCart, itemCount, subtotal, resCharges, discount, total, isCartOpen, appliedCoupon]
+    [items, addItem, reorderItems, removeItem, updateQuantity, clearCart, itemCount, subtotal, resCharges, discount, total, isCartOpen, appliedCoupon]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

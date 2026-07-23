@@ -1,9 +1,8 @@
-// src/features/staff/pages/StaffProfilePage.tsx
-
 import React, { useState, useRef } from 'react';
 import { useStaffProfile } from '../hooks/useStaffProfile';
 import ImageCropperModal from '../../customer/components/dashboard/ImageCropperModal';
 import { useAuth } from '../../../auth/AuthProvider';
+import { apiClient } from '../../../shared/services/apiClient';
 
 export default function StaffProfilePage() {
   const { signOut } = useAuth();
@@ -71,6 +70,15 @@ export default function StaffProfilePage() {
     }
 
     // Direct save if phone number was not changed
+    try {
+      await apiClient.patch('/users/me', {
+        name: editName,
+        mobile: editPhone,
+      });
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { name: editName, mobile: editPhone } }));
     updateProfile({
       name: editName,
       role: editRole,
@@ -123,7 +131,13 @@ export default function StaffProfilePage() {
     }
   };
 
-  const handleCropConfirm = (croppedBase64: string) => {
+  const handleCropConfirm = async (croppedBase64: string) => {
+    try {
+      await apiClient.patch('/users/me', { avatar: croppedBase64 });
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
     updateProfile({ avatar: croppedBase64 });
     setShowCropModal(false);
   };

@@ -85,7 +85,7 @@ export default function CuisineExplorer({ cuisines, activeCuisine, onCuisineSele
   };
 
   return (
-    <section className="py-12 sm:py-16">
+    <section className="pt-12 pb-4 sm:pt-16 sm:pb-6">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
         {/* Header */}
         <div className="mb-8">

@@ -1,7 +1,7 @@
 // components/AddRestaurantModal.tsx
 
-import { useState, useEffect } from "react";
-import { X, MapPin, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, MapPin, RefreshCw, Camera } from "lucide-react";
 // Fixed relative import path to point to the local folder types directly
 import type { NewRestaurantForm } from "./Restauranttypes";
 
@@ -28,6 +28,22 @@ export default function AddRestaurantModal({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [phonePrefix, setPhonePrefix] = useState("+91");
   const [phoneVal, setPhoneVal] = useState("");
+  const [coverImagePreview, setCoverImagePreview] = useState<string | null>(formData.coverImage || null);
+  const coverImageRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 2 * 1024 * 1024) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setCoverImagePreview(result);
+      onChange({ coverImage: result });
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (formData.phone) {
@@ -215,6 +231,19 @@ export default function AddRestaurantModal({
                 />
               </div>
               <div>
+                <label htmlFor="isVeg" className={labelClass}>Vegetarian Type *</label>
+                <select
+                  id="isVeg"
+                  value={formData.isVeg || "both"}
+                  onChange={(e) => onChange({ isVeg: e.target.value })}
+                  className={selectClass}
+                >
+                  <option value="both" className={optionClass}>Veg & Non-Veg</option>
+                  <option value="veg" className={optionClass}>Pure Veg</option>
+                  <option value="non-veg" className={optionClass}>Non-Veg Only</option>
+                </select>
+              </div>
+              <div>
                 <label htmlFor="branches" className={labelClass}>Number of Branches *</label>
                 <input
                   id="branches"
@@ -239,6 +268,53 @@ export default function AddRestaurantModal({
                 />
               </div>
             </div>
+          </div>
+
+          {/* Cover Image Upload */}
+          <div className="space-y-3">
+            <h4 className={`text-xs font-bold uppercase tracking-wider ${darkMode ? "text-orange-400" : "text-orange-600"}`}>
+              Restaurant Cover Image *
+            </h4>
+            <div className="flex items-center gap-4">
+              {coverImagePreview ? (
+                <div className="relative group w-28 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                  <img src={coverImagePreview} alt="Cover" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => coverImageRef.current?.click()}
+                      className="p-1.5 bg-white/90 rounded-full text-slate-700 hover:bg-white mr-1"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setCoverImagePreview(null); onChange({ coverImage: undefined }); if (coverImageRef.current) coverImageRef.current.value = ''; }}
+                      className="p-1.5 bg-white/90 rounded-full text-red-600 hover:bg-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => coverImageRef.current?.click()}
+                  className={`w-28 h-20 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer flex-shrink-0 ${
+                    darkMode
+                      ? 'border-slate-700 hover:border-orange-500 bg-slate-900/50 hover:bg-orange-950/30'
+                      : 'border-slate-300 hover:border-orange-400 bg-slate-50 hover:bg-orange-50'
+                  }`}
+                >
+                  <Camera className={`w-5 h-5 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} />
+                  <span className={`text-[9px] font-semibold ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Add Photo</span>
+                </button>
+              )}
+              <p className={`text-[11px] leading-relaxed ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                Upload a cover image for the restaurant listing. Max 2MB. JPG, PNG, or WebP.
+              </p>
+            </div>
+            <input ref={coverImageRef} type="file" accept="image/*" className="hidden" onChange={handleCoverImageSelect} />
           </div>
 
           {/* Section 2: Contact Info */}

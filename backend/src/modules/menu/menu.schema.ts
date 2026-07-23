@@ -80,6 +80,7 @@ export const createItemSchema = z.object({
   image: z.string().url('Invalid image URL').optional().or(z.literal('')),
   images: z.array(z.string().url()).max(10).optional(),
   isVeg: z.boolean(),
+  isSpicy: z.boolean().optional().default(false),
   isAvailable: z.boolean().optional().default(true),
   isHidden: z.boolean().optional().default(false),
   stockQuantity: z.number().min(0).optional(),

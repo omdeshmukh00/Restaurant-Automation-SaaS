@@ -117,7 +117,9 @@ export interface CreateAuditLogInput {
   actorRole:    string;
   restaurantId?: string | null;
   entityType:   AuditEntity;
-  entityId:     string;
+  entityId?:    string | null;
+  externalEntityId?: string | null;
+  provider?:    string;
   action:       AuditAction;
   metadata?:    Record<string, unknown>;
   ipAddress?:   string;
