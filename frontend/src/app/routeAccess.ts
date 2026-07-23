@@ -6,7 +6,11 @@ export const CUSTOMER_AUTH_ROUTES = [
   '/customer/profile',
   '/customer/loyalty',
   '/customer/preferences',
-  '/customer/settings'
+  '/customer/settings',
+  '/customer/reservations',
+  '/customer/feedback',
+  '/customer/order-history',
+  '/customer/previous-invoices'
 ];
 
 export const CUSTOMER_SESSION_ROUTES = [
@@ -15,7 +19,7 @@ export const CUSTOMER_SESSION_ROUTES = [
   '/customer/cart',
   '/customer/checkout',
   '/customer/live-bill',
-  '/customer/orders'
+  '/customer/orders' // This is now purely Current Orders
 ];
 
 export function getCustomerRouteAccessLevel(pathname: string): RouteAccessLevel {

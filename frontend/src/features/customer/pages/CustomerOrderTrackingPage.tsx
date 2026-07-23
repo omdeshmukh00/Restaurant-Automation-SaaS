@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf';
 import { useCustomerStore, TrackedOrder } from '../store/customer.store';
 import { useCustomerPayment } from '../hooks/useCustomerPayment';
 import { useCart } from '../components/dashboard/CartContext';
+import { getInvoicePdfUrl } from '../api/customer.api';
 
 const STEPS = [
   { icon: 'assignment_turned_in', label: 'Confirmed' },
@@ -26,7 +27,8 @@ export default function CustomerOrderTrackingPage() {
   
   // Read invoice query param: e.g. ?invoice=true
   const showInvoiceModal = searchParams.get('invoice') === 'true';
-  const hasOfficialInvoice = liveBill?.paymentStatus === 'PAID' && !!liveBill?.invoiceNumber;
+  const isPaid = liveBill?.paymentStatus === 'PAID';
+  const isFinalizing = (paymentStatus === 'VERIFYING' || paymentStatus === 'SUCCESS') && !isPaid;
 
   // Find active orders (status in Placed, Preparing, Ready)
   const activeOrders = diningSession 
@@ -108,95 +110,9 @@ export default function CustomerOrderTrackingPage() {
   };
 
   const downloadInvoice = () => {
-    if (!liveBill || !hasOfficialInvoice) return;
-
-    const doc = new jsPDF();
-    
-    // Header styling
-    doc.setFillColor(235, 120, 40); // Smart Dining primary color tone
-    doc.rect(0, 0, 210, 15, "F");
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("SMART DINING BILL RECEIPT", 14, 10);
-    
-    // Restaurant Info
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(20);
-    doc.text("Smart Dining SaaS", 14, 30);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("Table: " + tableCode + " | Date: " + new Date().toLocaleDateString(), 14, 37);
-    
-    // Divider
-    doc.setDrawColor(220, 220, 220);
-    doc.line(14, 48, 196, 48);
-    
-    // Order Info
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text("Invoice No: " + liveBill.invoiceNumber, 14, 55);
-    doc.text("Status: " + liveBill.paymentStatus, 14, 60);
-    
-    // Items table header
-    let y = 72;
-    doc.line(14, y - 4, 196, y - 4);
-    doc.setFontSize(10);
-    doc.text("Item Details", 14, y);
-    doc.text("Qty", 125, y);
-    doc.text("Unit Price", 150, y);
-    doc.text("Total", 175, y);
-    doc.line(14, y + 2, 196, y + 2);
-    
-    y += 8;
-    doc.setFont("helvetica", "normal");
-    
-    const allItems = liveBill.orders.flatMap((o: any) => o.items);
-    allItems.forEach((item: any) => {
-      doc.text(item.name, 14, y);
-      doc.text(String(item.quantity), 125, y);
-      doc.text("INR " + item.price, 150, y);
-      doc.text("INR " + (item.price * item.quantity), 175, y);
-      y += 8;
-    });
-    
-    doc.line(14, y - 4, 196, y - 4);
-    y += 4;
-    
-    // Summary
-    doc.setFont("helvetica", "bold");
-    doc.text("Subtotal:", 125, y);
-    doc.text("INR " + liveBill.subtotal, 175, y);
-    
-    y += 6;
-    doc.text("Taxes:", 125, y);
-    doc.text("INR " + liveBill.taxAmount, 175, y);
-    
-    if (liveBill.serviceCharge > 0) {
-      y += 6;
-      doc.text("Service Charge:", 125, y);
-      doc.text("INR " + liveBill.serviceCharge, 175, y);
-    }
-
-    if (liveBill.discountAmount > 0) {
-      y += 6;
-      doc.text("Discount:", 125, y);
-      doc.text("- INR " + liveBill.discountAmount, 175, y);
-    }
-    
-    y += 8;
-    doc.setFontSize(12);
-    doc.text("Grand Total:", 125, y);
-    doc.text("INR " + liveBill.finalAmount, 175, y);
-    
-    // Footer
-    y += 20;
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "italic");
-    doc.text("Thank you for dining with us! Hope to serve you again.", 14, y);
-    
-    doc.save(`invoice-${liveBill.invoiceNumber}.pdf`);
+    if (!liveBill?._id) return;
+    const url = getInvoicePdfUrl(liveBill._id);
+    window.open(url, '_blank');
   };
 
   // ────────────────────────────────────────────────────────
@@ -233,7 +149,7 @@ export default function CustomerOrderTrackingPage() {
                     <p className="text-xs text-sd-on-surface-variant font-sans mt-1 max-w-sm truncate">
                       {order.items}
                     </p>
-                    <p className="text-[10px] text-sd-on-surface-variant/60 font-sans mt-1">Total Paid: ₹{order.total}</p>
+                    <p className="text-[10px] text-sd-on-surface-variant/60 font-sans mt-1">Total Paid: ₹{Number(order.total).toFixed(2)}</p>
                   </div>
                   
                     <div className="flex gap-2 self-end sm:self-center shrink-0">
@@ -268,6 +184,79 @@ export default function CustomerOrderTrackingPage() {
     );
   }
 
+  if (isFinalizing) {
+    return (
+      <div className="p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-full sd-custom-scrollbar flex items-center justify-center">
+        <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-8 border border-sd-outline-variant dark:border-sd-outline-variant/40 text-center sd-food-card-shadow flex flex-col items-center justify-center w-full max-w-sm">
+          <div className="w-16 h-16 rounded-full bg-sd-primary/10 flex items-center justify-center text-sd-primary mb-4">
+            <span className="material-symbols-outlined text-3xl animate-spin">refresh</span>
+          </div>
+          <h3 className="font-bold text-xl font-sans text-sd-on-surface mb-2">Finalizing Payment</h3>
+          <p className="text-sm text-sd-on-surface-variant font-sans mb-4">
+            Please wait while we sync your official invoice...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPaid) {
+    return (
+      <div className="p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-full sd-custom-scrollbar">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-12">
+            <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-8 border border-sd-outline-variant dark:border-sd-outline-variant/40 text-center sd-food-card-shadow flex flex-col items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/40 flex items-center justify-center text-green-600 mb-4">
+                <span className="material-symbols-outlined text-3xl">check_circle</span>
+              </div>
+              <h3 className="font-bold text-2xl font-sans text-sd-on-surface mb-2">Payment Successful!</h3>
+              <p className="text-sm text-sd-on-surface-variant font-sans max-w-md mx-auto mb-6">
+                Your dining session has been completed and the bill is settled. 
+                Thank you for dining at {diningSession?.restaurantName || 'our restaurant'}.
+              </p>
+              
+              <div className="bg-sd-surface dark:bg-sd-surface-container-low rounded-xl p-6 w-full max-w-sm mb-6 border border-sd-outline-variant">
+                <div className="flex justify-between items-center mb-3 text-sm">
+                  <span className="text-sd-on-surface-variant">Table</span>
+                  <span className="font-bold text-sd-on-surface">{diningSession?.tableNumber || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between items-center mb-3 text-sm">
+                  <span className="text-sd-on-surface-variant">Invoice No</span>
+                  <span className="font-bold text-sd-on-surface">{liveBill?.invoiceNumber || 'Pending'}</span>
+                </div>
+                <div className="flex justify-between items-center mb-3 text-sm">
+                  <span className="text-sd-on-surface-variant">Date</span>
+                  <span className="font-bold text-sd-on-surface">{new Date().toLocaleDateString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between items-center mb-3 text-sm">
+                  <span className="text-sd-on-surface-variant">Time</span>
+                  <span className="font-bold text-sd-on-surface">{new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+                <div className="flex justify-between items-center mb-3 text-sm">
+                  <span className="text-sd-on-surface-variant">Payment Method</span>
+                  <span className="font-bold text-sd-on-surface">{(liveBill as any)?.paymentMethod || 'Online'}</span>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-sd-surface-variant text-base">
+                  <span className="font-bold text-sd-on-surface">Amount Paid</span>
+                  <span className="font-bold text-sd-primary">₹{Number(liveBill?.finalAmount || 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <button 
+                onClick={downloadInvoice}
+                disabled={!liveBill?.invoiceNumber}
+                className="px-6 py-3 bg-sd-primary text-white rounded-xl text-sm font-bold font-sans active:scale-95 transition-transform flex items-center gap-2 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">download</span>
+                Download Official Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-full sd-custom-scrollbar">
       <div className="mb-6 flex justify-between items-start">
@@ -282,7 +271,7 @@ export default function CustomerOrderTrackingPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left / Active Order Column */}
-        <div className={(liveBill?.status === 'PAID' || liveBill?.paymentStatus === 'PAID') ? "lg:col-span-12 space-y-6" : "lg:col-span-8 space-y-6"}>
+        <div className="lg:col-span-8 space-y-6">
           
           {/* Past Orders Section */}
           <div className="space-y-4">
@@ -308,7 +297,7 @@ export default function CustomerOrderTrackingPage() {
                       <p className="text-xs text-sd-on-surface-variant font-sans mt-1 max-w-sm truncate">
                         {order.items}
                       </p>
-                      <p className="text-[10px] text-sd-on-surface-variant/60 font-sans mt-1">Total Paid: ₹{order.total}</p>
+                      <p className="text-[10px] text-sd-on-surface-variant/60 font-sans mt-1">Total Paid: ₹{Number(order.total).toFixed(2)}</p>
                     </div>
                     
                     <div className="flex gap-2 self-end sm:self-center shrink-0">
@@ -460,90 +449,73 @@ export default function CustomerOrderTrackingPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-sd-on-surface text-sm font-sans truncate">{item.name}</h4>
-                      <p className="text-[10px] text-sd-on-surface-variant font-sans">Qty: {item.quantity} • Unit: ₹{item.price}</p>
+                      <p className="text-[10px] text-sd-on-surface-variant font-sans">Qty: {item.quantity} • Unit: ₹{Number(item.price).toFixed(2)}</p>
                     </div>
-                    <span className="font-bold text-sd-on-surface text-sm font-sans shrink-0">₹{item.price * item.quantity}</span>
+                    <span className="font-bold text-sd-on-surface text-sm font-sans shrink-0">₹{Number(item.price * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
               </div>
               <div className="pt-4 border-t border-sd-surface-variant space-y-2">
                 <div className="flex justify-between items-center text-sm font-sans text-sd-on-surface-variant">
                   <span>Item Total</span>
-                  <span>₹{liveBill.subtotal || 0}</span>
+                  <span>₹{Number(liveBill.subtotal || 0).toFixed(2)}</span>
                 </div>
                 {liveBill.taxAmount > 0 && (
                   <div className="flex justify-between items-center text-sm font-sans text-sd-on-surface-variant">
                     <span>Taxes</span>
-                    <span>₹{liveBill.taxAmount}</span>
+                    <span>₹{Number(liveBill.taxAmount).toFixed(2)}</span>
                   </div>
                 )}
                 {liveBill.serviceCharge > 0 && (
                   <div className="flex justify-between items-center text-sm font-sans text-sd-on-surface-variant">
                     <span>Restaurant Charges</span>
-                    <span>₹{liveBill.serviceCharge}</span>
+                    <span>₹{Number(liveBill.serviceCharge).toFixed(2)}</span>
                   </div>
                 )}
                 {liveBill.discountAmount > 0 && (
                   <div className="flex justify-between items-center text-sm font-sans text-sd-secondary">
                     <span>Discount</span>
-                    <span className="font-bold">- ₹{liveBill.discountAmount}</span>
+                    <span className="font-bold">- ₹{Number(liveBill.discountAmount).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="pt-2 border-t border-sd-surface-variant/50 flex justify-between items-center text-sm font-sans text-sd-on-surface mt-2">
                   <span className="font-bold">Total Bill</span>
-                  <span className="font-bold text-sd-primary text-base">₹{liveBill.finalAmount}</span>
+                  <span className="font-bold text-sd-primary text-base">₹{Number(liveBill.finalAmount).toFixed(2)}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Payment Section OR Invoice Section */}
-          {hasOfficialInvoice ? (
-            <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
-              <h4 className="text-sm font-bold font-sans text-sd-on-surface mb-4">Official Invoice</h4>
-              <p className="text-xs text-sd-on-surface-variant font-sans mb-4">Your bill has been successfully settled. You can now download your official invoice.</p>
+          {/* Payment Section */}
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
+            <h4 className="text-sm font-bold font-sans text-sd-on-surface mb-4">Payment Options</h4>
+            <div className="flex flex-col gap-3">
               <button 
-                onClick={() => setSearchParams({ invoice: 'true' })}
-                className="w-full py-2.5 rounded-xl bg-sd-primary text-white font-bold text-sm hover:bg-sd-primary/95 transition-colors font-sans flex items-center justify-center gap-2"
+                onClick={payLiveBill}
+                disabled={loading}
+                className="w-full py-2.5 rounded-xl bg-sd-primary text-white font-bold text-sm hover:bg-sd-primary/95 transition-colors font-sans flex items-center justify-center gap-2 disabled:opacity-70"
               >
-                <span className="material-symbols-outlined text-[18px]">receipt_long</span>
-                View Official Invoice
+                <span className="material-symbols-outlined text-[18px]">credit_card</span>
+                {loading ? 'Processing...' : 'Pay Online Now'}
+              </button>
+              <button 
+                onClick={payCashAtCounter}
+                disabled={loading}
+                className="w-full py-2.5 rounded-xl border border-sd-outline-variant text-sd-on-surface font-bold text-sm hover:bg-sd-surface-variant/50 transition-colors font-sans flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                <span className="material-symbols-outlined text-[18px]">payments</span>
+                Pay with Cash
               </button>
             </div>
-          ) : (
-            <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
-              <h4 className="text-sm font-bold font-sans text-sd-on-surface mb-4">Payment Options</h4>
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={payLiveBill}
-                  disabled={loading || paymentStatus === 'SUCCESS'}
-                  className="w-full py-2.5 rounded-xl bg-sd-primary text-white font-bold text-sm hover:bg-sd-primary/95 transition-colors font-sans flex items-center justify-center gap-2 disabled:opacity-70"
-                >
-                  <span className="material-symbols-outlined text-[18px]">credit_card</span>
-                  {loading ? 'Processing...' : 'Pay Online Now'}
-                </button>
-                <button 
-                  onClick={payCashAtCounter}
-                  disabled={loading || paymentStatus === 'SUCCESS'}
-                  className="w-full py-2.5 rounded-xl border border-sd-outline-variant text-sd-on-surface font-bold text-sm hover:bg-sd-surface-variant/50 transition-colors font-sans flex items-center justify-center gap-2 disabled:opacity-70"
-                >
-                  <span className="material-symbols-outlined text-[18px]">payments</span>
-                  Pay with Cash
-                </button>
-              </div>
-              {paymentStatus === 'FAILED' && (
-                <p className="text-xs text-red-500 mt-3 text-center font-sans font-semibold">Payment failed. Please try again.</p>
-              )}
-              {paymentStatus === 'SUCCESS' && (
-                <p className="text-xs text-green-600 mt-3 text-center font-sans font-semibold">Payment successful!</p>
-              )}
-            </div>
-          )}
+            {paymentStatus === 'FAILED' && (
+              <p className="text-xs text-red-500 mt-3 text-center font-sans font-semibold">Payment failed. Please try again.</p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Invoice Modal Popup */}
-      {showInvoiceModal && hasOfficialInvoice && liveBill && (
+      {showInvoiceModal && isPaid && liveBill && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-scaleUp flex flex-col max-h-[90vh]">
             
@@ -600,10 +572,10 @@ export default function CustomerOrderTrackingPage() {
                       <div key={idx} className="flex justify-between items-center text-sm font-sans text-sd-on-surface">
                         <div className="flex-1">
                           <p className="font-bold">{item.name}</p>
-                          <p className="text-[10px] text-sd-on-surface-variant">Unit Price: ₹{item.price}</p>
+                          <p className="text-[10px] text-sd-on-surface-variant">Unit Price: ₹{Number(item.price).toFixed(2)}</p>
                         </div>
                         <span className="text-sd-on-surface-variant font-semibold w-16 text-center">x{item.quantity}</span>
-                        <span className="font-bold w-20 text-right">₹{item.price * item.quantity}</span>
+                        <span className="font-bold w-20 text-right">₹{Number(item.price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -613,22 +585,22 @@ export default function CustomerOrderTrackingPage() {
                 <div className="space-y-2 border-b border-sd-surface-variant pb-4 text-sm font-sans text-sd-on-surface-variant">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span className="font-semibold text-sd-on-surface">₹{liveBill.subtotal}</span>
+                    <span className="font-semibold text-sd-on-surface">₹{Number(liveBill.subtotal).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Taxes</span>
-                    <span className="font-semibold text-sd-on-surface">₹{liveBill.taxAmount}</span>
+                    <span className="font-semibold text-sd-on-surface">₹{Number(liveBill.taxAmount).toFixed(2)}</span>
                   </div>
                   {liveBill.serviceCharge > 0 && (
                     <div className="flex justify-between">
                       <span>Service Charge</span>
-                      <span className="font-semibold text-sd-on-surface">₹{liveBill.serviceCharge}</span>
+                      <span className="font-semibold text-sd-on-surface">₹{Number(liveBill.serviceCharge).toFixed(2)}</span>
                     </div>
                   )}
                   {liveBill.discountAmount > 0 && (
                     <div className="flex justify-between text-sd-secondary">
                       <span>Discount</span>
-                      <span className="font-semibold">- ₹{liveBill.discountAmount}</span>
+                      <span className="font-semibold">- ₹{Number(liveBill.discountAmount).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -636,7 +608,7 @@ export default function CustomerOrderTrackingPage() {
                 {/* Grand Total */}
                 <div className="flex justify-between items-center text-base font-bold font-sans text-sd-on-surface">
                   <span>Grand Total</span>
-                  <span className="text-lg text-sd-primary">₹{liveBill.finalAmount}</span>
+                  <span className="text-lg text-sd-primary">₹{Number(liveBill.finalAmount).toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -644,8 +616,8 @@ export default function CustomerOrderTrackingPage() {
             {/* Modal Footer */}
             <div className="p-4 bg-sd-surface-container-low border-t border-sd-surface-variant flex gap-3 shrink-0">
               <button
-                onClick={() => downloadInvoice()}
-                className="flex-1 bg-sd-primary hover:bg-sd-primary/95 text-white py-3 rounded-2xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2 font-sans active:scale-95"
+                onClick={downloadInvoice}
+                className="flex-1 bg-sd-primary hover:bg-sd-primary/95 text-white py-3 rounded-2xl font-bold text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2 font-sans active:scale-95 no-underline"
               >
                 <span className="material-symbols-outlined text-[18px]">download</span>
                 Download PDF

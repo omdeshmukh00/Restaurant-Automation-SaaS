@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 import CustomerLayout from '../layouts/CustomerLayout';
+import { CustomerSessionGuard } from '../app/guards/CustomerSessionGuard';
 import CustomerHomePage from '../features/customer/pages/CustomerHomePage';
 import CustomerMenuPage from '../features/customer/pages/CustomerMenuPage';
 import CustomerCheckoutPage from '../features/customer/pages/CustomerCheckoutPage';
@@ -15,13 +16,26 @@ export const customerRoutes: RouteObject[] = [
     element: <CustomerLayout />,
     children: [
       { index: true, element: <Navigate to="home" replace /> },
-      { path: 'home', element: <CustomerHomePage /> },
-      { path: 'menu', element: <CustomerMenuPage /> },
-      { path: 'checkout', element: <CustomerCheckoutPage /> },
-      { path: 'orders', element: <CustomerOrderTrackingPage /> },
+      
+      // Account routes (no session required, protected by AuthGuard internally or ProtectedRoute)
       { path: 'reservations', element: <CustomerReservationPage /> },
       { path: 'feedback', element: <CustomerFeedbackPage /> },
       { path: 'profile', element: <CustomerProfilePage /> },
+      // Placeholders for Phase 3 pages:
+      // { path: 'order-history', element: <CustomerOrderHistoryPage /> },
+      // { path: 'previous-invoices', element: <CustomerPreviousInvoicesPage /> },
+
+      // Session routes (require active dining session)
+      {
+        element: <CustomerSessionGuard />,
+        children: [
+          { path: 'home', element: <CustomerHomePage /> },
+          { path: 'menu', element: <CustomerMenuPage /> },
+          { path: 'checkout', element: <CustomerCheckoutPage /> },
+          { path: 'orders', element: <CustomerOrderTrackingPage /> },
+          { path: 'live-bill', element: <Navigate to="orders" replace /> }, // Placeholder mapping
+        ]
+      }
     ],
   },
 ];
