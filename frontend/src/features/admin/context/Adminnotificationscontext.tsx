@@ -45,8 +45,90 @@ export function AdminNotificationsProvider({ children }: PropsWithChildren) {
 
     socket.on('notification:new', handleNotificationNew);
 
+    // Additional real-time events for the admin notification bar
+    const onOrderCreated = (payload: any) => {
+      store.addRealtimeNotification({
+        _id: `order-${Date.now()}`,
+        title: 'New Order',
+        message: `New order received${payload?.orderId ? ` (#${payload.orderId})` : ''}`,
+        type: 'ORDER_NEW',
+        read: false,
+        createdAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'orders',
+        category: 'SYSTEM' as any,
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
+    };
+
+    const onStaffRequest = (_payload: any) => {
+      store.addRealtimeNotification({
+        _id: `staff-${Date.now()}`,
+        title: 'Staff Request',
+        message: 'New staff assistance request',
+        type: 'STAFF_REQUEST',
+        read: false,
+        createdAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'staff',
+        category: 'SYSTEM' as any,
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
+    };
+
+    const onStaffTicket = (payload: any) => {
+      store.addRealtimeNotification({
+        _id: `ticket-${Date.now()}`,
+        title: 'Escalation Ticket',
+        message: `Escalation Ticket: ${payload?.subject || payload?.notes || 'Staff issue escalated'}`,
+        type: 'TICKET',
+        read: false,
+        createdAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'staff',
+        category: 'SYSTEM' as any,
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
+    };
+
+    const onBillRequested = (payload: any) => {
+      store.addRealtimeNotification({
+        _id: `bill-${Date.now()}`,
+        title: 'Bill Requested',
+        message: `Bill Requested for Table ${payload?.tableNumber || ''}`,
+        type: 'BILL_REQUESTED',
+        read: false,
+        createdAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'billing',
+        category: 'SYSTEM' as any,
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
+    };
+
+    socket.on('order.created', onOrderCreated);
+    socket.on('staff:request-new', onStaffRequest);
+    socket.on('staff.ticket.created', onStaffTicket);
+    socket.on('bill.requested', onBillRequested);
+
     return () => {
       socket.off('notification:new', handleNotificationNew);
+      socket.off('order.created', onOrderCreated);
+      socket.off('staff:request-new', onStaffRequest);
+      socket.off('staff.ticket.created', onStaffTicket);
+      socket.off('bill.requested', onBillRequested);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -12,6 +12,7 @@ import { useInventoryStore } from '../store/inventory.store';
 import { useMenuStore }      from '../store/menu.store';
 import { useStaffStore }     from '../store/staff.store';
 import { useTablesStore }    from '../store/tables.store';
+import { useSettingsStore }  from '../store/settings.store';
 
 function useSyncSearchToStore(query: string, pathname: string) {
   const setOrders      = useOrdersStore((s) => s.setSearchQuery);
@@ -87,8 +88,9 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
     return 'Search orders, customers, tables…';
   }
 
-  const displayName = user?.name ?? 'Admin';
-  const avatarSeed  = displayName.replace(/\s+/g, '');
+  const adminState = useSettingsStore((s) => s.admin);
+  const displayName = user?.name || adminState.name || 'Admin';
+  const avatarImage = user?.avatar || adminState.avatar;
 
   const searchInput = (inputRef?: React.RefObject<HTMLInputElement>) => (
     <div className="relative w-full">
@@ -176,11 +178,17 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
               onClick={() => { setUserMenuOpen(!userMenuOpen); }}
               className="flex items-center gap-2 sm:gap-2.5 pl-1 pr-2 sm:pr-3 py-1 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              <img
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarSeed}`}
-                alt={displayName}
-                className="w-8 h-8 rounded-full bg-orange-100 object-cover flex-shrink-0"
-              />
+              {avatarImage ? (
+                <img
+                  src={avatarImage}
+                  alt={displayName}
+                  className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-200 dark:border-gray-700"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-blue-500 text-white font-bold flex items-center justify-center flex-shrink-0 text-sm">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div className="text-left hidden sm:block">
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-tight">{displayName}</p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Admin</p>

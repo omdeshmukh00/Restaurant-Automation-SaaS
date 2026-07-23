@@ -8,10 +8,12 @@ import { useCleaning } from '../features/cleaning/hooks/usecleaning';
 import { getCleaningRolePermissions } from '../features/cleaning/utils/cleaningRoleAccess';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
+import { useTranslation } from '../features/cleaning/hooks/useTranslation';
 
 export default function CleaningLayout(): JSX.Element {
   const { settings } = usePlatformSettingsGuard();
   const { profile } = useCleaning();
+  const { t } = useTranslation();
   const location = useLocation();
 
   const allowedPaths = getCleaningRolePermissions(profile.role);
@@ -31,20 +33,20 @@ export default function CleaningLayout(): JSX.Element {
   const getPageDetails = (): { title: string; subtitle: string; badge?: React.ReactNode } => {
     switch (location.pathname) {
       case '/cleaning':
-        return { title: 'Dashboard', subtitle: 'Overview of today\'s cleaning operations.' };
+        return { title: t('dashboardTitle'), subtitle: t('dashboardSubtitle') };
       case '/cleaning/tables':
-        return { title: 'Tables', subtitle: 'View and manage all tables and their cleaning status.' };
+        return { title: t('tablesTitle'), subtitle: t('tablesSubtitle') };
       case '/cleaning/requests':
         return { 
-          title: 'Cleaning Requests', 
-          subtitle: 'Manage and track all cleaning requests raised by users.'
+          title: t('requestsTitle'), 
+          subtitle: t('requestsSubtitle')
         };
       case '/cleaning/tasks':
-        return { title: 'Tasks', subtitle: 'View and manage your assigned hygiene and cleaning tasks.' };
+        return { title: t('tasksTitle'), subtitle: t('tasksSubtitle') };
       case '/cleaning/profile':
-        return { title: 'Profile', subtitle: 'Manage your staff profile and review performance metrics.' };
+        return { title: t('profileTitle'), subtitle: t('profileSubtitle') };
       case '/cleaning/settings':
-        return { title: 'Settings', subtitle: 'Customize preferences, theme, and notification settings.' };
+        return { title: t('settingsTitle'), subtitle: t('settingsSubtitle') };
       default:
         return { title: 'CleanServe', subtitle: 'Management Panel' };
     }

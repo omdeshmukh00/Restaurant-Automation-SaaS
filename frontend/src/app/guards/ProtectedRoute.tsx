@@ -33,7 +33,18 @@ export function ProtectedRoute(): JSX.Element {
   const matched = PATH_PANEL_MAP.find(({ prefix }) => location.pathname.startsWith(prefix));
 
   const searchParams = new URLSearchParams(location.search);
-  const qrToken = searchParams.get('qr_token');
+  const qrToken =
+    searchParams.get('qr_token') ||
+    searchParams.get('table_token') ||
+    searchParams.get('qr') ||
+    searchParams.get('table') ||
+    searchParams.get('tableId');
+
+  useEffect(() => {
+    if (qrToken) {
+      sessionStorage.setItem('pending_qr_token', qrToken);
+    }
+  }, [qrToken]);
 
   useEffect(() => {
     if (matched) {

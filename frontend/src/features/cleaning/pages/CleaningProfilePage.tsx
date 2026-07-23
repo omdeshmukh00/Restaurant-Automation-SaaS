@@ -5,6 +5,8 @@ import ImageCropperModal from '../../customer/components/dashboard/ImageCropperM
 import { useAuth } from '../../../auth/AuthProvider';
 import { useToast } from '../components/dashboard/Toast';
 import { cleaningStore } from '../store/cleaning.store';
+import { useTranslation } from '../hooks/useTranslation';
+import { apiClient } from '../../../shared/services/apiClient';
 
 interface ActivityItem {
   icon: string;
@@ -40,22 +42,25 @@ interface TableTask {
 }
 
 export default function CleaningProfilePage() {
+  const { t, lang } = useTranslation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 🔌 Connect with dynamic system telemetry layer
-  const { urgentTasks, profile, updateProfile } = useCleaning();
+  const { urgentTasks, profile, updateProfile, requestMobileOtp } = useCleaning();
   const { showToast } = useToast();
   const safeTasks: TableTask[] = (urgentTasks || []) as TableTask[];
 
   const [tableList, setTableList] = useState(cleaningStore.tables);
+  const [activitiesList, setActivitiesList] = useState(cleaningStore.activities);
   const [showAllActivities, setShowAllActivities] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
   useEffect(() => {
     const unsubscribe = cleaningStore.subscribe(() => {
       setTableList([...cleaningStore.tables]);
+      setActivitiesList([...cleaningStore.activities]);
     });
     return () => {
       unsubscribe();
@@ -78,6 +83,10 @@ export default function CleaningProfilePage() {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [showOtpInput, setShowOtpInput] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [userEnteredOtp, setUserEnteredOtp] = useState('');
+  const [otpError, setOtpError] = useState('');
 
   // Prefs Modal Form states
   const [editPreferredArea, setEditPreferredArea] = useState('');
@@ -95,6 +104,9 @@ export default function CleaningProfilePage() {
     setEditName(profile.name);
     setEditEmail(profile.email);
     setEditPhone(profile.phone);
+    setShowOtpInput(false);
+    setUserEnteredOtp('');
+    setOtpError('');
     setShowInfoModal(true);
   };
 
@@ -115,14 +127,56 @@ export default function CleaningProfilePage() {
     setShowPasswordModal(true);
   };
 
-  const handleSaveInfo = (e: React.FormEvent) => {
+  const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({
-      name: editName,
-      email: editEmail,
-      phone: editPhone
-    });
-    setShowInfoModal(false);
+    if (editPhone !== profile.phone && !showOtpInput) {
+      try {
+        const res = await requestMobileOtp(editPhone);
+        if (res.success && res.data?.otpSent) {
+          const receivedOtp = res.data.otp || '';
+          setOtpCode(receivedOtp);
+          setShowOtpInput(true);
+          setOtpError('');
+          showToast("Verification code generated. Please check the backend terminal logs.", "info");
+        } else {
+          setOtpError(res.error || "Failed to generate verification code.");
+        }
+      } catch (err) {
+        setOtpError("Error requesting verification code.");
+      }
+      return;
+    }
+
+    if (showOtpInput) {
+      if (userEnteredOtp !== otpCode) {
+        setOtpError("Invalid verification code. Please check the terminal logs.");
+        return;
+      }
+      setShowOtpInput(false);
+    }
+
+    try {
+      try {
+        await apiClient.patch('/users/me', {
+          name: editName,
+          mobile: editPhone,
+        });
+      } catch {
+        // ignore
+      }
+      window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { name: editName, mobile: editPhone } }));
+
+      await updateProfile({
+        name: editName,
+        email: editEmail,
+        phone: editPhone,
+        mobileOtp: showOtpInput ? userEnteredOtp : undefined,
+      } as any);
+      setShowInfoModal(false);
+      showToast("Profile information updated successfully!", "success");
+    } catch (err) {
+      showToast("Failed to update profile.", "error");
+    }
   };
 
   const handleSavePrefs = (e: React.FormEvent) => {
@@ -167,107 +221,62 @@ export default function CleaningProfilePage() {
     }
   };
 
-  const handleCropConfirm = (croppedBase64: string) => {
+  const handleCropConfirm = async (croppedBase64: string) => {
+    try {
+      await apiClient.patch('/users/me', { avatar: croppedBase64 });
+    } catch {
+      // ignore
+    }
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
     updateProfile({ avatar: croppedBase64 });
     setShowCropModal(false);
   };
 
-  const activities: ActivityItem[] = [
-    {
-      icon: 'check_circle',
-      iconBg: 'bg-green-100 dark:bg-green-950/30',
-      iconColor: 'text-green-600 dark:text-green-400',
-      title: 'Completed table T01',
-      timestamp: 'Jun 16, 2026',
-      subtitle: 'Dining Area A • 10:30 AM',
-    },
-    {
-      icon: 'timer',
-      iconBg: 'bg-orange-100 dark:bg-orange-950/30',
-      iconColor: 'text-orange-600 dark:text-orange-400',
-      title: 'Started cleaning table T12',
-      timestamp: 'Jun 16, 2026',
-      subtitle: 'Dining Area A • 10:18 AM',
-    },
-    {
-      icon: 'assignment',
-      iconBg: 'bg-orange-100 dark:bg-orange-950/30',
-      iconColor: 'text-orange-500 dark:text-orange-400',
-      title: 'Completed task',
-      timestamp: 'Jun 16, 2026',
-      subtitle: 'Restroom Sanitization • 09:15 AM',
-    },
-    {
-      icon: 'verified',
-      iconBg: 'bg-purple-100 dark:bg-purple-950/30',
-      iconColor: 'text-purple-600 dark:text-purple-400',
-      title: 'Hygiene score updated',
-      timestamp: 'Jun 15, 2026',
-      subtitle: 'Score: 98% (Excellent)',
-    },
-    {
-      icon: 'check_circle',
-      iconBg: 'bg-green-100 dark:bg-green-950/30',
-      iconColor: 'text-green-600 dark:text-green-400',
-      title: 'Completed table T05',
-      timestamp: 'Jun 15, 2026',
-      subtitle: 'Dining Area B • 03:45 PM',
-    },
-    {
-      icon: 'timer',
-      iconBg: 'bg-orange-100 dark:bg-orange-950/30',
-      iconColor: 'text-orange-600 dark:text-orange-400',
-      title: 'Started cleaning table T08',
-      timestamp: 'Jun 15, 2026',
-      subtitle: 'Dining Area A • 02:30 PM',
-    },
-  ];
-
   const preferences: PreferenceItem[] = [
-    { icon: 'location_on', label: 'Preferred Area', value: profile.preferredArea },
-    { icon: 'light_mode', label: 'Preferred Shift', value: profile.preferredShift },
-    { icon: 'calendar_month', label: 'Days Available', value: profile.daysAvailable },
-    { icon: 'coffee', label: 'Break Preference', value: profile.breakPreference },
-    { icon: 'fact_check', label: 'Preferred Task Types', value: profile.preferredTaskTypes },
+    { icon: 'location_on', label: 'preferredArea', value: profile.preferredArea },
+    { icon: 'light_mode', label: 'preferredShift', value: profile.preferredShift },
+    { icon: 'calendar_month', label: 'daysAvailable', value: profile.daysAvailable },
+    { icon: 'coffee', label: 'breakPreference', value: profile.breakPreference },
+    { icon: 'fact_check', label: 'preferredTaskTypes', value: profile.preferredTaskTypes },
   ];
 
   const badges: BadgeItem[] = [
     {
-      title: 'Consistency Star',
-      desc: 'Completed 20 tasks in a row',
-      earned: 'Earned on Jun 10, 2026',
+      title: 'consistencyStar',
+      desc: 'completed20TasksInARow',
+      earned: 'Jun 10, 2026',
       icon: 'star',
       bgClass: 'bg-green-500',
       shadowClass: 'shadow-green-250 dark:shadow-none',
     },
     {
-      title: 'Hygiene Hero',
-      desc: 'Maintained 95%+ hygiene score for a week',
-      earned: 'Earned on Jun 5, 2026',
+      title: 'hygieneHero',
+      desc: 'maintained95HygieneScore',
+      earned: 'Jun 5, 2026',
       icon: 'shield',
       bgClass: 'bg-blue-500',
       shadowClass: 'shadow-blue-250 dark:shadow-none',
     },
     {
-      title: 'Time Keeper',
-      desc: 'Completed tasks on time for 10 days',
-      earned: 'Earned on May 28, 2026',
+      title: 'timeKeeper',
+      desc: 'completedTasksOnTime',
+      earned: 'May 28, 2026',
       icon: 'schedule',
       bgClass: 'bg-purple-500',
       shadowClass: 'shadow-purple-250 dark:shadow-none',
     },
     {
-      title: 'Clean Sweep',
-      desc: 'No pending tasks for a full day',
-      earned: 'Earned on May 20, 2026',
+      title: 'cleanSweep',
+      desc: 'noPendingTasksFullDay',
+      earned: 'May 20, 2026',
       icon: 'cleaning_services',
       bgClass: 'bg-orange-500',
       shadowClass: 'shadow-orange-250 dark:shadow-none',
     },
     {
-      title: 'Rising Star',
-      desc: 'Top performer of the month',
-      earned: 'Earned on May 1, 2026',
+      title: 'risingStar',
+      desc: 'topPerformerMonth',
+      earned: 'May 1, 2026',
       icon: 'workspace_premium',
       bgClass: 'bg-teal-500',
       shadowClass: 'shadow-teal-250 dark:shadow-none',
@@ -282,14 +291,14 @@ export default function CleaningProfilePage() {
           {/* Profile Overview */}
           <section className="col-span-12 lg:col-span-7 bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-155 dark:border-slate-800 p-6 shadow-sm">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">Profile Overview</h3>
+              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('profileOverview')}</h3>
               <button
                 onClick={openInfoModal}
                 className="text-slate-400 hover:text-orange-500 transition-colors flex items-center gap-1 text-[11px] font-bold font-sans cursor-pointer focus:outline-none"
                 title="Edit Profile Information"
               >
                 <span className="material-symbols-outlined text-[16px]">edit</span>
-                Edit Info
+                {t('editInfo')}
               </button>
             </div>
             <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
@@ -320,61 +329,60 @@ export default function CleaningProfilePage() {
                   className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-500 text-orange-500 dark:text-white dark:border-slate-700 rounded-lg text-[10px] font-bold hover:bg-orange-500/10 transition-all active:scale-95 font-sans cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">photo_camera</span>
-                  Change Photo
+                  {t('changePhoto')}
                 </button>
                 <button
                   onClick={() => signOut()}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:text-red-400 border border-transparent rounded-lg text-[10px] font-bold transition-all active:scale-95 font-sans cursor-pointer w-full justify-center mt-2"
                 >
                   <span className="material-symbols-outlined text-[16px]">logout</span>
-                  Logout
+                  {t('logout')}
                 </button>
               </div>
 
               <div className="flex-1 grid grid-cols-2 gap-y-4 gap-x-6 lg:gap-x-8 font-sans text-xs">
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Full Name</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('fullName')}</p>
                   <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.name}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Staff ID</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('staffId')}</p>
                   <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.id}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Email</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('email')}</p>
                   <p className="font-extrabold text-slate-800 dark:text-slate-200 truncate">{profile.email}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Phone</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('phone')}</p>
                   <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.phone}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Role</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.role}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('role')}</p>
+                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{t(profile.role)}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Department</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.department}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('department')}</p>
+                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{t(profile.department)}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Joined On</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('joinedOn')}</p>
                   <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.joinedOn}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Status</p>
-                  <span className="bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-455 px-2 py-0.5 rounded text-[10px] font-bold inline-block">{profile.status}</span>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('status')}</p>
+                  <span className="bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-455 px-2 py-0.5 rounded text-[10px] font-bold inline-block">{t(profile.status)}</span>
                 </div>
               </div>
             </div>
           </section>
-
           {/* Performance Summary */}
           <section className="col-span-12 lg:col-span-5 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">Performance Summary</h3>
-              <select className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-[10px] font-bold font-sans focus:ring-1 focus:ring-orange-500 px-2.5 py-1 text-slate-700 dark:text-slate-350 outline-none accent-orange-500 cursor-pointer">
-                <option>This Month</option>
-                <option>Last Month</option>
+              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('performanceSummary')}</h3>
+              <select className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-[10px] font-bold font-sans focus:ring-1 focus:ring-orange-500 px-2.5 py-1 text-slate-700 dark:text-slate-355 outline-none accent-orange-500 cursor-pointer">
+                <option value="This Month">{t('thisMonth')}</option>
+                <option value="Last Month">{t('lastMonth')}</option>
               </select>
             </div>
 
@@ -384,10 +392,10 @@ export default function CleaningProfilePage() {
                   <span className="material-symbols-outlined text-[20px]">done_all</span>
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">{12 + liveCleanedCount}</h4>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">Tables Cleaned</p>
+                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('tablesCleaned')}</p>
                 <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
                   <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  12% vs last month
+                  12% {t('vsLastMonth')}
                 </div>
               </div>
 
@@ -396,10 +404,10 @@ export default function CleaningProfilePage() {
                   <span className="material-symbols-outlined text-[20px]">verified_user</span>
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">98%</h4>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">Hygiene Score</p>
+                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('hygieneScore')}</p>
                 <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
                   <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  5% vs last month
+                  5% {t('vsLastMonth')}
                 </div>
               </div>
 
@@ -411,10 +419,10 @@ export default function CleaningProfilePage() {
                   <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">24h</h4>
                   <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">36m</span>
                 </div>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">Total Work Time</p>
+                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('totalWorkTime')}</p>
                 <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
                   <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  8% vs last month
+                  8% {t('vsLastMonth')}
                 </div>
               </div>
 
@@ -423,10 +431,10 @@ export default function CleaningProfilePage() {
                   <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
                 </div>
                 <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">{22 + liveCleanedCount + liveInProgressCount}</h4>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">Tasks Completed</p>
+                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('tasksCompleted')}</p>
                 <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
                   <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  14% vs last month
+                  14% {t('vsLastMonth')}
                 </div>
               </div>
             </div>
@@ -436,12 +444,12 @@ export default function CleaningProfilePage() {
         {/* Account Settings, Activity, Work Preferences */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
           <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-5 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-4 font-sans">Account Settings</h3>
+            <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-4 font-sans">{t('accountSettings')}</h3>
             <div className="space-y-1.5">
               {[
-                { label: 'Personal Information', desc: 'Update your personal details', icon: 'person', action: openInfoModal },
-                { label: 'Change Password', desc: 'Update your account password', icon: 'lock', action: openPasswordModal },
-                { label: 'Notification Preferences', desc: 'Manage your notification settings', icon: 'notifications_active', action: () => navigate('/cleaning/settings') },
+                { label: 'personalInfo', desc: 'personalInfoDesc', icon: 'person', action: openInfoModal },
+                { label: 'changePassword', desc: 'changePasswordDesc', icon: 'lock', action: openPasswordModal },
+                { label: 'notificationPreferences', desc: 'notificationPrefsDesc', icon: 'notifications_active', action: () => navigate('/cleaning/settings') },
               ].map((item, idx) => (
                 <button
                   key={idx}
@@ -451,14 +459,13 @@ export default function CleaningProfilePage() {
                   <div className="flex items-center gap-3">
                     <span className="material-symbols-outlined text-slate-400 group-hover:text-orange-500 transition-colors text-[18px]">{item.icon}</span>
                     <div>
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{item.label}</p>
-                      <p className="text-[9px] text-slate-400 font-semibold">{item.desc}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{t(item.label)}</p>
+                      <p className="text-[9px] text-slate-400 font-semibold">{t(item.desc)}</p>
                     </div>
                   </div>
                   <span className="material-symbols-outlined text-slate-450 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
                 </button>
               ))}
-
               <button
                 onClick={() => navigate('/cleaning/settings')}
                 className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group font-sans text-xs text-left cursor-pointer"
@@ -466,13 +473,15 @@ export default function CleaningProfilePage() {
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-slate-400 group-hover:text-orange-500 transition-colors text-[18px]">language</span>
                   <div>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">Language</p>
-                    <p className="text-[9px] text-slate-400 font-semibold">Choose your preferred language</p>
+                    <p className="font-bold text-slate-800 dark:text-slate-200">{t('language')}</p>
+                    <p className="text-[9px] text-slate-400 font-semibold">{t('preferredLanguageDesc')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-orange-500">English</span>
-                  <span className="material-symbols-outlined text-slate-450 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
+                  <span className="text-[10px] font-bold text-orange-500">
+                    {lang === 'hi' ? 'हिन्दी' : lang === 'es' ? 'Español' : 'English'}
+                  </span>
+                  <span className="material-symbols-outlined text-slate-455 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
                 </div>
               </button>
               <button
@@ -482,13 +491,13 @@ export default function CleaningProfilePage() {
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-slate-400 group-hover:text-orange-500 transition-colors text-[18px]">dark_mode</span>
                   <div>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">Theme</p>
-                    <p className="text-[9px] text-slate-400 font-semibold">Choose your preferred theme</p>
+                    <p className="font-bold text-slate-800 dark:text-slate-200">{t('theme')}</p>
+                    <p className="text-[9px] text-slate-400 font-semibold">{t('themeDesc')}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-orange-500">Active</span>
-                  <span className="material-symbols-outlined text-slate-450 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
+                  <span className="text-[10px] font-bold text-orange-500">{t('active')}</span>
+                  <span className="material-symbols-outlined text-slate-455 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
                 </div>
               </button>
             </div>
@@ -497,24 +506,24 @@ export default function CleaningProfilePage() {
           {/* Recent Activity */}
           <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-5 shadow-sm">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 font-sans">Recent Activity</h3>
+              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 font-sans">{t('recentActivity')}</h3>
               <button type="button" onClick={() => setShowAllActivities(!showAllActivities)} className="text-[10px] font-bold text-orange-500 cursor-pointer hover:underline font-sans">
-                {showAllActivities ? "Show Less" : "View All"}
+                {showAllActivities ? t('showLess') : t('viewAll')}
               </button>
             </div>
 
             <div className="space-y-4 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2.5px] before:bg-slate-100 dark:before:bg-slate-800/80">
-              {(showAllActivities ? activities : activities.slice(0, 3)).map((act, idx) => (
+              {(showAllActivities ? activitiesList : activitiesList.slice(0, 3)).map((act, idx) => (
                 <div key={idx} className="flex gap-3 relative z-10 font-sans text-xs bg-white dark:bg-sd-surface-container">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${act.iconBg}`}>
                     <span className={`material-symbols-outlined text-[16px] ${act.iconColor}`} style={{ fontVariationSettings: "'FILL' 1" }}>{act.icon}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
-                      <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{act.title}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{t(act.title)}</p>
                       <span className="text-[9px] text-slate-400 font-semibold shrink-0 ml-2">{act.timestamp}</span>
                     </div>
-                    <p className="text-[10px] text-slate-455 dark:text-slate-400 font-semibold">{act.subtitle}</p>
+                    <p className="text-[10px] text-slate-455 dark:text-slate-400 font-semibold">{t(act.subtitle)}</p>
                   </div>
                 </div>
               ))}
@@ -524,8 +533,8 @@ export default function CleaningProfilePage() {
           {/* Work Preferences */}
           <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-5 shadow-sm md:col-span-2 lg:col-span-1">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 font-sans">Work Preferences</h3>
-              <button type="button" onClick={openPrefsModal} className="text-[10px] font-bold text-orange-500 cursor-pointer hover:underline font-sans">Edit</button>
+              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 font-sans">{t('workPreferences')}</h3>
+              <button type="button" onClick={openPrefsModal} className="text-[10px] font-bold text-orange-500 cursor-pointer hover:underline font-sans">{t('edit')}</button>
             </div>
             <div className="space-y-4 font-sans text-xs">
               {preferences.map((pref, idx) => (
@@ -534,8 +543,8 @@ export default function CleaningProfilePage() {
                     <span className="material-symbols-outlined text-orange-500 text-[16px]">{pref.icon}</span>
                   </div>
                   <div>
-                    <p className="text-[9px] text-slate-455 font-bold uppercase tracking-wider leading-none mb-1">{pref.label}</p>
-                    <p className="font-extrabold text-slate-800 dark:text-slate-200 leading-tight">{pref.value}</p>
+                    <p className="text-[9px] text-slate-455 font-bold uppercase tracking-wider leading-none mb-1">{t(pref.label)}</p>
+                    <p className="font-extrabold text-slate-800 dark:text-slate-200 leading-tight">{t(pref.value)}</p>
                   </div>
                 </div>
               ))}
@@ -546,8 +555,8 @@ export default function CleaningProfilePage() {
         {/* Badges & Achievements */}
         <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">Badges & Achievements</h3>
-            <span className="text-xs font-bold text-orange-500 cursor-pointer hover:underline font-sans">View All</span>
+            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('badgesAchievements')}</h3>
+            <span className="text-xs font-bold text-orange-500 cursor-pointer hover:underline font-sans">{t('viewAll')}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -561,9 +570,9 @@ export default function CleaningProfilePage() {
                     {badge.icon}
                   </span>
                 </div>
-                <p className="font-extrabold text-xs text-slate-850 dark:text-slate-250 mb-1 leading-snug">{badge.title}</p>
-                <p className="text-[10px] text-slate-400 font-semibold mb-2 leading-relaxed">{badge.desc}</p>
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{badge.earned}</span>
+                <p className="font-extrabold text-xs text-slate-850 dark:text-slate-250 mb-1 leading-snug">{t(badge.title)}</p>
+                <p className="text-[10px] text-slate-400 font-semibold mb-2 leading-relaxed">{t(badge.desc)}</p>
+                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{t('earnedOn')} {badge.earned}</span>
               </div>
             ))}
           </div>
@@ -574,59 +583,104 @@ export default function CleaningProfilePage() {
       {showInfoModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Edit Personal Information</h3>
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">{t('editInfo')}</h3>
             <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              Update your contact details below.
+              {showOtpInput ? "Verify phone number change to print validation logs." : "Update your contact details below."}
             </p>
             <form onSubmit={handleSaveInfo} className="space-y-4 font-sans text-xs">
-              <div>
-                <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Full Name</label>
-                <input
-                  id="edit-name"
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Email</label>
-                <input
-                  id="edit-email"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Phone</label>
-                <input
-                  id="edit-phone"
-                  type="text"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowInfoModal(false)}
-                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-orange-505 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
-                >
-                  Save Changes
-                </button>
-              </div>
+              {otpError && (
+                <div className="p-2.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 font-bold mb-2">
+                  {otpError}
+                </div>
+              )}
+              
+              {showOtpInput ? (
+                <>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">{t('phone')}</p>
+                    <p className="font-bold text-slate-700 dark:text-slate-200 mt-0.5">{editPhone}</p>
+                  </div>
+                  <div>
+                    <label htmlFor="user-otp" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Verification Code (OTP)</label>
+                    <input
+                      id="user-otp"
+                      type="text"
+                      maxLength={4}
+                      placeholder="Enter 4-digit OTP"
+                      value={userEnteredOtp}
+                      onChange={(e) => setUserEnteredOtp(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 tracking-widest text-center font-extrabold text-sm"
+                      required
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowOtpInput(false)}
+                      className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
+                    >
+                      {t('cancel')}
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
+                    >
+                      {t('saveEmployee')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('fullName')}</label>
+                    <input
+                      id="edit-name"
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('email')}</label>
+                    <input
+                      id="edit-email"
+                      type="email"
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('phone')}</label>
+                    <input
+                      id="edit-phone"
+                      type="text"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                      required
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInfoModal(false)}
+                      className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
+                    >
+                      {t('cancel')}
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
+                    >
+                      {t('saveEmployee')}
+                    </button>
+                  </div>
+                </>
+              )}
             </form>
           </div>
         </div>
@@ -636,13 +690,13 @@ export default function CleaningProfilePage() {
       {showPrefsModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Edit Work Preferences</h3>
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">{t('workPreferences')}</h3>
             <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
               Update shift and assignment preferences.
             </p>
             <form onSubmit={handleSavePrefs} className="space-y-4 font-sans text-xs">
               <div>
-                <label htmlFor="edit-area" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Preferred Area</label>
+                <label htmlFor="edit-area" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('preferredArea')}</label>
                 <input
                   id="edit-area"
                   type="text"
@@ -653,7 +707,7 @@ export default function CleaningProfilePage() {
                 />
               </div>
               <div>
-                <label htmlFor="edit-shift" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Preferred Shift</label>
+                <label htmlFor="edit-shift" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('preferredShift')}</label>
                 <input
                   id="edit-shift"
                   type="text"
@@ -664,7 +718,7 @@ export default function CleaningProfilePage() {
                 />
               </div>
               <div>
-                <label htmlFor="edit-days" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Days Available</label>
+                <label htmlFor="edit-days" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('daysAvailable')}</label>
                 <input
                   id="edit-days"
                   type="text"
@@ -675,7 +729,7 @@ export default function CleaningProfilePage() {
                 />
               </div>
               <div>
-                <label htmlFor="edit-break" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Break Preference</label>
+                <label htmlFor="edit-break" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('breakPreference')}</label>
                 <input
                   id="edit-break"
                   type="text"
@@ -686,7 +740,7 @@ export default function CleaningProfilePage() {
                 />
               </div>
               <div>
-                <label htmlFor="edit-tasks" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Preferred Task Types</label>
+                <label htmlFor="edit-tasks" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('preferredTaskTypes')}</label>
                 <input
                   id="edit-tasks"
                   type="text"
@@ -702,13 +756,13 @@ export default function CleaningProfilePage() {
                   onClick={() => setShowPrefsModal(false)}
                   className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
                 >
-                  Save Changes
+                  {t('saveEmployee')}
                 </button>
               </div>
             </form>

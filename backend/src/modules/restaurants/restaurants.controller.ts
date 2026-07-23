@@ -96,6 +96,7 @@ export const getRestaurantSettingsController = asyncHandler(async (req: Request,
       address: restaurant.address ?? '',
       city: restaurant.city ?? '',
       plan: restaurant.plan ?? '',
+      coverImage: restaurant.coverImage ?? '',
     },
     settings: restaurant.settings ?? {},
     gst: {
@@ -170,7 +171,7 @@ export const updateRestaurantSettingsController = asyncHandler(async (req: Reque
   const restaurant = await findRestaurantForRequest(req);
 
   // ── Top-level restaurant fields (distinct from the `settings` sub-object) ──
-  const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan', 'gstEnabled', 'gstNumber', 'legalBusinessName', 'defaultGSTPercentage', 'invoicePrefix'] as const;
+  const TOP_LEVEL_FIELDS = ['name', 'cuisine', 'city', 'type', 'phone', 'address', 'plan', 'gstEnabled', 'gstNumber', 'legalBusinessName', 'defaultGSTPercentage', 'invoicePrefix','coverImage'] as const;
   const topLevel: Record<string, unknown> = {};
   for (const field of TOP_LEVEL_FIELDS) {
     if (req.body[field] !== undefined) {

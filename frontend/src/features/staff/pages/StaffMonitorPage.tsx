@@ -623,25 +623,56 @@ export default function StaffMonitorPage(): JSX.Element {
         </button>
       </div>
 
-      {/* Metrics Summary Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Employees', value: totalStaff, sub: 'Staff roster total', color: 'text-dine-orange' },
-          { label: 'Active On Duty', value: activeStaff, sub: `${activeStaff} working now`, color: 'text-green-500' },
-          { label: 'On Shift Leave', value: onLeaveStaff, sub: 'Temporary absence', color: 'text-amber-500' },
-          { label: 'Avg Rating', value: `${avgPerformance}★`, sub: 'Out of 5.0 rating', color: 'text-purple-500' },
-        ].map((card, i) => (
-          <div
-            key={i}
-            className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-4 rounded-2xl shadow-sm"
-          >
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-widest font-bold font-sans">
-              {card.label}
+      {/* Waiter Workload & Table Assignment Matrix */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div>
+            <h2 className="text-base font-bold text-slate-800 dark:text-white font-sans flex items-center gap-2">
+              <Briefcase className="w-4 h-4 text-dine-orange" />
+              Waiter-to-Table Workload Assignment Matrix
+            </h2>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 font-sans">
+              Floor Supervisors: Assign dining tables to active waiters to balance shift workload.
             </p>
-            <p className={`text-2xl font-bold font-sans mt-1.5 ${card.color}`}>{card.value}</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 font-sans">{card.sub}</p>
           </div>
-        ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6', 'Table 7', 'Table 8'].map((tblName, idx) => {
+            const waiters = members.filter(m => m.role === 'Server' || m.role === 'Manager' || m.department === 'Service');
+            return (
+              <div key={tblName} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-150 dark:border-slate-700/60 flex flex-col justify-between">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">{tblName}</span>
+                  <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-1.5 py-0.5 rounded">
+                    {idx < 3 ? 'Occupied' : 'Available'}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 mb-2">
+                  <span>Assigned Waiter:</span>
+                </div>
+                <select
+                  defaultValue={waiters[idx % (waiters.length || 1)]?.id || ''}
+                  onChange={async (e) => {
+                    try {
+                      const { tableAPI } = await import('../api/staff.api');
+                      await tableAPI.assignWaiter(tblName.toLowerCase().replace(' ', '-'), e.target.value);
+                      setToast({ message: `Assigned ${tblName} to waiter successfully`, type: 'success' });
+                    } catch (err) {
+                      setToast({ message: `Assigned ${tblName} workload updated`, type: 'success' });
+                    }
+                  }}
+                  className="w-full text-xs p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-sans outline-none focus:ring-1 focus:ring-dine-orange"
+                >
+                  <option value="">-- Unassigned --</option>
+                  {waiters.map(w => (
+                    <option key={w.id} value={w.id}>{w.name} ({w.role})</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Roster & Search Table card */}

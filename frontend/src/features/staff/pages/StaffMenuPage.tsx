@@ -28,6 +28,7 @@ export default function StaffMenuPage() {
   const [newItemCategory, setNewItemCategory] = useState<MenuItem['category']>('Starters');
   const [newItemVeg, setNewItemVeg] = useState(true);
   const [newItemSpicy, setNewItemSpicy] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -41,7 +42,7 @@ export default function StaffMenuPage() {
       }
     };
     void fetchCategories();
-  }, []);
+  }, [showAddModal]);
 
   const toggleAvailability = async (id: string) => {
     try {
@@ -57,21 +58,24 @@ export default function StaffMenuPage() {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName || !newItemPrice) return;
+    if (!newItemName || !newItemPrice || isSubmitting) return;
 
+    setIsSubmitting(true);
     try {
-      let categoryId = categories.find(c => c.name.toLowerCase() === newItemCategory.toLowerCase())?._id;
-      if (!categoryId && categories.length > 0) {
-        categoryId = categories[0]._id;
+      let currentCategories = categories;
+      if (currentCategories.length === 0) {
+        const catRes = await menuAPI.getCategories();
+        if (catRes.success && Array.isArray(catRes.data) && catRes.data.length > 0) {
+          currentCategories = catRes.data;
+          setCategories(catRes.data);
+        }
       }
-      
-      if (!categoryId) {
-        alert('Please create menu categories in the Admin panel first.');
-        return;
-      }
+
+      const matchedCat = currentCategories.find(c => c.name.toLowerCase() === newItemCategory.toLowerCase());
+      const categoryId = matchedCat?._id || (currentCategories.length > 0 ? currentCategories[0]._id : undefined);
 
       const res = await menuAPI.createItem({
-        categoryId,
+        ...(categoryId ? { categoryId } : {}),
         name: newItemName,
         description: newItemDesc,
         price: parseFloat(newItemPrice),
@@ -87,7 +91,7 @@ export default function StaffMenuPage() {
           name: item.name || newItemName,
           description: item.description || newItemDesc,
           price: Number(item.price ?? newItemPrice),
-          category: categoryName === 'Desserts' ? 'Desserts' : categoryName === 'Beverages' ? 'Beverages' : categoryName === 'Starters' ? 'Starters' : 'Mains',
+          category: (categoryName === 'Desserts' ? 'Desserts' : categoryName === 'Beverages' ? 'Beverages' : categoryName === 'Starters' ? 'Starters' : 'Mains') as any,
           veg: item.isVeg ?? newItemVeg,
           available: item.isAvailable !== false,
         };
@@ -100,9 +104,14 @@ export default function StaffMenuPage() {
         setNewItemVeg(true);
         setNewItemSpicy(false);
         setShowAddModal(false);
+      } else {
+        alert(res.error || 'Failed to create menu item.');
       }
     } catch (err) {
       console.error('Failed to add item to menu', err);
+      alert('An unexpected error occurred while adding the menu item.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -281,13 +290,23 @@ export default function StaffMenuPage() {
                   <select
                     id="new-cat"
                     value={newItemCategory}
-                    onChange={(e) => setNewItemCategory(e.target.value as MenuItem['category'])}
+                    onChange={(e) => setNewItemCategory(e.target.value as any)}
                     className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-850 dark:text-slate-200"
                   >
-                    <option value="Starters">Starters</option>
-                    <option value="Mains">Mains</option>
-                    <option value="Desserts">Desserts</option>
-                    <option value="Beverages">Beverages</option>
+                    {categories.length > 0 ? (
+                      categories.map((cat) => (
+                        <option key={cat._id || cat.name} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="Starters">Starters</option>
+                        <option value="Mains">Mains</option>
+                        <option value="Desserts">Desserts</option>
+                        <option value="Beverages">Beverages</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -321,9 +340,10 @@ export default function StaffMenuPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95 cursor-pointer"
+                  disabled={isSubmitting || !newItemName.trim() || !newItemPrice}
+                  className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
-                  Add Item
+                  {isSubmitting ? 'Adding...' : 'Add Item'}
                 </button>
               </div>
             </form>

@@ -86,6 +86,44 @@ staffRouter.get('/tables/:id', validate({ params: entityIdParamsSchema }), async
   }
 });
 
+import { OrdersController } from '../orders/orders.controller';
+import { emitSessionEvent } from '../../services/sessionEvents';
+
+staffRouter.patch(
+  '/tables/:id/assign-waiter',
+  async (req, res, next) => {
+    try {
+      const staffId = req.body?.waiterId ?? req.body?.staffId ?? req.user?.id ?? null;
+      const table = ensureFound(
+        await TableModel.findOneAndUpdate(
+          {
+            _id: req.params.id,
+            restaurantId: req.user?.restaurantId,
+          },
+          {
+            assignedStaffId: staffId,
+            assignedWaiterId: staffId,
+          },
+          { new: true },
+        ),
+        'Table not found',
+      ) as any;
+
+      if (req.user?.restaurantId) {
+        emitSessionEvent(req.user.restaurantId, 'staff.table.waiter_assigned', {
+          tableId: table._id,
+          tableNumber: table.tableNumber,
+          assignedWaiterId: staffId,
+        });
+      }
+
+      ok(res, { table });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 staffRouter.patch(
   '/tables/:id/assign',
   validate({ params: entityIdParamsSchema, body: assignTableBodySchema }),
@@ -99,6 +137,7 @@ staffRouter.patch(
         },
         {
           assignedStaffId: req.body?.staffId ?? req.user?.id ?? null,
+          assignedWaiterId: req.body?.staffId ?? req.user?.id ?? null,
         },
         { new: true },
       ),
@@ -230,6 +269,20 @@ staffRouter.patch(
       'Staff request not found',
     ) as any;
 
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff.request.accepted', {
+        requestId: request._id,
+        tableId: request.tableId,
+        sessionId: request.sessionId,
+        type: request.type,
+        acceptedBy: request.acceptedBy,
+      });
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff:request-updated', {
+        requestId: request._id,
+        status: RequestStatus.ACCEPTED,
+      });
+    }
+
     ok(res, { request, acceptedBy: req.body?.staffId ?? req.user?.id ?? null });
   } catch (error) {
     next(error);
@@ -255,6 +308,20 @@ staffRouter.patch(
       ),
       'Staff request not found',
     ) as any;
+
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff.request.completed', {
+        requestId: request._id,
+        tableId: request.tableId,
+        sessionId: request.sessionId,
+        type: request.type,
+        completedBy: request.completedBy,
+      });
+      emitSessionEvent(req.user.restaurantId.toString(), 'staff:request-updated', {
+        requestId: request._id,
+        status: RequestStatus.COMPLETED,
+      });
+    }
     
     ok(res, { request });
   } catch (error) {
@@ -278,8 +345,94 @@ staffRouter.post('/issues/escalate', validate({ body: issueEscalationBodySchema 
       },
     });
 
-    ok(res, { escalation }, 201);
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId, 'staff.ticket.created', {
+        ticketId: escalation._id,
+        reporterId: req.user?.id,
+        notes: req.body.notes,
+      });
+    }
+
+    ok(res, { escalation, ticket: escalation }, 201);
   } catch (error) {
     next(error);
   }
 });
+
+staffRouter.post('/tickets', async (req, res, next) => {
+  try {
+    const { category, priority, subject, description, tableId, entityId } = req.body;
+    const escalation = await AuditLogModel.create({
+      actorId: req.user?.id || null,
+      actorRole: req.user?.role || 'staff',
+      restaurantId: req.user?.restaurantId || null,
+      entityType: AuditEntity.TABLE,
+      entityId: entityId || tableId || 'STAFF_TICKET',
+      action: AuditAction.ESCALATE_ISSUE,
+      metadata: {
+        restaurantId: req.user?.restaurantId,
+        category: category || 'GENERAL',
+        priority: priority || 'HIGH',
+        subject: subject || 'Escalation Ticket',
+        description: description || '',
+        notes: `[${category || 'GENERAL'} - ${priority || 'HIGH'}] ${subject}: ${description}`,
+      },
+    });
+
+    if (req.user?.restaurantId) {
+      emitSessionEvent(req.user.restaurantId, 'staff.ticket.created', {
+        ticketId: escalation._id,
+        reporterId: req.user?.id,
+        category,
+        priority,
+        subject,
+        description,
+      });
+    }
+
+    ok(res, { ticket: escalation, escalation }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
+
+staffRouter.post('/orders/:id/apply-offer', OrdersController.applyWaiterOffer);
+staffRouter.post('/send-phone-otp', async (req, res, next) => {
+  try {
+    const { phone } = req.body || {};
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`
+================================================================================
+ 📲 [STAFF PHONE VERIFICATION OTP]
+ Staff User: ${req.user?.email || req.user?.id || 'Staff Member'}
+ Target Mobile: ${phone || 'Unknown Phone'}
+ Terminal OTP Code:  >>> ${otp} <<<
+ Timestamp: ${new Date().toLocaleTimeString()}
+================================================================================
+    `);
+    ok(res, { success: true, otp, message: 'OTP sent to backend terminal console' });
+  } catch (error) {
+    next(error);
+  }
+});
+staffRouter.post('/tables', async (req, res, next) => {
+  try {
+    const restaurantId = req.user?.restaurantId;
+    if (!restaurantId) {
+      throw new AppError('Restaurant context required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+    const { tableNumber, capacity, section, floor } = req.body || {};
+    const table = await tablesService.createTable({
+      restaurantId: restaurantId.toString(),
+      tableNumber: String(tableNumber),
+      capacity: Number(capacity || 4),
+      section: section || 'Zone A',
+      floor: Number(floor || 1),
+    });
+    ok(res, { table }, 201);
+  } catch (error) {
+    next(error);
+  }
+});
+staffRouter.get('/offers', OrdersController.getActiveOffers);
+staffRouter.get('/tables/:id/guest-loyalty', OrdersController.getTableGuestLoyaltyAndOffers);

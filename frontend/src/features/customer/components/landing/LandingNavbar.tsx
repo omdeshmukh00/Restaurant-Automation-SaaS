@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Bell, Menu, X, ChevronRight } from 'lucide-react';
+import { Search, Bell, Menu, X, ChevronRight, ChevronDown, Sun, Moon, LayoutDashboard, LogOut } from 'lucide-react';
 import { useCustomerStore } from '../../store/customer.store';
 import { useAuth } from '../../../../auth/AuthProvider';
 import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
+import { useTheme } from '../../../../app/providers/ThemeProvider';
 import './landing.css';
 
 interface LandingNavbarProps {
@@ -24,15 +25,18 @@ const NAV_LINKS: NavLink[] = [
 ];
 
 export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
+  const { theme, toggleTheme } = useTheme();
   const { settings } = usePlatformSettingsGuard();
   const platformName = settings?.platformName || "RestoHub";
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { isPanelAuthenticated } = useAuth();
+  const { isPanelAuthenticated, user, signOut } = useAuth();
   const isCustomerAuth = isPanelAuthenticated('customer');
 
   const {
@@ -59,6 +63,16 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
     return () => { document.body.style.overflow = ''; };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleNavClick = (e: React.MouseEvent, link: NavLink) => {
     e.preventDefault();
     if (link.requiresAuth && !isCustomerAuth) {
@@ -83,7 +97,14 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
       >
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12 h-[72px] flex items-center justify-between">
           {/* Logo */}
-          <a href="/" className="flex items-center gap-2.5 landing-focus-ring">
+          <a
+            href="/customer/home"
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/customer/home');
+            }}
+            className="flex items-center gap-2.5 landing-focus-ring cursor-pointer"
+          >
             <div
               className="w-[38px] h-[38px] rounded-full flex items-center justify-center shrink-0"
               style={{ backgroundColor: '#FF6B1A', boxShadow: '0 0 14px rgba(255,107,26,0.35)' }}
@@ -261,17 +282,79 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
               )}
             </div>
 
-            <button
-              onClick={() => onLoginOpen()}
-              className="hidden sm:flex items-center gap-2 px-5 h-[42px] text-[14px] font-semibold text-white transition-all duration-150 landing-btn-premium landing-focus-ring"
-              style={{
-                background: 'linear-gradient(135deg, #FF6B1A 0%, #E65A0A 100%)',
-                borderRadius: '14px',
-                boxShadow: '0 4px 15px rgba(255,107,26,0.3)',
-              }}
-            >
-              Login / Sign Up
-            </button>
+            {isCustomerAuth ? (
+              <div className="relative hidden sm:block" ref={profileMenuRef}>
+                <button
+                  onClick={() => setProfileMenuOpen(!profileMenuOpen)}
+                  onMouseEnter={() => setProfileMenuOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/10 transition-colors border border-white/15 cursor-pointer"
+                >
+                  {user?.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name || 'User'}
+                      className="w-8 h-8 rounded-full object-cover border border-orange-500/50 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold flex items-center justify-center text-xs shrink-0 shadow-md">
+                      {(user?.name || 'Customer').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-xs font-semibold text-white max-w-[100px] truncate">
+                    {user?.name || 'Customer'}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-300 transition-transform ${profileMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Hover/Click Profile Dropdown */}
+                {profileMenuOpen && (
+                  <div
+                    onMouseLeave={() => setProfileMenuOpen(false)}
+                    className="absolute right-0 top-11 w-48 bg-neutral-900 border border-neutral-800 rounded-2xl shadow-xl z-50 overflow-hidden py-1.5 animate-fadeIn"
+                  >
+                    <div className="px-4 py-2 border-b border-neutral-800">
+                      <p className="text-xs font-bold text-white truncate">{user?.name || 'Customer'}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{user?.email || ''}</p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        navigate('/customer/home');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-gray-200 hover:bg-orange-500/10 hover:text-orange-400 transition-colors text-left"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-orange-500" />
+                      Dashboard
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        signOut();
+                        navigate('/');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                    >
+                      <LogOut className="w-4 h-4 text-red-400" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => onLoginOpen()}
+                className="hidden sm:flex items-center gap-2 px-5 h-[42px] text-[14px] font-semibold text-white transition-all duration-150 landing-btn-premium landing-focus-ring"
+                style={{
+                  background: 'linear-gradient(135deg, #FF6B1A 0%, #E65A0A 100%)',
+                  borderRadius: '14px',
+                  boxShadow: '0 4px 15px rgba(255,107,26,0.3)',
+                }}
+              >
+                Login / Sign Up
+              </button>
+            )}
 
             {/* Mobile Menu Toggle */}
             <button
@@ -297,7 +380,15 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
           style={{ background: 'linear-gradient(135deg, #0F0F0F 0%, #1A1008 100%)' }}
         >
           <div className="flex items-center justify-between px-6 h-[72px]">
-            <a href="/" className="flex items-center gap-2.5">
+            <a
+              href="/customer/home"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsMobileMenuOpen(false);
+                navigate('/customer/home');
+              }}
+              className="flex items-center gap-2.5 cursor-pointer"
+            >
               <div
                 className="w-[38px] h-[38px] rounded-full flex items-center justify-center"
                 style={{ backgroundColor: '#FF6B1A' }}
@@ -351,13 +442,39 @@ export default function LandingNavbar({ onLoginOpen }: LandingNavbarProps) {
           </nav>
 
           <div className="px-8 pb-8 shrink-0">
-            <button
-              onClick={() => { onLoginOpen(); setIsMobileMenuOpen(false); }}
-              className="w-full h-[52px] text-[16px] font-semibold text-white landing-btn-premium"
-              style={{ background: 'linear-gradient(135deg, #FF6B1A 0%, #E65A0A 100%)', borderRadius: '14px' }}
-            >
-              Login / Sign Up
-            </button>
+            {isCustomerAuth ? (
+              <div className="flex flex-col gap-2.5">
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    navigate('/customer/home');
+                  }}
+                  className="w-full h-[48px] text-[15px] font-semibold text-white bg-gradient-to-r from-orange-500 to-amber-600 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20"
+                >
+                  <LayoutDashboard className="w-4.5 h-4.5" />
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    signOut();
+                    navigate('/');
+                  }}
+                  className="w-full h-[48px] text-[15px] font-semibold text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4.5 h-4.5" />
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { onLoginOpen(); setIsMobileMenuOpen(false); }}
+                className="w-full h-[52px] text-[16px] font-semibold text-white landing-btn-premium"
+                style={{ background: 'linear-gradient(135deg, #FF6B1A 0%, #E65A0A 100%)', borderRadius: '14px' }}
+              >
+                Login / Sign Up
+              </button>
+            )}
           </div>
         </div>
       )}

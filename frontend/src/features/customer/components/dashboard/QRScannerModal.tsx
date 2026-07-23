@@ -64,12 +64,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
     }, 500);
   };
 
-  const handleSimulateScan = () => {
-    setScanned(true);
-    setTimeout(() => {
-      onScanSuccess('T07'); // Default mock table
-    }, 800);
-  };
+
 
   const handleRetryScan = () => {
     setScanned(false);
@@ -103,8 +98,9 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
           if (barcodes && barcodes.length > 0) {
             const rawValue = barcodes[0]?.rawValue;
             if (rawValue) {
+              const cleanToken = extractQrToken(rawValue);
               setScanned(true);
-              onScanSuccess(rawValue);
+              onScanSuccess(cleanToken);
               return;
             }
           }
@@ -275,13 +271,6 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
                 <span className="material-symbols-outlined text-[18px]">replay</span>
                 Retry Scan
               </button>
-              <button
-                onClick={() => setShowManualInput(true)}
-                className="w-full py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl text-sm font-semibold transition-all font-sans flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">keyboard</span>
-                Enter Table ID Manually
-              </button>
             </div>
           </div>
         ) : (
@@ -296,22 +285,9 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
                   playsInline
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center text-center p-6 gap-3 select-none">
-                  <div className="w-16 h-16 bg-sd-primary-container/10 border border-sd-primary-container/30 rounded-2xl flex items-center justify-center text-sd-primary-container animate-pulse">
-                    <span className="material-symbols-outlined text-4xl">
-                      {cameraSupport ? 'qr_code_2' : 'videocam_off'}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold font-sans">
-                      {cameraSupport ? 'Connecting Camera Feed...' : 'Camera Access Disabled'}
-                    </p>
-                    <p className="text-[10px] text-white/50 font-sans max-w-[200px] leading-relaxed">
-                      {!window.isSecureContext
-                        ? 'Camera access requires HTTPS or localhost. Scan or type below...'
-                        : 'Please fit the table QR code inside the viewfinder box.'}
-                    </p>
-                  </div>
+                <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 gap-3 select-none">
+                  <div className="w-10 h-10 rounded-full border-2 border-sd-primary-container border-t-transparent animate-spin" />
+                  <p className="text-xs text-white/70 font-sans">Starting camera scanner...</p>
                 </div>
               )}
 
@@ -332,14 +308,7 @@ export default function QRScannerModal({ isOpen, onClose, onScanSuccess }: Props
             </p>
 
             <div className="flex flex-col gap-2.5 mt-4 w-full px-4 items-center">
-              {/* Simulate QR Scan Button for Demo */}
-              <button
-                onClick={handleSimulateScan}
-                className="px-5 py-2.5 bg-white/10 hover:bg-white/15 border border-white/20 rounded-2xl text-xs font-semibold text-white/95 transition-all active:scale-95 flex items-center gap-2 font-sans"
-              >
-                <span className="material-symbols-outlined text-[16px] text-sd-primary-container">sensors</span>
-                Simulate QR Detection
-              </button>
+
 
               {/* Manual Entry Fallback Button */}
               <button

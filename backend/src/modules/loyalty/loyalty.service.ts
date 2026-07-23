@@ -163,6 +163,16 @@ export async function redeemOffer(
 
   wallet.pointsBalance -= requiredPoints;
 
+  if (!wallet.transactions) {
+    wallet.transactions = [];
+  }
+  wallet.transactions.push({
+    type: 'REDEEMED',
+    points: requiredPoints,
+    description: `Redeemed offer: ${offer.name}`,
+    date: new Date(),
+  } as any);
+
   await wallet.save();
 
   return {
@@ -232,6 +242,17 @@ export async function creditPoints(
 
   wallet.pointsBalance += points;
   wallet.lifetimePoints += points;
+
+  if (!wallet.transactions) {
+    wallet.transactions = [];
+  }
+  wallet.transactions.push({
+    type: 'EARNED',
+    points,
+    description: `Earned points from order #${order.orderNumber || order._id}`,
+    orderId: order._id as any,
+    date: new Date(),
+  } as any);
 
   wallet.tier = calculateTier(
     wallet.lifetimePoints,

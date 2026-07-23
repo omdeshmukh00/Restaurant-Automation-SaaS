@@ -119,3 +119,34 @@ export async function cancelQueueController(req: Request, res: Response, next: N
     next(error);
   }
 }
+
+export async function notifyWaitingCustomerController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.body.restaurantId ?? req.query.restaurantId);
+    const { QueueEntryModel } = await import('./queue.model');
+    const { emitSessionEvent } = await import('../../services/sessionEvents');
+
+    const entry = await QueueEntryModel.findOne({ _id: req.params.id, restaurantId });
+    if (!entry) {
+      throw new AppError('Queue entry not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    entry.status = QueueStatus.NOTIFIED;
+    (entry as any).notifiedAt = new Date();
+    await entry.save();
+
+    emitSessionEvent(restaurantId, 'queue.notified', {
+      queueId: entry._id,
+      customerName: entry.customerName,
+      mobile: entry.mobile,
+      status: QueueStatus.NOTIFIED,
+    });
+
+    ok(res, {
+      queue: mapQueueDto(entry),
+      message: `Table-ready SMS/Push notification sent to ${entry.customerName} (${entry.mobile})`,
+    });
+  } catch (error) {
+    next(error);
+  }
+}

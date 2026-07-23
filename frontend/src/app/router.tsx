@@ -1,6 +1,7 @@
 // src/app/router.tsx
 // Central application router — assembles all role-based route modules
 
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import RootErrorBoundary from './RootErrorBoundary';
 import { ProtectedRoute } from './guards/ProtectedRoute';
@@ -17,12 +18,10 @@ import { superAdminRoutes } from '../routes/superAdmin.routes';
 // Pages
 import LandingPage from '../features/customer/pages/LandingPage';
 import RestaurantsPage from '../features/customer/pages/RestaurantsPage';
+import DishesPage from '../features/customer/pages/DishesPage';
 import OffersPage from '../features/customer/pages/OffersPage';
 import PricingPage from '../features/customer/pages/PricingPage';
 import PartnerWithUs from '../pages/public/PartnerWithUs';
-import { lazy, Suspense } from 'react';
-
-// Lazy-loaded table session page (QR scan entry)
 const TableSessionPage = lazy(
   () => import('../features/customer/pages/TableSessionPage')
 );
@@ -46,6 +45,18 @@ const router = createBrowserRouter([
   {
     path: '/customer/restaurants',
     element: <RestaurantsPage />,
+    errorElement: <RootErrorBoundary />,
+  },
+
+  // ── Public dishes pages ─────────────────────────────────────────────
+  {
+    path: '/dishes',
+    element: <DishesPage />,
+    errorElement: <RootErrorBoundary />,
+  },
+  {
+    path: '/customer/dishes',
+    element: <DishesPage />,
     errorElement: <RootErrorBoundary />,
   },
 

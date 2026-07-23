@@ -16,12 +16,13 @@ export interface Restaurant {
   image: string;
   rating: number;
   reviewCount: number;
-  priceLevel: string;
+  priceLevel?: string;
   distance: string;
   waitTime: string;
   availableTables: number;
   currentOffer?: string;
   isOpen: boolean;
+  isVeg?: string;
 }
 
 interface RestaurantCardProps {
@@ -96,11 +97,9 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
       )}
 
       <div
-        className="landing-card-hover landing-shiny flex flex-col bg-white overflow-hidden"
+        className="landing-card-hover landing-shiny flex flex-col bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 shadow-sm dark:shadow-none overflow-hidden text-slate-800 dark:text-neutral-100 transition-colors duration-300"
         style={{
           borderRadius: '12px',
-          border: '1px solid #E5E7EB',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         }}
       >
         {/* Image Container */}
@@ -170,7 +169,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
         <div className="p-5 flex-1 flex flex-col">
           {/* Name + Rating */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-[18px] sm:text-[20px] font-semibold leading-tight truncate landing-font-hero" style={{ color: '#222222' }}>
+            <h3 className="text-[18px] sm:text-[20px] font-semibold leading-tight truncate landing-font-hero text-slate-900 dark:text-white">
               {restaurant.name}
             </h3>
             <div
@@ -187,34 +186,57 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
             </div>
           </div>
 
-          {/* Cuisine */}
-          <p className="text-[14px] mt-1 truncate" style={{ color: '#666666' }}>
-            {restaurant.cuisine}
-          </p>
+          {/* Cuisine + Veg Badge */}
+          <div className="flex items-center gap-2 mt-1 truncate">
+            <span className="text-[13px] text-slate-550 dark:text-neutral-400">
+              {restaurant.cuisine}
+            </span>
+            <span className="text-slate-300 dark:text-neutral-700 font-bold">•</span>
+            {restaurant.isVeg === 'veg' && (
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md border border-emerald-200/50 dark:border-emerald-900/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Pure Veg
+              </span>
+            )}
+            {restaurant.isVeg === 'non-veg' && (
+              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-450 flex items-center gap-0.5 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded-md border border-rose-200/50 dark:border-rose-900/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                Non-Veg
+              </span>
+            )}
+            {restaurant.isVeg === 'both' && (
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-0.5 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded-md border border-amber-200/50 dark:border-amber-900/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Veg & Non-Veg
+              </span>
+            )}
+          </div>
 
           {/* Location + Distance */}
-          <div className="flex items-center gap-1.5 mt-2 text-[13px]" style={{ color: '#666666' }}>
-            <MapPin className="w-[14px] h-[14px] shrink-0" style={{ color: '#999999' }} />
+          <div className="flex items-center gap-1.5 mt-2 text-[13px] text-slate-500 dark:text-neutral-400">
+            <MapPin className="w-[14px] h-[14px] shrink-0 text-slate-400 dark:text-neutral-500" />
             <span className="truncate">{restaurant.location}</span>
             <span className="shrink-0">• {restaurant.distance}</span>
           </div>
 
           {/* Divider */}
-          <div className="my-3" style={{ borderTop: '1px solid #E5E7EB' }} />
+          <div className="my-3 border-t border-slate-200 dark:border-neutral-800" />
 
           {/* Info Row */}
-          <div className="flex items-center gap-4 text-[13px]" style={{ color: '#666666' }}>
+          <div className="flex items-center gap-4 text-[13px] text-slate-500 dark:text-neutral-400">
             <span className="flex items-center gap-1">
-              <Clock className="w-[13px] h-[13px]" style={{ color: '#999999' }} />
+              <Clock className="w-[13px] h-[13px] text-slate-400 dark:text-neutral-500" />
               {restaurant.waitTime}
             </span>
             <span className="flex items-center gap-1">
-              <Users className="w-[13px] h-[13px]" style={{ color: '#999999' }} />
+              <Users className="w-[13px] h-[13px] text-slate-400 dark:text-neutral-500" />
               {restaurant.availableTables} tables
             </span>
-            <span className="font-medium" style={{ color: '#FF6B1A' }}>
-              {restaurant.priceLevel}
-            </span>
+            {restaurant.priceLevel && (
+              <span className="font-medium text-[#FF6B1A]">
+                {restaurant.priceLevel}
+              </span>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -222,21 +244,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
             {/* View Menu Button */}
             <button
               onClick={() => setIsMenuOpen(true)}
-              className="h-[42px] text-[13px] font-semibold transition-all duration-150 landing-btn-press landing-focus-ring cursor-pointer"
-              style={{
-                border: '1px solid #E5E7EB',
-                borderRadius: '10px',
-                color: '#222222',
-                backgroundColor: 'transparent',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = '#FF6B1A';
-                e.currentTarget.style.color = '#FF6B1A';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = '#E5E7EB';
-                e.currentTarget.style.color = '#222222';
-              }}
+              className="h-[42px] text-[13px] font-semibold transition-all duration-150 landing-btn-press landing-focus-ring cursor-pointer border border-slate-200 dark:border-neutral-800 rounded-[10px] text-slate-800 dark:text-neutral-200 bg-transparent hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A] hover:text-[#FF6B1A] dark:hover:text-[#FF6B1A]"
             >
               View Menu
             </button>
@@ -259,23 +267,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
           {/* Locate Restaurant Button */}
           <button
             onClick={() => handleLocateRestaurant()}
-            className="w-full mt-3 h-[42px] text-[13px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 landing-btn-press landing-focus-ring cursor-pointer"
-            style={{
-              border: '1px solid #E5E7EB',
-              borderRadius: '10px',
-              color: '#222222',
-              backgroundColor: '#F9FAFB',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#FF6B1A';
-              e.currentTarget.style.backgroundColor = '#FFF5F0';
-              e.currentTarget.style.color = '#FF6B1A';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#E5E7EB';
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
-              e.currentTarget.style.color = '#222222';
-            }}
+            className="w-full mt-3 h-[42px] text-[13px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 landing-btn-press landing-focus-ring cursor-pointer border border-slate-200 dark:border-neutral-800 rounded-[10px] text-slate-800 dark:text-neutral-200 bg-[#F9FAFB] dark:bg-neutral-850 hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A] hover:bg-[#FFF5F0] dark:hover:bg-neutral-800 hover:text-[#FF6B1A] dark:hover:text-[#FF6B1A]"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

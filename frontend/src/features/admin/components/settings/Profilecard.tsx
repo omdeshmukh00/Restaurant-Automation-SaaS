@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Phone, ShieldCheck, AlertCircle, X, CheckCircle2 } from 'lucide-react';
 import { useSettingsStore } from '../../store/settings.store';
 import { adminUserApi } from '../../api/admin.users.api';
+import { useAuth } from '../../../../auth/AuthProvider';
 
 const ROLE_LABELS: Record<string, string> = {
   'restaurant-admin': 'Administrator',
@@ -19,8 +20,12 @@ function humanizeRole(role: string): string {
 }
 
 export function ProfileCard(): JSX.Element {
+  const { user } = useAuth();
   const admin = useSettingsStore((s) => s.admin);
   const updateProfile = useSettingsStore((s) => s.updateProfile);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const avatarImage = user?.avatar || admin.avatar;
 
   const [formData, setFormData] = useState({
     name: admin.name,
@@ -48,6 +53,20 @@ export function ProfileCard(): JSX.Element {
     const id = setInterval(() => setOtpResendTimer((t) => t - 1), 1000);
     return () => clearInterval(id);
   }, [otpResendTimer]);
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        if (typeof reader.result === 'string') {
+          await updateProfile({ avatar: reader.result });
+          window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: reader.result } }));
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,8 +155,29 @@ export function ProfileCard(): JSX.Element {
     <>
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5 transition-colors duration-200">
         <div className="flex items-center gap-4 mb-5">
-          <div className="w-14 h-14 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl font-semibold">
-            {admin.name ? admin.name.charAt(0).toUpperCase() : 'A'}
+          <div className="relative group shrink-0">
+            <div className="w-14 h-14 rounded-full bg-blue-500 overflow-hidden flex items-center justify-center text-white text-xl font-semibold shadow-sm">
+              {avatarImage ? (
+                <img src={avatarImage} alt={admin.name || 'Admin'} className="w-full h-full object-cover" />
+              ) : (
+                admin.name ? admin.name.charAt(0).toUpperCase() : 'A'
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="absolute -bottom-1 -right-1 w-6 h-6 bg-white dark:bg-gray-800 shadow-md rounded-full flex items-center justify-center border border-gray-200 dark:border-gray-700 text-gray-600 hover:text-blue-500 transition-colors"
+              title="Change Avatar Photo"
+            >
+              <span className="material-symbols-outlined text-[13px]">photo_camera</span>
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleAvatarFileChange}
+              accept="image/*"
+              className="hidden"
+            />
           </div>
           <div>
             <h3 className="font-semibold text-gray-800 dark:text-gray-100">{admin.name || 'Admin'}</h3>

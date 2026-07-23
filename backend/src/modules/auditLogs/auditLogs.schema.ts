@@ -11,7 +11,9 @@ export interface IAuditLog extends Document {
   actorRole:    string;
   restaurantId?: mongoose.Types.ObjectId;
   entityType:   AuditEntity;
-  entityId:     mongoose.Types.ObjectId | string;
+  entityId?:    mongoose.Types.ObjectId;
+  externalEntityId?: string | null;
+  provider?:    string;
   action:       AuditAction;
   metadata:     Record<string, unknown>;
   ipAddress?:   string;
@@ -46,10 +48,23 @@ const auditLogSchema = new Schema<IAuditLog>(
       required: true,
     },
 
-    // entityId can be any ObjectId (order, payment, user, etc.)
+    // entityId MUST be an internal Mongo ObjectId
     entityId: {
       type: Schema.Types.ObjectId,
-      required: true,
+      required: false,
+      default: null,
+    },
+
+    externalEntityId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+
+    provider: {
+      type: String,
+      enum: ['razorpay', 'stripe', 'phonepe', 'cashfree', 'internal'],
+      default: 'internal',
     },
 
     action: {

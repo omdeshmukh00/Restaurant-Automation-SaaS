@@ -1178,6 +1178,7 @@ export async function approveRestaurantRequest(requestId: string, reviewerId: st
       revenue: 0,
       lastActive: new Date(),
       joinedDate: new Date(),
+      isVeg: request.isVeg || 'both',
       tags: ['New'],
     }], { session });
 
@@ -1348,6 +1349,7 @@ export async function registerRestaurantDirectly(input: any, reviewerId: string)
       revenue: 0,
       lastActive: new Date(),
       joinedDate: new Date(),
+      isVeg: input.isVeg || 'both',
       tags: ['New'],
     }], { session });
 
@@ -2308,6 +2310,8 @@ export async function createRestaurant(input: CreateRestaurantInput) {
     expectedMonthlyOrders: 0,
     latitude: 0,
     longitude: 0,
+    isVeg: input.isVeg || 'both',
+    coverImage: input.coverImage || undefined,
   }]);
 
   // Create Admin User

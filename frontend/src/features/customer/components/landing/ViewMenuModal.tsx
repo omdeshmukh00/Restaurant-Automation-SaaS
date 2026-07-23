@@ -220,7 +220,10 @@ export default function ViewMenuModal({
                     <img
                       src={item.imageUrl}
                       alt={item.name}
-                      className="w-20 h-20 rounded-xl object-cover shrink-0 bg-neutral-800"
+                      className="w-20 h-20 rounded-xl object-cover shrink-0 bg-neutral-100 dark:bg-neutral-800"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        e.currentTarget.src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format';
+                      }}
                     />
                   )}
                   <div className="flex-1 min-w-0 flex flex-col justify-between">

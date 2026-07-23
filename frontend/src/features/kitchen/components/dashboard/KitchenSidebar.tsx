@@ -7,6 +7,7 @@ import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSe
 
 const NAV_ITEMS = [
   { to: '/kitchen', icon: 'dashboard', label: 'Overview', end: true },
+  { to: '/kitchen/manager', icon: 'admin_panel_settings', label: 'Manager Dashboard' },
   { to: '/kitchen/orders', icon: 'shopping_bag', label: 'Orders', badge: 24 },
   { to: '/kitchen/batch-cooking', icon: 'inventory_2', label: 'Batch Cooking' },
   { to: '/kitchen/inventory', icon: 'package_2', label: 'Inventory' },

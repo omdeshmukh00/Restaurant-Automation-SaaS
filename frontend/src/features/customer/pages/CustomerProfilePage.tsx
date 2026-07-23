@@ -5,6 +5,7 @@ import { useCustomerStore } from '../store/customer.store';
 import ImageCropperModal from '../components/dashboard/ImageCropperModal';
 import { apiClient } from '../../../shared/services/apiClient';
 import { useAuth } from '../../../auth/AuthProvider';
+import { getOrderHistory, getReservations, getLoyaltyWallet, getNotifications } from '../api/customer.api';
 
 const STATS_CONFIG = [
   { icon: 'event_available', key: 'reservations', label: 'Reservations', color: 'bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400' },
@@ -15,7 +16,7 @@ const STATS_CONFIG = [
 
 const MENU_ITEMS = [
   { icon: 'person_outline', label: 'Personal Information', desc: 'Update your name and phone', color: 'bg-orange-50 text-orange-500 dark:bg-orange-950/20 dark:text-orange-400', key: 'profile' },
-  { icon: 'star_outline', label: 'Reward Points', desc: 'View your reward points and history', color: 'bg-purple-50 text-purple-500 dark:bg-purple-950/20 dark:text-purple-400', key: 'loyalty', badge: '450 Pts' },
+  { icon: 'star_outline', label: 'Reward Points', desc: 'View your reward points and history', color: 'bg-purple-50 text-purple-500 dark:bg-purple-950/20 dark:text-purple-400', key: 'loyalty' },
   { icon: 'confirmation_number', label: 'Offers & Coupons', desc: 'View available restaurant offers', color: 'bg-red-50 text-red-500 dark:bg-red-950/20 dark:text-red-400', key: 'offers', badge: '5 Available' },
   { icon: 'notifications_active', label: 'Notifications', desc: 'Manage your alert preferences', color: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950/20 dark:text-yellow-400', key: 'notifications' },
 ];
@@ -28,7 +29,14 @@ export default function CustomerProfilePage() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const [themeExpanded, setThemeExpanded] = useState(false);
-  const [activeModal, setActiveModal] = useState<'profile' | 'loyalty' | 'offers' | 'notifications' | null>(null);
+  const [activeModal, setActiveModal] = useState<'profile' | 'loyalty' | 'offers' | 'notifications' | 'orders' | 'reservations' | null>(null);
+
+  // Integration States
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [reservationHistory, setReservationHistory] = useState<any[]>([]);
+  const [loyaltyWallet, setLoyaltyWallet] = useState<any>(null);
+  const [liveNotifications, setLiveNotifications] = useState<any[]>([]);
+
 
   // Zustand state and actions
   const {
@@ -148,6 +156,7 @@ export default function CustomerProfilePage() {
       setUserData(updatedUser);
       setSelectedAvatar(croppedBase64);
       updateProfile({ avatar: croppedBase64 });
+      window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
       setCropperOpen(false);
       setTempImageSrc('');
       showToast('Custom photo uploaded and cropped successfully!');
@@ -291,77 +300,77 @@ export default function CustomerProfilePage() {
         <div className="lg:col-span-2 space-y-5">
           {/* Profile Card */}
           <div className="bg-white rounded-2xl p-5 border border-sd-surface-variant sd-food-card-shadow flex flex-col sm:flex-row gap-5 items-start">
-            <div className="relative shrink-0">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-sd-primary-container/30 to-sd-primary-fixed-dim overflow-hidden flex items-center justify-center ring-4 ring-sd-primary-fixed shadow-md">
-                {selectedAvatar.startsWith('data:image') || selectedAvatar.startsWith('http') ? (
-                  <img src={selectedAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="material-symbols-outlined text-4xl text-sd-primary/60" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {selectedAvatar}
-                  </span>
-                )}
+            <div className="flex flex-col items-center shrink-0">
+              <div className="relative shrink-0 mb-3">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-950/60 dark:to-orange-900/40 overflow-hidden flex items-center justify-center ring-4 ring-orange-500/20 dark:ring-orange-500/10 shadow-md">
+                  {selectedAvatar.startsWith('data:image') || selectedAvatar.startsWith('http') ? (
+                    <img src={selectedAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="material-symbols-outlined text-4xl text-orange-500" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      person
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-white dark:bg-sd-surface shadow-md rounded-full flex items-center justify-center border border-sd-surface-variant text-slate-600 hover:text-orange-500 transition-colors"
+                  title="Upload / Change Photo"
+                >
+                  <span className="material-symbols-outlined text-[14px]">edit</span>
+                </button>
               </div>
-              <button
-                onClick={() => setAvatarMenuOpen(!avatarMenuOpen)}
-                className="absolute -bottom-1.5 -right-1.5 w-7 h-7 bg-white dark:bg-sd-surface shadow-md rounded-full flex items-center justify-center border border-sd-surface-variant text-sd-on-surface-variant hover:text-sd-primary transition-colors"
-                title="Change Avatar"
-              >
-                <span className="material-symbols-outlined text-[14px]">edit</span>
-              </button>
 
-              {/* Avatar Selector Dropdown */}
-              {avatarMenuOpen && (
-                <>
-                  {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
-                  <div className="fixed inset-0 z-40" onClick={() => setAvatarMenuOpen(false)} />
-                  <div className="absolute left-0 mt-2 p-2 bg-white dark:bg-sd-surface-container border border-sd-surface-variant rounded-xl shadow-lg z-50 flex gap-2 items-center">
-                    {AVATAR_OPTIONS.map((opt) => {
-                      const isSelected = selectedAvatar === opt.icon;
-                      return (
-                        <button
-                          key={opt.icon}
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const response = await apiClient.patch('/users/me', { avatar: opt.icon });
-                              const updatedUser = response.data.data.user;
-                              setUserData(updatedUser);
-                              setSelectedAvatar(opt.icon);
-                              setAvatarMenuOpen(false);
-                              showToast(`Avatar changed to ${opt.label}!`);
-                            } catch (err: any) {
-                              showToast('Failed to change avatar', 'error');
-                            }
-                          }}
-                          className={`w-9 h-9 rounded-full flex items-center justify-center border hover:border-sd-primary transition-all ${
-                            isSelected ? 'border-sd-primary bg-sd-primary/10 text-sd-primary' : 'border-sd-surface-variant text-sd-on-surface-variant'
-                          }`}
-                          title={opt.label}
-                        >
-                          <span className="material-symbols-outlined text-xl">{opt.icon}</span>
-                        </button>
-                      );
-                    })}
-                    
-                    {/* File Upload Input */}
-                    <input
-                      type="file"
-                      ref={avatarFileInputRef}
-                      onChange={handleAvatarFileChange}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => avatarFileInputRef.current?.click()}
-                      className="w-9 h-9 rounded-full flex items-center justify-center border border-dashed border-sd-primary text-sd-primary hover:bg-sd-primary/5 transition-all"
-                      title="Upload Custom Photo"
-                    >
-                      <span className="material-symbols-outlined text-xl">add_a_photo</span>
-                    </button>
-                  </div>
-                </>
-              )}
+              {/* Subimage Pill Buttons (Image 1 design) */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-sd-surface-container border border-slate-200 dark:border-sd-surface-variant rounded-2xl shadow-sm">
+                {/* 1. Default Avatar Subimage Button */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const response = await apiClient.patch('/users/me', { avatar: 'person' });
+                      const updatedUser = response.data.data.user;
+                      setUserData(updatedUser);
+                      setSelectedAvatar('person');
+                      updateProfile({ avatar: 'person' });
+                      showToast('Avatar reset to default!');
+                    } catch (err: any) {
+                      showToast('Failed to reset avatar', 'error');
+                    }
+                  }}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                    !selectedAvatar.startsWith('data:image') && !selectedAvatar.startsWith('http')
+                      ? 'bg-orange-100 dark:bg-orange-950/40 border-2 border-orange-500 text-orange-500'
+                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-orange-500'
+                  }`}
+                  title="Default Avatar"
+                >
+                  <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
+                </button>
+
+                {/* 2. Upload Photo Subimage Button */}
+                <button
+                  type="button"
+                  onClick={() => avatarFileInputRef.current?.click()}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border-2 border-dashed ${
+                    selectedAvatar.startsWith('data:image') || selectedAvatar.startsWith('http')
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-500'
+                      : 'border-orange-400 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20'
+                  }`}
+                  title="Upload Custom Photo"
+                >
+                  <span className="material-symbols-outlined text-lg">add_a_photo</span>
+                </button>
+              </div>
+
+              {/* File Upload Input */}
+              <input
+                type="file"
+                ref={avatarFileInputRef}
+                onChange={handleAvatarFileChange}
+                accept="image/*"
+                className="hidden"
+              />
             </div>
             <div className="flex-1 w-full">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
@@ -589,27 +598,7 @@ export default function CustomerProfilePage() {
             </div>
           </div>
 
-          {/* Contact */}
-          <div className="space-y-3">
-            <div className="bg-sd-primary-container/5 rounded-xl p-4 border border-sd-primary-container/10 flex items-center gap-3">
-              <div className="w-9 h-9 bg-sd-primary-container text-white rounded-full flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">call</span>
-              </div>
-              <div>
-                <p className="text-xs font-bold font-sans">Need Help?</p>
-                <p className="text-[11px] text-sd-on-surface-variant font-sans">Call us at +91 98765 43210</p>
-              </div>
-            </div>
-            <div className="bg-sd-tertiary-container/5 rounded-xl p-4 border border-sd-tertiary-container/10 flex items-center gap-3">
-              <div className="w-9 h-9 bg-sd-tertiary-container text-white rounded-full flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[18px]">chat</span>
-              </div>
-              <div>
-                <p className="text-xs font-bold font-sans">Live Chat</p>
-                <p className="text-[11px] text-sd-on-surface-variant font-sans">Chat with our support team</p>
-              </div>
-            </div>
-          </div>
+
 
           {/* Logout */}
           <button
@@ -708,6 +697,21 @@ export default function CustomerProfilePage() {
                       />
                     </div>
                   </div>
+                  {liveNotifications.length > 0 && (
+                    <div className="pt-4 border-t border-sd-surface-variant/50">
+                      <h4 className="font-bold text-sd-on-surface font-sans mb-3">Recent Alerts</h4>
+                      <div className="space-y-3">
+                        {liveNotifications.map((notif, idx) => (
+                          <div key={idx} className="p-3 bg-sd-surface-container-low rounded-xl border border-sd-surface-variant/50">
+                            <p className="font-bold text-sm text-sd-on-surface">{notif.title}</p>
+                            <p className="text-xs text-sd-on-surface-variant mt-1">{notif.message}</p>
+                            <p className="text-[10px] text-sd-on-surface-variant mt-2">{new Date(notif.createdAt).toLocaleString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="pt-2 flex justify-end gap-3 shrink-0">
                     <button 
                       type="button" 

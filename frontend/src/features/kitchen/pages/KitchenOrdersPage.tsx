@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { type KitchenOrder as UIKitchenOrder, type OrderStatus, type OrderType } from '../store/kitchenData';
+import { type UIKitchenOrder } from './KitchenOverviewPage';
+
+export type OrderStatus = 'new' | 'preparing' | 'ready' | 'delayed' | 'cancelled' | 'completed';
+export type OrderType = 'dine-in' | 'take-away' | 'delivery';
 import { useKitchenSearch } from '../components/dashboard/KitchenSearchContext';
 import {
   acceptOrder,
@@ -39,7 +42,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function KitchenOrdersPage() {
   const { query } = useKitchenSearch();
 
-  const { orders: rawOrders, refreshDashboard } = useKitchenDashboard();
+  const { ordersById, orderIds, refreshDashboard, executeOptimisticOrderUpdate } = useKitchenDashboard();
   const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(() => {
@@ -68,6 +71,7 @@ export default function KitchenOrdersPage() {
   }, []);
 
   const orders = React.useMemo(() => {
+    const rawOrders = orderIds.map(id => ordersById[id]).filter(Boolean);
     return rawOrders.map((bo: any): UIKitchenOrder => {
       let status: OrderStatus = 'new';
       const rawStatus = String(bo.status || '').toLowerCase();
@@ -102,9 +106,10 @@ export default function KitchenOrdersPage() {
         type: 'dine-in',
         time,
         timeAgo,
+        progress: 0,
       };
     });
-  }, [rawOrders, now]);
+  }, [orderIds, ordersById, now]);
 
   const handleStatusFilterChange = (filter: OrderStatus | 'all') => {
     setStatusFilter(filter);
@@ -131,28 +136,21 @@ export default function KitchenOrdersPage() {
       setEtaOrderId(id);
       return;
     }
-    try {
-      if (newStatus === 'ready') {
-        await readyOrder(id);
-      } else if (newStatus === 'cancelled') {
-        await rejectOrder(id);
-      }
-    } catch (err) {
-      console.error('Action failed:', err);
+    if (newStatus === 'ready') {
+      await executeOptimisticOrderUpdate(id, { status: 'READY' }, () => readyOrder(id));
+    } else if (newStatus === 'cancelled') {
+      await executeOptimisticOrderUpdate(id, { status: 'REJECTED' }, () => rejectOrder(id));
     }
-    refreshDashboard();
   };
 
   const handleEtaConfirm = async (eta: number) => {
     if (!etaOrderId) return;
-    try {
-      await acceptOrder(etaOrderId, eta);
-      await startOrder(etaOrderId);
-    } catch (err) {
-      console.error('Accept action failed:', err);
-    }
+    const id = etaOrderId;
     setEtaOrderId(null);
-    refreshDashboard();
+    await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, async () => {
+      await acceptOrder(id, eta);
+      return startOrder(id);
+    });
   };
 
   return (
@@ -206,7 +204,7 @@ export default function KitchenOrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && rawOrders.length === 0 ? (
+              {filtered.length === 0 && orders.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-sans">
                     <div className="flex items-center justify-center gap-2">
@@ -254,7 +252,7 @@ export default function KitchenOrdersPage() {
                   </tr>
                 ))
               )}
-              {rawOrders.length > 0 && filtered.length === 0 && (
+              {orders.length > 0 && filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-sans">No orders match your filters</td></tr>
               )}
             </tbody>

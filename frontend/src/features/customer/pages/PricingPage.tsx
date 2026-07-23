@@ -68,14 +68,14 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="landing-page-container min-h-screen bg-neutral-50 font-sans relative overflow-hidden flex flex-col justify-between">
+    <div className="landing-page-container min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-100 transition-colors duration-300 font-sans relative overflow-hidden flex flex-col justify-between">
       <LandingNavbar onLoginOpen={openLogin} />
 
       {/* Spacer for Navbar */}
       <div className="h-[72px] shrink-0" />
 
       {/* Main Content Area */}
-      <main className="flex-1 py-16 sm:py-20 relative overflow-hidden" style={{ backgroundColor: '#FFF8F3' }}>
+      <main className="flex-1 py-16 sm:py-20 relative overflow-hidden bg-[#FFF8F3] dark:bg-neutral-950 transition-colors duration-300">
         {/* Decorative background orbs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div

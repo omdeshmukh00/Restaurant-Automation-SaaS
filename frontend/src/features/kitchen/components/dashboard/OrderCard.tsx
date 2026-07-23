@@ -1,5 +1,5 @@
 import React from 'react';
-import type { KitchenOrder } from '../../store/kitchenData';
+import { type UIKitchenOrder as KitchenOrder } from '../../pages/KitchenOverviewPage';
 
 interface Props {
   order: KitchenOrder;
@@ -9,6 +9,7 @@ interface Props {
   onDelay?: (id: string) => void;
   onRush?: (id: string) => void;
   onPickup?: (id: string) => void;
+  onAddNote?: (id: string) => void;
 }
 
 const STATUS_COLORS = {
@@ -20,15 +21,37 @@ const STATUS_COLORS = {
   cancelled: { border: 'border-l-slate-300', text: 'text-slate-400', bg: 'bg-slate-50', btnPrimary: '', btnSecondary: '' },
 };
 
-export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDelay, onRush, onPickup }: Props) {
+export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDelay, onRush, onPickup, onAddNote }: Props) {
   const colors = STATUS_COLORS[order.status];
 
   return (
     <div className={`bg-white border-l-4 ${colors.border} rounded-xl shadow-sm p-4 border border-slate-100`}>
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
-        <h4 className="font-bold text-base font-sans text-slate-800">#{order.id}</h4>
-        <span className="text-[10px] text-slate-400 font-medium font-sans">{order.timeAgo || order.time}</span>
+        <div className="flex flex-col gap-1">
+          <h4 className="font-bold text-base font-sans text-slate-800">#{order.id}</h4>
+          {order.serviceFlags && (
+            <div className="flex flex-wrap gap-1">
+              {order.serviceFlags.isVip && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wider">VIP</span>
+              )}
+              {order.serviceFlags.isRush && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 uppercase tracking-wider">RUSH</span>
+              )}
+              {order.serviceFlags.allergyAlert && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-100 text-yellow-800 uppercase tracking-wider">ALLERGY</span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {onAddNote && (
+            <button onClick={() => onAddNote(order.id)} className="text-slate-400 hover:text-slate-600 transition-colors" title="Add Note">
+              <span className="material-symbols-outlined text-[16px]">edit_note</span>
+            </button>
+          )}
+          <span className="text-[10px] text-slate-400 font-medium font-sans">{order.timeAgo || order.time}</span>
+        </div>
       </div>
 
       {/* Items */}
@@ -54,6 +77,28 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
       {order.status === 'delayed' && order.delayMins && (
         <div className="mb-3">
           <p className="text-[11px] font-bold text-red-600 font-sans">{order.delayMins} mins delay</p>
+          {order.delayHistory && order.delayHistory.length > 0 && (
+            <p className="text-[10px] text-red-500 font-sans mt-0.5">
+              Reason: {order.delayHistory[order.delayHistory.length - 1].reason.replace(/_/g, ' ')}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Internal Notes */}
+      {order.internalNotes && order.internalNotes.length > 0 && (
+        <div className="mb-3 p-2 bg-yellow-50/50 border border-yellow-200/50 rounded-lg space-y-1.5">
+          {order.internalNotes.slice(-2).map((note: any, idx: number) => (
+            <div key={idx} className="text-[10px] font-sans">
+              <span className="font-bold text-yellow-800">{note.authorName}: </span>
+              <span className="text-yellow-700">{note.content}</span>
+            </div>
+          ))}
+          {order.internalNotes.length > 2 && (
+            <div className="text-[9px] text-yellow-600 font-bold font-sans">
+              +{order.internalNotes.length - 2} more notes
+            </div>
+          )}
         </div>
       )}
 
@@ -65,7 +110,7 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
         {order.chef && (
           <>
             <span className="text-slate-300">•</span>
-            <span className="text-slate-400">{order.chef}</span>
+            <span className="text-slate-400">{order.chef.name}</span>
           </>
         )}
       </div>

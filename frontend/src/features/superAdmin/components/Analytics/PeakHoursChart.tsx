@@ -18,12 +18,12 @@ export default function PeakHoursChart({ darkMode, data }: PeakHoursChartProps) 
   // unless there is activity outside this range, in which case we show all 24 hours.
   const chartData = useMemo(() => {
     if (!data || data.length === 0) {
-      // Generate empty mock hours if no data passed
-      const mock: PeakHourItem[] = [];
+      // Generate empty layout if no data passed
+      const emptyState: PeakHourItem[] = [];
       for (let h = 0; h < 24; h++) {
-        mock.push({ hour: h, reservations: 0, queueEntries: 0 });
+        emptyState.push({ hour: h, reservations: 0, queueEntries: 0 });
       }
-      return mock.filter((d) => d.hour >= 8 && d.hour <= 23);
+      return emptyState.filter((d) => d.hour >= 8 && d.hour <= 23);
     }
     
     const activeOutsideRange = data.some(

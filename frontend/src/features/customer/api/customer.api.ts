@@ -57,6 +57,52 @@ export async function verifyCustomerPayment(input: VerifyCustomerPaymentInput) {
   return response.data.data;
 }
 
+export async function requestCashPayment() {
+  const response = await apiClient.post<ApiResponse<any>>('/payments/customer/cash');
+  return response.data.data;
+}
+
+export async function placeCustomerOrder(specialInstructions: string = '') {
+  const response = await apiClient.post<ApiResponse<any>>('/customer/orders', {
+    specialInstructions,
+  });
+  return response.data.data;
+}
+
+export type CustomerRequestType = 'waiter' | 'water' | 'cutlery' | 'cleaning' | 'bill' | 'help';
+
+export async function createCustomerRequest(type: CustomerRequestType) {
+  const response = await apiClient.post<ApiResponse<any>>(`/customer/requests/${type}`);
+  return response.data;
+}
+
+export type SubmitFeedbackInput = {
+  rating: number;
+  comment?: string;
+};
+
+export async function submitCustomerFeedback(input: SubmitFeedbackInput) {
+  const response = await apiClient.post<ApiResponse<any>>('/customer/feedback', input);
+  return response.data;
+}
+
+export async function getLiveBill() {
+  const response = await apiClient.get<ApiResponse<any>>('/billing/customer/bill');
+  return response.data.data;
+}
+
+export async function requestFinalBill() {
+  const response = await apiClient.post<ApiResponse<any>>('/billing/customer/bill/request');
+  return response.data.data;
+}
+
+export function getInvoicePdfUrl(billId: string): string {
+  // Uses backend route to download the PDF
+  return `${import.meta.env.VITE_API_URL || '/api/v1'}/billing/customer/bill/${billId}/receipt/pdf`;
+}
+
+// ── Reservation APIs (customer panel) ────────────────────────────────
+
 export type CustomerReservationInput = {
   customerName?: string;
   mobile?: string;
@@ -122,40 +168,6 @@ export async function cancelCustomerReservation(id: string) {
   return response.data.data.reservation;
 }
 
-export async function placeCustomerOrder(specialInstructions: string = '') {
-  const response = await apiClient.post<ApiResponse<any>>('/customer/orders', {
-    specialInstructions,
-  });
-  return response.data.data;
-}
-
-export type CustomerRequestType = 'waiter' | 'water' | 'cutlery' | 'cleaning' | 'bill' | 'help';
-
-export async function createCustomerRequest(type: CustomerRequestType) {
-  const response = await apiClient.post<ApiResponse<any>>(`/customer/requests/${type}`);
-  return response.data;
-}
-
-export type SubmitFeedbackInput = {
-  rating: number;
-  comment?: string;
-};
-
-export async function submitCustomerFeedback(input: SubmitFeedbackInput) {
-  const response = await apiClient.post<ApiResponse<any>>('/customer/feedback', input);
-  return response.data;
-}
-
-export async function getLiveBill() {
-  const response = await apiClient.get<ApiResponse<any>>('/billing/customer/bill');
-  return response.data.data;
-}
-
-export async function requestFinalBill() {
-  const response = await apiClient.post<ApiResponse<any>>('/billing/customer/bill/request');
-  return response.data.data;
-}
-
 // ── Loyalty & Offers ──────────────────────────────────────────────────
 
 export type CustomerWallet = {
@@ -209,5 +221,27 @@ export async function getOfferEligibility() {
 
 export async function redeemCustomerOffer(offerId: string) {
   const response = await apiClient.post<ApiResponse<RedeemOfferResult>>(`/customer/offers/${offerId}/redeem`);
+  return response.data.data;
+}
+
+// ── User profile / history APIs ──────────────────────────────────────
+
+export async function getLoyaltyWallet() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/loyalty');
+  return response.data.data;
+}
+
+export async function getNotifications() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/notifications');
+  return response.data.data;
+}
+
+export async function getOrderHistory() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/order-history');
+  return response.data.data;
+}
+
+export async function getReservations() {
+  const response = await apiClient.get<ApiResponse<any>>('/users/me/reservations');
   return response.data.data;
 }

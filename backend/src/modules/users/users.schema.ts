@@ -87,6 +87,7 @@ export const updateProfileSchema = z.object({
   location: z.string().optional(),
   bio: z.string().optional(),
   otp: z.string().optional(),
+  mobileOtp: z.string().optional(),
 });
 
 

@@ -85,15 +85,17 @@ export async function logAudit(
   payload: Omit<CreateAuditLogInput, 'actorId' | 'actorRole' | 'restaurantId' | 'ipAddress' | 'userAgent'> &
     Partial<Pick<CreateAuditLogInput, 'actorId' | 'actorRole' | 'restaurantId' | 'ipAddress' | 'userAgent'>>,
 ): Promise<void> {
-  const actorId = req.user?._id?.toString() || payload.actorId || null;
-  const actorRole = req.user?.role || payload.actorRole || 'system';
+  const actorId = (req as any).user?._id?.toString() || payload.actorId || null;
+  const actorRole = (req as any).user?.role || payload.actorRole || 'system';
 
   const input: CreateAuditLogInput = {
     actorId,
     actorRole,
-    restaurantId: payload.restaurantId ?? req.user?.restaurantId?.toString(),
+    restaurantId: payload.restaurantId ?? (req as any).user?.restaurantId?.toString(),
     entityType:   payload.entityType,
     entityId:     payload.entityId,
+    externalEntityId: payload.externalEntityId,
+    provider:     payload.provider,
     action:       payload.action,
     metadata:     payload.metadata ?? {},
     ipAddress:    payload.ipAddress ?? extractRealIp(req),

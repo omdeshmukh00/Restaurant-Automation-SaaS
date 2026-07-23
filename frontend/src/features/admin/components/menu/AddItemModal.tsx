@@ -40,7 +40,9 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
   const [stock, setStock] = useState('');
   const [category, setCategory] = useState('');
   const [isVeg, setIsVeg] = useState(false);
+  const [isSpicy, setIsSpicy] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
+  const [preparationComplexity, setPreparationComplexity] = useState('1');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -98,11 +100,13 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
         price: Number(price) || 0,
         categoryId: category,
         isVeg,
+        isSpicy,
         isAvailable,
         stockQuantity: stockNum,
-        image: imageUrl || undefined,
+        preparationComplexity: Number(preparationComplexity) || 1,
+        image: imageUrl || '',
       });
-      onClose();
+      if (!formError) onClose();
     } catch (err: any) {
       setFormError(err?.response?.data?.message ?? 'Failed to create item');
       setUploading(false);
@@ -172,6 +176,19 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Preparation Complexity (1-10)</label>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              className={inputClass}
+              value={preparationComplexity}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPreparationComplexity(e.target.value)}
+              placeholder="1"
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Category</label>
             <select
               className={inputClass}
@@ -216,6 +233,23 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                   isAvailable ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/50">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1.5">🌶️ Extra Spicy</span>
+            <button
+              type="button"
+              onClick={() => setIsSpicy((v) => !v)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                isSpicy ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isSpicy ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>

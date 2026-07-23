@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { REPORT_TEMPLATES } from '../store/kitchenData';
+import { REPORT_TEMPLATES, type ReportTemplate } from '../constants';
 
 interface GeneratedReport {
   id: string;

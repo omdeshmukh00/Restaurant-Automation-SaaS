@@ -72,7 +72,7 @@ export const reorderCategoriesSchema = z.object({
 */
 
 export const createItemSchema = z.object({
-  categoryId: objectIdSchema,
+  categoryId: objectIdSchema.optional(),
   name: z.string().min(1, 'Name is required').max(150),
   description: z.string().max(1000).optional(),
   shortDescription: z.string().max(200).optional(),
@@ -81,11 +81,13 @@ export const createItemSchema = z.object({
   image: imageReferenceSchema.optional().or(z.literal('')),
   images: z.array(imageReferenceSchema).max(10).optional(),
   isVeg: z.boolean(),
+  isSpicy: z.boolean().optional().default(false),
   isAvailable: z.boolean().optional().default(true),
   isHidden: z.boolean().optional().default(false),
   stockQuantity: z.number().min(0).optional(),
   preparationTime: z.number().int().min(0).optional(),
   spiceLevel: z.number().int().min(0).max(5).optional(),
+  preparationComplexity: z.number().int().min(1).max(10).optional().default(1),
   tags: z.array(z.string().max(50)).max(10).optional(),
   displayOrder: z.number().int().min(0).optional().default(0),
   ingredients: z

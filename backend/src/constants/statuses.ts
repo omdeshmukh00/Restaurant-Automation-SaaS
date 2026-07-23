@@ -18,6 +18,8 @@ export enum TableStatus {
   DIRTY = 'NEEDS_CLEANING',
   CLEANING = 'CLEANING_IN_PROGRESS',
   MAINTENANCE = 'MAINTENANCE',
+  UNDER_MAINTENANCE = 'UNDER_MAINTENANCE',
+  WAITING_ASSIGNED = 'WAITING_ASSIGNED',
 
   // Backward compatibility aliases
   PAYMENT_PENDING = 'PAYMENT_PENDING',
@@ -60,6 +62,7 @@ export enum PaymentStatus {
 export enum CleaningStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
+  PAUSED = 'PAUSED',
   COMPLETED = 'COMPLETED',
   VERIFIED = 'VERIFIED',
 }
@@ -130,4 +133,11 @@ export enum Priority {
   NORMAL = 'NORMAL',
   HIGH = 'HIGH',
   URGENT = 'URGENT',
+  CRITICAL = 'CRITICAL',
+}
+
+export enum ItemAvailabilityStatus {
+  AVAILABLE = 'AVAILABLE',
+  OUT_OF_STOCK = 'OUT_OF_STOCK',
+  TEMPORARILY_UNAVAILABLE = 'TEMPORARILY_UNAVAILABLE',
 }

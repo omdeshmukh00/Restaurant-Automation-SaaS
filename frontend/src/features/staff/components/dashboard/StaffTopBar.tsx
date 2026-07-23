@@ -92,7 +92,14 @@ export default function StaffTopBar({ onNotificationClick }: { onNotificationCli
 
       {/* Mobile view brand name */}
       <div className="flex md:hidden items-center gap-2">
-        <div className="bg-dine-light-orange p-1.5 rounded-lg">
+        <button
+          onClick={() => window.dispatchEvent(new Event('toggle-staff-sidebar'))}
+          className="p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-sd-surface-variant rounded-lg mr-1 focus:outline-none flex items-center justify-center"
+          title="Toggle Navigation Menu"
+        >
+          <span className="material-symbols-outlined text-[22px]">menu</span>
+        </button>
+        <div className="bg-dine-light-orange p-1.5 rounded-lg flex items-center justify-center">
           <span className="material-symbols-outlined text-dine-orange text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
         </div>
         <span className="font-bold text-sm text-slate-800 dark:text-slate-200 font-sans">{platformName}</span>

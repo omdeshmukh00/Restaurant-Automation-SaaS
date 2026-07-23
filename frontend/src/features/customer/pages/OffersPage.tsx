@@ -20,10 +20,13 @@ interface ApiOffer {
   image?: string;
 }
 
+const CATEGORIES = ['All', 'Food', 'Beverages', 'New', 'Limited Time'];
+
 export default function OffersPage() {
   const [offers, setOffers] = useState<ApiOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState('All');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +46,14 @@ export default function OffersPage() {
     fetchOffers();
   }, []);
 
+  const filteredOffers = activeCategory === 'All' ? offers : offers.filter(o => {
+    if (activeCategory === 'Limited Time') return o.status === 'ACTIVE';
+    if (activeCategory === 'Food') return o.discountType === 'PERCENTAGE';
+    if (activeCategory === 'Beverages') return o.title?.toLowerCase().includes('drink') || o.title?.toLowerCase().includes('beverage');
+    if (activeCategory === 'New') return new Date(o.startDate) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return true;
+  });
+
   const handleCopy = async (id: string, code: string) => {
     try { await navigator.clipboard.writeText(code); } catch { /* */ }
     setCopiedId(id);
@@ -57,7 +68,7 @@ export default function OffersPage() {
   const openLogin = () => navigate('/auth/customer');
 
   return (
-    <div className="min-h-screen landing-font-inter flex flex-col justify-between" style={{ background: '#FFF8F3', color: '#222222' }}>
+    <div className="min-h-screen landing-font-inter flex flex-col justify-between bg-[#FFF8F3] dark:bg-neutral-950 text-slate-800 dark:text-neutral-100 transition-colors duration-300">
       <LandingNavbar onLoginOpen={openLogin} />
       
       <div className="h-[72px] shrink-0" />
@@ -120,10 +131,34 @@ export default function OffersPage() {
         </div>
       </section>
 
-      {/* Offers Grid */}
+      {/* ── Category Tabs ────────────────────────────── */}
+      <div className="sticky top-[64px] z-40 bg-[#FFF8F3]/95 dark:bg-neutral-950/95 backdrop-blur-md border-b border-slate-200 dark:border-neutral-800 transition-colors duration-300">
+        <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-3 flex items-center gap-2.5 overflow-x-auto landing-hide-scrollbar">
+          {CATEGORIES.map((cat) => {
+            const isActive = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className="whitespace-nowrap px-4 py-2 text-[13px] font-semibold shrink-0 transition-all duration-150 rounded-full border bg-white dark:bg-neutral-900 border-slate-200 dark:border-neutral-850 text-slate-600 dark:text-neutral-300 hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A]"
+                style={isActive ? {
+                  borderColor: '#FF6B1A',
+                  backgroundColor: '#FF6B1A',
+                  color: '#FFFFFF',
+                  boxShadow: '0 2px 12px rgba(255,107,26,0.3)',
+                } : undefined}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Offers Grid ──────────────────────────────── */}
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {offers.map((offer) => (
+          {filteredOffers.map((offer) => (
             <div
               key={offer._id}
               className="landing-card-hover landing-shiny overflow-hidden"
@@ -176,7 +211,7 @@ export default function OffersPage() {
           ))}
         </div>
 
-        {!loading && offers.length === 0 && (
+        {!loading && filteredOffers.length === 0 && (
           <div className="text-center py-20">
             <div className="w-16 h-16 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-8 h-8 text-orange-400" />

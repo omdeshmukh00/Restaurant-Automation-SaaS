@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useKitchenSearch } from './KitchenSearchContext';
 import { useNavigate } from 'react-router-dom';
+import { getSocket } from '../../../../lib/socket';
 import { useKitchenStore } from '../../store/kitchen.store';
 import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
@@ -79,32 +80,43 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
   };
 
   useEffect(() => {
-    // 1. Clock timer (every second)
-    const clockTimer = setInterval(() => {
+    const interval = setInterval(() => {
       setTime(new Date());
-    }, 1000);
+    }, 60000);
 
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listen to real time notifications via Socket.IO
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewNotification = (data: any) => {
+      const newNotif: KitchenNotification = {
+        id: data._id || `nt-${Date.now()}`,
+        message: data.message,
+        time: 'Just now',
+        read: false,
+        route: data.link || '/kitchen',
+        type: data.category === 'ORDER' ? 'order' : data.category === 'INVENTORY' ? 'inventory' : 'analytics' as any
+      };
+      setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
+    };
+
+    socket.on('notification:new', handleNewNotification);
+
+    return () => {
+      socket.off('notification:new', handleNewNotification);
+    };
+  }, []);
+
+  useEffect(() => {
     // 2. Metrics fluctuate timer (every 5 seconds)
     const metricsTimer = setInterval(() => {
       setActiveOrders(prev => {
         const change = Math.random() > 0.5 ? 1 : -1;
         const next = prev + change;
-
-        // Occasionally trigger a new order notification when orders count increases
-        if (next > prev && Math.random() > 0.3) {
-          const newId = `ORD-${Math.floor(Math.random() * 9000) + 12600}`;
-          const newTable = `T${String(Math.floor(Math.random() * 15) + 1).padStart(2, '0')}`;
-          const newNotif: KitchenNotification = {
-            id: `nt-${Date.now()}`,
-            message: `New order #${newId} received at Table ${newTable}`,
-            time: 'Just now',
-            read: false,
-            route: '/kitchen',
-            type: 'order'
-          };
-          setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
-        }
-
         return next >= 20 && next <= 28 ? next : prev;
       });
 
@@ -133,7 +145,6 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
     }, 5000);
 
     return () => {
-      clearInterval(clockTimer);
       clearInterval(metricsTimer);
     };
   }, []);

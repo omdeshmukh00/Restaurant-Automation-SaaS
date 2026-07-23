@@ -45,6 +45,8 @@ export interface ProfileData {
   role: string;
   department: string;
   phone: string;
+  mobile?: string;
+  mobileOtp?: string;
   joinDate?: string;
   employeeId?: string;
   avatarUrl?: string | null;
@@ -118,5 +120,12 @@ export const profileAPI = {
       data: res.data?.profile ?? (res.data as ProfileData | undefined),
       error: res.error,
     };
+  },
+
+  requestMobileOtp: async (mobile: string): Promise<ApiResponse<{ otpSent: boolean; otp?: string }>> => {
+    return fetchAPI<{ otpSent: boolean; otp?: string }>('/users/me/request-mobile-otp', {
+      method: 'POST',
+      body: JSON.stringify({ mobile }),
+    });
   },
 };

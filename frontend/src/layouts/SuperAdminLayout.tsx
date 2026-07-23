@@ -139,21 +139,21 @@ export default function SuperAdminLayout() {
         onToggle={handleToggleSidebar}
       />
 
+      {/* ── NAVBAR ────────────────────────────────────────────────────── */}
+      <Navbar
+        darkMode={darkMode}
+        onThemeToggle={toggleTheme}
+        onMobileMenuToggle={() => setMobileSidebarOpen((v) => !v)}
+        mobileMenuOpen={mobileSidebarOpen}
+        sidebarCollapsed={sidebarCollapsed}
+      />
+
       {/* ── MAIN CONTENT AREA ───────────────────────────────────────────── */}
       <main
         className={`flex-1 min-w-0 flex flex-col overflow-y-auto pt-16 h-screen transition-all duration-300 ${
           sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[260px]"
         }`}
       >
-        {/* ── NAVBAR ────────────────────────────────────────────────────── */}
-        <Navbar
-          darkMode={darkMode}
-          onThemeToggle={toggleTheme}
-          onMobileMenuToggle={() => setMobileSidebarOpen((v) => !v)}
-          mobileMenuOpen={mobileSidebarOpen}
-          sidebarCollapsed={sidebarCollapsed}
-        />
-
         {/* ── PAGE CONTENT ──────────────────────────────────────────────── */}
         <div className="flex-1">
           <Outlet context={{ darkMode, themePreference, setThemePreference: updateThemePreference }} />

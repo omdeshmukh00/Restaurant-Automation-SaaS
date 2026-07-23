@@ -143,6 +143,18 @@ export async function updateTableStatus(
 
   table.status = newStatus;
 
+  // Manage occupied and estimated availability timers
+  if (newStatus === TableStatus.OCCUPIED || newStatus === TableStatus.ORDERING) {
+    if (!table.occupiedAt) {
+      table.occupiedAt = new Date();
+    }
+    table.estimatedVacantAt = new Date(Date.now() + 45 * 60 * 1000);
+  } else if (newStatus === TableStatus.AVAILABLE || newStatus === TableStatus.NEEDS_CLEANING || newStatus === TableStatus.CLEANING_IN_PROGRESS) {
+    table.occupiedAt = null as any;
+    table.estimatedVacantAt = null as any;
+    table.waitingAssigned = false;
+  }
+
   if (newStatus === TableStatus.NEEDS_CLEANING) {
     await ensureCleaningTaskForTable({
       restaurantId: table.restaurantId,

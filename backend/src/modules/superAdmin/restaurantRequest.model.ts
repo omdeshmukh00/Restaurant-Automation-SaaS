@@ -25,6 +25,8 @@ export interface IRestaurantRequest extends Document {
   reviewedAt?: Date;
   restaurantId?: Types.ObjectId;
   rejectionReason?: string;
+  isVeg?: string;
+  coverImage?: string;
   
   // Payment Details
   paymentId?: string;
@@ -68,6 +70,8 @@ const restaurantRequestSchema = new Schema<IRestaurantRequest>(
     reviewedAt: { type: Date },
     restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant' },
     rejectionReason: { type: String, trim: true },
+    isVeg: { type: String, enum: ['veg', 'non-veg', 'both'], default: 'both' },
+    coverImage: { type: String, trim: true },
 
     paymentId: { type: String },
     orderId: { type: String },

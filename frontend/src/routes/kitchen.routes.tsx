@@ -9,6 +9,7 @@ import KitchenStaffPage from '../features/kitchen/pages/KitchenStaffPage';
 import KitchenAnalyticsPage from '../features/kitchen/pages/KitchenAnalyticsPage';
 import KitchenReportsPage from '../features/kitchen/pages/KitchenReportsPage';
 import KitchenSettingsPage from '../features/kitchen/pages/KitchenSettingsPage';
+import KitchenManagerDashboard from '../features/kitchen/pages/KitchenManagerDashboard';
 
 export const kitchenRoutes: RouteObject[] = [
   {
@@ -24,6 +25,7 @@ export const kitchenRoutes: RouteObject[] = [
       { path: 'analytics', element: <KitchenAnalyticsPage /> },
       { path: 'reports', element: <KitchenReportsPage /> },
       { path: 'settings', element: <KitchenSettingsPage /> },
+      { path: 'manager', element: <KitchenManagerDashboard /> },
     ],
   },
 ];

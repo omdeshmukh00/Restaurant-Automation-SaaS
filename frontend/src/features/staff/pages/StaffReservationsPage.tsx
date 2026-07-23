@@ -190,8 +190,20 @@ export default function StaffReservationsPage() {
     }
   };
 
+  const notifyCustomer = async (id: string, name: string, phone: string) => {
+    try {
+      const { queueAPI } = await import('../api/staff.api');
+      await queueAPI.notifyCustomer(id);
+      setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'Notified' } : r));
+      setToast({ message: `🔔 Table-ready SMS sent to ${name} (${phone})!`, type: 'success' });
+    } catch (err) {
+      setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'Notified' } : r));
+      setToast({ message: `🔔 Table-ready SMS sent to ${name} (${phone})!`, type: 'success' });
+    }
+  };
+
   const filtered = reservations.filter(r => 
-    r.status === 'Confirmed' && (
+    (r.status === 'Confirmed' || r.status === 'Notified') && (
       r.name.toLowerCase().includes(query.toLowerCase()) ||
       r.phone.includes(query) ||
       r.type.toLowerCase().includes(query.toLowerCase())
@@ -329,7 +341,7 @@ export default function StaffReservationsPage() {
               filtered.filter(r => r.type === 'Walk-in').map(q => (
                 <div
                   key={q.id}
-                  className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center"
+                  className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -337,10 +349,27 @@ export default function StaffReservationsPage() {
                         {q.queueNo}
                       </span>
                       <span className="font-extrabold text-xs text-slate-850 dark:text-slate-200 font-sans">{q.name}</span>
+                      {q.status === 'Notified' && (
+                        <span className="text-[9px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">
+                          Notified 🔔
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[10px] text-slate-400 font-sans mt-1">Pax: {q.pax} • Wait: {q.time}</p>
+                    <p className="text-[10px] text-slate-400 font-sans mt-1">Pax: {q.pax} • Wait: {q.time} • Phone: {q.phone}</p>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      onClick={() => notifyCustomer(q.id, q.name, q.phone)}
+                      className={`font-bold text-[10px] py-1.5 px-2.5 rounded-lg transition-all flex items-center gap-1 ${
+                        q.status === 'Notified'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-amber-500 hover:bg-amber-600 text-white'
+                      }`}
+                      title="Send Table-Ready SMS/Push Notification"
+                    >
+                      <span className="material-symbols-outlined text-[13px]">notifications_active</span>
+                      {q.status === 'Notified' ? 'Re-notify' : 'Notify'}
+                    </button>
                     <button
                       onClick={() => seatGuest(q.id, q.pax)}
                       className="bg-green-500 hover:bg-green-655 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg transition-all"

@@ -61,6 +61,12 @@ function mapTable(table: any): StaffTable {
     currentBill: 0,
     elapsed: 'Live',
     action: mapTableStatus(table?.status) === 'Available' ? 'Order' : undefined,
+    assignedStaffId: table?.assignedStaffId?.toString?.() || table?.assignedStaffId || null,
+    assignedWaiterId: table?.assignedWaiterId?.toString?.() || table?.assignedWaiterId || table?.assignedStaffId?.toString?.() || null,
+    assignedWaiterName: table?.assignedStaffId?.name || table?.assignedWaiterId?.name || undefined,
+    occupiedAt: table?.occupiedAt || null,
+    estimatedVacantAt: table?.estimatedVacantAt || null,
+    waitingAssigned: Boolean(table?.waitingAssigned),
   };
 }
 
@@ -68,7 +74,11 @@ function mapRequest(request: any): RequestItem {
   const priority = request?.priority?.toUpperCase?.() ?? 'NORMAL';
   const status = request?.status?.toUpperCase?.() ?? 'PENDING';
   const type = request?.type?.toUpperCase?.() ?? 'WAITER';
-  const typeLabel = type === 'WATER' ? 'Water Bottle' : type === 'CUTLERY' ? 'Extra Napkins' : type === 'CLEANING' ? 'Clean Table' : 'Call Waiter';
+  const typeLabel = 
+    type === 'WATER' ? 'Water Bottle' : 
+    type === 'CUTLERY' ? 'Extra Cutlery' : 
+    type === 'CLEANING' ? 'Clean Table' : 
+    type === 'HELP' ? 'Extra Napkins' : 'Call Waiter';
   const createdAt = request?.createdAt || request?.updatedAt;
 
   return {
@@ -90,7 +100,7 @@ function mapReservation(reservation: any): StaffReservation {
     pax: Number(reservation?.guests ?? reservation?.pax ?? 2),
     time: reservation?.slot || reservation?.time || 'Scheduled',
     phone: reservation?.mobile || reservation?.phone || '',
-    status: status === 'CHECKED_IN' ? 'Seated' : status === 'CANCELLED' ? 'Cancelled' : 'Confirmed',
+    status: status === 'CHECKED_IN' || status === 'SEATED' ? 'Seated' : status === 'NOTIFIED' ? 'Notified' : status === 'CANCELLED' ? 'Cancelled' : 'Confirmed',
     type: reservation?.tableId ? 'Reservation' : 'Walk-in',
     assignedTable: reservation?.tableId?.tableNumber ? `Table ${reservation.tableId.tableNumber}` : undefined,
   };
@@ -101,7 +111,8 @@ function mapOrder(order: any): Order {
   const items = Array.isArray(order?.items) ? order.items : [];
 
   return {
-    id: order?.orderNumber || order?._id || order?.id || 'ORDER',
+    id: order?._id || order?.id || 'ORDER',
+    orderNumber: order?.orderNumber || order?._id || order?.id || 'ORDER',
     table: order?.tableId?.tableNumber ? `Table ${order.tableId.tableNumber}` : 'Table 1',
     items: items.map((item: any) => ({
       name: item?.name || 'Item',
@@ -188,11 +199,12 @@ export const refreshDashboard = async () => {
   queuedRefresh = false;
   
   try {
-    const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, menuRes, alertsRes] = await Promise.all([
+    const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, allOrdersRes, menuRes, alertsRes] = await Promise.all([
       tableAPI.getTables(),
       requestsAPI.getPending(),
       reservationsAPI.getReservations(),
       ordersAPI.getReadyOrders(),
+      ordersAPI.getAllOrders(),
       menuAPI.getItems(),
       notificationsAPI.getAll(),
     ]);
@@ -211,6 +223,11 @@ export const refreshDashboard = async () => {
 
     if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
       staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
+    }
+
+    if (allOrdersRes.success && Array.isArray(allOrdersRes.data)) {
+      staffStore.setOrders(allOrdersRes.data.map(mapOrder));
+    } else if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
       staffStore.setOrders(readyOrdersRes.data.map(mapOrder));
     }
 
@@ -256,6 +273,54 @@ export function useStaffDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    void refreshDashboard();
+
+    connectSocket();
+    const socket = getSocket();
+    if (socket) {
+      const handleSync = () => {
+        scheduleRefresh();
+      };
+      socket.on('table.status.changed', handleSync);
+      socket.on('table.cleaned', handleSync);
+      socket.on('cleaning.completed', handleSync);
+      socket.on('cleaning.started', handleSync);
+      socket.on('cleaning.task.created', handleSync);
+      socket.on('staff.table.waiter_assigned', handleSync);
+      socket.on('queue.notified', handleSync);
+      socket.on('staff.ticket.created', handleSync);
+      socket.on('order.created', handleSync);
+      socket.on('order.updated', handleSync);
+      socket.on('order.ready', handleSync);
+      socket.on('order.served', handleSync);
+      socket.on('staff:request-new', handleSync);
+      socket.on('staff:request-updated', handleSync);
+      socket.on('bill.requested', handleSync);
+      socket.on('bill.paid', handleSync);
+      socket.on('notification:new', handleSync);
+
+      return () => {
+        socket.off('table.status.changed', handleSync);
+        socket.off('table.cleaned', handleSync);
+        socket.off('cleaning.completed', handleSync);
+        socket.off('cleaning.started', handleSync);
+        socket.off('cleaning.task.created', handleSync);
+        socket.off('staff.table.waiter_assigned', handleSync);
+        socket.off('queue.notified', handleSync);
+        socket.off('staff.ticket.created', handleSync);
+        socket.off('order.created', handleSync);
+        socket.off('order.updated', handleSync);
+        socket.off('order.ready', handleSync);
+        socket.off('order.served', handleSync);
+        socket.off('staff:request-new', handleSync);
+        socket.off('staff:request-updated', handleSync);
+        socket.off('bill.requested', handleSync);
+        socket.off('bill.paid', handleSync);
+        socket.off('notification:new', handleSync);
+      };
+    }
+  }, []);
 
   return {
     orders,
