@@ -237,10 +237,11 @@ function deriveStats(
 }
 
 function deriveAttendanceBreakdown(attendance: AttendanceRecord[], members: StaffMember[]): AttendanceBreakdown[] {
+  const onLeaveIds = new Set(members.filter((m) => m.status === 'On Leave').map((m) => m.id));
   const onShift = attendance.filter((a) => a.attendanceStatus === 'ON_SHIFT').length;
   const offShift = attendance.filter((a) => a.attendanceStatus === 'OFF_SHIFT').length;
-  const noShift = attendance.filter((a) => a.attendanceStatus === 'NO_SHIFT').length;
-  const onLeave = members.filter((m) => m.status === 'On Leave').length;
+  const noShift = attendance.filter((a) => a.attendanceStatus === 'NO_SHIFT' && !onLeaveIds.has(a.staffId)).length;
+  const onLeave = onLeaveIds.size;
   return [
     { label: 'On Shift', count: onShift, color: '#22c55e' },
     { label: 'Off Shift', count: offShift, color: '#f97316' },

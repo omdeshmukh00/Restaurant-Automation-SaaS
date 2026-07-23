@@ -123,7 +123,11 @@ publicRouter.get('/landing/data', async (req, res, next) => {
         ],
       },
     }).lean();
-    const offers = await OfferModel.find({ active: true }).lean();
+    const offers = await OfferModel.find({
+      status: 'ACTIVE',
+      startDate: { $lte: new Date() },
+      expiryDate: { $gte: new Date() },
+    }).lean();
     const dishes = await MenuItem.find().limit(12).lean();
 
     const cuisinesSet = new Set<string>();
@@ -146,7 +150,11 @@ publicRouter.get('/landing/data', async (req, res, next) => {
         status: ReservationStatus.CONFIRMED,
         date: new Date().toISOString().split('T')[0]
       }),
-      OfferModel.countDocuments({ active: true })
+      OfferModel.countDocuments({
+        status: 'ACTIVE',
+        startDate: { $lte: new Date() },
+        expiryDate: { $gte: new Date() },
+      })
     ]);
 
     ok(res, {
@@ -230,4 +238,3 @@ publicRouter.get('/plans', async (_req, res, next) => {
     next(error);
   }
 });
-

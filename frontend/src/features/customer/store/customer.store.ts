@@ -4,6 +4,14 @@ import { generateTableCode, getRecommendedItems } from '../utils/customer.utils'
 import { apiClient } from '../../../shared/services/apiClient';
 import { connectSocket, disconnectSocket, getSocket } from '../../../lib/socket';
 import { getCartHasItems } from './cartSnapshot';
+import {
+  getCustomerWallet,
+  getCustomerOffers,
+  getOfferEligibility,
+  redeemCustomerOffer,
+  type CustomerWallet,
+  type CustomerOffer as ApiCustomerOffer,
+} from '../api/customer.api';
 
 export type DiningSession = {
   sessionId: string;
@@ -152,6 +160,7 @@ type CustomerStore = {
   loyaltyPoints: number;
   loyaltyHistory: LoyaltyHistory[];
   offers: OfferCoupon[];
+  redeemedOfferIds: string[];
   notificationPreferences: NotificationPreferences;
   notifications: CustomerNotification[];
 
@@ -178,9 +187,10 @@ type CustomerStore = {
   checkSessionInactivity: () => Promise<void>;
 
   // Profile Features Actions
+  fetchLoyaltyData: () => Promise<void>;
   updateProfile: (profile: Partial<CustomerProfile>) => void;
   addLoyaltyPoints: (points: number, description: string) => void;
-  claimOffer: (offerId: string) => boolean;
+  claimOffer: (offerId: string) => Promise<boolean>;
   updateNotificationPreferences: (prefs: Partial<NotificationPreferences>) => void;
 
   // Notification Actions
@@ -238,6 +248,7 @@ export const useCustomerStore = create<CustomerStore>()(
       loyaltyPoints: 0,
       loyaltyHistory: [],
       offers: DEFAULT_OFFERS,
+      redeemedOfferIds: [],
       notificationPreferences: {
         email: true,
         sms: true,
@@ -448,7 +459,50 @@ export const useCustomerStore = create<CustomerStore>()(
         }
       },
 
-      // Profile features action implementations
+      // ── Fetch real loyalty & offers from backend ─────────────────────────
+      fetchLoyaltyData: async () => {
+        const { diningSession } = get();
+        if (!diningSession) return;
+        try {
+          const [wallet, apiOffers, eligibilityList] = await Promise.all([
+            getCustomerWallet().catch(() => null),
+            getCustomerOffers().catch(() => []),
+            getOfferEligibility().catch(() => []),
+          ]);
+
+          // Build local OfferCoupon[] from backend data
+          const eligibleMap = new Map(
+            (eligibilityList || []).map((e: any) => [e.offerId, e.eligible]),
+          );
+
+          // Track which offers have been redeemed locally (backend doesn't persist per-customer)
+          const redeemedIds: string[] = get().redeemedOfferIds || [];
+          const mappedCoupons: OfferCoupon[] = (apiOffers || []).map((o: ApiCustomerOffer) => ({
+            id: o._id,
+            code: o.promoCode,
+            title: o.title,
+            desc: o.description || `${o.discountType === 'PERCENTAGE' ? o.discountValue + '% off' : '₹' + o.discountValue + ' off'}`,
+            requiredPoints: o.requiredPoints ?? 0,
+            discountType: o.discountType === 'PERCENTAGE' ? 'percentage' : 'fixed',
+            discountValue: o.discountValue,
+            minOrderAmount: o.minOrderAmount ?? undefined,
+            expiryDate: new Date(o.expiryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            claimed: o.requiredPoints === 0 || redeemedIds.includes(o._id),
+          }));
+
+          if (wallet) {
+            set({
+              loyaltyPoints: wallet.pointsBalance ?? 0,
+              offers: mappedCoupons,
+            });
+          } else {
+            set({ offers: mappedCoupons });
+          }
+        } catch (err) {
+          console.error('Failed to fetch loyalty data', err);
+        }
+      },
+
       updateProfile: (profileUpdates) => set((state) => ({
         profile: { ...state.profile, ...profileUpdates }
       })),
@@ -465,50 +519,31 @@ export const useCustomerStore = create<CustomerStore>()(
           ...state.loyaltyHistory
         ]
       })),
-      claimOffer: (offerId) => {
-        let success = false;
-        set((state) => {
-          const offer = state.offers.find((o) => o.id === offerId);
-          if (!offer || offer.claimed || state.loyaltyPoints < offer.requiredPoints) {
-            return {};
+      claimOffer: async (offerId: string) => {
+        try {
+          const result = await redeemCustomerOffer(offerId);
+          if (result.success) {
+            // Track locally that this offer was redeemed
+            set((state) => ({
+              redeemedOfferIds: state.redeemedOfferIds.includes(offerId)
+                ? state.redeemedOfferIds
+                : [...state.redeemedOfferIds, offerId],
+            }));
+            // Refresh loyalty data
+            await get().fetchLoyaltyData();
+            const offer = get().offers.find((o) => o.id === offerId);
+            get().addNotification(
+              'Offer Unlocked! 🎉',
+              `You successfully unlocked "${offer?.title || 'Offer'}". Use code during checkout.`,
+              'offer',
+            );
+            return true;
           }
-
-          success = true;
-          const updatedOffers = state.offers.map((o) =>
-            o.id === offerId ? { ...o, claimed: true } : o
-          );
-          
-          const updatedHistory: LoyaltyHistory[] = offer.requiredPoints > 0 ? [
-            {
-              id: `h-${Date.now()}`,
-              points: -offer.requiredPoints,
-              type: 'redeem' as const,
-              description: `Redeemed for ${offer.title}`,
-              date: 'Just now'
-            },
-            ...state.loyaltyHistory
-          ] : state.loyaltyHistory;
-
-          const updatedNotifications = [
-            {
-              id: `n-${Date.now()}`,
-              title: 'Offer Unlocked! 🎉',
-              message: `You successfully unlocked "${offer.title}". Use coupon code "${offer.code}" during checkout.`,
-              timestamp: 'Just now',
-              read: false,
-              type: 'offer' as const,
-            },
-            ...state.notifications
-          ];
-
-          return {
-            loyaltyPoints: state.loyaltyPoints - offer.requiredPoints,
-            offers: updatedOffers,
-            loyaltyHistory: updatedHistory,
-            notifications: updatedNotifications,
-          };
-        });
-        return success;
+        } catch (err: any) {
+          console.error('Failed to redeem offer', err);
+          get().addNotification('Redemption Failed', err?.response?.data?.error?.message || 'Could not redeem offer', 'info');
+        }
+        return false;
       },
       updateNotificationPreferences: (prefs) => set((state) => ({
         notificationPreferences: { ...state.notificationPreferences, ...prefs }

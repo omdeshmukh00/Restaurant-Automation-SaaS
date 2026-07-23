@@ -219,8 +219,10 @@ export class BillingService {
 
     const offer = await OfferModel.findOne({
       restaurantId: new mongoose.Types.ObjectId(restaurantId),
-      code: couponCode.toUpperCase(),
-      active: true
+      promoCode: couponCode.toUpperCase(),
+      status: 'ACTIVE',
+      startDate: { $lte: new Date() },
+      expiryDate: { $gte: new Date() },
     });
     if (!offer) {
       throw new AppError('Invalid coupon code.', 400, ErrorCode.VALIDATION_ERROR);
@@ -231,11 +233,13 @@ export class BillingService {
       throw new AppError('Coupon already applied.', 400, ErrorCode.VALIDATION_ERROR);
     }
 
-    const discountAmount = bill.subtotal * (offer.discountPercent / 100);
+    const discountAmount = offer.discountType === 'PERCENTAGE'
+      ? bill.subtotal * (offer.discountValue / 100)
+      : offer.discountValue;
 
     bill.appliedCoupons.push({
       couponId: offer._id as mongoose.Types.ObjectId,
-      code: offer.code,
+      code: offer.promoCode,
       discountAmount
     });
 

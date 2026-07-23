@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, ShoppingBag, UtensilsCrossed, CalendarDays,
   Users, Package, UserCog, BarChart3, Settings,
-  LayoutGrid, X, Sparkles,
+  LayoutGrid, X, Sparkles, Tag,
 } from 'lucide-react';
 import { usePlatformSettingsGuard } from '../../../shared/hooks/usePlatformSettingsGuard';
 import { useSettingsStore } from '../store/settings.store';
@@ -14,6 +14,7 @@ const navItems = [
   { label: 'Menu Management',     icon: UtensilsCrossed, to: '/admin/menu' },
   { label: 'Reservations',        icon: CalendarDays,    to: '/admin/reservations' },
   { label: 'Customers',           icon: Users,           to: '/admin/customers' },
+  { label: 'Offers',              icon: Tag,             to: '/admin/offers' },
   { label: 'Inventory',           icon: Package,         to: '/admin/inventory' },
   { label: 'Staff Management',    icon: UserCog,         to: '/admin/staff' },
   { label: 'Reports & Analytics', icon: BarChart3,       to: '/admin/reports' },

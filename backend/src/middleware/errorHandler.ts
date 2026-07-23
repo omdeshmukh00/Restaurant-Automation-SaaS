@@ -92,11 +92,16 @@ export function errorHandler(error: Error, req: Request, res: Response, _next: N
 
   if ((error as { code?: number }).code === 11000) {
     const keyValue = (error as { keyValue?: Record<string, unknown> }).keyValue ?? {};
-    const field = Object.keys(keyValue)[0] ?? 'field';
+    const fields = Object.keys(keyValue);
+    const field = fields[0] ?? 'field';
+    // For compound unique indexes (e.g. restaurantId + promoCode), show all fields involved
+    const message = fields.length > 1
+      ? `A record with this combination of ${fields.join(' + ')} already exists`
+      : `A record with this ${field} already exists`;
     sendOperationalError(
       req,
       res,
-      new AppError(`A record with this ${field} already exists`, 409, ErrorCode.CONFLICT),
+      new AppError(message, 409, ErrorCode.CONFLICT),
     );
     return;
   }

@@ -74,9 +74,12 @@ export async function getRules(
 export async function getOffers(
   restaurantId: string,
 ) {
+  const now = new Date();
   return OfferModel.find({
     restaurantId,
-    active: true,
+    status: 'ACTIVE',
+    startDate: { $lte: now },
+    expiryDate: { $gte: now },
   }).lean();
 }
 
@@ -93,15 +96,18 @@ export async function getEligibility(
 
   const points = wallet?.pointsBalance ?? 0;
 
+  const now = new Date();
   const offers = await OfferModel.find({
     restaurantId,
-    active: true,
+    status: 'ACTIVE',
+    startDate: { $lte: now },
+    expiryDate: { $gte: now },
   }).lean();
 
   return offers.map((offer: any) => ({
     offerId: offer._id,
-    name: offer.name,
-    code: offer.code,
+    name: offer.title,
+    code: offer.promoCode,
     requiredPoints: offer.requiredPoints ?? 0,
     eligible: points >= (offer.requiredPoints ?? 0),
   }));
@@ -128,10 +134,13 @@ export async function redeemOffer(
     );
   }
 
+  const now = new Date();
   const offer: any = await OfferModel.findOne({
     _id: offerId,
     restaurantId,
-    active: true,
+    status: 'ACTIVE',
+    startDate: { $lte: now },
+    expiryDate: { $gte: now },
   });
 
   if (!offer) {
@@ -232,6 +241,3 @@ export async function creditPoints(
 
   return wallet;
 }
-
-
-

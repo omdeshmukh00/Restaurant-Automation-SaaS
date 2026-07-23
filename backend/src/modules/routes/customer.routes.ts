@@ -5,7 +5,7 @@ import { ok } from '../../utils/responses';
 import { endSession } from '../tableSessions/tableSessions.service';
 import { TableSessionModel } from '../tableSessions/tableSessions.model';
 import { FeedbackModel } from '../feedback/feedback.model';
-import { OfferModel } from '../offers/offers.model';
+
 import { StaffRequestModel } from '../staff/staffRequest.model';
 import { ReservationModel } from '../reservations/reservations.model';
 import { ReservationsService } from '../reservations/reservations.service';
@@ -13,6 +13,7 @@ import { Priority, RequestStatus, RequestType, TableStatus } from '../../constan
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { feedbackBodySchema } from './customer.schema';
+import { OffersController } from '../offers/offers.controller';
 import { z } from 'zod';
 // import { getActiveLoyaltyRule } from '../loyalty/loyalty.service';
 
@@ -202,43 +203,7 @@ customerRouter.get('/loyalty', async (req, res, next) => {
   }
 });
 */
-customerRouter.get('/offers', async (req, res, next) => {
-  try {
-    const offers = await OfferModel.find({
-      restaurantId: req.tableSession!.restaurantId,
-      active: true,
-    }).sort({ createdAt: -1 });
-
-    ok(res, {
-      offers,
-      meta: {
-        count: offers.length,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-customerRouter.get('/offers/eligibility', async (req, res, next) => {
-  try {
-    const offers = await OfferModel.find({
-      restaurantId: req.tableSession!.restaurantId,
-      active: true,
-    }).select('_id');
-
-    const eligibleOfferIds = offers.map((offer) => offer._id.toString());
-
-    ok(res, {
-      eligibleOfferIds,
-      meta: {
-        count: eligibleOfferIds.length,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+customerRouter.get('/offers', OffersController.getActiveOffers);
 
 const customerReservationBodySchema = z.object({
   customerName: z.string().trim().optional(),

@@ -5,6 +5,8 @@ import { UserRole } from '../../constants/roles';
 import { UserStatus } from '../../constants/statuses';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
+import { TableSessionModel } from '../tableSessions/tableSessions.model';
+import { OrderModel } from '../orders/orders.model';
 
 export interface CustomerDto {
   id: string;
@@ -71,10 +73,111 @@ function deriveStatus(lastVisitAt?: Date | string | null): CustomerDto['status']
   return last.getTime() >= cutoff ? 'Active' : 'Inactive';
 }
 
-function shapeFromUser(user: any, profile?: any | null): CustomerDto {
-  const totalSpent = profile?.totalSpent || 0;
-  const totalVisits = profile?.totalVisits || 0;
-  const lastVisitAt = profile?.lastVisitAt || null;
+/**
+ * Compute totalSpent and totalVisits for mobiles at a restaurant directly
+ * from TableSessions and Orders — NOT from the analytics module (unreliable).
+ *
+ * A "visit" = a unique TableSession for that mobile+restaurant.
+ * "Total spent" = sum of finalAmount for PAID orders in those sessions.
+ */
+async function computeCustomerMetrics(
+  mobiles: string[],
+  restaurantId: string,
+): Promise<Map<string, { totalVisits: number; totalSpent: number; lastVisitAt: Date | null; lastOrderId: string }>> {
+  const rid = new Types.ObjectId(restaurantId);
+
+  // Build all mobile variants for matching
+  const allVariants: string[] = [];
+  for (const mobile of mobiles) {
+    for (const fmt of mobileFormats(mobile)) {
+      allVariants.push(fmt);
+    }
+  }
+
+  if (allVariants.length === 0) return new Map();
+
+  // Get all sessions for these mobiles at this restaurant
+  const sessions = await TableSessionModel.find({
+    restaurantId: rid,
+    mobile: { $in: allVariants },
+  })
+    .setOptions({ bypassTenant: true })
+    .lean()
+    .exec();
+
+  // Group sessions by mobile (digits-only)
+  const sessionsByMobile = new Map<string, typeof sessions>();
+  for (const s of sessions) {
+    const key = digitsOnly(s.mobile);
+    if (!sessionsByMobile.has(key)) sessionsByMobile.set(key, []);
+    sessionsByMobile.get(key)!.push(s);
+  }
+
+  // Get all session IDs for order lookup
+  const sessionIds = sessions.map((s) => s._id);
+
+  // Get all PAID orders for these sessions
+  const orders = await OrderModel.find({
+    restaurantId: rid,
+    sessionId: { $in: sessionIds },
+    paymentStatus: 'PAID',
+  })
+    .setOptions({ bypassTenant: true })
+    .lean()
+    .exec();
+
+  // Index orders by sessionId
+  const ordersBySession = new Map<string, typeof orders>();
+  for (const o of orders) {
+    const sid = o.sessionId?.toString();
+    if (!sid) continue;
+    if (!ordersBySession.has(sid)) ordersBySession.set(sid, []);
+    ordersBySession.get(sid)!.push(o);
+  }
+
+  // Build result per mobile
+  const result = new Map<string, { totalVisits: number; totalSpent: number; lastVisitAt: Date | null; lastOrderId: string }>();
+
+  for (const mobile of mobiles) {
+    const key = digitsOnly(mobile);
+    const sessionsForMobile = sessionsByMobile.get(key) || [];
+
+    let totalSpent = 0;
+    let lastVisitAt: Date | null = null;
+    let lastOrderId = '';
+
+    for (const s of sessionsForMobile) {
+      const orderList = ordersBySession.get(s._id.toString()) || [];
+      for (const o of orderList) {
+        totalSpent += o.finalAmount || 0;
+        if (!lastVisitAt || o.createdAt > lastVisitAt) {
+          lastVisitAt = o.createdAt;
+          lastOrderId = o._id.toString();
+        }
+      }
+    }
+
+    result.set(key, {
+      totalVisits: sessionsForMobile.length,
+      totalSpent,
+      lastVisitAt,
+      lastOrderId,
+    });
+  }
+
+  return result;
+}
+
+function shapeFromUser(
+  user: any,
+  profile?: any | null,
+  metrics?: { totalSpent: number; totalVisits: number; lastVisitAt: Date | null; lastOrderId: string } | null,
+): CustomerDto {
+  // Use computed metrics (from real orders/sessions) when available, fall back to profile
+  const totalSpent = metrics?.totalSpent ?? profile?.totalSpent ?? 0;
+  const totalVisits = metrics?.totalVisits ?? profile?.totalVisits ?? 0;
+  const lastVisitAt = metrics?.lastVisitAt ?? profile?.lastVisitAt ?? null;
+  const lastOrderId = metrics?.lastOrderId ?? '';
   const avatar = user.avatar || initials(user.name);
   return {
     id: user._id.toString(),
@@ -87,7 +190,7 @@ function shapeFromUser(user: any, profile?: any | null): CustomerDto {
     totalSpent: formatINR(totalSpent),
     totalSpentRaw: totalSpent,
     lastOrder: formatDate(lastVisitAt),
-    lastOrderId: '',
+    lastOrderId,
     status: deriveStatus(lastVisitAt),
   };
 }
@@ -203,7 +306,14 @@ export const CustomersService = {
     // ── Step 1: Resolve all mobile numbers belonging to this restaurant ────
     const relevantMobiles = await resolveRestaurantMobiles(restaurantId);
 
-    // ── Step 2: Load all matching Users (any mobile format) ────────────────
+    // ── Step 2: Compute metrics directly from orders + sessions ───────────
+    // This is the authoritative source — NOT the analytics module (unreliable).
+    const metricsByMobile = await computeCustomerMetrics(
+      Array.from(relevantMobiles),
+      restaurantId,
+    );
+
+    // ── Step 3: Load all matching Users (any mobile format) ────────────────
     // Build a flat list of every possible mobile-string variant so we match
     // User records regardless of whether they store '+91', '91', or plain digits.
     const allVariants: string[] = [];
@@ -223,7 +333,7 @@ export const CustomersService = {
           .exec()
       : [];
 
-    // ── Step 3: Load matching CustomerProfiles ─────────────────────────────
+    // ── Step 4: Load matching CustomerProfiles (for name/email fallback only) ──
     const profiles = allVariants.length > 0
       ? await CustomerProfileModel.find({
           mobile: { $in: Array.from(relevantMobiles) },
@@ -239,7 +349,7 @@ export const CustomersService = {
       profileByMobile.set(digitsOnly(p.mobile), p);
     }
 
-    // ── Step 4: Build the customer list ────────────────────────────────────
+    // ── Step 5: Build the customer list using computed metrics ────────────
     let totalSpentSum = 0;
     let totalVisitsSum = 0;
     let loyal = 0;
@@ -254,14 +364,18 @@ export const CustomersService = {
     const items: { dto: CustomerDto; date: number }[] = [];
     const seenMobiles = new Set<string>();
 
-    // 4a. Every matching User → shape into CustomerDto
+    // 5a. Every matching User → shape into CustomerDto with real metrics
     for (const u of users) {
       const key = digitsOnly(u.mobile);
       seenMobiles.add(key);
       const profile = profileByMobile.get(key) || null;
-      const dto = shapeFromUser(u, profile);
-      totalSpentSum += profile?.totalSpent || 0;
-      totalVisitsSum += profile?.totalVisits || 0;
+      const metrics = metricsByMobile.get(key) || null;
+      const dto = shapeFromUser(u, profile, metrics);
+
+      const spent = metrics?.totalSpent ?? profile?.totalSpent ?? 0;
+      const visits = metrics?.totalVisits ?? profile?.totalVisits ?? 0;
+      totalSpentSum += spent;
+      totalVisitsSum += visits;
       if (dto.loyaltyTier === 'Gold') gold += 1;
       else if (dto.loyaltyTier === 'Silver') silver += 1;
       else bronze += 1;
@@ -274,7 +388,7 @@ export const CustomersService = {
       items.push({ dto, date: ts });
     }
 
-    // 4b. Standalone profiles (no matching User) — customers who visited
+    // 5b. Standalone profiles (no matching User) — customers who visited
     //     but never did an OTP/email signup (e.g. reservation-only guests).
     for (const p of profiles) {
       const key = digitsOnly(p.mobile);
@@ -287,9 +401,13 @@ export const CustomersService = {
         mobile: p.mobile,
         avatar: undefined,
       };
-      const dto = shapeFromUser(synthUser, p);
-      totalSpentSum += p.totalSpent || 0;
-      totalVisitsSum += p.totalVisits || 0;
+      const metrics = metricsByMobile.get(key) || null;
+      const dto = shapeFromUser(synthUser, p, metrics);
+
+      const spent = metrics?.totalSpent ?? p.totalSpent ?? 0;
+      const visits = metrics?.totalVisits ?? p.totalVisits ?? 0;
+      totalSpentSum += spent;
+      totalVisitsSum += visits;
       if (dto.loyaltyTier === 'Gold') gold += 1;
       else if (dto.loyaltyTier === 'Silver') silver += 1;
       else bronze += 1;
@@ -380,7 +498,10 @@ export const CustomersService = {
         .setOptions({ bypassTenant: true })
         .lean()
         .exec();
-      return shapeFromUser(user, profile);
+      // Compute real metrics from orders/sessions
+      const metricsMap = await computeCustomerMetrics([mobile], restaurantId);
+      const metrics = metricsMap.get(mobile) || null;
+      return shapeFromUser(user, profile, metrics);
     }
 
     // Fallback: standalone CustomerProfile (no User record)
@@ -399,6 +520,10 @@ export const CustomersService = {
     if (!visited) {
       throw new AppError('Customer not found at this restaurant', 404, ErrorCode.NOT_FOUND);
     }
+    // Compute real metrics from orders/sessions
+    const mobile = digitsOnly(profile.mobile);
+    const metricsMap = await computeCustomerMetrics([mobile], restaurantId);
+    const metrics = metricsMap.get(mobile) || null;
     return shapeFromUser(
       {
         _id: profile._id,
@@ -408,6 +533,7 @@ export const CustomersService = {
         avatar: undefined,
       },
       profile,
+      metrics,
     );
   },
 

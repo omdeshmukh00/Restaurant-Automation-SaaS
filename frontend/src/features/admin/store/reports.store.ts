@@ -250,8 +250,13 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
       const vsLabel = 'last period';
 
       // Build groupBy from per-widget ranges
-      const revGroupBy = get().revenueRange === 'Monthly' ? 'month' : 'day';
-      const ordGroupBy = get().ordersRange === 'Monthly' ? 'month' : 'day';
+      const periodToGroupBy = (range: DateRange): string => {
+        if (range === 'Monthly') return 'month';
+        if (range === 'Weekly') return 'week';
+        return 'day';
+      };
+      const revGroupBy = periodToGroupBy(get().revenueRange);
+      const ordGroupBy = periodToGroupBy(get().ordersRange);
       const topItemsLimit = 50; // get enough items for scrollable list
 
       // Fetch all analytics endpoints in parallel
@@ -265,7 +270,7 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
       ] = await Promise.all([
         apiClient.get(`/admin/analytics/overview?from=${fromStr}&to=${toStr}`),
         apiClient.get(`/admin/analytics/overview?from=${prevFromStr}&to=${prevToStr}`),
-        apiClient.get(`/admin/analytics/orders?from=${fromStr}&to=${toStr}`),
+        apiClient.get(`/admin/analytics/orders?from=${fromStr}&to=${toStr}&groupBy=${ordGroupBy}`),
         apiClient.get(`/admin/analytics/top-items?from=${fromStr}&to=${toStr}&limit=${topItemsLimit}`),
         apiClient.get(`/admin/analytics/revenue?from=${fromStr}&to=${toStr}&groupBy=${revGroupBy}`),
         apiClient.get(`/admin/analytics/peak-hours?from=${fromStr}&to=${toStr}`),
@@ -339,9 +344,12 @@ export const useReportsStore = create<ReportsState>((set, get) => ({
         date: formatPeriodLabel(pt.period),
         revenue: pt.totalRevenue || 0,
       }));
-      const ordersTrend = rawRevenuePoints.map((pt: any) => ({
+
+      // ── Orders Trend from orders API (dedicated endpoint) ──
+      const rawOrdersPoints = ordersData.orders || [];
+      const ordersTrend = rawOrdersPoints.map((pt: any) => ({
         date: formatPeriodLabel(pt.period),
-        orders: pt.billCount || 0,
+        orders: pt.orderCount || 0,
       }));
 
       // ── Top Selling Items from backend ──

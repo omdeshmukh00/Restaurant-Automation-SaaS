@@ -12,6 +12,7 @@ import  ReportsPage  from '../features/admin/pages/ReportsPage';
 import { TableManagementPage } from '../features/admin/pages/TableManagementPage';
 import  SettingsPage from '../features/admin/pages/SettingsPage';
 import ResetPasswordPage from '../features/admin/pages/ResetPasswordPage';
+import { OffersPage } from '../features/admin/pages/OffersPage';
 
 export const adminRoutes: RouteObject[] = [
   {
@@ -24,6 +25,7 @@ export const adminRoutes: RouteObject[] = [
       { path: 'reservations', element: <ReservationsPage /> },
       { path: 'customers',    element: <CustomersPage /> },
       { path: 'inventory',    element: <InventoryPage /> },
+      { path: 'offers',       element: <OffersPage /> },
       { path: 'staff',        element: <StaffManagementPage /> },
       { path: 'reports',      element: <ReportsPage /> },
       { path: 'tables',       element: <TableManagementPage /> },      

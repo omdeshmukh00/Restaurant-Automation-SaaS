@@ -155,3 +155,59 @@ export async function requestFinalBill() {
   const response = await apiClient.post<ApiResponse<any>>('/billing/customer/bill/request');
   return response.data.data;
 }
+
+// ── Loyalty & Offers ──────────────────────────────────────────────────
+
+export type CustomerWallet = {
+  pointsBalance: number;
+  lifetimePoints: number;
+  tier: string;
+};
+
+export type CustomerOffer = {
+  _id: string;
+  title: string;
+  description?: string;
+  promoCode: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  requiredPoints: number;
+  minOrderAmount: number | null;
+  maxDiscount: number | null;
+  expiryDate: string;
+  startDate: string;
+};
+
+export type OfferEligibility = {
+  offerId: string;
+  name: string;
+  code: string;
+  requiredPoints: number;
+  eligible: boolean;
+};
+
+export type RedeemOfferResult = {
+  success: boolean;
+  remainingPoints: number;
+  offer: CustomerOffer;
+};
+
+export async function getCustomerWallet() {
+  const response = await apiClient.get<ApiResponse<{ wallet: CustomerWallet }>>('/customer/loyalty');
+  return response.data.data.wallet;
+}
+
+export async function getCustomerOffers() {
+  const response = await apiClient.get<ApiResponse<{ offers: CustomerOffer[] }>>('/customer/offers');
+  return response.data.data.offers;
+}
+
+export async function getOfferEligibility() {
+  const response = await apiClient.get<ApiResponse<{ eligibility: OfferEligibility[] }>>('/customer/offers/eligibility');
+  return response.data.data.eligibility;
+}
+
+export async function redeemCustomerOffer(offerId: string) {
+  const response = await apiClient.post<ApiResponse<RedeemOfferResult>>(`/customer/offers/${offerId}/redeem`);
+  return response.data.data;
+}

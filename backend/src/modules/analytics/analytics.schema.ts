@@ -18,7 +18,7 @@ export const analyticsQuerySchema = z
   .object({
     from: analyticsDateSchema.optional(),
     to: analyticsDateSchema.optional(),
-    groupBy: z.enum(['day', 'month']).optional(),
+    groupBy: z.enum(['day', 'week', 'month']).optional(),
     restaurantId: z
       .string()
       .trim()

@@ -17,12 +17,12 @@ import { ReservationStatus } from '../../constants/statuses';
 import type { AnalyticsQueryInput } from './analytics.schema';
 
 type AnalyticsDateRange = Pick<AnalyticsQueryInput, 'from' | 'to'>;
-type RevenueAnalyticsFilters = AnalyticsDateRange & Pick<AnalyticsQueryInput, 'groupBy'>;
+type RevenueAnalyticsFilters = AnalyticsDateRange & { groupBy?: 'day' | 'week' | 'month' };
 
 type AnalyticsFiltersResponse = {
   from: string | null;
   to: string | null;
-  groupBy?: 'day' | 'month';
+  groupBy?: 'day' | 'week' | 'month';
 };
 
 type RevenueSummaryRow = {
@@ -132,7 +132,7 @@ function buildDateRangeExpression(fieldPath: string, filters: AnalyticsDateRange
   return expressions.length === 1 ? expressions[0] : { $and: expressions };
 }
 
-function buildFiltersResponse(filters: AnalyticsDateRange, groupBy?: 'day' | 'month'): AnalyticsFiltersResponse {
+function buildFiltersResponse(filters: AnalyticsDateRange, groupBy?: 'day' | 'week' | 'month'): AnalyticsFiltersResponse {
   return {
     from: filters.from ?? null,
     to: filters.to ?? null,
@@ -351,12 +351,37 @@ export class AnalyticsService {
   static async getRevenueAnalytics(restaurantId: string, filters: RevenueAnalyticsFilters) {
     const restaurantObjectId = toObjectId(restaurantId);
     const groupBy = filters.groupBy ?? 'day';
-    const groupFormat = groupBy === 'month' ? '%Y-%m' : '%Y-%m-%d';
     const matchStage = {
       restaurantId: restaurantObjectId,
       status: BillStatus.PAID,
       ...buildDateRangeMatch('paidAt', filters, { requireNonNull: true }),
     };
+
+    // Build the correct $group _id expression based on groupBy
+    let groupIdExpression: Record<string, unknown>;
+    if (groupBy === 'month') {
+      groupIdExpression = {
+        $dateToString: { date: '$paidAt', format: '%Y-%m' },
+      };
+    } else if (groupBy === 'week') {
+      // Group by ISO week: calculate Monday of the week for each paidAt
+      groupIdExpression = {
+        $dateToString: {
+          format: '%Y-%m-%d',
+          date: {
+            $dateFromParts: {
+              isoWeekYear: { $isoWeekYear: '$paidAt' },
+              isoWeek: { $isoWeek: '$paidAt' },
+              isoDayOfWeek: 1,
+            },
+          },
+        },
+      };
+    } else {
+      groupIdExpression = {
+        $dateToString: { date: '$paidAt', format: '%Y-%m-%d' },
+      };
+    }
 
     const [summaryRows, revenueRows, paymentReportRows] = await Promise.all([
       BillingModel.aggregate<RevenueSummaryRow>([
@@ -375,12 +400,7 @@ export class AnalyticsService {
         { $match: matchStage },
         {
           $group: {
-            _id: {
-              $dateToString: {
-                date: '$paidAt',
-                format: groupFormat,
-              },
-            },
+            _id: groupIdExpression,
             totalRevenue: { $sum: '$finalAmount' },
             totalTax: { $sum: '$taxAmount' },
             totalDiscount: { $sum: '$discountAmount' },
@@ -914,44 +934,85 @@ export class AnalyticsService {
     };
   }
 
-  // ── NEW: Orders Summary (total, completed, cancelled) ──────────────────
+  // ── Orders time‑series & summary ─────────────────────────────────────
 
-  static async getOrdersAnalytics(restaurantId: string, filters: AnalyticsDateRange) {
+  static async getOrdersAnalytics(restaurantId: string, filters: AnalyticsDateRange & { groupBy?: 'day' | 'week' | 'month' }) {
     const restaurantObjectId = toObjectId(restaurantId);
+    const groupBy = filters.groupBy ?? 'day';
     const orderMatch = {
       restaurantId: restaurantObjectId,
       ...buildDateRangeMatch('createdAt', filters),
     };
 
-    const orderStats = await OrderModel.aggregate([
-      { $match: orderMatch },
-      {
-        $group: {
-          _id: null,
-          totalOrders: { $sum: 1 },
-          completedOrders: {
-            $sum: {
-              $cond: [
-                { $in: ['$status', [OrderStatus.COMPLETED, OrderStatus.PAID, OrderStatus.SERVED, OrderStatus.BILLED]] },
-                1, 0,
-              ],
+    // Build group ID expression for time‑series
+    let groupIdExpression: Record<string, unknown>;
+    if (groupBy === 'month') {
+      groupIdExpression = {
+        $dateToString: { date: '$createdAt', format: '%Y-%m' },
+      };
+    } else if (groupBy === 'week') {
+      groupIdExpression = {
+        $dateToString: {
+          format: '%Y-%m-%d',
+          date: {
+            $dateFromParts: {
+              isoWeekYear: { $isoWeekYear: '$createdAt' },
+              isoWeek: { $isoWeek: '$createdAt' },
+              isoDayOfWeek: 1,
             },
           },
-          cancelledOrders: {
-            $sum: {
-              $cond: [
-                { $in: ['$status', [OrderStatus.CANCELLED, OrderStatus.REJECTED]] },
-                1, 0,
-              ],
-            },
-          },
-          totalRevenue: { $sum: '$finalAmount' },
-          totalTax: { $sum: '$taxAmount' },
         },
-      },
+      };
+    } else {
+      groupIdExpression = {
+        $dateToString: { date: '$createdAt', format: '%Y-%m-%d' },
+      };
+    }
+
+    const [totalStats, periodStats] = await Promise.all([
+      // Overall totals
+      OrderModel.aggregate([
+        { $match: orderMatch },
+        {
+          $group: {
+            _id: null,
+            totalOrders: { $sum: 1 },
+            completedOrders: {
+              $sum: {
+                $cond: [
+                  { $in: ['$status', [OrderStatus.COMPLETED, OrderStatus.PAID, OrderStatus.SERVED, OrderStatus.BILLED]] },
+                  1, 0,
+                ],
+              },
+            },
+            cancelledOrders: {
+              $sum: {
+                $cond: [
+                  { $in: ['$status', [OrderStatus.CANCELLED, OrderStatus.REJECTED]] },
+                  1, 0,
+                ],
+              },
+            },
+            totalRevenue: { $sum: '$finalAmount' },
+            totalTax: { $sum: '$taxAmount' },
+          },
+        },
+      ]),
+      // Time‑series data grouped by period
+      OrderModel.aggregate([
+        { $match: orderMatch },
+        {
+          $group: {
+            _id: groupIdExpression,
+            orderCount: { $sum: 1 },
+            totalRevenue: { $sum: '$finalAmount' },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
     ]);
 
-    const result = orderStats[0] ?? {
+    const result = totalStats[0] ?? {
       totalOrders: 0,
       completedOrders: 0,
       cancelledOrders: 0,
@@ -965,7 +1026,12 @@ export class AnalyticsService {
       cancelledOrders: result.cancelledOrders,
       totalRevenue: result.totalRevenue,
       totalTax: result.totalTax,
-      filters: buildFiltersResponse(filters),
+      orders: periodStats.map((row) => ({
+        period: String(row._id),
+        orderCount: row.orderCount ?? 0,
+        totalRevenue: row.totalRevenue ?? 0,
+      })),
+      filters: buildFiltersResponse(filters, groupBy),
     };
   }
 
