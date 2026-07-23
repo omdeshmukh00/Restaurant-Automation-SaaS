@@ -1052,7 +1052,7 @@ export async function getPlatformAuditLogs(filters: SuperAdminAuditLogQuery) {
 }
 
 // ── Partner Onboarding Request Services ──────────────────────────────────
-import { RestaurantRequestModel } from './restaurantRequest.model';
+import { RestaurantRequestModel, formatRestaurantRequest } from './restaurantRequest.model';
 import { logAuditRaw } from '../auditLogs/auditLogs.helper';
 import {AuditEntity, AuditAction } from '../auditLogs/auditLogs.types';
 import crypto from 'crypto';

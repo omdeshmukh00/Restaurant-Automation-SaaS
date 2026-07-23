@@ -846,7 +846,7 @@ export class PaymentsService {
     }
 
     // ---- Partner request onboarding fee path ----
-    const { RestaurantRequestModel } = await import('../superAdmin/restaurantRequest.model');
+    const { RestaurantRequestModel, formatRestaurantRequest } = await import('../superAdmin/restaurantRequest.model');
     const partnerRequest = await RestaurantRequestModel.findOne({ orderId: rzpOrderId }).setOptions({ bypassTenant: true });
     if (partnerRequest) {
       if (eventType === 'payment.captured') {
@@ -867,20 +867,7 @@ export class PaymentsService {
           );
 
           // Broadcast via Socket.IO
-          socketService.emitToSuperAdmin('restaurant_request_created', {
-            id: partnerRequest._id.toString(),
-            name: partnerRequest.restaurantName,
-            owner: partnerRequest.ownerName,
-            email: partnerRequest.email,
-            phone: partnerRequest.phone,
-            location: `${partnerRequest.city}, ${partnerRequest.state}, ${partnerRequest.country}`,
-            plan: partnerRequest.selectedPlan || 'Free Onboarding',
-            requestedAt: partnerRequest.submittedAt.toISOString(),
-            message: partnerRequest.message ?? '',
-            latitude: partnerRequest.latitude,
-            longitude: partnerRequest.longitude,
-            googleMapsUrl: partnerRequest.googleMapsUrl ?? '',
-          });
+          socketService.emitToSuperAdmin('restaurant_request_created', formatRestaurantRequest(partnerRequest));
         }
       }
 

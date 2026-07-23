@@ -158,26 +158,23 @@ export function useCleaning() {
           let progress = 0;
           const taskId = activeTask?._id;
 
-          if (activeTask) {
-            if (activeTask.status === 'IN_PROGRESS') {
-              status = 'In Progress';
-              progress = 45;
-            } else if (activeTask.status === 'COMPLETED') {
-              status = 'Ready for Inspection';
-            } else {
-              status = 'Needs Cleaning';
-            }
+          const tableStatusUpper = (table.status || '').toUpperCase();
+
+          if (tableStatusUpper === 'AVAILABLE') {
+            status = 'Available';
+          } else if (tableStatusUpper === 'CLEANING_IN_PROGRESS' || activeTask?.status === 'IN_PROGRESS') {
+            status = 'In Progress';
+            progress = (activeTask as any)?.progress || 45;
+          } else if (activeTask?.status === 'COMPLETED') {
+            status = 'Ready for Inspection';
+          } else if (['DIRTY', 'NEEDS_CLEANING'].includes(tableStatusUpper) || (activeTask && activeTask.status === 'PENDING')) {
+            status = 'Needs Cleaning';
+          } else if (['OCCUPIED', 'BILL_PENDING', 'PAYMENT_PENDING', 'PAID', 'ORDERING', 'FOOD_SERVED'].includes(tableStatusUpper)) {
+            status = 'Occupied';
+          } else if (tableStatusUpper === 'RESERVED') {
+            status = 'Reserved';
           } else {
-            const tableStatusUpper = (table.status || '').toUpperCase();
-            if (['OCCUPIED', 'BILL_PENDING', 'PAYMENT_PENDING', 'PAID', 'ORDERING', 'FOOD_SERVED'].includes(tableStatusUpper)) {
-              status = 'Occupied';
-            } else if (tableStatusUpper === 'RESERVED') {
-              status = 'Reserved';
-            } else if (['DIRTY', 'NEEDS_CLEANING'].includes(tableStatusUpper)) {
-              status = 'Needs Cleaning';
-            } else {
-              status = 'Available';
-            }
+            status = 'Available';
           }
 
           let priority = 'Medium';
@@ -193,8 +190,11 @@ export function useCleaning() {
             };
           }
 
+          const rawTableNum = String(table.tableNumber ?? table.number ?? '1');
+          const displayTableId = rawTableNum.toLowerCase().startsWith('table') ? rawTableNum : `Table ${rawTableNum}`;
+
           return {
-            id: `Table ${table.tableNumber ?? 1}`,
+            id: displayTableId,
             area: table.section || 'Dining Area A',
             seats: Number(table.capacity || 4),
             status: status as any,
@@ -202,7 +202,7 @@ export function useCleaning() {
             timeAgo: activeTask?.createdAt ? new Date(activeTask.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Just Now',
             assignedTo,
             progress,
-            taskId,
+            taskId: taskId || String(table._id || table.id),
             floor: table.floor || 1,
             section: table.section || 'Main',
           };

@@ -179,6 +179,7 @@ export interface CleaningTask {
   isPaused?: boolean;
   isDeepCleaning?: boolean;
   queueWaitingCount?: number;
+  progress?: number;
   startedBy?: string | null;
   completedBy?: string | null;
   verifiedBy?: string | null;

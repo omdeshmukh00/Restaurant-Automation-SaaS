@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import { RestaurantRequestModel } from './restaurantRequest.model';
+import { RestaurantRequestModel, formatRestaurantRequest } from './restaurantRequest.model';
 import { RestaurantModel } from '../restaurants/restaurants.model';
 import { UserModel } from '../users/users.model';
 import { createRazorpayOrder as createRzpOrder, verifyRazorpaySignature as verifyRzpSig } from '../../services/razorpay.service';
@@ -242,21 +242,7 @@ export async function submitPartnerRequest(req: Request, res: Response, next: Ne
     );
 
     // Broadcast via Socket.IO
-    socketService.emitToSuperAdmin('restaurant_request_created', {
-      id: newRequest._id.toString(),
-      name: newRequest.restaurantName,
-      owner: newRequest.ownerName,
-      email: newRequest.email,
-      phone: newRequest.phone,
-      location: `${newRequest.city}, ${newRequest.state}, ${newRequest.country}`,
-      plan: newRequest.selectedPlan || 'Free Onboarding',
-      requestedAt: newRequest.submittedAt.toISOString(),
-      message: newRequest.message ?? '',
-      latitude: newRequest.latitude,
-      longitude: newRequest.longitude,
-      googleMapsUrl: newRequest.googleMapsUrl ?? '',
-      status: newRequest.status,
-    });
+    socketService.emitToSuperAdmin('restaurant_request_created', formatRestaurantRequest(newRequest));
 
     return ok(res, {
       message: "Your application has been submitted successfully. Our team will review it and you'll receive an email once approved.",
@@ -338,21 +324,7 @@ export async function verifyPartnerRequestPayment(req: Request, res: Response, n
       );
 
       // Broadcast via Socket.IO
-      socketService.emitToSuperAdmin('restaurant_request_created', {
-        id: request._id.toString(),
-        name: request.restaurantName,
-        owner: request.ownerName,
-        email: request.email,
-        phone: request.phone,
-        location: `${request.city}, ${request.state}, ${request.country}`,
-        plan: request.selectedPlan || 'Paid Onboarding',
-        requestedAt: request.submittedAt.toISOString(),
-        message: request.message ?? '',
-        latitude: request.latitude,
-        longitude: request.longitude,
-        googleMapsUrl: request.googleMapsUrl ?? '',
-        status: request.status,
-      });
+      socketService.emitToSuperAdmin('restaurant_request_created', formatRestaurantRequest(request));
     }
 
     return ok(res, {
@@ -428,21 +400,7 @@ export async function recoverPartnerRequest(req: Request, res: Response, next: N
       );
 
       // Broadcast via Socket.IO
-      socketService.emitToSuperAdmin('restaurant_request_created', {
-        id: request._id.toString(),
-        name: request.restaurantName,
-        owner: request.ownerName,
-        email: request.email,
-        phone: request.phone,
-        location: `${request.city}, ${request.state}, ${request.country}`,
-        plan: request.selectedPlan || 'Paid Onboarding',
-        requestedAt: request.submittedAt.toISOString(),
-        message: request.message ?? '',
-        latitude: request.latitude,
-        longitude: request.longitude,
-        googleMapsUrl: request.googleMapsUrl ?? '',
-        status: request.status,
-      });
+      socketService.emitToSuperAdmin('restaurant_request_created', formatRestaurantRequest(request));
     }
 
     return ok(res, {

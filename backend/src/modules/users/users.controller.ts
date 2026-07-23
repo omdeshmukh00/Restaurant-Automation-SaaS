@@ -7,7 +7,7 @@ import { sendSuccess } from '../../utils/response';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import * as userService from './users.service';
-import { comparePassword, hashPassword } from '../../utils/crypto';
+import { comparePassword, hashPassword, normalizeMobile } from '../../utils/crypto';
 import { sendPasswordChangedAlertEmail } from '../../services/mail.service';
 import logger from '../../config/logger';
 
@@ -87,21 +87,30 @@ export const requestMobileOtp = asyncHandler(async (req: Request, res: Response)
 export const updateProfile = asyncHandler(async (req: Request, res: Response) => {
   const { otp, mobileOtp, ...updates } = req.body;
 
-  // If mobile number is being updated, verify it with mobileOtp
-  if (updates.mobile && updates.mobile !== (req.user as any)?.mobile) {
-    if (!mobileOtp) {
-      throw new AppError('Mobile OTP verification is required to update phone number.', 400, ErrorCode.INVALID_REQUEST);
-    }
-    await otpService.verifyOTP(updates.mobile, 'mobile', mobileOtp);
-  }
-
-  // If OTP is provided, verify it against the registered email
+  // 1. If OTP (email OTP) is provided, verify it against the registered email
   if (otp) {
     const userEmail = req.user?.email;
     if (!userEmail) {
       throw new AppError('No registered email found to verify OTP', 400, ErrorCode.INVALID_REQUEST);
     }
     await otpService.verifyOTP(userEmail, 'email', otp);
+  }
+
+  // 2. Check if mobile number is changing
+  const currentMobile = (req.user as any)?.mobile || '';
+  const newMobile = updates.mobile || '';
+  const isMobileChanging = Boolean(newMobile) && normalizeMobile(newMobile) !== normalizeMobile(currentMobile);
+
+  // If mobile is changing and email OTP was NOT provided, require mobileOtp
+  if (isMobileChanging && !otp) {
+    if (!mobileOtp) {
+      throw new AppError('Mobile OTP or Email OTP verification is required to update phone number.', 400, ErrorCode.INVALID_REQUEST);
+    }
+    await otpService.verifyOTP(newMobile, 'mobile', mobileOtp);
+  }
+
+  if (updates.mobile) {
+    updates.mobile = normalizeMobile(updates.mobile);
   }
 
   const user = await userService.updateProfile(req.user!._id, updates);

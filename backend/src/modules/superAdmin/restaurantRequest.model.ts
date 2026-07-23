@@ -95,3 +95,45 @@ restaurantRequestSchema.index({ status: 1, submittedAt: -1 });
 export const RestaurantRequestModel =
   mongoose.models.RestaurantRequest ||
   mongoose.model<IRestaurantRequest>('RestaurantRequest', restaurantRequestSchema);
+
+export function formatRestaurantRequest(req: any) {
+  const city = req.city || '';
+  const state = req.state || '';
+  const country = req.country || '';
+  const locationParts = [city, state, country].filter(Boolean);
+  const location = locationParts.length > 0 ? locationParts.join(', ') : (req.address || 'Unknown Location');
+
+  return {
+    id: req._id ? req._id.toString() : req.id,
+    name: req.restaurantName || req.name || '',
+    owner: req.ownerName || req.owner || '',
+    email: req.email || '',
+    phone: req.phone || '',
+    location,
+    plan: req.selectedPlan || req.plan || (req.paymentId ? 'Paid Onboarding' : 'Free Onboarding'),
+    requestedAt: req.submittedAt ? new Date(req.submittedAt).toISOString() : req.requestedAt || new Date().toISOString(),
+    message: req.message ?? '',
+    latitude: req.latitude,
+    longitude: req.longitude,
+    googleMapsUrl: req.googleMapsUrl ?? '',
+    address: req.address || '',
+    city: req.city || '',
+    state: req.state || '',
+    country: req.country || '',
+    pinCode: req.pinCode || '',
+    gstNumber: req.gstNumber ?? '',
+    cuisine: req.cuisine || '',
+    branches: typeof req.branches === 'number' ? req.branches : 1,
+    expectedMonthlyOrders: typeof req.expectedMonthlyOrders === 'number' ? req.expectedMonthlyOrders : 0,
+    isVeg: req.isVeg || 'both',
+    coverImage: req.coverImage || undefined,
+    paymentId: req.paymentId ?? '',
+    paymentAmount: req.paymentAmount ?? 0,
+    paymentStatus: req.paymentStatus ?? '',
+    paymentSignature: req.paymentSignature ?? '',
+    paymentTimestamp: req.paymentTimestamp ? new Date(req.paymentTimestamp).toISOString() : undefined,
+    billingFrequency: req.billingFrequency ?? 'monthly',
+    status: req.status || 'APPLICATION_PENDING',
+    rejectionReason: req.rejectionReason ?? '',
+  };
+}
