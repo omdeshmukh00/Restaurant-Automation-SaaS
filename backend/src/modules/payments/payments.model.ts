@@ -4,9 +4,8 @@ import { PaymentStatus } from '../../constants/statuses';
 export interface IPayment extends Document {
   restaurantId: Types.ObjectId;
   billId?: Types.ObjectId | null;
-  orderId?: Types.ObjectId | null;
+  orderId: Types.ObjectId;
   sessionId?: Types.ObjectId | null;
-  confirmedBy?: Types.ObjectId | null;
   amount: number;
   currency: string;
   method: string;
@@ -20,9 +19,8 @@ export interface IPayment extends Document {
 
   status: PaymentStatus;
   verifiedAt?: Date | null;
+  confirmedBy?: Types.ObjectId | null;
   failureReason?: string | null;
-  commissionRate?: number | null;
-  commission?: number | null;
   metadata?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -32,14 +30,13 @@ const paymentSchema = new Schema<IPayment>(
   {
     restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true },
     billId: { type: Schema.Types.ObjectId, ref: 'Bill', default: null, index: true },
-    orderId: { type: Schema.Types.ObjectId, ref: 'Order', default: null, index: true },
+    orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
     sessionId: { type: Schema.Types.ObjectId, ref: 'TableSession', default: null },
-    confirmedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     amount: { type: Number, required: true, min: 0 },
     currency: { type: String, default: 'INR', trim: true, uppercase: true },
     method: { type: String, required: true, trim: true },
     provider: { type: String, default: 'mock', trim: true },
-    providerPaymentId: { type: String, default: null, trim: true },
+    providerPaymentId: { type: String, default: null, trim: true, index: true },
 
     // Razorpay-specific
     razorpayOrderId:   { type: String, default: null, trim: true, index: true },
@@ -52,9 +49,12 @@ const paymentSchema = new Schema<IPayment>(
       default: PaymentStatus.PENDING,
     },
     verifiedAt: { type: Date, default: null },
+    confirmedBy: {
+  type: Schema.Types.ObjectId,
+  ref: 'User',
+  default: null,
+},
     failureReason: { type: String, default: null, trim: true },
-    commissionRate: { type: Number, default: null },
-    commission: { type: Number, default: null },
     metadata: { type: Schema.Types.Mixed, default: {} },
   },
   {
@@ -67,6 +67,5 @@ const paymentSchema = new Schema<IPayment>(
 paymentSchema.index({ restaurantId: 1, sessionId: 1, createdAt: -1 });
 paymentSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ restaurantId: 1, method: 1, createdAt: -1 });
-paymentSchema.index({ providerPaymentId: 1 }, { unique: true, sparse: true });
 
 export const PaymentModel = mongoose.model<IPayment>('Payment', paymentSchema);

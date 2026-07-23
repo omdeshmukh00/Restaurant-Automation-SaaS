@@ -144,7 +144,7 @@ export function UpcomingReservationsList(): JSX.Element {
             No reservations match the current filter.
           </p>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-[24rem] overflow-y-auto pr-1 sm:pr-2">
             {filteredUpcoming.map((r) => (
               <ReservationRow
                 key={r.id}

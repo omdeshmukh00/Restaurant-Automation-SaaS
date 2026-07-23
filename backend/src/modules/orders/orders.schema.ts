@@ -62,6 +62,16 @@ export interface IOrder extends Document {
 
   finalAmount: number;
 
+  // ── GST Snapshot (stored at time of order/payment) ──────────────
+  taxableAmount?: number;
+  gstPercentage?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+  totalGST?: number;
+  gstType?: string;
+  // ── End GST Snapshot ───────────────────────────────────────────
+
   status: OrderStatus;
   priority: Priority;
 
@@ -276,6 +286,16 @@ export const orderSchema = new Schema<IOrder>(
       required: true,
       min: 0,
     },
+
+    // ── GST Snapshot Fields ───────────────────────────────────────
+    taxableAmount:    { type: Number, default: 0, min: 0 },
+    gstPercentage:    { type: Number, default: 0, min: 0 },
+    cgst:             { type: Number, default: 0, min: 0 },
+    sgst:             { type: Number, default: 0, min: 0 },
+    igst:             { type: Number, default: 0, min: 0 },
+    totalGST:         { type: Number, default: 0, min: 0 },
+    gstType:          { type: String, default: null },
+    // ── End GST Snapshot Fields ───────────────────────────────────
 
     status: {
       type: String,

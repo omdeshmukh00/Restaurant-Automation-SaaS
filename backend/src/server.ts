@@ -16,8 +16,25 @@ createSocketServer(server);
 let isDatabaseConnected = false;
 let shutdownStarted = false;
 
+async function validateRazorpayConfig(): Promise<void> {
+  const keyId = env.RAZORPAY_KEY_ID;
+  const keySecret = env.RAZORPAY_KEY_SECRET;
+
+  if (!keyId || !keySecret) {
+    logger.warn(
+      '⚠️ Razorpay is NOT configured. Payment operations will fail with "Razorpay is not configured". '
+      + 'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env to enable real payments.',
+    );
+  } else {
+    logger.info('✅ Razorpay configured with key_id=' + keyId.slice(0, 8) + '...');
+  }
+}
+
 async function bootstrap(): Promise<void> {
   try {
+    // Validate Razorpay config early (logs a warning if missing, doesn't crash)
+    validateRazorpayConfig();
+
     try {
       await connectToDatabase();
       isDatabaseConnected = true;

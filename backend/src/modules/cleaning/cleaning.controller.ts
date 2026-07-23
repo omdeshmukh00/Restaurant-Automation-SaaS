@@ -8,6 +8,8 @@ import { TableModel } from '../tables/tables.model';
 import { CleaningTaskModel } from './cleaning.model';
 import { MaintenanceIssueModel } from './maintenanceIssue.model';
 import { logger } from '../../config/logger';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../../constants/roles';
 import { socketService } from '../../sockets/socket.service';
 
 function ensureCleaningStatus(currentStatus: CleaningStatus, allowedStatuses: CleaningStatus[], message: string): void {
@@ -158,6 +160,17 @@ export class CleaningController {
       }
 
       socketService.emitToRestaurant(task.restaurantId.toString(), 'cleaning.completed', { task });
+
+      // Notify admin about cleaning task completion
+      NotificationsService.createNotification({
+        restaurantId: task.restaurantId.toString(),
+        recipientRole: UserRole.RESTAURANT_ADMIN,
+        title: 'Cleaning Task Completed',
+        message: `Cleaning task for table has been completed.`,
+        type: 'CLEANING_TASK_COMPLETED',
+        entityId: task._id.toString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      }).catch(() => {});
 
       logger.info('Cleaning task completed', { taskId: task._id, tableId: task.tableId });
 

@@ -22,6 +22,9 @@ export const SocketEvent = {
 
   // ── Reservation events ────────────────────────────────────────────────
   RESERVATION_CREATED: 'reservation:created',
+  RESERVATION_ACTIVATED: 'reservation:activated',
+  RESERVATION_ARRIVED: 'reservation:arrived',
+  RESERVATION_NO_SHOW: 'reservation:no-show',
 
   // ── Order events ──────────────────────────────────────────────────────
   ORDER_NEW: 'order.created',

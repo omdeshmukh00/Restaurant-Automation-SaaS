@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { connectSocket, getSocket } from '../../../lib/socket';
 import { useCustomersStore, type SpendFilter } from '../store/customers.store';
 import {
   CustomersHeader,
@@ -33,10 +34,32 @@ export function CustomersPage() {
     loading,
     error,
     fetchCustomers,
+    setCurrentPage,
   } = useCustomersStore();
 
   useEffect(() => {
     fetchCustomers();
+  }, [fetchCustomers]);
+
+  // Live sync: new signups and admin CRUD on customers reflect immediately
+  useEffect(() => {
+    connectSocket();
+    const socket = getSocket();
+    if (!socket) return;
+
+    const refetch = () => { fetchCustomers(); };
+    // Jump back to the first page so a freshly created customer (now sorted
+    // newest-first) is immediately visible instead of buried on the last page.
+    const onCreated = () => { setCurrentPage(1); fetchCustomers(); };
+    socket.on('customer:created', onCreated);
+    socket.on('customer:updated', refetch);
+    socket.on('customer:deleted', refetch);
+
+    return () => {
+      socket.off('customer:created', onCreated);
+      socket.off('customer:updated', refetch);
+      socket.off('customer:deleted', refetch);
+    };
   }, [fetchCustomers]);
 
   // Filter

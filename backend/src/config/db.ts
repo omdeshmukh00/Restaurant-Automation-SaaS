@@ -62,6 +62,30 @@ export async function connectToDatabase(): Promise<void> {
   } catch (err: any) {
     logger.warn('Failed to drop non-sparse email index', { error: err.message });
   }
+
+  // Drop stale unique indexes on offers collection from old schema versions.
+  // restaurantId_1_code_1 is from when the field was named "code" before it was renamed to "promoCode".
+  // restaurantId_1_promoCode_1 was previously unique and is now non-unique.
+  try {
+    const db = mongoose.connection.db;
+    if (db) {
+      const collections = await db.listCollections({ name: 'offers' }).toArray();
+      if (collections.length > 0) {
+        const indexes = await db.collection('offers').indexes();
+        const staleIndexes = ['restaurantId_1_code_1', 'restaurantId_1_promoCode_1'];
+        for (const idxName of staleIndexes) {
+          const idx = indexes.find((i: any) => i.name === idxName && i.unique === true);
+          if (idx) {
+            logger.info(`Dropping unique index ${idxName} on offers collection`);
+            await db.collection('offers').dropIndex(idxName);
+            logger.info(`Successfully dropped unique index ${idxName} on offers`);
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    logger.warn('Failed to drop unique indexes on offers collection', { error: err.message });
+  }
 }
 
 export async function disconnectFromDatabase(): Promise<void> {

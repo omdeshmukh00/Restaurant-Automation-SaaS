@@ -49,6 +49,7 @@ export interface ActivityItem {
   bg: string;
   text: string;
   time: string;
+  timeRaw: number;
 }
 
 export interface DashboardState {
@@ -89,11 +90,84 @@ const seedTopItems: TopItem[] = [
   { name: 'Caesar Salad',     category: 'Popular', orders: 102, revenue: '₹11,400', trend: '+2%'  },
 ];
 
+function formatActivityTime(isoOrTimestamp: string | number): string {
+  const date = new Date(isoOrTimestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
 const seedActivities: ActivityItem[] = [
-  { icon: CheckCircle2, color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/30', text: 'Order #1042 marked as served', time: '2 min ago' },
-  { icon: Clock,        color: 'text-blue-500',  bg: 'bg-blue-50 dark:bg-blue-900/30',  text: 'New reservation: Sat 8 PM, party of 4', time: '10 min ago' },
-  { icon: XCircle,      color: 'text-red-500',   bg: 'bg-red-50 dark:bg-red-900/30',    text: 'Order #1038 cancelled by customer', time: '25 min ago' },
-  { icon: Settings,     color: 'text-purple-500',bg: 'bg-purple-50 dark:bg-purple-900/30', text: 'Inventory restocked: Olive Oil', time: '1 hr ago' },
+  {
+    icon: CheckCircle2,
+    color: 'text-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/30',
+    text: 'Order #1042 marked as served',
+    time: formatActivityTime(seedNow - 2 * 60000),
+    timeRaw: seedNow - 2 * 60000,
+  },
+  {
+    icon: Clock,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'New reservation: Sat 8 PM, party of 4',
+    time: formatActivityTime(seedNow - 10 * 60000),
+    timeRaw: seedNow - 10 * 60000,
+  },
+  {
+    icon: XCircle,
+    color: 'text-red-500',
+    bg: 'bg-red-50 dark:bg-red-900/30',
+    text: 'Order #1038 cancelled by customer',
+    time: formatActivityTime(seedNow - 25 * 60000),
+    timeRaw: seedNow - 25 * 60000,
+  },
+  {
+    icon: Settings,
+    color: 'text-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/30',
+    text: 'Inventory restocked: Olive Oil',
+    time: formatActivityTime(seedNow - 60 * 60000),
+    timeRaw: seedNow - 60 * 60000,
+  },
+  {
+    icon: Activity,
+    color: 'text-gray-500',
+    bg: 'bg-gray-50 dark:bg-gray-800/50',
+    text: 'QR menu refreshed for Table 6',
+    time: formatActivityTime(seedNow - 3 * 60 * 60000),
+    timeRaw: seedNow - 3 * 60 * 60000,
+  },
+  {
+    icon: CheckCircle2,
+    color: 'text-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/30',
+    text: 'Payment verified for Order #1031',
+    time: formatActivityTime(seedNow - 6 * 60 * 60000),
+    timeRaw: seedNow - 6 * 60 * 60000,
+  },
+  {
+    icon: Clock,
+    color: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/30',
+    text: 'Table session extended for Table 2',
+    time: formatActivityTime(seedNow - 12 * 60 * 60000),
+    timeRaw: seedNow - 12 * 60 * 60000,
+  },
+  {
+    icon: Settings,
+    color: 'text-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/30',
+    text: 'Menu pricing updated for beverages',
+    time: formatActivityTime(seedNow - 23 * 60 * 60000),
+    timeRaw: seedNow - 23 * 60 * 60000,
+  },
 ];
 
 function seedStatTiles(): StatTile[] {
@@ -132,17 +206,35 @@ function weekdayLabel(period: string): string {
 }
 
 function buildRevenueData(revenue: { period: string; totalRevenue: number }[]): RevenuePoint[] {
-  const window = revenue.slice(-14);
-  const weekLen = 7;
-  const thisWeekRaw = window.slice(-weekLen);
-  const lastWeekRaw = window.slice(0, Math.max(0, window.length - weekLen));
+  // The analytics API only returns days that have at least one paid bill,
+  // so the series is sparse. Build a fixed 14-day window (last 7 = "this
+  // week", prior 7 = "last week") ending today and backfill zero-revenue
+  // days. This keeps the chart a proper 7-vs-7 line that grows as more
+  // payments come in instead of collapsing to a single flat point.
+  const byPeriod = new Map<string, number>();
+  for (const r of revenue) {
+    byPeriod.set(r.period, Math.round(r.totalRevenue ?? 0));
+  }
 
-  return thisWeekRaw.map((tw, i) => {
-    const lw = lastWeekRaw[i];
+  const utcDay = (d: Date) => d.toISOString().slice(0, 10);
+  const today = new Date();
+  const days: { day: string; key: string; bucket: 'this' | 'last' }[] = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = utcDay(d);
+    days.push({ day: weekdayLabel(key), key, bucket: i < 7 ? 'this' : 'last' });
+  }
+
+  const thisWeek = days.filter((d) => d.bucket === 'this');
+  const lastWeek = days.filter((d) => d.bucket === 'last');
+
+  return thisWeek.map((tw, i) => {
+    const lw = lastWeek[i];
     return {
-      day: weekdayLabel(tw.period),
-      thisWeek: Math.round(tw.totalRevenue ?? 0),
-      lastWeek: lw ? Math.round(lw.totalRevenue ?? 0) : 0,
+      day: tw.day,
+      thisWeek: byPeriod.get(tw.key) ?? 0,
+      lastWeek: lw ? byPeriod.get(lw.key) ?? 0 : 0,
     };
   });
 }
@@ -258,17 +350,9 @@ function titleCase(s: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function relativeTime(iso: string): string {
+function getActivityTimestamp(iso: string): number {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  const diff = Math.max(0, Date.now() - d.getTime());
-  const min = Math.round(diff / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.round(min / 60);
-  if (hr < 24) return `${hr} hr ago`;
-  const day = Math.round(hr / 24);
-  return `${day} day${day > 1 ? 's' : ''} ago`;
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
 function mapActivity(log: AuditLogEntry): ActivityItem {
@@ -308,13 +392,15 @@ function mapActivity(log: AuditLogEntry): ActivityItem {
     bg = 'bg-purple-50 dark:bg-purple-900/30';
   }
 
-  return { icon, color, bg, text: text + suffix, time: relativeTime(log.createdAt) };
+  const timeRaw = getActivityTimestamp(log.createdAt);
+  return { icon, color, bg, text: text + suffix, time: formatActivityTime(timeRaw), timeRaw };
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────
 
 interface DashboardStore extends DashboardState {
   fetchDashboard: () => Promise<void>;
+  addActivityFromSocket: (data: any) => void;
 }
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
@@ -346,7 +432,8 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       const summary = revData?.summary || { totalRevenue: 0, billCount: 0, averageBillValue: 0, totalTax: 0, totalDiscount: 0 };
       const backendOrders = Array.isArray(ordData?.orders) ? ordData!.orders : [];
       const orders: Order[] = backendOrders.map(mapBackendOrder);
-      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
       const ordersToday = orders.filter((o) => o.date === today).length;
       const activeCount = orders.filter(
         (o) => o.status === 'Pending' || o.status === 'Preparing' || o.status === 'Served'
@@ -400,7 +487,12 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       const revenueData = buildRevenueData(revData?.revenue || []);
       const recentOrders = buildRecentOrders(orders);
       const topItems = buildTopItems(backendOrders);
-      const activities = (audData?.logs || []).slice(0, 8).map(mapActivity);
+      const last24HoursCutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const activities = (audData?.logs || [])
+        .filter((log) => getActivityTimestamp(log.createdAt) >= last24HoursCutoff)
+        .map(mapActivity)
+        .sort((a, b) => b.timeRaw - a.timeRaw)
+        .slice(0, 12);
 
       set({ loading: false, statTiles, revenueData, recentOrders, topItems, activities });
     } catch (err) {
@@ -409,5 +501,59 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
       console.error('[dashboard] fetchDashboard derivation failed', err);
       set({ loading: false });
     }
+  },
+
+  addActivityFromSocket: (data: any) => {
+    // Transform the incoming socket activity payload into an ActivityItem
+    // and prepend it to the list (keeping max ~50 items).
+    const action: string = data.action || '';
+    const entityType: string = data.entityType || '';
+    const text = FRIENDLY_ACTION[action] ?? titleCase(action);
+
+    const meta = data.metadata || {};
+    let suffix = '';
+    if (typeof meta.total === 'number') suffix = ` · ${formatCurrency(meta.total)}`;
+    else if (typeof meta.amount === 'number') suffix = ` · ${formatCurrency(meta.amount)}`;
+
+    const negative = /CANCEL|REJECT|FAIL|EXPIRED|DELETED/.test(action);
+    const orderLike = /ORDER|KITCHEN|PAYMENT|BILL/.test(entityType) || /ORDER|KITCHEN|PAYMENT/.test(action);
+    const sessionLike = /SESSION|TABLE/.test(entityType);
+    const adminLike = /STAFF|MENU|OFFER|INVENTORY|SETTINGS|SUPPLIER/.test(entityType) || /ADMIN/.test(action);
+
+    let icon: LucideIcon = Activity;
+    let color = 'text-gray-500';
+    let bg = 'bg-gray-50 dark:bg-gray-800/50';
+
+    if (negative) {
+      icon = XCircle;
+      color = 'text-red-500';
+      bg = 'bg-red-50 dark:bg-red-900/30';
+    } else if (orderLike) {
+      icon = CheckCircle2;
+      color = 'text-green-500';
+      bg = 'bg-green-50 dark:bg-green-900/30';
+    } else if (sessionLike) {
+      icon = Clock;
+      color = 'text-blue-500';
+      bg = 'bg-blue-50 dark:bg-blue-900/30';
+    } else if (adminLike) {
+      icon = Settings;
+      color = 'text-purple-500';
+      bg = 'bg-purple-50 dark:bg-purple-900/30';
+    }
+
+    const timeRaw = getActivityTimestamp(data.createdAt);
+    const item: ActivityItem = {
+      icon,
+      color,
+      bg,
+      text: text + suffix,
+      time: formatActivityTime(timeRaw),
+      timeRaw,
+    };
+
+    set((state) => ({
+      activities: [item, ...state.activities].slice(0, 50),
+    }));
   },
 }));

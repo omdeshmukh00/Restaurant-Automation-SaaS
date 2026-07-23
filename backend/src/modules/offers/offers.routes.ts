@@ -5,21 +5,18 @@ import {
   offerIdParamsSchema,
   offersQuerySchema,
   updateOfferBodySchema,
+  toggleOfferStatusSchema,
 } from './offers.schema';
-import {
-  createOfferController,
-  deleteOfferController,
-  getOfferByIdController,
-  listOffersController,
-  updateOfferController,
-} from './offers.controller';
+import { OffersController } from './offers.controller';
 
 const router = Router();
 
-router.post('/', validate({ body: createOfferBodySchema }), createOfferController);
-router.get('/', validate({ query: offersQuerySchema }), listOffersController);
-router.get('/:id', validate({ params: offerIdParamsSchema }), getOfferByIdController);
-router.patch('/:id', validate({ params: offerIdParamsSchema, body: updateOfferBodySchema }), updateOfferController);
-router.delete('/:id', validate({ params: offerIdParamsSchema }), deleteOfferController);
+// Admin routes (mounted at /admin/offers via admin.routes)
+router.post('/', validate({ body: createOfferBodySchema }), OffersController.create);
+router.get('/', validate({ query: offersQuerySchema }), OffersController.list);
+router.get('/:id', validate({ params: offerIdParamsSchema }), OffersController.getById);
+router.patch('/:id', validate({ params: offerIdParamsSchema, body: updateOfferBodySchema }), OffersController.update);
+router.delete('/:id', validate({ params: offerIdParamsSchema }), OffersController.delete);
+router.patch('/:id/toggle', validate({ params: offerIdParamsSchema, body: toggleOfferStatusSchema }), OffersController.toggleStatus);
 
 export default router;

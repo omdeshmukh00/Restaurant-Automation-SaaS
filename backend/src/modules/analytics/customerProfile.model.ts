@@ -14,6 +14,7 @@ export interface ICustomerProfile extends Document {
   firstVisitAt: Date;
   restaurantsVisited: Types.ObjectId[];
   tags?: string[];
+  noShowCount: number; // Tracks how many times the customer didn't show
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +65,11 @@ const customerProfileSchema = new Schema<ICustomerProfile>(
       type: String,
       trim: true,
     }],
+    noShowCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: true,

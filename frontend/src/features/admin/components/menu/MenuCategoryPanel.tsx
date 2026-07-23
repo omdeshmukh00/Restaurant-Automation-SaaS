@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Settings2, X } from 'lucide-react';
 import { useMenuStore } from '../../store/menu.store';
 import { ManageCategoriesModal } from './ManageCategoriesModal';
-import { AddItemModal } from './AddItemModal';
 
 interface Props {
   mobileOpen?: boolean;
@@ -28,8 +27,8 @@ function CategoryList({ onClose, onManageCategories, onAddItem }: CategoryListPr
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Categories</h3>
         <button
-          onClick={onAddItem}
-          title="Add new item"
+          onClick={onManageCategories}
+          title="Manage categories"
           className="w-7 h-7 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-orange-50 dark:hover:bg-orange-950/40 hover:text-orange-500 transition-colors"
         >
           <Plus className="w-4 h-4 text-gray-500" />
@@ -126,7 +125,6 @@ export function MenuCategoryPanel({ mobileOpen = false, onMobileClose }: Props):
 
       {/* ── Modals — single instance, mounted at panel level ── */}
       {showManage  && <ManageCategoriesModal onClose={() => setShowManage(false)} />}
-      {showAddItem && <AddItemModal          onClose={() => setShowAddItem(false)} />}
     </>
   );
 }

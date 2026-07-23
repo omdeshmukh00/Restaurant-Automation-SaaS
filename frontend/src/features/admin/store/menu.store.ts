@@ -122,6 +122,7 @@ const BACKEND_ORIGIN = (env.apiUrl ?? '').replace(/\/api\/v\d+$/i, '');
 
 function resolveImage(url: string | undefined): string {
   if (!url) return '';
+  if (url.startsWith('data:')) return url;
   if (!url.startsWith('/')) return url;
   if (!/^https?:\/\//i.test(BACKEND_ORIGIN)) return url;
   return `${BACKEND_ORIGIN}${url}`;
@@ -380,14 +381,7 @@ export const useMenuStore = create<MenuStore>()(
 
       uploadImage: async (file) => {
         const { base64, type } = await compressImage(file);
-        const res = await apiClient.post('/uploads', {
-          fileName: file.name,
-          content: base64,
-          mimeType: type,
-        });
-        const id = res.data?.data?._id;
-        if (!id) return '';
-        return `${env.apiUrl}/uploads/${id}/image`;
+        return `data:${type};base64,${base64}`;
       },
 
       addCategory: async (name) => {

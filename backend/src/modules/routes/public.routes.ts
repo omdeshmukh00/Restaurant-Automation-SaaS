@@ -124,7 +124,11 @@ publicRouter.get('/landing/data', async (req, res, next) => {
         ],
       },
     }).lean();
-    const offers = await OfferModel.find({ active: true }).lean();
+    const offers = await OfferModel.find({
+      status: 'ACTIVE',
+      startDate: { $lte: new Date() },
+      expiryDate: { $gte: new Date() },
+    }).lean();
 
     // Fetch tables & menu items to calculate actual available tables and avg wait times
     const [tables, allMenuItems] = await Promise.all([
@@ -203,7 +207,11 @@ publicRouter.get('/landing/data', async (req, res, next) => {
         status: ReservationStatus.CONFIRMED,
         date: new Date().toISOString().split('T')[0]
       }),
-      OfferModel.countDocuments({ active: true })
+      OfferModel.countDocuments({
+        status: 'ACTIVE',
+        startDate: { $lte: new Date() },
+        expiryDate: { $gte: new Date() },
+      })
     ]);
 
     ok(res, {
@@ -300,5 +308,3 @@ publicRouter.get('/dishes', async (req, res, next) => {
     next(error);
   }
 });
-
-

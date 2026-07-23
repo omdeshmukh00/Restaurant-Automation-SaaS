@@ -7,9 +7,20 @@ export function BillingCard(): JSX.Element {
   const { billing, fetchSettings } = useSettingsStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const status = (billing.status || 'free').toLowerCase();
+  const statusLabel = status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
+  const statusStyles: Record<string, string> = {
+    active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+    past_due: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+    suspended: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+    expired: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+    free: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
+  };
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 sm:p-6">
-      <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-5">Billing &amp; Subscription</h3>
+      <h3 className="text-base font-bold text-gray-800 dark:text-gray-100 mb-5">Billing & Subscription</h3>
 
       <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
         {/* Icon */}
@@ -22,7 +33,11 @@ export function BillingCard(): JSX.Element {
           <Field label="Current Plan">
             <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{billing.plan}</p>
           </Field>
-          <div className="hidden sm:block" /> {/* spacer */}
+          <Field label="Status">
+            <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${statusStyles[status] ?? statusStyles.free}`}>
+              {statusLabel}
+            </span>
+          </Field>
           <Field label="Billing Cycle">
             <p className="text-sm text-gray-700 dark:text-gray-300 capitalize">{billing.cycle}</p>
           </Field>
@@ -35,7 +50,6 @@ export function BillingCard(): JSX.Element {
           <Field label="Payment Method">
             <div className="flex items-center gap-2">
               <span className="px-2 py-0.5 text-xs font-bold bg-blue-600 text-white rounded">{billing.paymentMethod}</span>
-              <span className="text-sm text-gray-600 dark:text-gray-400">•••• {billing.cardLast4}</span>
             </div>
           </Field>
 

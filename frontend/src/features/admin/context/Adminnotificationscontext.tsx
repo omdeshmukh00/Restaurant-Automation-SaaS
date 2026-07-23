@@ -1,142 +1,185 @@
-import React, { createContext, useContext, useState, useEffect, type PropsWithChildren } from 'react';
+import React, { createContext, useContext, useEffect, useCallback, useRef, type PropsWithChildren } from 'react';
 import { getSocket } from '../../../lib/socket';
-
-export interface AdminNotification {
-  id: string;
-  message: string;
-  time: string;
-  icon: string;
-  read: boolean;
-}
+import { useNotificationsStore } from '../store/notifications.store';
+import type { NotificationItem } from '../api/admin.notifications.api';
 
 interface AdminNotificationsContextValue {
-  notifications: AdminNotification[];
+  notifications: NotificationItem[];
   unreadCount: number;
-  markRead: (id: string) => void;
-  markAllRead: () => void;
-  addNotification: (n: Omit<AdminNotification, 'id' | 'read'>) => void;
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  fetchMore: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AdminNotificationsContext = createContext<AdminNotificationsContextValue | null>(null);
 
-const INITIAL_NOTIFICATIONS: AdminNotification[] = [
-  { id: '1', message: 'New order #1042 received from Table 5', time: '2 min ago', icon: '🛒', read: false },
-  { id: '2', message: 'Low stock alert: Tomatoes below threshold', time: '15 min ago', icon: '⚠️', read: false },
-  { id: '3', message: 'Reservation confirmed for 7 guests at 8 PM', time: '1 hr ago', icon: '📅', read: false },
-  { id: '4', message: 'Staff member Rahul checked in', time: '2 hr ago', icon: '👤', read: true },
-  { id: '5', message: "Daily revenue target ₹50,000 achieved!", time: '3 hr ago', icon: '🎯', read: true },
-];
-
-function iconForType(type?: string): string {
-  switch (type) {
-    case 'LOW_STOCK_ALERT':
-    case 'INVENTORY_ALERT':
-      return '⚠️';
-    case 'ORDER_PLACED':
-    case 'ORDER_NEW':
-      return '🛒';
-    case 'RESERVATION':
-      return '📅';
-    case 'STAFF':
-      return '👤';
-    default:
-      return '🔔';
-  }
-}
-
 export function AdminNotificationsProvider({ children }: PropsWithChildren) {
-  const [notifications, setNotifications] = useState<AdminNotification[]>(INITIAL_NOTIFICATIONS);
+  const store = useNotificationsStore();
+  const initializedRef = useRef(false);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  function markRead(id: string) {
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
-  }
-
-  function markAllRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }
-
-  function addNotification(n: Omit<AdminNotification, 'id' | 'read'>) {
-    setNotifications((prev) => [
-      { ...n, id: `rt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, read: false },
-      ...prev,
-    ]);
-  }
-
+  // Fetch initial notifications and connect socket listeners
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    store.fetchNotifications(true);
+    store.fetchUnreadCount();
+
     const socket = getSocket();
     if (!socket) return;
 
-    const handle = (n: Omit<AdminNotification, 'id' | 'read'>) => addNotification(n);
+    const handleNotificationNew = (payload: any) => {
+      // Only add admin-staff notifications to the dropdown
+      const role = payload?.recipientRole;
+      const isAdminNotification = !role || role === 'RESTAURANT_ADMIN' || role === 'SERVICE_STAFF';
 
-    const onNotificationNew = (payload: any) => {
-      handle({
-        message: payload?.title ? `${payload.title}${payload.message ? ` — ${payload.message}` : ''}` : (payload?.message ?? 'New notification'),
-        time: 'just now',
-        icon: iconForType(payload?.type),
-      });
+      if (isAdminNotification && payload?._id) {
+        store.addRealtimeNotification(payload);
+      }
     };
 
+    socket.on('notification:new', handleNotificationNew);
+
+    // Additional real-time events for the admin notification bar
     const onOrderCreated = (payload: any) => {
-      handle({
+      store.addRealtimeNotification({
+        _id: `order-${Date.now()}`,
+        title: 'New Order',
         message: `New order received${payload?.orderId ? ` (#${payload.orderId})` : ''}`,
-        time: 'just now',
-        icon: '🛒',
-      });
+        type: 'ORDER_NEW',
+        read: false,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'orders',
+        category: 'SYSTEM',
+        priority: 'NORMAL',
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
     };
 
     const onStaffRequest = (_payload: any) => {
-      handle({
+      store.addRealtimeNotification({
+        _id: `staff-${Date.now()}`,
+        title: 'Staff Request',
         message: 'New staff assistance request',
-        time: 'just now',
-        icon: '👤',
-      });
+        type: 'STAFF_REQUEST',
+        read: false,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'staff',
+        category: 'SYSTEM',
+        priority: 'NORMAL',
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
     };
 
     const onStaffTicket = (payload: any) => {
-      handle({
+      store.addRealtimeNotification({
+        _id: `ticket-${Date.now()}`,
+        title: 'Escalation Ticket',
         message: `Escalation Ticket: ${payload?.subject || payload?.notes || 'Staff issue escalated'}`,
-        time: 'just now',
-        icon: '🚨',
-      });
-    };
-
-    const onMaintenanceIssue = (payload: any) => {
-      handle({
-        message: `Maintenance Issue: Table set to under maintenance`,
-        time: 'just now',
-        icon: '🛠️',
-      });
+        type: 'TICKET',
+        read: false,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'staff',
+        category: 'SYSTEM',
+        priority: 'NORMAL',
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
     };
 
     const onBillRequested = (payload: any) => {
-      handle({
+      store.addRealtimeNotification({
+        _id: `bill-${Date.now()}`,
+        title: 'Bill Requested',
         message: `Bill Requested for Table ${payload?.tableNumber || ''}`,
-        time: 'just now',
-        icon: '🧾',
-      });
+        type: 'BILL_REQUESTED',
+        read: false,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        restaurantId: '',
+        recipientRole: 'RESTAURANT_ADMIN',
+        module: 'billing',
+        category: 'SYSTEM',
+        priority: 'NORMAL',
+        entityId: '',
+        actionUrl: '',
+        expiresAt: '',
+      } as NotificationItem);
     };
 
-    socket.on('notification:new', onNotificationNew);
     socket.on('order.created', onOrderCreated);
     socket.on('staff:request-new', onStaffRequest);
     socket.on('staff.ticket.created', onStaffTicket);
-    socket.on('cleaning.issue.reported', onMaintenanceIssue);
     socket.on('bill.requested', onBillRequested);
 
     return () => {
-      socket.off('notification:new', onNotificationNew);
+      socket.off('notification:new', handleNotificationNew);
       socket.off('order.created', onOrderCreated);
       socket.off('staff:request-new', onStaffRequest);
       socket.off('staff.ticket.created', onStaffTicket);
-      socket.off('cleaning.issue.reported', onMaintenanceIssue);
       socket.off('bill.requested', onBillRequested);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const markRead = useCallback(async (id: string) => {
+    await store.markAsRead(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const markAllRead = useCallback(async () => {
+    await store.markAllAsRead();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deleteNotification = useCallback(async (id: string) => {
+    await store.deleteNotification(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchMore = useCallback(async () => {
+    await store.fetchMore();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const refresh = useCallback(async () => {
+    await store.fetchNotifications(true);
+    await store.fetchUnreadCount();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const value: AdminNotificationsContextValue = {
+    notifications: store.notifications,
+    unreadCount: store.unreadCount,
+    loading: store.loading,
+    loadingMore: store.loadingMore,
+    hasMore: store.hasMore,
+    markRead,
+    markAllRead,
+    deleteNotification,
+    fetchMore,
+    refresh,
+  };
 
   return (
-    <AdminNotificationsContext.Provider value={{ notifications, unreadCount, markRead, markAllRead, addNotification }}>
+    <AdminNotificationsContext.Provider value={value}>
       {children}
     </AdminNotificationsContext.Provider>
   );

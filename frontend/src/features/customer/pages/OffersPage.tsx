@@ -1,61 +1,81 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, Check, Tag, Sparkles, Clock, Star, Gift, Zap, Percent } from 'lucide-react';
+import { Copy, Check, Tag, Sparkles, Clock, Percent } from 'lucide-react';
 import '../components/landing/landing.css';
 import { LandingNavbar, LandingFooter } from '../components/landing';
 
-interface Offer {
-  id: number;
-  discount: string;
-  condition: string;
-  code: string;
-  validity: string;
-  category: string;
-  image: string;
-  gradient: string;
-  hot?: boolean;
+// Module-level constant — called once at module load, not during render.
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const NEW_CUTOFF = Date.now() - SEVEN_DAYS_MS;
+
+interface ApiOffer {
+  _id: string;
+  title: string;
+  description?: string;
+  promoCode: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  minOrderAmount?: number | null;
+  maxDiscount?: number | null;
+  startDate: string;
+  expiryDate: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED';
+  displayPriority: number;
+  image?: string;
 }
 
-const CATEGORIES = ['All', 'Food Deals', 'First Order', 'Combo', 'Premium', 'Weekend'];
-
-const OFFERS: Offer[] = [
-  { id: 1, discount: 'FLAT 20% OFF', condition: 'On all orders above ₹499', code: 'RESTO20', validity: 'Valid till 31 July', category: 'Food Deals', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)', hot: true },
-  { id: 2, discount: 'FLAT 25% OFF', condition: 'On your first reservation', code: 'FIRST25', validity: 'Valid till 15 Aug', category: 'First Order', image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%)' },
-  { id: 3, discount: 'Buy 1 Get 1 Free', condition: 'On selected dishes', code: 'BOGO', validity: 'Valid till 20 July', category: 'Combo', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)', hot: true },
-  { id: 4, discount: 'Free Dessert', condition: 'On orders above ₹599', code: 'SWEET', validity: 'Valid till 25 July', category: 'Food Deals', image: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%)' },
-  { id: 5, discount: '₹150 CASHBACK', condition: 'Pay via UPI or Wallet', code: 'CASH150', validity: 'Valid till 10 Aug', category: 'Premium', image: 'https://images.unsplash.com/photo-1604382354936-07c5d9983bd3?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)' },
-  { id: 6, discount: 'FREE DELIVERY', condition: 'On all orders above ₹299', code: 'FREEDEL', validity: 'Valid till 5 Aug', category: 'Food Deals', image: 'https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%)', hot: true },
-  { id: 7, discount: '30% OFF on Weekends', condition: 'Dine-in only, Sat & Sun', code: 'WKND30', validity: 'Valid till 30 Aug', category: 'Weekend', image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)' },
-  { id: 8, discount: 'Family Feast ₹999', condition: 'Meal for 4 at select restaurants', code: 'FAM999', validity: 'Valid till 15 Aug', category: 'Combo', image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%)' },
-  { id: 9, discount: 'Premium ₹500 OFF', condition: 'On orders above ₹2000', code: 'PREM500', validity: 'Valid till 20 Aug', category: 'Premium', image: 'https://images.unsplash.com/photo-1579027989536-b7b1f875659b?w=400&auto=format&fit=crop', gradient: 'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)' },
-];
+const CATEGORIES = ['All', 'Food', 'Beverages', 'New', 'Limited Time'];
 
 export default function OffersPage() {
+  const [offers, setOffers] = useState<ApiOffer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [copiedId, setCopiedId] = useState<number | null>(null);
-
   const navigate = useNavigate();
 
-  const handleCopy = async (id: number, code: string) => {
+  useEffect(() => {
+    const fetchOffers = async () => {
+      try {
+        const { apiClient } = await import('../../../shared/services/apiClient');
+        const res = await apiClient.get('/public/landing/data');
+        setOffers(res.data.data.offers || []);
+      } catch {
+        setOffers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOffers();
+  }, []);
+
+  const filteredOffers = activeCategory === 'All' ? offers : offers.filter(o => {
+    if (activeCategory === 'Limited Time') return o.status === 'ACTIVE';
+    if (activeCategory === 'Food') return o.discountType === 'PERCENTAGE';
+    if (activeCategory === 'Beverages') return o.title?.toLowerCase().includes('drink') || o.title?.toLowerCase().includes('beverage');
+    if (activeCategory === 'New') return new Date(o.startDate) > new Date(NEW_CUTOFF);
+    return true;
+  });
+
+  const handleCopy = async (id: string, code: string) => {
     try { await navigator.clipboard.writeText(code); } catch { /* */ }
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const filtered = activeCategory === 'All' ? OFFERS : OFFERS.filter((o) => o.category === activeCategory);
-  
-  const openLogin = () => {
-    navigate('/auth/customer');
+  const formatValidity = (start: string, expiry: string): string => {
+    const end = new Date(expiry);
+    return `Valid till ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   };
+
+  const openLogin = () => navigate('/auth/customer');
 
   return (
     <div className="min-h-screen landing-font-inter flex flex-col justify-between bg-[#FFF8F3] dark:bg-neutral-950 text-slate-800 dark:text-neutral-100 transition-colors duration-300">
       <LandingNavbar onLoginOpen={openLogin} />
       
-      {/* Spacer for Navbar */}
       <div className="h-[72px] shrink-0" />
 
-      {/* ── Hero ───────────────────────────────────────── */}
+      {/* Hero section */}
       <section
         className="relative py-16 sm:py-20 overflow-hidden"
         style={{
@@ -64,17 +84,12 @@ export default function OffersPage() {
           backgroundPosition: 'center',
         }}
       >
-        {/* Floating illustrated elements */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {[
             { emoji: '🎁', top: '8%', left: '5%', size: 52, rotate: -15, delay: 0 },
             { emoji: '🏷️', top: '60%', right: '6%', size: 48, rotate: 12, delay: 1 },
             { emoji: '💰', top: '20%', right: '10%', size: 44, rotate: -10, delay: 0.5 },
             { emoji: '🎉', bottom: '12%', left: '8%', size: 50, rotate: 8, delay: 1.5 },
-            { emoji: '✨', top: '45%', left: '3%', size: 40, rotate: 20, delay: 0.8 },
-            { emoji: '🔥', bottom: '20%', right: '14%', size: 46, rotate: -18, delay: 1.3 },
-            { emoji: '🍕', top: '70%', left: '18%', size: 42, rotate: 15, delay: 2 },
-            { emoji: '🍰', top: '10%', right: '22%', size: 38, rotate: -5, delay: 0.3 },
           ].map((item, i) => (
             <div
               key={i}
@@ -88,7 +103,6 @@ export default function OffersPage() {
               }}
             >{item.emoji}</div>
           ))}
-          {/* Glow orb */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full landing-glow-orb" style={{ background: 'radial-gradient(circle, rgba(255,107,26,0.08) 0%, transparent 70%)' }} />
         </div>
 
@@ -101,13 +115,12 @@ export default function OffersPage() {
             Offers & <span className="italic" style={{ color: '#FF6B1A' }}>Deals</span>
           </h1>
           <p className="text-[15px] sm:text-[17px] mt-3 max-w-[500px] mx-auto" style={{ color: '#666666' }}>
-            Save more with our handpicked restaurant deals and discount codes
+            Save more with our exclusive restaurant deals and discount codes
           </p>
 
-          {/* Stats */}
           <div className="flex items-center justify-center gap-6 sm:gap-10 mt-8">
             {[
-              { value: `${OFFERS.length}+`, label: 'Active Offers' },
+              { value: loading ? '...' : `${offers.length}+`, label: 'Active Offers' },
               { value: '40%', label: 'Max Savings' },
               { value: '100+', label: 'Restaurants' },
             ].map((stat) => (
@@ -147,52 +160,52 @@ export default function OffersPage() {
       {/* ── Offers Grid ──────────────────────────────── */}
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((offer) => (
+          {filteredOffers.map((offer) => (
             <div
-              key={offer.id}
+              key={offer._id}
               className="landing-card-hover landing-shiny overflow-hidden"
               style={{ borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.12)' }}
             >
-              {/* Card with food image */}
-              <div className="relative overflow-hidden flex" style={{ background: offer.gradient, minHeight: '190px' }}>
-                {/* Left text */}
+              <div className="relative overflow-hidden flex" style={{ background: 'linear-gradient(135deg, #1A1008 0%, #2D1F10 100%)', minHeight: '190px' }}>
                 <div className="flex-1 p-5 flex flex-col justify-between relative z-10">
                   <div>
                     <div className="flex items-center gap-2 mb-2">
-                      {offer.hot ? (
-                        <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full uppercase" style={{ backgroundColor: 'rgba(255,87,34,0.2)', color: '#FF5722' }}>
-                          <Zap className="w-[10px] h-[10px]" /> HOT
-                        </span>
-                      ) : (
-                        <Tag className="w-[13px] h-[13px] text-white opacity-60" />
-                      )}
+                      <Tag className="w-[13px] h-[13px] text-white opacity-60" />
                     </div>
-                    <h3 className="text-[20px] sm:text-[24px] font-bold text-white leading-tight">{offer.discount}</h3>
-                    <p className="text-[12px] text-white opacity-50 mt-1">{offer.condition}</p>
+                    <h3 className="text-[20px] sm:text-[24px] font-bold text-white leading-tight">
+                      {offer.discountType === 'PERCENTAGE' ? `FLAT ${offer.discountValue}% OFF` : `₹${offer.discountValue} OFF`}
+                    </h3>
+                    <p className="text-[12px] text-white opacity-50 mt-1">
+                      {offer.description || (offer.minOrderAmount ? `On orders above ₹${offer.minOrderAmount}` : 'Limited time offer')}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3 mt-4">
                     <button
-                      onClick={() => handleCopy(offer.id, offer.code)}
+                      onClick={() => handleCopy(offer._id, offer.promoCode)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold transition-all duration-150"
                       style={{ borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.08)', color: '#FFFFFF' }}
                     >
-                      {copiedId === offer.id ? (
+                      {copiedId === offer._id ? (
                         <><Check className="w-[12px] h-[12px]" style={{ color: '#4CAF50' }} /><span style={{ color: '#4CAF50' }}>Copied!</span></>
                       ) : (
-                        <><span className="tracking-widest opacity-60" style={{ fontSize: '10px' }}>Code:</span><span className="tracking-widest">{offer.code}</span><Copy className="w-[12px] h-[12px] opacity-60" /></>
+                        <><span className="tracking-widest opacity-60" style={{ fontSize: '10px' }}>Code:</span><span className="tracking-widest">{offer.promoCode}</span><Copy className="w-[12px] h-[12px] opacity-60" /></>
                       )}
                     </button>
                   </div>
                 </div>
-                {/* Right image */}
                 <div className="w-[130px] sm:w-[150px] shrink-0 relative">
-                  <img src={offer.image} alt="offer" className="absolute inset-0 w-full h-full object-cover" loading="lazy" style={{ maskImage: 'linear-gradient(to right, transparent 0%, black 30%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 30%)' }} />
+                  {offer.image ? (
+                    <img src={offer.image} alt="offer" className="absolute inset-0 w-full h-full object-cover" loading="lazy" style={{ maskImage: 'linear-gradient(to right, transparent 0%, black 30%)', WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 30%)' }} />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Percent className="w-16 h-16 text-white/10" />
+                    </div>
+                  )}
                 </div>
               </div>
-              {/* Bottom strip */}
               <div className="px-5 py-3 flex items-center justify-between" style={{ background: 'rgba(0,0,0,0.9)' }}>
                 <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  <Clock className="w-[12px] h-[12px]" /> {offer.validity}
+                  <Clock className="w-[12px] h-[12px]" /> {formatValidity(offer.startDate, offer.expiryDate)}
                 </span>
                 <span className="text-[12px] font-semibold" style={{ color: '#FF6B1A' }}>Apply Now →</span>
               </div>
@@ -200,15 +213,24 @@ export default function OffersPage() {
           ))}
         </div>
 
-        {filtered.length === 0 && (
+        {!loading && filteredOffers.length === 0 && (
           <div className="text-center py-20">
-            <p className="text-[18px] font-semibold">No offers found</p>
-            <p className="text-[14px] mt-2" style={{ color: '#666666' }}>Check back later for new deals!</p>
+            <div className="w-16 h-16 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-orange-400" />
+            </div>
+            <p className="text-[18px] font-semibold">No active offers right now</p>
+            <p className="text-[14px] mt-2" style={{ color: '#666666' }}>Check back later for exciting deals!</p>
+          </div>
+        )}
+
+        {loading && (
+          <div className="text-center py-20">
+            <div className="w-10 h-10 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gray-500">Loading offers...</p>
           </div>
         )}
       </div>
 
-      {/* ── Footer ──────────────────────────────────────── */}
       <LandingFooter />
     </div>
   );

@@ -6,8 +6,11 @@ export function ActivityFeed(): JSX.Element {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 sm:p-5 transition-colors duration-200">
-      <h3 className="font-semibold text-gray-800 dark:text-gray-100 mb-4">Live Activity</h3>
-      <div className="space-y-3">
+      <div className="mb-4">
+        <h3 className="font-semibold text-gray-800 dark:text-gray-100">Live Activity</h3>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Showing the last 24 hours of activity</p>
+      </div>
+      <div className="space-y-3 max-h-[18rem] overflow-y-auto pr-1 sm:pr-2">
         {activities.map((item, i) => (
           <div key={i} className="flex items-start gap-3">
             <div className={`w-7 h-7 rounded-lg ${item.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>

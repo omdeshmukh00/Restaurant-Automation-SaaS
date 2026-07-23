@@ -4,6 +4,8 @@ import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { buildPaginationMeta } from '../../utils/pagination';
 import { socketService } from '../../sockets/socket.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../../constants/roles';
 import { ItemAvailabilityStatus } from '../../constants/statuses';
 
 export class MenuService {
@@ -361,6 +363,21 @@ export class MenuService {
       throw new AppError('Menu item not found', 404, ErrorCode.NOT_FOUND);
     }
     socketService.emitToRestaurant(restaurantId.toString(), 'menu.updated', { restaurantId });
+
+    // Notify admin about menu availability change
+    const typeKey = isAvailable ? 'MENU_ITEM_UNAVAILABLE' : 'MENU_ITEM_DISABLED';
+    const msg = isAvailable ? `${item.name} is now available again.` : `${item.name} has been marked as unavailable.`;
+    NotificationsService.createNotification({
+      restaurantId: restaurantId.toString(),
+      recipientRole: UserRole.RESTAURANT_ADMIN,
+      title: isAvailable ? 'Menu Item Available' : 'Menu Item Unavailable',
+      message: msg,
+      type: typeKey,
+      entityId: itemId.toString(),
+      actionUrl: '/admin/menu',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    }).catch(() => {});
+
     return item;
   }
 

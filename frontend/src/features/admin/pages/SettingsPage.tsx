@@ -7,21 +7,8 @@ import {
   BillingCard,
   TeamCard,
   NotificationsCard,
-  IntegrationsCard,
   ThemeSelectorCard,
 } from '../components/settings/Index';
-
-function ComingSoonSection({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[30vh] text-center">
-      <div className="w-14 h-14 rounded-2xl bg-orange-50 dark:bg-orange-950/50 border border-orange-100 dark:border-orange-900 flex items-center justify-center mb-3">
-        <span className="text-2xl">🚧</span>
-      </div>
-      <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">{title}</h2>
-      <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Coming soon!</p>
-    </div>
-  );
-}
 
 function SettingsContent(): JSX.Element {
   const { activeSection } = useSettingsStore();
@@ -35,7 +22,6 @@ function SettingsContent(): JSX.Element {
           <BillingCard />
           <TeamCard />
           <NotificationsCard />
-          <IntegrationsCard />
         </div>
       );
     case 'restaurant':
@@ -62,16 +48,6 @@ function SettingsContent(): JSX.Element {
           <NotificationsCard />
         </div>
       );
-    case 'integrations':
-      return (
-        <div className="w-full max-w-2xl">
-          <IntegrationsCard />
-        </div>
-      );
-    case 'security':
-      return <ComingSoonSection title="Security Settings" />;
-    case 'backup':
-      return <ComingSoonSection title="Backup & Export" />;
     case 'system':
       return <ThemeSelectorCard />;
     default:

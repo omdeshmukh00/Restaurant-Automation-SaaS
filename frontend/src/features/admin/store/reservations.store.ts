@@ -213,6 +213,11 @@ function deriveTableSlots(tables: TableSlot[], reservations: Reservation[]): Tab
   }));
 }
 
+export interface TimelineEntry {
+  iso: string | null;
+  relative: string | null;
+}
+
 export interface Reservation {
   id: string;
   name: string;
@@ -227,6 +232,14 @@ export interface Reservation {
   phone: string;
   email: string;
   occasion?: string;
+  preferredArea?: string;
+  timeline?: {
+    created?: TimelineEntry;
+    reserved?: TimelineEntry;
+    arrived?: TimelineEntry;
+    noShow?: TimelineEntry;
+    expiresAt?: TimelineEntry;
+  };
 }
 
 export interface TableSlot {
@@ -553,6 +566,8 @@ export const useReservationsStore = create<ReservationsStore>()(
               phone: reservation.phone || reservation.mobile || '',
               email: reservation.email || reservation.customerEmail || '',
               occasion: reservation.occasion || '',
+              preferredArea: reservation.preferredArea || '',
+              timeline: reservation.timeline || undefined,
             } as Reservation;
           });
 

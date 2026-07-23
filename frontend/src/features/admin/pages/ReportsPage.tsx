@@ -6,7 +6,7 @@ import { ReportStatCards } from '../components/reports/ReportStatCards';
 import { RevenueOverview } from '../components/reports/RevenueOverview';
 import { OrdersTrend, SalesByChannel } from '../components/reports/ReportCharts';
 import { PeakHours, TopSellingItems, RevenueByCategory } from '../components/reports/ReportWidgets';
-import { DailySummary, InsightsPanel, ReportShortcuts } from '../components/reports/ReportBottom';
+import { DailySummary } from '../components/reports/ReportBottom';
 import { CalendarPanel } from '../components/reports/CalendarPanel';
 
 const GLOBAL_RANGES: DateRange[] = ['Daily', 'Weekly', 'Monthly'];
@@ -117,16 +117,8 @@ export default function ReportsPage(): JSX.Element {
         <RevenueByCategory />
       </div>
 
-      {/* Row 3: Daily summary + Insights sidebar */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-4">
-        <div className="space-y-4">
-          <DailySummary />
-        </div>
-        <div className="space-y-4">
-          <ReportShortcuts />
-          <InsightsPanel />
-        </div>
-      </div>
+      {/* Row 3: Daily/Weekly/Monthly Summary — full width, no sidebar */}
+      <DailySummary />
     </div>
   );
 }

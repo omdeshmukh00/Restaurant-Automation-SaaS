@@ -4,6 +4,14 @@ import { generateTableCode, getRecommendedItems } from '../utils/customer.utils'
 import { apiClient } from '../../../shared/services/apiClient';
 import { connectSocket, disconnectSocket, getSocket } from '../../../lib/socket';
 import { getCartHasItems } from './cartSnapshot';
+import {
+  getCustomerWallet,
+  getCustomerOffers,
+  getOfferEligibility,
+  redeemCustomerOffer,
+  type CustomerWallet,
+  type CustomerOffer as ApiCustomerOffer,
+} from '../api/customer.api';
 
 export type DiningSession = {
   sessionId: string;
@@ -195,6 +203,7 @@ type CustomerStore = {
   loyaltyPoints: number;
   loyaltyHistory: LoyaltyHistory[];
   offers: OfferCoupon[];
+  redeemedOfferIds: string[];
   notificationPreferences: NotificationPreferences;
   notifications: CustomerNotification[];
 
@@ -219,13 +228,15 @@ type CustomerStore = {
   // Dining Session Actions
   setDiningSession: (session: DiningSession) => void;
   clearDiningSession: (forceLocalOnly?: boolean) => Promise<void>;
+  validateStoredSession: () => Promise<void>;
   recordActivity: () => void;
   checkSessionInactivity: () => Promise<void>;
 
   // Profile Features Actions
+  fetchLoyaltyData: () => Promise<void>;
   updateProfile: (profile: Partial<CustomerProfile>) => void;
   addLoyaltyPoints: (points: number, description: string) => void;
-  claimOffer: (offerId: string) => boolean;
+  claimOffer: (offerId: string) => Promise<boolean>;
   updateNotificationPreferences: (prefs: Partial<NotificationPreferences>) => void;
 
   // Notification Actions
@@ -315,6 +326,7 @@ export const useCustomerStore = create<CustomerStore>()(
       loyaltyPoints: 0,
       loyaltyHistory: [],
       offers: DEFAULT_OFFERS,
+      redeemedOfferIds: [],
       notificationPreferences: {
         email: true,
         sms: true,
@@ -458,8 +470,10 @@ export const useCustomerStore = create<CustomerStore>()(
           try {
             await apiClient.post('/customer/session/end');
           } catch (e: any) {
-            console.error('Failed to end dining session on backend', e);
-            // Don't throw, we still want to clean up local state
+            // Backend session may already be gone (e.g. switched DB, token
+            // from another environment). Log but still clear locally so the
+            // customer is logged out regardless.
+            console.warn('Could not end dining session on backend (continuing local logout)', e?.response?.status ?? e?.message);
           }
         }
         localStorage.removeItem('x-session-token');
@@ -472,6 +486,22 @@ export const useCustomerStore = create<CustomerStore>()(
           tableCode: 'T07', // Reset to default or clear it
         });
         disconnectSocket();
+      },
+
+      validateStoredSession: async () => {
+        const token = localStorage.getItem('x-session-token');
+        if (!token) return;
+        try {
+          await apiClient.get('/customer/session');
+        } catch (e: any) {
+          // Token is invalid/stale (e.g. from a different DB). Purge it so a
+          // dead session from another environment can't revive on reload.
+          if (e?.response?.status === 401 || e?.response?.status === 404) {
+            localStorage.removeItem('x-session-token');
+            set({ diningSession: null, lastActivity: null });
+            disconnectSocket();
+          }
+        }
       },
       recordActivity: () => {
         if (get().diningSession) {
@@ -501,7 +531,50 @@ export const useCustomerStore = create<CustomerStore>()(
         }
       },
 
-      // Profile features action implementations
+      // ── Fetch real loyalty & offers from backend ─────────────────────────
+      fetchLoyaltyData: async () => {
+        const { diningSession } = get();
+        if (!diningSession) return;
+        try {
+          const [wallet, apiOffers, eligibilityList] = await Promise.all([
+            getCustomerWallet().catch(() => null),
+            getCustomerOffers().catch(() => []),
+            getOfferEligibility().catch(() => []),
+          ]);
+
+          // Build local OfferCoupon[] from backend data
+          const eligibleMap = new Map(
+            (eligibilityList || []).map((e: any) => [e.offerId, e.eligible]),
+          );
+
+          // Track which offers have been redeemed locally (backend doesn't persist per-customer)
+          const redeemedIds: string[] = get().redeemedOfferIds || [];
+          const mappedCoupons: OfferCoupon[] = (apiOffers || []).map((o: ApiCustomerOffer) => ({
+            id: o._id,
+            code: o.promoCode,
+            title: o.title,
+            desc: o.description || `${o.discountType === 'PERCENTAGE' ? o.discountValue + '% off' : '₹' + o.discountValue + ' off'}`,
+            requiredPoints: o.requiredPoints ?? 0,
+            discountType: o.discountType === 'PERCENTAGE' ? 'percentage' : 'fixed',
+            discountValue: o.discountValue,
+            minOrderAmount: o.minOrderAmount ?? undefined,
+            expiryDate: new Date(o.expiryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            claimed: o.requiredPoints === 0 || redeemedIds.includes(o._id),
+          }));
+
+          if (wallet) {
+            set({
+              loyaltyPoints: wallet.pointsBalance ?? 0,
+              offers: mappedCoupons,
+            });
+          } else {
+            set({ offers: mappedCoupons });
+          }
+        } catch (err) {
+          console.error('Failed to fetch loyalty data', err);
+        }
+      },
+
       updateProfile: (profileUpdates) => set((state) => ({
         profile: { ...state.profile, ...profileUpdates }
       })),
@@ -518,50 +591,31 @@ export const useCustomerStore = create<CustomerStore>()(
           ...state.loyaltyHistory
         ]
       })),
-      claimOffer: (offerId) => {
-        let success = false;
-        set((state) => {
-          const offer = state.offers.find((o) => o.id === offerId);
-          if (!offer || offer.claimed || state.loyaltyPoints < offer.requiredPoints) {
-            return {};
+      claimOffer: async (offerId: string) => {
+        try {
+          const result = await redeemCustomerOffer(offerId);
+          if (result.success) {
+            // Track locally that this offer was redeemed
+            set((state) => ({
+              redeemedOfferIds: state.redeemedOfferIds.includes(offerId)
+                ? state.redeemedOfferIds
+                : [...state.redeemedOfferIds, offerId],
+            }));
+            // Refresh loyalty data
+            await get().fetchLoyaltyData();
+            const offer = get().offers.find((o) => o.id === offerId);
+            get().addNotification(
+              'Offer Unlocked! 🎉',
+              `You successfully unlocked "${offer?.title || 'Offer'}". Use code during checkout.`,
+              'offer',
+            );
+            return true;
           }
-
-          success = true;
-          const updatedOffers = state.offers.map((o) =>
-            o.id === offerId ? { ...o, claimed: true } : o
-          );
-          
-          const updatedHistory: LoyaltyHistory[] = offer.requiredPoints > 0 ? [
-            {
-              id: `h-${Date.now()}`,
-              points: -offer.requiredPoints,
-              type: 'redeem' as const,
-              description: `Redeemed for ${offer.title}`,
-              date: 'Just now'
-            },
-            ...state.loyaltyHistory
-          ] : state.loyaltyHistory;
-
-          const updatedNotifications = [
-            {
-              id: `n-${Date.now()}`,
-              title: 'Offer Unlocked! 🎉',
-              message: `You successfully unlocked "${offer.title}". Use coupon code "${offer.code}" during checkout.`,
-              timestamp: 'Just now',
-              read: false,
-              type: 'offer' as const,
-            },
-            ...state.notifications
-          ];
-
-          return {
-            loyaltyPoints: state.loyaltyPoints - offer.requiredPoints,
-            offers: updatedOffers,
-            loyaltyHistory: updatedHistory,
-            notifications: updatedNotifications,
-          };
-        });
-        return success;
+        } catch (err: any) {
+          console.error('Failed to redeem offer', err);
+          get().addNotification('Redemption Failed', err?.response?.data?.error?.message || 'Could not redeem offer', 'info');
+        }
+        return false;
       },
       updateNotificationPreferences: (prefs) => set((state) => ({
         notificationPreferences: { ...state.notificationPreferences, ...prefs }
@@ -595,6 +649,18 @@ export const useCustomerStore = create<CustomerStore>()(
     }),
     {
       name: 'restohub-customer-store',
+      // Do NOT persist the session-bearing fields. The session token lives in
+      // the separate `x-session-token` localStorage key and is re-validated on
+      // every load via `validateStoredSession`. Persisting `diningSession`
+      // here would let a stale/invalid session (e.g. from a different database)
+      // silently "revive" the UI on reload while every real API call still 401s.
+      partialize: (state) => {
+        const { diningSession, lastActivity, ...rest } = state;
+        return rest;
+      },
+      // On rehydration, ensure liveBill is structurally valid. If persisted
+      // state was corrupted (e.g. stale shape from an older deploy), drop it
+      // rather than passing bad data downstream.
       merge: (persistedState: any, currentState) => {
         const nextState = { ...currentState, ...persistedState };
         if (nextState.liveBill && !isValidLiveBill(nextState.liveBill)) {

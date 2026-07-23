@@ -1,28 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useCustomerStore } from '../store/customer.store';
 import { apiClient } from '../../../shared/services/apiClient';
 
-interface Reservation {
+type Reservation = {
   id: string;
   restaurantId: string;
-  restaurantName?: string;
-  name: string;
-  avatar: string;
-  avatarColor: string;
-  time: string;
-  guests: number;
-  tableId?: number | string;
-  status: string;
+  restaurantName: string;
+  guestName: string;
+  partySize: number;
   date: string;
-  specialRequest?: string;
-  phone: string;
-  email: string;
-  occasion?: string;
+  time: string;
+  status: string;
+  occasion: string;
+  seating: string;
+  notes: string;
+};
+
+// Restaurant serving window: 11:00 AM to 10:30 PM, in 30-minute increments.
+const SERVICE_START_HOUR = 11;
+const SERVICE_END_HOUR = 22;
+const SLOT_INTERVAL_MINUTES = 30;
+
+// A few slots are flagged as "limited" so the UI can hint at lower availability.
+const LIMITED_SLOTS = new Set(['01:00 PM', '07:30 PM', '08:00 PM', '09:00 PM']);
+
+function formatSlotTime(hour24: number, minute: number): string {
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const minStr = minute.toString().padStart(2, '0');
+  return `${hour12.toString().padStart(2, '0')}:${minStr} ${period}`;
 }
 
+function buildTimeSlots(): { time: string; status: 'available' | 'limited' }[] {
+  const slots: { time: string; status: 'available' | 'limited' }[] = [];
+  for (let h = SERVICE_START_HOUR; h <= SERVICE_END_HOUR; h++) {
+    for (let m = 0; m < 60; m += SLOT_INTERVAL_MINUTES) {
+      if (h === SERVICE_END_HOUR && m > 30) break;
+      const time = formatSlotTime(h, m);
+      slots.push({ time, status: LIMITED_SLOTS.has(time) ? 'limited' : 'available' });
+    }
+  }
+  return slots;
+}
+
+const TIME_SLOTS = buildTimeSlots();
+
+function isSlotInPast(dateStr: string, slotTime: string): boolean {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(slotTime.trim());
+  if (!match) return false;
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const period = match[3].toUpperCase();
+
+  if (period === 'PM' && hour < 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  if (!y || !mo || !d) return false;
+
+  const slotDate = new Date(y, mo - 1, d, hour, minute, 0, 0);
+  return slotDate.getTime() <= Date.now();
+}
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
+
 const getTomorrowStr = () => {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -33,12 +76,14 @@ const parseTimeTo24h = (time12h: string): string => {
   const [time, modifier] = time12h.split(' ');
   const [hoursStr, minutes] = time.split(':');
   let hours = hoursStr;
+
   if (hours === '12') {
     hours = '00';
   }
   if (modifier === 'PM') {
     hours = String(parseInt(hours, 10) + 12);
   }
+
   return `${hours.padStart(2, '0')}:${minutes}`;
 };
 
@@ -47,9 +92,11 @@ const formatTimeTo12h = (time24h: string): string => {
   if (time24h.includes('AM') || time24h.includes('PM')) {
     return time24h;
   }
+
   const [hoursStr, minutes] = time24h.split(':');
   let hours = parseInt(hoursStr, 10);
   if (isNaN(hours)) return '07:00 PM';
+
   const modifier = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   hours = hours ? hours : 12;
@@ -58,9 +105,14 @@ const formatTimeTo12h = (time24h: string): string => {
 
 const formatDateReadable = (dateStr: string) => {
   try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
   } catch {
     return dateStr;
   }
@@ -69,27 +121,29 @@ const formatDateReadable = (dateStr: string) => {
 export default function CustomerReservationPage() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const navRestaurantId = location.state?.restaurantId || searchParams.get('restaurantId');
+  const routeState = (location.state as { restaurantId?: string; restaurantName?: string } | null) ?? null;
+  const navRestaurantId = routeState?.restaurantId || searchParams.get('restaurantId') || '';
+  const navRestaurantName = routeState?.restaurantName || '';
 
-  const { profile, diningSession, addNotification } = useCustomerStore();
+  const { diningSession, addNotification } = useCustomerStore();
   const formRef = useRef<HTMLFormElement>(null);
 
   const [todayStr] = useState(getTodayStr);
   const [tomorrowStr] = useState(getTomorrowStr);
+  const firstValidSlot = TIME_SLOTS.find((slot) => !isSlotInPast(todayStr, slot.time))?.time ?? TIME_SLOTS[0].time;
 
   const [restaurantsList, setRestaurantsList] = useState<any[]>([]);
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState(navRestaurantId || '');
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(navRestaurantId);
   const [isSelectModalOpen, setIsSelectModalOpen] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState('');
 
   const [guests, setGuests] = useState('2 Guests');
   const [date, setDate] = useState(todayStr);
-  const [time, setTime] = useState('07:00 PM');
+  const [time, setTime] = useState(firstValidSlot);
   const [area, setArea] = useState('Any Preference');
   const [specialRequest, setSpecialRequest] = useState('');
   const [dateTab, setDateTab] = useState<'today' | 'tomorrow' | 'custom'>('today');
 
-  const [popularSlots, setPopularSlots] = useState<{time: string, status: string}[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(false);
   const [modifyingId, setModifyingId] = useState<string | null>(null);
@@ -100,6 +154,12 @@ export default function CustomerReservationPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  const ensureValidTime = (dateStr: string, currentTime: string) => {
+    if (!isSlotInPast(dateStr, currentTime)) return;
+    const valid = TIME_SLOTS.find((slot) => !isSlotInPast(dateStr, slot.time))?.time ?? TIME_SLOTS[0].time;
+    setTime(valid);
+  };
+
   const fetchRestaurants = async () => {
     try {
       const response = await apiClient.get('/public/landing/data');
@@ -107,9 +167,14 @@ export default function CustomerReservationPage() {
         const list = response.data.data.restaurants;
         setRestaurantsList(list);
 
-        const targetId = navRestaurantId || diningSession?.restaurantId || (list.length > 0 ? (list[0]._id || list[0].id) : '');
+        const targetId =
+          navRestaurantId ||
+          selectedRestaurantId ||
+          diningSession?.restaurantId ||
+          (list.length > 0 ? String(list[0]._id || list[0].id) : '');
+
         if (targetId) {
-          setSelectedRestaurantId(targetId);
+          setSelectedRestaurantId(String(targetId));
         }
       }
     } catch (err) {
@@ -122,22 +187,18 @@ export default function CustomerReservationPage() {
     try {
       const response = await apiClient.get('/users/me/reservations');
       if ((response.data?.success || response.data?.status === 'success') && response.data?.data?.reservations) {
-        const mapped: Reservation[] = response.data.data.reservations.map((res: any) => ({
-          id: res._id,
-          restaurantId: res.restaurantId?._id || res.restaurantId,
-          restaurantName: res.restaurantId?.name || 'Amber Table',
-          name: res.customerName,
-          avatar: res.customerName.split(' ').map((n: string) => n[0]).join('').toUpperCase(),
-          avatarColor: 'bg-orange-500',
-          time: formatTimeTo12h(res.slot),
-          guests: res.guests,
-          tableId: res.tableId,
-          status: res.status,
-          date: res.date,
-          specialRequest: res.notes,
-          phone: res.mobile,
-          email: res.customerEmail || '',
-          occasion: res.notes ? 'Custom' : 'Any Preference'
+        const mapped: Reservation[] = response.data.data.reservations.map((reservation: any) => ({
+          id: String(reservation._id || reservation.id || ''),
+          restaurantId: String(reservation.restaurantId?._id || reservation.restaurantId || ''),
+          restaurantName: reservation.restaurantId?.name || navRestaurantName || 'Restaurant',
+          guestName: reservation.customerName || '',
+          partySize: Number(reservation.guests) || 1,
+          date: reservation.date || '',
+          time: formatTimeTo12h(reservation.slot || ''),
+          status: reservation.status || 'PENDING',
+          occasion: reservation.occasion || '',
+          seating: reservation.preferredArea || 'Any Preference',
+          notes: reservation.notes || '',
         }));
         setReservations(mapped);
       }
@@ -149,38 +210,38 @@ export default function CustomerReservationPage() {
   };
 
   useEffect(() => {
-    fetchRestaurants();
-    fetchReservations();
-  }, [diningSession]);
+    void fetchRestaurants();
+    void fetchReservations();
+  }, [diningSession?.restaurantId, navRestaurantId]);
 
-  const fetchSlots = async () => {
-    if (!selectedRestaurantId || !date) return;
-    try {
-      const guestCount = parseInt(guests) || 2;
-      const response = await apiClient.get(`/users/me/reservations/slots?restaurantId=${selectedRestaurantId}&date=${date}&guests=${guestCount}`);
-      if ((response.data?.success || response.data?.status === 'success') && response.data?.data?.slots) {
-        setPopularSlots(response.data.data.slots);
-      }
-    } catch (err) {
-      console.error('Failed to fetch slots', err);
-    }
+  const resetForm = () => {
+    setModifyingId(null);
+    setGuests('2 Guests');
+    setDate(todayStr);
+    setTime(firstValidSlot);
+    setArea('Any Preference');
+    setSpecialRequest('');
+    setDateTab('today');
   };
-
-  useEffect(() => {
-    fetchSlots();
-  }, [selectedRestaurantId, date, guests]);
 
   const handleDateTabChange = (tab: 'today' | 'tomorrow' | 'custom') => {
     setDateTab(tab);
+    let nextDate = date;
+
     if (tab === 'today') {
+      nextDate = todayStr;
       setDate(todayStr);
     } else if (tab === 'tomorrow') {
+      nextDate = tomorrowStr;
       setDate(tomorrowStr);
     }
+
+    ensureValidTime(nextDate, time);
   };
 
   const handleDateInputChange = (newDate: string) => {
     setDate(newDate);
+
     if (newDate === todayStr) {
       setDateTab('today');
     } else if (newDate === tomorrowStr) {
@@ -188,12 +249,14 @@ export default function CustomerReservationPage() {
     } else {
       setDateTab('custom');
     }
+
+    ensureValidTime(newDate, time);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const guestCount = parseInt(guests) || 2;
+    const guestCount = parseInt(guests, 10) || 2;
     const backendSlot = parseTimeTo24h(time);
 
     try {
@@ -203,64 +266,68 @@ export default function CustomerReservationPage() {
           date,
           slot: backendSlot,
           notes: specialRequest,
+          occasion: area,
+          preferredArea: area,
         });
 
         if (response.data?.success || response.data?.status === 'success') {
+          await fetchReservations();
           addNotification(
             'Reservation Updated! 📅',
             `Your reservation has been modified to ${guestCount} guests on ${formatDateReadable(date)} at ${time}.`,
             'info',
-            '/customer/reservations'
+            '/customer/reservations',
           );
           showToast('Reservation updated successfully!', 'success');
-          setModifyingId(null);
-          fetchReservations();
+          resetForm();
         }
-      } else {
-        const response = await apiClient.post('/users/me/reservations', {
-          restaurantId: selectedRestaurantId,
-          guests: guestCount,
-          date,
-          slot: backendSlot,
-          notes: specialRequest,
-        });
-
-        if (response.data?.success || response.data?.status === 'success') {
-          addNotification(
-            'Reservation Confirmed! 📅',
-            `Your table reservation for ${guestCount} guests on ${formatDateReadable(date)} at ${time} is confirmed.`,
-            'info',
-            '/customer/reservations'
-          );
-          showToast('Table reserved successfully!', 'success');
-          fetchReservations();
-        }
+        return;
       }
 
-      // Reset inputs
-      setGuests('2 Guests');
-      setDate(todayStr);
-      setTime('07:00 PM');
-      setArea('Any Preference');
-      setSpecialRequest('');
-      setDateTab('today');
+      if (!selectedRestaurantId) {
+        showToast('Please select a restaurant first.', 'error');
+        return;
+      }
+
+      const response = await apiClient.post('/users/me/reservations', {
+        restaurantId: selectedRestaurantId,
+        guests: guestCount,
+        date,
+        slot: backendSlot,
+        notes: specialRequest,
+        occasion: area,
+        preferredArea: area,
+      });
+
+      if (response.data?.success || response.data?.status === 'success') {
+        await fetchReservations();
+        addNotification(
+          'Reservation Confirmed! 📅',
+          `Your table reservation for ${guestCount} guests on ${formatDateReadable(date)} at ${time} is confirmed.`,
+          'info',
+          '/customer/reservations',
+        );
+        showToast('Table reserved successfully!', 'success');
+        resetForm();
+      }
     } catch (err: any) {
       console.error(err);
       showToast(err.response?.data?.message || 'Action failed. Please try again.', 'error');
     }
   };
 
-  const handleModify = (res: Reservation) => {
-    setModifyingId(res.id);
-    setSelectedRestaurantId(res.restaurantId);
-    setGuests(`${res.guests} Guests`);
-    setDate(res.date);
-    setTime(res.time);
-    setSpecialRequest(res.specialRequest || '');
+  const handleModify = (reservation: Reservation) => {
+    setModifyingId(reservation.id);
+    setSelectedRestaurantId(reservation.restaurantId);
+    setGuests(`${reservation.partySize} Guests`);
+    setDate(reservation.date);
+    setTime(reservation.time);
+    setArea(reservation.seating || 'Any Preference');
+    setSpecialRequest(reservation.notes || '');
 
-    if (res.date === todayStr) {
+    if (reservation.date === todayStr) {
       setDateTab('today');
-    } else if (res.date === tomorrowStr) {
+    } else if (reservation.date === tomorrowStr) {
       setDateTab('tomorrow');
     } else {
       setDateTab('custom');
@@ -277,24 +344,19 @@ export default function CustomerReservationPage() {
       const response = await apiClient.patch(`/users/me/reservations/${id}`, {
         status: 'CANCELLED',
       });
+
       if (response.data?.success || response.data?.status === 'success') {
+        await fetchReservations();
         addNotification(
           'Reservation Cancelled 📅',
-          `Your table reservation has been cancelled.`,
+          'Your table reservation has been cancelled.',
           'info',
-          '/customer/reservations'
+          '/customer/reservations',
         );
         showToast('Reservation cancelled', 'info');
-        fetchReservations();
-        
+
         if (modifyingId === id) {
-          setModifyingId(null);
-          setGuests('2 Guests');
-          setDate(todayStr);
-          setTime('07:00 PM');
-          setArea('Any Preference');
-          setSpecialRequest('');
-          setDateTab('today');
+          resetForm();
         }
       }
     } catch (err: any) {
@@ -303,14 +365,26 @@ export default function CustomerReservationPage() {
     }
   };
 
+  const filteredRestaurants = restaurantsList.filter((restaurant) => {
+    if (!modalSearchQuery) return true;
+    const query = modalSearchQuery.toLowerCase();
+    return (
+      restaurant.name?.toLowerCase().includes(query) ||
+      restaurant.city?.toLowerCase().includes(query) ||
+      restaurant.address?.toLowerCase().includes(query) ||
+      restaurant.cuisine?.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <div className="p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-full sd-custom-scrollbar relative">
-      {/* Toast Notification */}
       {toastMessage && (
         <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-5 py-3.5 rounded-xl border shadow-xl animate-fade-in transition-all font-sans text-sm ${
-          toastMessage.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-          toastMessage.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
-          'bg-blue-50 border-blue-200 text-blue-800'
+          toastMessage.type === 'success'
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : toastMessage.type === 'error'
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : 'bg-blue-50 border-blue-200 text-blue-800'
         }`}>
           <span className="material-symbols-outlined text-[20px]">
             {toastMessage.type === 'success' ? 'check_circle' : toastMessage.type === 'error' ? 'error' : 'info'}
@@ -325,15 +399,13 @@ export default function CustomerReservationPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Booking Form */}
           <form ref={formRef} onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-orange-500/5 text-left">
             <h3 className="text-base font-bold text-slate-800 mb-5 font-sans">
               {modifyingId ? 'Modify Your Booking' : 'Book Your Table'}
             </h3>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Restaurant Selector & Modal Trigger */}
               <div className="space-y-1.5 md:col-span-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="restaurant-select" className="text-xs font-bold text-slate-700 font-sans">
@@ -360,11 +432,15 @@ export default function CustomerReservationPage() {
                     onChange={(e) => setSelectedRestaurantId(e.target.value)}
                     disabled={!!modifyingId}
                   >
-                    {restaurantsList.map((r) => (
-                      <option key={r._id || r.id} value={r._id || r.id}>
-                        {r.name} ({r.city || r.address || 'Mumbai'})
-                      </option>
-                    ))}
+                    {restaurantsList.length === 0 ? (
+                      <option value="">Loading restaurants...</option>
+                    ) : (
+                      restaurantsList.map((restaurant) => (
+                        <option key={restaurant._id || restaurant.id} value={restaurant._id || restaurant.id}>
+                          {restaurant.name} ({restaurant.city || restaurant.address || 'Mumbai'})
+                        </option>
+                      ))
+                    )}
                   </select>
 
                   <button
@@ -378,7 +454,6 @@ export default function CustomerReservationPage() {
                 </div>
               </div>
 
-              {/* Guests */}
               <div className="space-y-1.5">
                 <label htmlFor="guests-select" className="text-xs font-bold text-slate-700 font-sans">Number of Guests</label>
                 <div className="relative">
@@ -400,8 +475,7 @@ export default function CustomerReservationPage() {
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-slate-400 text-[18px]">expand_more</span>
                 </div>
               </div>
-              
-              {/* Date */}
+
               <div className="space-y-1.5">
                 <label htmlFor="date-input" className="text-xs font-bold text-slate-700 font-sans">Date</label>
                 <div className="relative">
@@ -417,22 +491,29 @@ export default function CustomerReservationPage() {
                 </div>
               </div>
 
-              {/* Time */}
               <div className="space-y-1.5">
                 <label htmlFor="time-select" className="text-xs font-bold text-slate-700 font-sans">Time</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px] pointer-events-none">schedule</span>
-                  <input
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 text-[20px]">schedule</span>
+                  <select
                     id="time-select"
-                    type="time"
-                    className="w-full h-12 pl-10 pr-4 bg-white text-slate-800 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm font-sans shadow-sm cursor-pointer"
-                    value={parseTimeTo24h(time)}
-                    onChange={(e) => setTime(formatTimeTo12h(e.target.value))}
-                  />
+                    className="w-full h-12 pl-10 pr-4 bg-white text-slate-800 rounded-xl border border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 appearance-none text-sm font-sans shadow-sm"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                  >
+                    {TIME_SLOTS.map(({ time: slotTime }) => {
+                      const past = isSlotInPast(date, slotTime);
+                      return (
+                        <option key={slotTime} value={slotTime} disabled={past}>
+                          {slotTime}{past ? ' (Unavailable)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined pointer-events-none text-slate-400 text-[18px]">expand_more</span>
                 </div>
               </div>
 
-              {/* Area */}
               <div className="space-y-1.5">
                 <label htmlFor="area-select" className="text-xs font-bold text-slate-700 font-sans">Area Preference <span className="text-slate-400 font-normal">(Optional)</span></label>
                 <div className="relative">
@@ -452,7 +533,6 @@ export default function CustomerReservationPage() {
                 </div>
               </div>
 
-              {/* Special Request */}
               <div className="md:col-span-2 space-y-1.5">
                 <label htmlFor="special-request-textarea" className="text-xs font-bold text-slate-700 font-sans">Special Request <span className="text-slate-400 font-normal">(Optional)</span></label>
                 <div className="relative">
@@ -467,20 +547,14 @@ export default function CustomerReservationPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="mt-5 flex justify-between items-center">
               <div>
                 {modifyingId && (
                   <button
                     type="button"
                     onClick={() => {
-                      setModifyingId(null);
-                      setGuests('2 Guests');
-                      setDate(todayStr);
-                      setTime('07:00 PM');
-                      setArea('Any Preference');
-                      setSpecialRequest('');
-                      setDateTab('today');
+                      resetForm();
                       showToast('Cancelled modifications', 'info');
                     }}
                     className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all font-sans"
@@ -498,7 +572,6 @@ export default function CustomerReservationPage() {
             </div>
           </form>
 
-          {/* Time Slots */}
           <section className="bg-white rounded-2xl p-6 border border-slate-100 shadow-lg shadow-orange-500/5 text-left">
             <div className="flex justify-between items-end mb-5">
               <div>
@@ -521,27 +594,30 @@ export default function CustomerReservationPage() {
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {popularSlots.map(({ time: slotTime, status }) => {
+              {TIME_SLOTS.map(({ time: slotTime, status }) => {
                 const isSelected = time === slotTime;
                 const isLimited = status === 'limited';
-                const isUnavailable = status === 'unavailable';
+                const isPast = isSlotInPast(date, slotTime);
+
                 return (
                   <button
                     key={slotTime}
                     type="button"
-                    onClick={() => { if (!isUnavailable) setTime(slotTime); }}
-                    disabled={isUnavailable}
+                    disabled={isPast}
+                    onClick={() => !isPast && setTime(slotTime)}
                     className={`p-4 rounded-xl flex flex-col items-center gap-1 transition-all ${
-                      isSelected
-                        ? 'border-2 border-orange-500 bg-orange-50/30 shadow-md'
-                        : isUnavailable
-                        ? 'border border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed opacity-70'
-                        : 'border border-slate-200 bg-white hover:border-orange-500 text-slate-800'
+                      isPast
+                        ? 'border border-slate-200 bg-slate-50 opacity-50 cursor-not-allowed'
+                        : isSelected
+                          ? 'border-2 border-orange-500 bg-orange-50/30 shadow-md'
+                          : 'border border-slate-200 bg-white hover:border-orange-500 text-slate-800'
                     }`}
                   >
-                    <span className={`text-sm font-bold font-sans ${isSelected ? 'text-orange-600' : isUnavailable ? 'text-slate-400' : 'text-slate-800'}`}>{slotTime}</span>
-                    <span className={`text-[10px] uppercase font-bold font-sans ${isUnavailable ? 'text-slate-400' : isLimited ? 'text-orange-600' : 'text-emerald-600'}`}>
-                      {isUnavailable ? 'Unavailable' : isLimited ? 'Limited' : 'Available'}
+                    <span className={`text-sm font-bold font-sans ${isSelected ? 'text-orange-600' : 'text-slate-800'}`}>{slotTime}</span>
+                    <span className={`text-[10px] uppercase font-bold font-sans ${
+                      isPast ? 'text-slate-400' : isLimited ? 'text-orange-600' : 'text-emerald-600'
+                    }`}>
+                      {isPast ? 'Unavailable' : isLimited ? 'Limited' : 'Available'}
                     </span>
                   </button>
                 );
@@ -550,9 +626,7 @@ export default function CustomerReservationPage() {
           </section>
         </div>
 
-        {/* Right Column */}
         <div className="lg:col-span-4 space-y-6 text-left">
-          {/* Benefits */}
           <section className="bg-white rounded-2xl p-5 border border-slate-100 shadow-lg shadow-orange-500/5">
             <h3 className="text-base font-bold text-slate-800 mb-4 font-sans">Why Reserve with Us?</h3>
             <div className="space-y-3">
@@ -576,7 +650,6 @@ export default function CustomerReservationPage() {
             </div>
           </section>
 
-          {/* Existing Reservations list */}
           <section className="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-orange-500/5 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
               <h3 className="text-base font-bold text-slate-800 font-sans">Your Reservations</h3>
@@ -591,48 +664,55 @@ export default function CustomerReservationPage() {
                 </div>
               ) : reservations.length > 0 ? (
                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1 sd-custom-scrollbar">
-                  {reservations.map((res) => (
-                    <div key={res.id} className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm">
+                  {reservations.map((reservation) => (
+                    <div key={reservation.id} className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm">
                       <div className="h-24 bg-gradient-to-br from-orange-100 via-orange-50 to-orange-100/10 flex items-center justify-center relative">
                         <span className="material-symbols-outlined text-4xl text-orange-500/20">restaurant</span>
                         <div className="absolute top-2 left-3 bg-black/60 text-[9px] font-bold text-white px-2 py-0.5 rounded">
-                          {res.restaurantName}
+                          {reservation.restaurantName}
                         </div>
                       </div>
                       <div className="p-4">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h4 className="font-bold text-xs text-slate-800 font-sans">{formatDateReadable(res.date)}</h4>
+                            <h4 className="font-bold text-xs text-slate-800 font-sans">{formatDateReadable(reservation.date)}</h4>
                             <div className="flex gap-3 mt-1.5">
                               <div className="flex items-center gap-1 text-slate-500 text-[10px] font-sans">
-                                <span className="material-symbols-outlined text-[12px] text-slate-400">schedule</span> {res.time}
+                                <span className="material-symbols-outlined text-[12px] text-slate-400">schedule</span> {reservation.time}
                               </div>
                               <div className="flex items-center gap-1 text-slate-500 text-[10px] font-sans">
-                                <span className="material-symbols-outlined text-[12px] text-slate-400">group</span> {res.guests} Guests
+                                <span className="material-symbols-outlined text-[12px] text-slate-400">group</span> {reservation.partySize} Guests
                               </div>
                             </div>
-                            {res.specialRequest && (
-                              <p className="mt-1.5 text-[10px] text-slate-400 italic font-sans max-w-[170px] truncate" title={res.specialRequest}>
-                                &ldquo;{res.specialRequest}&rdquo;
+                            {reservation.seating && reservation.seating !== 'Any Preference' && (
+                              <div className="mt-1 text-[10px] text-orange-600 font-semibold font-sans">
+                                Preference: {reservation.seating}
+                              </div>
+                            )}
+                            {reservation.notes && (
+                              <p className="mt-1.5 text-[10px] text-slate-400 italic font-sans max-w-[170px] truncate" title={reservation.notes}>
+                                &ldquo;{reservation.notes}&rdquo;
                               </p>
                             )}
                           </div>
                           <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase font-sans ${
-                            res.status === 'CONFIRMED' || res.status === 'Confirmed' ? 'bg-green-100 text-green-700' :
-                            res.status === 'PENDING' || res.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                            res.status === 'CANCELLED' || res.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
-                          }`}>{res.status}</span>
+                            reservation.status === 'CONFIRMED' || reservation.status === 'Confirmed'
+                              ? 'bg-green-100 text-green-700'
+                              : reservation.status === 'CANCELLED' || reservation.status === 'Cancelled'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-orange-100 text-orange-700'
+                          }`}>{reservation.status}</span>
                         </div>
-                        {res.status !== 'CANCELLED' && res.status !== 'Cancelled' && (
+                        {reservation.status !== 'CANCELLED' && reservation.status !== 'Cancelled' && (
                           <div className="flex gap-2 mt-3">
                             <button
-                              onClick={() => handleModify(res)}
+                              onClick={() => handleModify(reservation)}
                               className="flex-1 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors font-sans"
                             >
                               Modify
                             </button>
                             <button
-                              onClick={() => handleCancel(res.id)}
+                              onClick={() => handleCancel(reservation.id)}
                               className="flex-1 py-1.5 border border-red-100 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-50/50 transition-colors font-sans"
                             >
                               Cancel
@@ -655,12 +735,9 @@ export default function CustomerReservationPage() {
         </div>
       </div>
 
-      {/* Select Restaurant Modal with Real-time Search */}
       {isSelectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn font-sans">
           <div className="relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-3xl bg-white dark:bg-[#121214] border border-gray-200 dark:border-neutral-800 shadow-2xl overflow-hidden text-gray-900 dark:text-gray-100">
-            
-            {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 dark:border-neutral-800 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2 font-sans">
@@ -680,7 +757,6 @@ export default function CustomerReservationPage() {
               </button>
             </div>
 
-            {/* Search Input Bar */}
             <div className="p-4 bg-gray-50 dark:bg-[#18181b] border-b border-gray-100 dark:border-neutral-800">
               <div className="relative flex items-center">
                 <span className="absolute left-3.5 text-gray-400 material-symbols-outlined text-[20px] pointer-events-none">
@@ -705,94 +781,71 @@ export default function CustomerReservationPage() {
               </div>
             </div>
 
-            {/* Restaurant List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 sd-custom-scrollbar">
-              {restaurantsList.filter((r) => {
-                if (!modalSearchQuery) return true;
-                const q = modalSearchQuery.toLowerCase();
-                return (
-                  r.name?.toLowerCase().includes(q) ||
-                  r.city?.toLowerCase().includes(q) ||
-                  r.address?.toLowerCase().includes(q) ||
-                  r.cuisine?.toLowerCase().includes(q)
-                );
-              }).length === 0 ? (
+              {filteredRestaurants.length === 0 ? (
                 <div className="py-12 text-center text-gray-400 text-xs font-semibold">
                   No restaurants found matching &ldquo;{modalSearchQuery}&rdquo;
                 </div>
               ) : (
-                restaurantsList
-                  .filter((r) => {
-                    if (!modalSearchQuery) return true;
-                    const q = modalSearchQuery.toLowerCase();
-                    return (
-                      r.name?.toLowerCase().includes(q) ||
-                      r.city?.toLowerCase().includes(q) ||
-                      r.address?.toLowerCase().includes(q) ||
-                      r.cuisine?.toLowerCase().includes(q)
-                    );
-                  })
-                  .map((r, idx) => {
-                    const rId = String(r._id || r.id);
-                    const isSelected = String(selectedRestaurantId) === rId;
-                    const imgIndex = (idx % 4) + 1;
-                    const bgImg = r.coverImage || r.image || `/images/landing/restaurant-${imgIndex}.png`;
+                filteredRestaurants.map((restaurant, idx) => {
+                  const restaurantId = String(restaurant._id || restaurant.id);
+                  const isSelected = String(selectedRestaurantId) === restaurantId;
+                  const imgIndex = (idx % 4) + 1;
+                  const bgImg = restaurant.coverImage || restaurant.image || `/images/landing/restaurant-${imgIndex}.png`;
 
-                    return (
-                      <div
-                        key={rId}
-                        className={`flex items-center gap-4 p-3.5 rounded-2xl border transition-all ${
+                  return (
+                    <div
+                      key={restaurantId}
+                      className={`flex items-center gap-4 p-3.5 rounded-2xl border transition-all ${
+                        isSelected
+                          ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/10 ring-1 ring-orange-500/30'
+                          : 'border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#18181b] hover:border-orange-500/30'
+                      }`}
+                    >
+                      <img
+                        src={bgImg}
+                        alt={restaurant.name}
+                        className="w-16 h-16 rounded-xl object-cover shrink-0 bg-neutral-800"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate font-sans">
+                            {restaurant.name}
+                          </h4>
+                          {restaurant.rating && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-bold flex items-center gap-0.5">
+                              ⭐ {restaurant.rating}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                          {restaurant.cuisine || 'Multi-Cuisine'} • {restaurant.address || restaurant.city || 'Mumbai'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedRestaurantId(restaurantId);
+                          setIsSelectModalOpen(false);
+                          showToast(`Selected ${restaurant.name}`, 'info');
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
                           isSelected
-                            ? 'border-orange-500 bg-orange-500/10 dark:bg-orange-500/10 ring-1 ring-orange-500/30'
-                            : 'border-gray-200 dark:border-neutral-800 bg-white dark:bg-[#18181b] hover:border-orange-500/30'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-orange-500 hover:bg-orange-600 text-white shadow-sm shadow-orange-500/20'
                         }`}
                       >
-                        <img
-                          src={bgImg}
-                          alt={r.name}
-                          className="w-16 h-16 rounded-xl object-cover shrink-0 bg-neutral-800"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate font-sans">
-                              {r.name}
-                            </h4>
-                            {r.rating && (
-                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 text-[10px] font-bold flex items-center gap-0.5">
-                                ⭐ {r.rating}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                            {r.cuisine || 'Multi-Cuisine'} • {r.address || r.city || 'Mumbai'}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedRestaurantId(rId);
-                            setIsSelectModalOpen(false);
-                            showToast(`Selected ${r.name}`, 'info');
-                          }}
-                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-600 text-white shadow-sm'
-                              : 'bg-orange-500 hover:bg-orange-600 text-white shadow-sm shadow-orange-500/20'
-                          }`}
-                        >
-                          {isSelected ? '✓ Selected' : 'Select'}
-                        </button>
-                      </div>
-                    );
-                  })
+                        {isSelected ? '✓ Selected' : 'Select'}
+                      </button>
+                    </div>
+                  );
+                })
               )}
             </div>
-
           </div>
         </div>
       )}
     </div>
   );
 }
-

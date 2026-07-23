@@ -18,6 +18,8 @@ import { env } from '../../config/env';
 import logger from '../../config/logger';
 import crypto from 'crypto';
 import { assertPlanLimit, recordSubscriptionUsage } from '../subscriptions/subscriptionEnforcement.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UserRole } from '../../constants/roles';
 
 type StaffRole = (typeof STAFF_ROLES)[number];
 
@@ -257,6 +259,17 @@ export async function createStaffController(req: Request, res: Response, next: N
         logger.error('Failed to send staff invitation email', { error: err, email: req.body.email });
       }
     })();
+
+    // Notify admin about staff creation
+    NotificationsService.createNotification({
+      restaurantId,
+      recipientRole: UserRole.RESTAURANT_ADMIN,
+      title: 'Staff Member Created',
+      message: `Staff member ${req.body.name} (${req.body.role}) has been added.`,
+      type: 'STAFF_CREATED',
+      entityId: created._id.toString(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    }).catch(() => {});
 
     void logAudit(req, {
       entityType:   AuditEntity.STAFF,
@@ -549,6 +562,18 @@ export async function updateStaffController(req: Request, res: Response, next: N
       .lean();
 
     ok(res, { staff: { ...staff, activeShift: activeShift ?? null } });
+
+    // Notify admin about staff update
+    NotificationsService.createNotification({
+      restaurantId,
+      recipientRole: UserRole.RESTAURANT_ADMIN,
+      title: 'Staff Member Updated',
+      message: `Staff member ${staff.name}'s profile has been updated.`,
+      type: 'STAFF_UPDATED',
+      entityId: req.params.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    }).catch(() => {});
+
     void logAudit(req, {
       entityType:   AuditEntity.STAFF,
       entityId:     req.params.id,
@@ -600,6 +625,18 @@ export async function deleteStaffController(req: Request, res: Response, next: N
     );
 
     ok(res, { staff });
+
+    // Notify admin about staff deletion
+    NotificationsService.createNotification({
+      restaurantId,
+      recipientRole: UserRole.RESTAURANT_ADMIN,
+      title: 'Staff Member Removed',
+      message: `Staff member ${staff.name} has been removed from the system.`,
+      type: 'STAFF_DELETED',
+      entityId: req.params.id,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    }).catch(() => {});
+
     void logAudit(req, {
       entityType:   AuditEntity.STAFF,
       entityId:     req.params.id,

@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, Search, ChevronDown, Sun, Moon, LogOut, User, Settings, X, Menu } from 'lucide-react';
+import { Search, ChevronDown, Sun, Moon, LogOut, User, Settings, X, Menu, Bell } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../../app/providers/ThemeProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useAdminSearch } from '../context/Adminsearchcontext';
-import { useAdminNotifications } from '../context/Adminnotificationscontext';
+import { NotificationBell } from './NotificationBell';
 
 import { useOrdersStore }    from '../store/orders.store';
 import { useCustomersStore } from '../store/customers.store';
@@ -41,19 +41,15 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
   const { user, signOut }      = useAuth();
   const navigate               = useNavigate();
   const { pathname }           = useLocation();
-  const { searchQuery, setSearchQuery }                           = useAdminSearch();
-  const { notifications, unreadCount, markAllRead, markRead }     = useAdminNotifications();
+  const { searchQuery, setSearchQuery } = useAdminSearch();
 
   const [userMenuOpen, setUserMenuOpen]         = useState(false);
-  const [notifOpen, setNotifOpen]               = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [searchPathname, setSearchPathname]     = useState(pathname);
 
-  // When route changes, collapse mobile search by updating its paired pathname
   const resolvedMobileSearchOpen = mobileSearchOpen && searchPathname === pathname;
 
   const userMenuRef    = useRef<HTMLDivElement>(null);
-  const notifRef       = useRef<HTMLDivElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const pathnameRef    = useRef(pathname);
 
@@ -65,18 +61,15 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
 
   useSyncSearchToStore(searchQuery, pathname);
 
-  // Clear search query on route change only
   useEffect(() => {
     if (pathnameRef.current === pathname) return;
     pathnameRef.current = pathname;
     setSearchQuery('');
   }, [pathname, setSearchQuery]);
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
-      if (notifRef.current    && !notifRef.current.contains(e.target as Node))    setNotifOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -121,7 +114,7 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
   return (
     <header className="h-14 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center px-3 sm:px-6 sticky top-0 z-20 transition-colors duration-200">
 
-      {/* ── Hamburger: always the first item, flex-shrink-0 so it never collapses ── */}
+      {/* ── Hamburger ── */}
       <button
         onClick={onMenuToggle}
         className="lg:hidden flex-shrink-0 w-9 h-9 mr-2 rounded-xl flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -130,7 +123,7 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* ── Mobile expanded search: takes all remaining width, hides other icons ── */}
+      {/* ── Mobile expanded search ── */}
       {resolvedMobileSearchOpen && (
         <div className="flex flex-1 items-center gap-2">
           {searchInput(mobileInputRef)}
@@ -144,18 +137,18 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
         </div>
       )}
 
-      {/* ── Desktop search: always shown on sm+ ── */}
+      {/* ── Desktop search ── */}
       {!resolvedMobileSearchOpen && (
         <div className="hidden sm:flex flex-1 max-w-md">
           {searchInput()}
         </div>
       )}
 
-      {/* ── Right-side icons: hidden entirely when mobile search is open ── */}
+      {/* ── Right-side icons ── */}
       {!resolvedMobileSearchOpen && (
         <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
 
-          {/* Mobile search icon — only on small screens */}
+          {/* Mobile search trigger */}
           <button
             onClick={() => { setMobileSearchOpen(true); setSearchPathname(pathname); }}
             className="sm:hidden w-9 h-9 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -172,58 +165,17 @@ export function AdminTopbar({ onMenuToggle }: AdminTopbarProps): JSX.Element {
           >
             {theme === 'dark'
               ? <Sun  className="w-4 h-4 text-amber-400" />
-              : <Moon className="w-4 h-4 text-gray-500"  />
+              : <Moon className="w-4 h-4 text-gray-500" />
             }
           </button>
 
-          {/* Notification bell */}
-          <div className="relative" ref={notifRef}>
-            <button
-              onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }}
-              className="relative w-9 h-9 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <Bell className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 rounded-full border-2 border-white dark:border-gray-900" />
-              )}
-            </button>
-
-            {notifOpen && (
-              <div className="absolute right-0 top-11 w-[calc(100vw-1.5rem)] sm:w-80 max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                  <span className="text-sm font-bold text-gray-800 dark:text-gray-100">Notifications</span>
-                  {unreadCount > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-orange-500 hover:text-orange-600 font-medium">
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-72 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800">
-                  {notifications.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-6">No notifications</p>
-                  ) : notifications.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => markRead(n.id)}
-                      className={`w-full text-left flex gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${!n.read ? 'bg-orange-50/50 dark:bg-orange-950/20' : ''}`}
-                    >
-                      <span className="text-base flex-shrink-0 mt-0.5">{n.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm leading-snug ${!n.read ? 'font-semibold text-gray-800 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400'}`}>{n.message}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{n.time}</p>
-                      </div>
-                      {!n.read && <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0 mt-1.5" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Notification bell — uses fully isolated NotificationBell component */}
+          <NotificationBell />
 
           {/* User dropdown */}
           <div className="relative" ref={userMenuRef}>
             <button
-              onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
+              onClick={() => { setUserMenuOpen(!userMenuOpen); }}
               className="flex items-center gap-2 sm:gap-2.5 pl-1 pr-2 sm:pr-3 py-1 rounded-full hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               {avatarImage ? (

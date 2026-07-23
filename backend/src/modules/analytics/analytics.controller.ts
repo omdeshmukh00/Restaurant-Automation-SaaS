@@ -103,6 +103,40 @@ export async function getSubscriptionUsageAnalytics(req: Request, res: Response,
 
 import logger from '../../config/logger';
 
+export async function getOrdersAnalyticsEndpoint(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = getRestaurantId(req);
+    const query = req.query as unknown as AnalyticsQueryInput;
+    const data = await AnalyticsService.getOrdersAnalytics(restaurantId, query);
+    ok(res, data);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getTopSellingItemsEndpoint(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = getRestaurantId(req);
+    const query = req.query as unknown as AnalyticsQueryInput;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const data = await AnalyticsService.getTopSellingItems(restaurantId, query, limit);
+    ok(res, data);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getReservationAnalyticsEndpoint(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = getRestaurantId(req);
+    const query = req.query as unknown as AnalyticsQueryInput;
+    const data = await AnalyticsService.getReservationAnalytics(restaurantId, query);
+    ok(res, data);
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function getInventoryAnalytics(req: Request, res: Response, next: NextFunction) {
   try {
     const restaurantId = getRestaurantId(req);

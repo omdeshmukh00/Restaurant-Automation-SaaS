@@ -15,8 +15,6 @@ export interface MenuItem {
   isSpicy?: boolean;
 }
 
-
-
 import { useCustomerStore } from '../../store/customer.store';
 import { apiClient } from '../../../../shared/services/apiClient';
 import { getSocket } from '../../../../lib/socket';
@@ -52,7 +50,7 @@ interface SearchContextType {
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 export function SearchProvider({ children }: { children: React.ReactNode }) {
-  const { menuItems: storeMenuItems, fetchMenu } = useCustomerStore();
+  const { menuItems: storeMenuItems, fetchMenu, diningSession } = useCustomerStore();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Recommended');

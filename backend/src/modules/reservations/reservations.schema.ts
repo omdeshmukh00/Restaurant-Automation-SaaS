@@ -83,3 +83,12 @@ export const checkInReservationBodySchema = z.object({
   restaurantId: objectIdSchema.optional(),
   tableId: objectIdSchema.optional(),
 });
+
+export const arriveReservationBodySchema = z.object({
+  restaurantId: objectIdSchema.optional(),
+  tableId: objectIdSchema.optional(),
+});
+
+export const markNoShowBodySchema = z.object({
+  restaurantId: objectIdSchema.optional(),
+});

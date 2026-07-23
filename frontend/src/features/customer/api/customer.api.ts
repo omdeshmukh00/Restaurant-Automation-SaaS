@@ -101,6 +101,131 @@ export function getInvoicePdfUrl(billId: string): string {
   return `${import.meta.env.VITE_API_URL || '/api/v1'}/billing/customer/bill/${billId}/receipt/pdf`;
 }
 
+// ── Reservation APIs (customer panel) ────────────────────────────────
+
+export type CustomerReservationInput = {
+  customerName?: string;
+  mobile?: string;
+  guests?: number;
+  date: string;
+  slot: string;
+  tableNumber?: string;
+  notes?: string;
+  occasion?: string;
+  preferredArea?: string;
+  status?: string;
+};
+
+export type CustomerReservationResponse = {
+  _id?: string;
+  id?: string;
+  customerName?: string;
+  mobile?: string;
+  guests?: number;
+  date?: string;
+  slot?: string;
+  status?: string;
+  occasion?: string;
+  preferredArea?: string;
+  notes?: string;
+  tableNumber?: string;
+};
+
+export async function createCustomerReservation(input: CustomerReservationInput) {
+  const response = await apiClient.post<ApiResponse<{ reservation: CustomerReservationResponse }>>(
+    '/customer/reservations',
+    input,
+  );
+
+  return response.data.data.reservation;
+}
+
+export async function getCustomerReservations() {
+  const response = await apiClient.get<ApiResponse<{ reservations: CustomerReservationResponse[] }>>(
+    '/customer/reservations',
+  );
+
+  return response.data.data.reservations ?? [];
+}
+
+export async function updateCustomerReservation(
+  id: string,
+  updates: Partial<CustomerReservationInput>,
+) {
+  const response = await apiClient.patch<ApiResponse<{ reservation: CustomerReservationResponse }>>(
+    `/customer/reservations/${id}`,
+    updates,
+  );
+
+  return response.data.data.reservation;
+}
+
+export async function cancelCustomerReservation(id: string) {
+  const response = await apiClient.post<ApiResponse<{ reservation: CustomerReservationResponse }>>(
+    `/customer/reservations/${id}/cancel`,
+  );
+
+  return response.data.data.reservation;
+}
+
+// ── Loyalty & Offers ──────────────────────────────────────────────────
+
+export type CustomerWallet = {
+  pointsBalance: number;
+  lifetimePoints: number;
+  tier: string;
+};
+
+export type CustomerOffer = {
+  _id: string;
+  title: string;
+  description?: string;
+  promoCode: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  requiredPoints: number;
+  minOrderAmount: number | null;
+  maxDiscount: number | null;
+  expiryDate: string;
+  startDate: string;
+};
+
+export type OfferEligibility = {
+  offerId: string;
+  name: string;
+  code: string;
+  requiredPoints: number;
+  eligible: boolean;
+};
+
+export type RedeemOfferResult = {
+  success: boolean;
+  remainingPoints: number;
+  offer: CustomerOffer;
+};
+
+export async function getCustomerWallet() {
+  const response = await apiClient.get<ApiResponse<{ wallet: CustomerWallet }>>('/customer/loyalty');
+  return response.data.data.wallet;
+}
+
+export async function getCustomerOffers() {
+  const response = await apiClient.get<ApiResponse<{ offers: CustomerOffer[] }>>('/customer/offers');
+  return response.data.data.offers;
+}
+
+export async function getOfferEligibility() {
+  const response = await apiClient.get<ApiResponse<{ eligibility: OfferEligibility[] }>>('/customer/offers/eligibility');
+  return response.data.data.eligibility;
+}
+
+export async function redeemCustomerOffer(offerId: string) {
+  const response = await apiClient.post<ApiResponse<RedeemOfferResult>>(`/customer/offers/${offerId}/redeem`);
+  return response.data.data;
+}
+
+// ── User profile / history APIs ──────────────────────────────────────
+
 export async function getLoyaltyWallet() {
   const response = await apiClient.get<ApiResponse<any>>('/users/me/loyalty');
   return response.data.data;

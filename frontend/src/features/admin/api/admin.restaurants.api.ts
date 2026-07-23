@@ -33,10 +33,12 @@ export interface RestaurantSettings {
 
 export interface RestaurantBillingSummary {
   plan: string;
+  status?: string;
   cycle: string;
   nextBillingDate: string;
   amount: string;
   currency: string;
+  paymentMethod?: string;
 }
 
 export interface RestaurantSettingsResponse {

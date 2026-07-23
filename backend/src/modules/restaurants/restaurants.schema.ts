@@ -110,6 +110,31 @@ export const updateRestaurantSettingsSchema = z.object({
     )
     .optional(),
 
+  gstEnabled: z
+    .boolean()
+    .optional(),
+
+  gstNumber: z
+    .string()
+    .trim()
+    .optional(),
+
+  legalBusinessName: z
+    .string()
+    .trim()
+    .optional(),
+
+  defaultGSTPercentage: z
+    .number()
+    .min(0, 'GST percentage cannot be negative')
+    .max(100, 'GST percentage cannot exceed 100')
+    .optional(),
+
+  invoicePrefix: z
+    .string()
+    .trim()
+    .optional(),
+
   floors: z
     .array(
       z.object({
