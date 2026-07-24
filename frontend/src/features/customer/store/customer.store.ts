@@ -164,6 +164,7 @@ export type LiveBill = {
     paymentsApplied: number;
     outstandingBalance: number;
   };
+  appliedCoupons?: { couponId: string; code: string; discountAmount: number }[];
 };
 
 export function isValidLiveBill(value: any): value is LiveBill {
@@ -190,6 +191,7 @@ type CustomerStore = {
   cart: CustomerCartItem[];
   favourites: number[];
   menuItems: any[];
+  categories: any[];
   orders: TrackedOrder[];
   serviceRequests: ServiceRequestItem[];
 
@@ -310,6 +312,7 @@ export const useCustomerStore = create<CustomerStore>()(
       cart: [],
       favourites: [],
       menuItems: [],
+      categories: [],
       orders: [],
       serviceRequests: [],
       diningSession: null,
@@ -363,8 +366,13 @@ export const useCustomerStore = create<CustomerStore>()(
           if (!diningSession) return;
           const res = await apiClient.get(`/public/menu?restaurantId=${diningSession.restaurantId}`);
           const data = res.data?.data || res.data;
-          if (data && data.menuItems) {
-            set({ menuItems: data.menuItems });
+          if (data) {
+            const categories = data.categories || [];
+            const items = data.menuItems || [];
+            set({ 
+              menuItems: items,
+              categories: categories,
+            });
           }
         } catch (err) {
           console.error('Failed to fetch menu', err);

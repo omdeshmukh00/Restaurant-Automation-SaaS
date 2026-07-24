@@ -1214,6 +1214,7 @@ export class OrdersService {
   static async markOrdersPaid(
     sessionId: string | Types.ObjectId,
     dbSession?: mongoose.ClientSession,
+    paymentMethod?: string | null,
   ) {
     const unpaidStatuses = [
       OrderStatus.PENDING,
@@ -1233,14 +1234,17 @@ export class OrdersService {
     );
 
     if (updatedOrders.length > 0) {
+      const setFields: Record<string, unknown> = { 
+        paymentStatus: PaymentStatus.PAID,
+      };
+      if (paymentMethod) {
+        setFields.paymentMethod = paymentMethod as import('./orders.schema').PaymentMethod;
+      }
+
       // 1. Mark ALL unpaid orders as paymentStatus = PAID universally
       await OrderModel.updateMany(
         { sessionId, status: { $in: unpaidStatuses } },
-        { 
-          $set: { 
-            paymentStatus: PaymentStatus.PAID,
-          }
-        },
+        { $set: setFields },
         { session: dbSession }
       );
 
@@ -1259,6 +1263,9 @@ export class OrdersService {
       // Update in-memory objects to return correctly
       updatedOrders.forEach(o => {
         o.paymentStatus = PaymentStatus.PAID;
+        if (paymentMethod) {
+          (o as any).paymentMethod = paymentMethod;
+        }
         if (o.status === OrderStatus.BILLED) {
           o.status = OrderStatus.PAID;
         }

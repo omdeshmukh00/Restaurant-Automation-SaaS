@@ -36,6 +36,10 @@ export class BillingService {
       discountAmount += order.discountAmount;
     });
 
+    // Include coupon discounts stored on the bill (applied via BillingService.applyCoupon)
+    const couponDiscount = (bill?.appliedCoupons || []).reduce((sum: number, c: any) => sum + (c.discountAmount || 0), 0);
+    discountAmount += couponDiscount;
+
     (payments || []).forEach(payment => {
       paymentsApplied += payment.amount;
     });
@@ -59,6 +63,7 @@ export class BillingService {
       outstandingBalance: Math.max(0, outstandingBalance),
       amountPaid: paymentsApplied,
       payments: payments || [],
+      appliedCoupons: bill?.appliedCoupons || [],
       financialSummary: {
         grossTotal,
         tax: taxAmount,
@@ -223,9 +228,34 @@ export class BillingService {
   }
 
   static async applyCoupon(restaurantId: string, sessionId: string, couponCode: string) {
-    const bill = await BillingModel.findOne({ restaurantId, sessionId });
+    let bill = await BillingModel.findOne({ restaurantId, sessionId });
     if (!bill) {
-      throw new AppError('Bill not found. Please request bill first.', 404, ErrorCode.NOT_FOUND);
+      // Auto-create a draft bill to hold the coupon, without transitioning orders to BILLED
+      const liveBill = await this.getLiveBill(restaurantId, sessionId);
+      if (!liveBill.orders || liveBill.orders.length === 0) {
+        throw new AppError('No orders found for this session.', 400, ErrorCode.NOT_FOUND);
+      }
+
+      const orderIds = liveBill.orders
+        .map((o: any) => o._id?.toString() || o.id)
+        .filter(Boolean)
+        .map((id: string) => new mongoose.Types.ObjectId(id));
+
+      bill = await BillingModel.create({
+        restaurantId: new mongoose.Types.ObjectId(restaurantId),
+        sessionId: new mongoose.Types.ObjectId(sessionId),
+        orderIds,
+        subtotal: liveBill.subtotal,
+        taxAmount: liveBill.taxAmount,
+        serviceCharge: liveBill.serviceCharge,
+        discountAmount: 0,
+        grossTotal: liveBill.financialSummary.grossTotal,
+        paymentsApplied: liveBill.financialSummary.paymentsApplied,
+        outstandingBalance: liveBill.financialSummary.outstandingBalance,
+        finalAmount: liveBill.finalAmount,
+        status: BillStatus.DRAFT,
+        requestedAt: new Date(),
+      });
     }
 
     if (bill.status === BillStatus.PAID || bill.status === BillStatus.PENDING_PAYMENT) {
@@ -350,6 +380,7 @@ export class BillingService {
   static async settleSession(
     sessionId: string | mongoose.Types.ObjectId,
     dbSession?: mongoose.ClientSession,
+    paymentMethod?: string | null,
   ) {
     const mongoose = await import('mongoose');
     const safeSessionId = typeof sessionId === 'string' ? new mongoose.Types.ObjectId(sessionId) : sessionId;
@@ -365,7 +396,7 @@ export class BillingService {
 
     // 1. Mark orders as paid via OrdersService
     const { OrdersService } = await import('../orders/orders.service');
-    const updatedOrders = await OrdersService.markOrdersPaid(sessionId, dbSession);
+    const updatedOrders = await OrdersService.markOrdersPaid(sessionId, dbSession, paymentMethod || null);
 
     // 2. Settle the bill
     bill.status = BillStatus.PAID;

@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 import { useCustomerStore, TrackedOrder } from '../store/customer.store';
 import { useCustomerPayment } from '../hooks/useCustomerPayment';
 import { useCart } from '../components/dashboard/CartContext';
-import { getInvoicePdfUrl } from '../api/customer.api';
+import { getInvoicePdfUrl, downloadInvoicePdf } from '../api/customer.api';
 import { PaymentHistoryCard } from '../components/PaymentHistoryCard';
 
 const STEPS = [
@@ -110,11 +110,70 @@ export default function CustomerOrderTrackingPage() {
     });
   };
 
-  const downloadInvoice = () => {
+  const downloadInvoice = async () => {
     if (!liveBill?._id) return;
-    const url = getInvoicePdfUrl(liveBill._id);
-    window.open(url, '_blank');
+    try {
+      await downloadInvoicePdf(liveBill._id);
+    } catch (err) {
+      addNotification('Download Failed', 'Could not download invoice. Please try again.', 'info');
+    }
   };
+
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedBillCouponCode, setAppliedBillCouponCode] = useState('');
+  const [couponMsg, setCouponMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+
+  const handleApplyCouponToBill = async () => {
+    const code = couponCode.trim().toUpperCase();
+    if (!code) return;
+    setCouponLoading(true);
+    setCouponMsg(null);
+    try {
+      const { applyBillCoupon } = await import('../api/customer.api');
+      await applyBillCoupon(code);
+      setAppliedBillCouponCode(code);
+      setCouponMsg({ type: 'success', text: `Coupon "${code}" applied!` });
+      setCouponCode('');
+      await fetchLiveBill();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Failed to apply coupon';
+      setCouponMsg({ type: 'error', text: msg });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCouponFromBill = async () => {
+    const codeToRemove = appliedBillCouponCode;
+    if (!codeToRemove) return;
+    setCouponLoading(true);
+    setCouponMsg(null);
+    try {
+      const { removeBillCoupon } = await import('../api/customer.api');
+      await removeBillCoupon(codeToRemove);
+      setAppliedBillCouponCode('');
+      setCouponMsg({ type: 'success', text: 'Coupon removed.' });
+      await fetchLiveBill();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err?.message || 'Failed to remove coupon';
+      setCouponMsg({ type: 'error', text: msg });
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  // Sync applied coupon code from bill data after fetch
+  useEffect(() => {
+    if (liveBill?.appliedCoupons && liveBill.appliedCoupons.length > 0) {
+      const code = liveBill.appliedCoupons[0].code;
+      if (code && code !== appliedBillCouponCode) {
+        setAppliedBillCouponCode(code);
+      }
+    } else if (appliedBillCouponCode) {
+      setAppliedBillCouponCode('');
+    }
+  }, [liveBill]);
 
   // ────────────────────────────────────────────────────────
   // RENDER: Orders Tracking & Past Orders List
@@ -490,6 +549,53 @@ export default function CustomerOrderTrackingPage() {
               </div>
             </div>
           )}
+
+          {/* Apply Coupon Section */}
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">
+            <h4 className="text-sm font-bold font-sans text-sd-on-surface mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-sd-primary">local_activity</span>
+              {appliedBillCouponCode ? 'Applied Coupon' : 'Apply Coupon'}
+            </h4>
+            {appliedBillCouponCode ? (
+              <div className="flex items-center justify-between bg-green-50 dark:bg-green-950/20 rounded-xl px-3 py-2.5 border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
+                  <span className="text-sm font-bold font-sans text-green-700 dark:text-green-400">{appliedBillCouponCode}</span>
+                </div>
+                <button
+                  onClick={handleRemoveCouponFromBill}
+                  disabled={couponLoading}
+                  className="px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-xs font-bold font-sans hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors disabled:opacity-50 flex items-center gap-1"
+                >
+                  {couponLoading ? '...' : <><span className="material-symbols-outlined text-[14px]">close</span> Remove</>}
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 bg-sd-surface dark:bg-sd-surface-container-low border border-sd-outline-variant rounded-xl px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-sd-primary transition-all font-sans"
+                    placeholder="Enter coupon code"
+                    value={couponCode}
+                    disabled={couponLoading}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                  />
+                  <button
+                    onClick={handleApplyCouponToBill}
+                    disabled={couponLoading || !couponCode.trim()}
+                    className="px-4 h-10 rounded-xl bg-sd-primary text-white font-bold text-sm hover:bg-sd-primary/95 transition-colors font-sans disabled:opacity-50"
+                  >
+                    {couponLoading ? '...' : 'Apply'}
+                  </button>
+                </div>
+                {couponMsg && (
+                  <p className={`text-xs font-bold font-sans mt-2 ${couponMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                    {couponMsg.text}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Payment Section */}
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-5 border border-sd-outline-variant dark:border-sd-outline-variant/40 sd-food-card-shadow">

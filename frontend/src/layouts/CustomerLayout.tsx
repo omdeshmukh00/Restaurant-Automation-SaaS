@@ -108,6 +108,7 @@ export default function CustomerLayout() {
       
       const store = useCustomerStore.getState();
       store.fetchOrders(); // Recover active orders on load/refresh
+      store.fetchMenu();   // Fetch menu now that session is available
 
       const socket = getSocket();
       if (socket) {

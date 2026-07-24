@@ -20,7 +20,7 @@ const loadRazorpayScript = () => {
 export function useCustomerPayment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'IDLE' | 'INITIATING' | 'PROCESSING' | 'VERIFYING' | 'SUCCESS' | 'FAILED'>('IDLE');
+  const [paymentStatus, setPaymentStatus] = useState<'IDLE' | 'INITIATING' | 'PROCESSING' | 'VERIFYING' | 'SUCCESS' | 'FAILED' | 'CASH_REQUESTED'>('IDLE');
   const razorpaySuccessFiredRef = useRef(false);
   
   const { fetchLiveBill, fetchOrders, addNotification } = useCustomerStore();
@@ -143,7 +143,7 @@ export function useCustomerPayment() {
       setError(null);
       setPaymentStatus('INITIATING');
       await requestCashPayment();
-      setPaymentStatus('SUCCESS');
+      setPaymentStatus('CASH_REQUESTED');
       addNotification('Cash Payment Requested 💵', 'Please pay at the counter. The staff has been notified.', 'info');
       await fetchLiveBill();
       setLoading(false);

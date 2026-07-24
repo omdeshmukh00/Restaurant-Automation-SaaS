@@ -1,55 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  createCustomerPayment,
-  verifyCustomerPayment,
-  type CustomerPaymentMethod,
-} from '../api/customer.api';
+import { placeCustomerOrder, applyBillCoupon } from '../api/customer.api';
 import { useCart } from '../components/dashboard/CartContext';
 import { useCustomerStore } from '../store/customer.store';
-
-type RazorpaySuccessResponse = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayCheckoutOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  handler: (response: RazorpaySuccessResponse) => void;
-  modal?: {
-    ondismiss?: () => void;
-  };
-  theme?: {
-    color?: string;
-  };
-};
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: RazorpayCheckoutOptions) => { open: () => void };
-  }
-}
-
-const loadRazorpayCheckout = () =>
-  new Promise<void>((resolve, reject) => {
-    if (window.Razorpay) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Unable to load Razorpay checkout. Please try again.'));
-    document.body.appendChild(script);
-  });
 
 export default function CustomerCheckoutPage() {
   const {
@@ -64,7 +17,6 @@ export default function CustomerCheckoutPage() {
     appliedCoupon,
     setAppliedCoupon,
   } = useCart();
-  const [paymentMethod, setPaymentMethod] = useState('upi');
   const [coupon, setCoupon] = useState(appliedCoupon ? appliedCoupon.code : '');
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
@@ -105,77 +57,21 @@ export default function CustomerCheckoutPage() {
   const handlePlaceOrder = async () => {
     if (items.length === 0 || isPaying) return;
 
-    const paymentMethodMap: Record<string, CustomerPaymentMethod> = {
-      upi: 'UPI',
-      card: 'CARD',
-      netbanking: 'ONLINE',
-    };
-    const backendPaymentMethod = paymentMethodMap[paymentMethod] ?? 'ONLINE';
-
     setIsPaying(true);
     setPaymentError('');
 
     try {
-      const payment = await createCustomerPayment(backendPaymentMethod);
-      const paymentId = payment.razorpayOrderId ?? payment.paymentId ?? payment.paymentIntentId;
-
-      if (payment.provider === 'razorpay' && payment.razorpayKeyId && payment.razorpayOrderId) {
-        await loadRazorpayCheckout();
-
-        const Checkout = window.Razorpay;
-        if (!Checkout) {
-          throw new Error('Razorpay checkout is unavailable. Please try again.');
-        }
-
-        const checkout = new Checkout({
-          key: payment.razorpayKeyId,
-          amount: Math.round(payment.amount * 100),
-          currency: payment.currency ?? 'INR',
-          name: 'Smart Dining',
-          description: 'Table bill payment',
-          order_id: payment.razorpayOrderId,
-          handler: async (response) => {
-            try {
-              const res = await verifyCustomerPayment({
-                paymentId,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              completeLocalOrder((res as any)?.order);
-            } catch (error) {
-              setPaymentError(error instanceof Error ? error.message : 'Payment verification failed.');
-            } finally {
-              setIsPaying(false);
-            }
-          },
-          modal: {
-            ondismiss: () => {
-              setIsPaying(false);
-            },
-          },
-          theme: {
-            color: '#df6b21',
-          },
-        });
-
-        checkout.open();
-        return;
-      }
-
-      const res = await verifyCustomerPayment({
-        paymentId,
-        simulateStatus: 'COMPLETED',
-      });
-      completeLocalOrder((res as any)?.order);
-      setIsPaying(false);
-    } catch (error) {
-      setPaymentError(error instanceof Error ? error.message : 'Unable to start payment. Please try again.');
+      // Postpaid flow: just place the order without payment
+      const order = await placeCustomerOrder('');
+      completeLocalOrder(order);
+    } catch (error: any) {
+      const message = error?.response?.data?.error?.message || error?.message || 'Unable to place order. Please try again.';
+      setPaymentError(message);
       setIsPaying(false);
     }
   };
 
-  const handleApplyCoupon = (codeStr: string) => {
+  const handleApplyCoupon = async (codeStr: string) => {
     const code = codeStr.trim().toUpperCase();
     if (!code) {
       setCouponError('Please enter a coupon code.');
@@ -228,24 +124,35 @@ export default function CustomerCheckoutPage() {
       }
     }
 
+    // Also apply coupon to the backend so it persists after order placement
+    try {
+      await applyBillCoupon(code);
+    } catch (err: any) {
+      // Backend may reject (e.g. no orders yet) — that's okay for checkout,
+      // the coupon will be applied on the tracking page after order placement
+      console.warn('Backend coupon apply skipped (pre-order):', err?.message);
+    }
+
     setAppliedCoupon(offer);
     setCouponError('');
     setCouponSuccess(`Coupon "${offer.code}" applied successfully!`);
     setCoupon(offer.code);
   };
 
-  const handleRemoveCoupon = () => {
+  const handleRemoveCoupon = async () => {
+    if (appliedCoupon) {
+      try {
+        const { removeBillCoupon } = await import('../api/customer.api');
+        await removeBillCoupon(appliedCoupon.code);
+      } catch (err: any) {
+        console.warn('Backend coupon remove skipped:', err?.message);
+      }
+    }
     setAppliedCoupon(null);
     setCoupon('');
     setCouponSuccess('');
     setCouponError('');
   };
-
-  const PAYMENT_OPTIONS = [
-    { id: 'upi', icon: 'account_balance_wallet', label: 'UPI', desc: 'Google Pay, PhonePe, Paytm & more' },
-    { id: 'card', icon: 'credit_card', label: 'Card', desc: 'Visa, Mastercard, RuPay & more' },
-    { id: 'netbanking', icon: 'account_balance', label: 'Net Banking', desc: 'All major banks supported' },
-  ];
 
   return (
     <div className="p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto h-full sd-custom-scrollbar">
@@ -311,33 +218,6 @@ export default function CustomerCheckoutPage() {
               <Link to="/customer/menu" className="text-sd-primary font-bold text-sm flex items-center justify-center gap-2 font-sans">
                 <span className="material-symbols-outlined text-[18px]">add_circle</span> Add more items
               </Link>
-            </div>
-          </section>
-
-          {/* Payment Methods */}
-          <section className="space-y-4">
-            <h3 className="text-base font-bold font-sans">Payment Methods</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {PAYMENT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setPaymentMethod(opt.id)}
-                  className={`p-5 rounded-2xl border-2 shadow-sm flex items-start gap-4 text-left transition-all ${
-                    paymentMethod === opt.id ? 'border-sd-primary-container bg-white' : 'border-sd-surface-variant bg-white hover:border-sd-primary-container/50'
-                  }`}
-                >
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === opt.id ? 'bg-sd-primary-container/10' : 'bg-sd-surface-container'}`}>
-                    <span className={`material-symbols-outlined text-[24px] ${paymentMethod === opt.id ? 'text-sd-primary-container' : 'text-sd-on-surface-variant'}`}>{opt.icon}</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-sd-on-surface text-sm font-sans">{opt.label}</p>
-                    <p className="text-[11px] text-sd-on-surface-variant font-sans mt-0.5">{opt.desc}</p>
-                  </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-1 ${paymentMethod === opt.id ? 'border-sd-primary-container' : 'border-sd-surface-variant'}`}>
-                    {paymentMethod === opt.id && <div className="w-2 h-2 rounded-full bg-sd-primary-container" />}
-                  </div>
-                </button>
-              ))}
             </div>
           </section>
 
@@ -413,7 +293,7 @@ export default function CustomerCheckoutPage() {
               disabled={items.length === 0 || isPaying}
               className="w-full bg-sd-primary-container text-white h-13 py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-xl hover:shadow-sd-primary-container/20 transition-all active:scale-95 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isPaying ? 'Processing...' : `Pay ₹${total}`}
+              {isPaying ? 'Processing...' : `Place Order ₹${total}`}
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </button>
             {paymentError && (

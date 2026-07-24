@@ -174,7 +174,7 @@ export class ReservationsService {
       );
     }
 
-    const { tableId, tableNumber } = await findSuitableTable(
+    const { tableId } = await findSuitableTable(
       data.restaurantId,
       data.date,
       data.slot,
