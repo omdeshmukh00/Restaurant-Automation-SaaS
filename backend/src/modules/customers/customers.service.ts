@@ -52,8 +52,54 @@ function formatDate(value?: Date | string | null): string {
   });
 }
 
+/**
+ * Detect whether a name string is actually garbled / encoded data
+ * (e.g. base64 ciphertext, JWT fragments) that accidentally ended up
+ * as a customer display name.
+ *
+ * Heuristics:
+ *  - Contains base64 padding/special chars (+, /, =) never found in real names
+ *  - Very long (>50 chars) with no spaces — likely random bytes
+ *  - >50% digits when longer than 20 chars
+ */
+function isGarbledName(name: string): boolean {
+  if (!name || name.length < 10) return false;
+
+  // Base64 signatures
+  if (/[+\/=]/.test(name)) return true;
+
+  // Long string with no word breaks — likely machine-generated
+  if (name.length > 50 && !name.includes(' ')) {
+    const nonAlpha = name.replace(/[a-zA-Z0-9]/g, '').length;
+    if (nonAlpha / name.length < 0.05) return true;
+  }
+
+  // Unusually high digit-to-letter ratio
+  if (name.length > 20) {
+    const digits = (name.match(/\d/g) || []).length;
+    const letters = (name.match(/[a-zA-Z]/g) || []).length;
+    if (digits > letters * 0.5) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Sanitise a customer name: replace garbled data with a safe fallback,
+ * cap length at 100 chars, trim whitespace.
+ */
+function safeName(name: string, mobile?: string): string {
+  if (!name || typeof name !== 'string') return 'Guest';
+  const trimmed = name.trim().slice(0, 100);
+  if (isGarbledName(trimmed)) {
+    return mobile ? `Customer ${mobile.slice(-4)}` : 'Guest';
+  }
+  return trimmed;
+}
+
 function initials(name: string): string {
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
+  const cleaned = safeName(name);
+  const parts = cleaned.trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return 'CU';
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
@@ -178,10 +224,17 @@ function shapeFromUser(
   const totalVisits = metrics?.totalVisits ?? profile?.totalVisits ?? 0;
   const lastVisitAt = metrics?.lastVisitAt ?? profile?.lastVisitAt ?? null;
   const lastOrderId = metrics?.lastOrderId ?? '';
-  const avatar = user.avatar || initials(user.name);
+  // avatar must be a short initials string (2‑3 chars), NOT a data‑URI or URL.
+  // If the DB stores a base64 data URI (e.g. from avatar upload) we must fall
+  // back to initials — otherwise the raw base64 leaks as visible text.
+  const rawAvatar: string | undefined | null = user.avatar;
+  const avatar =
+    rawAvatar && !rawAvatar.startsWith('data:image/') && rawAvatar.length < 30
+      ? rawAvatar
+      : initials(user.name);
   return {
     id: user._id.toString(),
-    name: user.name,
+    name: safeName(user.name, user.mobile),
     email: user.email || '',
     phone: user.mobile,
     avatar,
