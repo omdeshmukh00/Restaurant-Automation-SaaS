@@ -66,20 +66,39 @@ export default function OffersDeals({ offers }: OffersDealsProps) {
     return items.map((o, idx) => {
       const grad = gradients[idx % gradients.length];
       const fallbackImage = `https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop`;
+      
+      let discountStr = '';
+      if (o.discountType === 'PERCENTAGE' && o.discountValue) {
+        discountStr = `FLAT ${o.discountValue}% OFF`;
+      } else if (o.discountType === 'FIXED_AMOUNT' && o.discountValue) {
+        discountStr = `₹${o.discountValue} OFF`;
+      } else {
+        discountStr = o.discountPercent ? `FLAT ${o.discountPercent}% OFF` : (o.title || o.name || 'Special Discount');
+      }
+
+      const conditionStr = o.description || (o.minOrderAmount ? `On orders above ₹${o.minOrderAmount}` : o.condition || o.name || 'Special discount offer');
+      const codeStr = o.promoCode || o.code || 'SPECIAL';
+
+      let validityStr = o.validity || 'Valid for a limited time';
+      if (o.expiryDate) {
+        const end = new Date(o.expiryDate);
+        validityStr = `Valid till ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`;
+      }
+
       return {
         id: o._id || o.id,
-        discount: `FLAT ${o.discountPercent}% OFF`,
-        condition: o.name || 'Special discount offer',
-        code: o.code || 'SPECIAL',
-        validity: 'Valid for a limited time',
+        discount: discountStr,
+        condition: conditionStr,
+        code: codeStr,
+        validity: validityStr,
         gradient: grad,
-        image: fallbackImage
+        image: o.image || fallbackImage
       };
     });
   };
 
   const displayOffers = offers && offers.length > 0
-    ? [...mapBackendOffers(offers), ...OFFERS]
+    ? mapBackendOffers(offers)
     : OFFERS;
 
   const scroll = (direction: 'left' | 'right') => {
@@ -94,8 +113,7 @@ export default function OffersDeals({ offers }: OffersDealsProps) {
   return (
     <section
       id="offers"
-      className="py-12 sm:py-16 relative overflow-hidden"
-      style={{ backgroundColor: '#FFF8F3' }}
+      className="py-12 sm:py-16 relative overflow-hidden bg-[#FFF8F3] dark:bg-[#0B0B0C] transition-colors duration-300"
     >
       {/* ── 2D Illustrated Background Objects ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -153,13 +171,10 @@ export default function OffersDeals({ offers }: OffersDealsProps) {
                 Limited Time Deals
               </span>
             </div>
-            <h2
-              className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold"
-              style={{ color: '#222222' }}
-            >
+            <h2 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold text-slate-900 dark:text-white">
               Exclusive Offers <span style={{ color: '#FF6B1A' }}>For You</span>
             </h2>
-            <p className="text-[15px] mt-1" style={{ color: '#666666' }}>
+            <p className="text-[15px] mt-1 text-slate-600 dark:text-neutral-400">
               Save more with our curated deals and discounts
             </p>
           </div>
@@ -167,16 +182,14 @@ export default function OffersDeals({ offers }: OffersDealsProps) {
           <div className="hidden lg:flex items-center gap-2">
             <button
               onClick={() => scroll('left')}
-              className="w-[40px] h-[40px] rounded-full flex items-center justify-center transition-all duration-150"
-              style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+              className="w-[40px] h-[40px] rounded-full flex items-center justify-center transition-all duration-150 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-white hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A]"
               aria-label="Scroll left"
             >
               <ChevronLeft className="w-[18px] h-[18px]" />
             </button>
             <button
               onClick={() => scroll('right')}
-              className="w-[40px] h-[40px] rounded-full flex items-center justify-center transition-all duration-150"
-              style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', color: '#222222' }}
+              className="w-[40px] h-[40px] rounded-full flex items-center justify-center transition-all duration-150 bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-white hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A]"
               aria-label="Scroll right"
             >
               <ChevronRight className="w-[18px] h-[18px]" />

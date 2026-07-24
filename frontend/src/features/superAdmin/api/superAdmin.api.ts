@@ -7,6 +7,7 @@ export const superAdminRestaurantRequestEndpoints = {
   list: "/superadmin/restaurant-requests",
   approve: (id: string) => `/superadmin/restaurant-requests/${id}/approve`,
   deny: (id: string) => `/superadmin/restaurant-requests/${id}/deny`,
+  delete: (id: string) => `/superadmin/restaurant-requests/${id}`,
 };
 
 export const placeholderRestaurantRequests: RestaurantRequest[] = [
@@ -73,6 +74,14 @@ export const superAdminRestaurantRequestsApi = {
     }
 
     await apiClient.post(superAdminRestaurantRequestEndpoints.deny(id), { reason, refund });
+  },
+
+  async deleteRequest(id: string): Promise<void> {
+    if (USE_PLACEHOLDER_RESTAURANT_REQUESTS) {
+      return Promise.resolve();
+    }
+
+    await apiClient.delete(superAdminRestaurantRequestEndpoints.delete(id));
   },
 
   async getRestaurants(): Promise<any[]> {

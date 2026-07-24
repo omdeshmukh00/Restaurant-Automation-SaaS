@@ -369,9 +369,21 @@ export default function EditProfile() {
     confirm: false,
   });
 
-  const [avatarUrl, setAvatarUrl] = useState(
-    () => user?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80"
-  );
+  const [avatarUrl, setAvatarUrl] = useState(() => user?.avatar || "");
+
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        ...prev,
+        name: user.name || prev.name,
+        email: user.email || prev.email,
+        phone: user.mobile || prev.phone,
+        location: user.location || prev.location,
+        bio: user.bio || prev.bio,
+      }));
+      setAvatarUrl(user.avatar || "");
+    }
+  }, [user]);
 
   const [cropperOpen, setCropperOpen] = useState(false);
   const [tempImageSrc, setTempImageSrc] = useState("");
@@ -540,14 +552,13 @@ export default function EditProfile() {
     try {
       setPwError("");
       
-      const payload = {
-        name: updatedFields.name !== undefined ? updatedFields.name : form.name,
-        email: updatedFields.email !== undefined ? updatedFields.email : form.email,
-        mobile: updatedFields.phone !== undefined ? updatedFields.phone : form.phone,
-        avatar: updatedFields.avatar !== undefined ? updatedFields.avatar : avatarUrl,
-        location: updatedFields.location !== undefined ? updatedFields.location : form.location,
-        bio: updatedFields.bio !== undefined ? updatedFields.bio : form.bio,
-      };
+      const payload: Record<string, any> = {};
+      if (updatedFields.name !== undefined) payload.name = updatedFields.name;
+      if (updatedFields.email !== undefined) payload.email = updatedFields.email;
+      if (updatedFields.phone !== undefined) payload.mobile = updatedFields.phone;
+      if (updatedFields.avatar !== undefined) payload.avatar = updatedFields.avatar;
+      if (updatedFields.location !== undefined) payload.location = updatedFields.location;
+      if (updatedFields.bio !== undefined) payload.bio = updatedFields.bio;
 
       const response = await apiClient.patch('/users/me', payload);
 
@@ -653,12 +664,16 @@ export default function EditProfile() {
           <p className={sectionTitle}>Profile Photo</p>
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <div className="relative shrink-0">
-              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-orange-500/20">
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-orange-500/20 bg-orange-500 flex items-center justify-center text-white font-bold text-3xl shrink-0">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="Avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  (form.name || "A").charAt(0).toUpperCase()
+                )}
               </div>
               <button
                 type="button"

@@ -7,7 +7,7 @@ import { sendSuccess } from '../../utils/response';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import * as userService from './users.service';
-import { comparePassword, hashPassword } from '../../utils/crypto';
+import { comparePassword, hashPassword, normalizeMobile } from '../../utils/crypto';
 import { sendPasswordChangedAlertEmail } from '../../services/mail.service';
 import logger from '../../config/logger';
 

@@ -223,11 +223,11 @@ export default function Sidebar({
               </div>
             )}
             {!isCollapsed && (
-              <div className="text-left min-w-0 truncate">
-                <p className="text-xs font-bold truncate leading-tight">
+              <div className="text-left min-w-0 truncate font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>
+                <p className="text-xs font-bold truncate leading-tight font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>
                   {user?.name || "Graphura"}
                 </p>
-                <p className={`text-[10px] truncate ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+                <p className={`text-[10px] truncate font-sans ${darkMode ? "text-slate-400" : "text-slate-500"}`} style={{ fontFamily: "'Inter', sans-serif" }}>
                   Super Admin
                 </p>
               </div>

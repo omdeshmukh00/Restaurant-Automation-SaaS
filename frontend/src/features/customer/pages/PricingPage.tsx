@@ -193,7 +193,7 @@ export default function PricingPage() {
                         )}
                       </div>
 
-                      <h3 className="text-[20px] font-bold text-slate-900 capitalize mb-2">{plan.name}</h3>
+                      <h3 className="text-[20px] font-bold text-slate-900 capitalize mb-2 font-sans" style={{ fontFamily: "'Inter', sans-serif" }}>{plan.name}</h3>
                       
                       {/* Price Section */}
                       <div className="flex items-baseline gap-1 my-4">

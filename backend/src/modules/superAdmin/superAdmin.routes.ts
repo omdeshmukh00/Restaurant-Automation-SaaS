@@ -37,6 +37,7 @@ import {
   listRestaurantRequests,
   approveRestaurantRequest,
   rejectRestaurantRequest,
+  deleteRestaurantRequest,
   getPlatformSettingsController,
   updatePlatformSettingsController,
   updateRestaurantStatusController,
@@ -69,6 +70,7 @@ router.patch('/platform-settings', updatePlatformSettingsController);
 router.get('/restaurant-requests', listRestaurantRequests);
 router.post('/restaurant-requests/:id/approve', approveRestaurantRequest);
 router.post('/restaurant-requests/:id/deny', rejectRestaurantRequest);
+router.delete('/restaurant-requests/:id', deleteRestaurantRequest);
 
 /*
 |--------------------------------------------------------------------------

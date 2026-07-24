@@ -61,8 +61,8 @@ function StarRating({ rating }: { rating: number }) {
           key={i}
           className="w-[15px] h-[15px]"
           style={{
-            color: i < rating ? '#FF6B1A' : '#E5E7EB',
-            fill: i < rating ? '#FF6B1A' : '#E5E7EB',
+            color: i < rating ? '#FF6B1A' : 'rgba(150,150,150,0.3)',
+            fill: i < rating ? '#FF6B1A' : 'rgba(150,150,150,0.2)',
           }}
         />
       ))}
@@ -73,10 +73,9 @@ function StarRating({ rating }: { rating: number }) {
 function TestimonialCard({ t, className = '', style = {} }: { t: Testimonial; className?: string; style?: React.CSSProperties }) {
   return (
     <div
-      className={`landing-shiny landing-card-hover flex flex-col bg-white p-6 relative overflow-hidden ${className}`}
+      className={`landing-shiny landing-card-hover flex flex-col bg-white dark:bg-[#121214] border border-slate-200 dark:border-neutral-800/80 p-6 relative overflow-hidden ${className}`}
       style={{
         borderRadius: '20px',
-        border: '1px solid #E5E7EB',
         boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
         ...style,
       }}
@@ -91,17 +90,11 @@ function TestimonialCard({ t, className = '', style = {} }: { t: Testimonial; cl
 
       <StarRating rating={t.rating} />
 
-      <p
-        className="text-[14px] sm:text-[15px] mt-4 leading-relaxed flex-1 relative z-10 italic"
-        style={{ color: '#444444' }}
-      >
+      <p className="text-[14px] sm:text-[15px] mt-4 leading-relaxed flex-1 relative z-10 italic text-slate-700 dark:text-neutral-300">
         &ldquo;{t.quote}&rdquo;
       </p>
 
-      <div
-        className="flex items-center gap-3 mt-5 pt-4"
-        style={{ borderTop: '1px solid #E5E7EB' }}
-      >
+      <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-200 dark:border-neutral-800/80">
         <img
           src={t.avatar}
           alt={t.author}
@@ -109,8 +102,8 @@ function TestimonialCard({ t, className = '', style = {} }: { t: Testimonial; cl
           loading="lazy"
         />
         <div>
-          <p className="text-[15px] font-semibold" style={{ color: '#222222' }}>{t.author}</p>
-          <p className="text-[13px]" style={{ color: '#666666' }}>{t.location}</p>
+          <p className="text-[15px] font-semibold text-slate-900 dark:text-white">{t.author}</p>
+          <p className="text-[13px] text-slate-500 dark:text-neutral-400">{t.location}</p>
         </div>
       </div>
     </div>
@@ -157,8 +150,7 @@ export default function TestimonialsSection() {
 
   return (
     <section
-      className="py-12 sm:py-16"
-      style={{ backgroundColor: '#F8F8F8' }}
+      className="py-12 sm:py-16 bg-[#F8F8F8] dark:bg-[#0B0B0C] transition-colors duration-300"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       ref={ref}
@@ -167,13 +159,10 @@ export default function TestimonialsSection() {
 
         {/* Header */}
         <div className="text-center mb-10">
-          <h2
-            className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold"
-            style={{ color: '#222222' }}
-          >
+          <h2 className="text-[28px] sm:text-[32px] lg:text-[40px] font-bold text-slate-900 dark:text-white">
             What Our Customers <span style={{ color: '#FF6B1A' }}>Say</span>
           </h2>
-          <p className="text-[15px] mt-2" style={{ color: '#666666' }}>
+          <p className="text-[15px] mt-2 text-slate-600 dark:text-neutral-400">
             Real experiences from real people
           </p>
         </div>
@@ -222,12 +211,7 @@ export default function TestimonialsSection() {
           <div className="flex items-center justify-between mt-6 px-2">
             <button
               onClick={prev}
-              className="w-[42px] h-[42px] rounded-full flex items-center justify-center transition-all duration-150 landing-btn-press"
-              style={{
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E7EB',
-                color: '#222222',
-              }}
+              className="w-[42px] h-[42px] rounded-full flex items-center justify-center transition-all duration-150 landing-btn-press bg-white dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-white"
               aria-label="Previous testimonial"
             >
               <ChevronLeft className="w-[20px] h-[20px]" />
@@ -244,7 +228,7 @@ export default function TestimonialsSection() {
                     width: i === activeIdx ? '24px' : '8px',
                     height: '8px',
                     borderRadius: '999px',
-                    backgroundColor: i === activeIdx ? '#FF6B1A' : '#E5E7EB',
+                    backgroundColor: i === activeIdx ? '#FF6B1A' : 'rgba(150,150,150,0.3)',
                   }}
                   aria-label={`Go to testimonial ${i + 1}`}
                 />

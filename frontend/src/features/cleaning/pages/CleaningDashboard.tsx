@@ -102,20 +102,17 @@ export default function CleaningDashboard() {
       floor: t.floor || 1,
     }));
 
-  const completedToday = safeTasks
-    .filter((t) => t.rawStatus === 'COMPLETED' || t.rawStatus === 'VERIFIED')
-    .map((t) => {
-      const tableLabel = t.tableNumber || t.id;
-      return {
-        id: tableLabel,
-        time: t.rawStatus === 'VERIFIED' ? '10:30 AM' : 'Just Now',
-        seats: t.seats || (tableLabel === 'T03' ? 6 : tableLabel === 'T12' ? 2 : tableLabel === 'T15' ? 3 : 4),
-        rawStatus: t.rawStatus,
-        rawId: t.id,
-        section: t.section || t.area || 'Indoor',
-        floor: t.floor || 1,
-      };
-    });
+  const completedToday = tables
+    .filter((t) => t.status === 'Ready for Inspection' || t.status === 'Done')
+    .map((t) => ({
+      id: t.id,
+      time: t.timeAgo || 'Just Now',
+      seats: t.seats || 4,
+      rawStatus: t.status === 'Ready for Inspection' ? 'COMPLETED' : 'VERIFIED',
+      rawId: t.taskId || t.id,
+      section: t.section || t.area || 'Indoor',
+      floor: t.floor || 1,
+    }));
 
   // Maintain original static array context for Hygiene checklist items
   const [hygieneTasks, setHygieneTasks] = useState<HygieneTask[]>([

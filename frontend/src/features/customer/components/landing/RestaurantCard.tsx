@@ -267,7 +267,7 @@ export default function RestaurantCard({ restaurant, onLoginOpen }: RestaurantCa
           {/* Locate Restaurant Button */}
           <button
             onClick={() => handleLocateRestaurant()}
-            className="w-full mt-3 h-[42px] text-[13px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 landing-btn-press landing-focus-ring cursor-pointer border border-slate-200 dark:border-neutral-800 rounded-[10px] text-slate-800 dark:text-neutral-200 bg-[#F9FAFB] dark:bg-neutral-850 hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A] hover:bg-[#FFF5F0] dark:hover:bg-neutral-800 hover:text-[#FF6B1A] dark:hover:text-[#FF6B1A]"
+            className="w-full mt-3 h-[42px] text-[13px] font-semibold flex items-center justify-center gap-2 transition-all duration-150 landing-btn-press landing-focus-ring cursor-pointer border border-slate-200 dark:border-zinc-700/80 rounded-[10px] text-slate-800 dark:text-zinc-100 bg-[#F9FAFB] dark:bg-zinc-800/90 hover:border-[#FF6B1A] dark:hover:border-[#FF6B1A] hover:bg-[#FFF5F0] dark:hover:bg-zinc-700/90 hover:text-[#FF6B1A] dark:hover:text-[#FF6B1A]"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
