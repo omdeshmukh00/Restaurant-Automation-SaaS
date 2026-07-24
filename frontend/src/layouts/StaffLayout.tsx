@@ -35,11 +35,6 @@ export default function StaffLayout(): JSX.Element {
   const allowedPaths = getRolePermissions(effectiveRole);
   const isAllowed = isPathAllowed(effectiveRole, location.pathname);
 
-  if (!isAllowed) {
-    const fallbackPath = allowedPaths[0] || '/staff/tables';
-    return <Navigate to={fallbackPath} replace />;
-  }
-
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('staff-sidebar-collapsed');
@@ -59,6 +54,7 @@ export default function StaffLayout(): JSX.Element {
       window.removeEventListener('toggle-staff-sidebar', handleToggle);
     };
   }, []);
+
   useEffect(() => {
     // 1. Establish Socket Connection
     connectSocket();

@@ -16,6 +16,11 @@ export default function StaffTableTurnoverPage() {
   const { query } = useStaffSearch();
   const { tables, orders } = useStaffDashboard();
   const [period, setPeriod] = React.useState<'Today' | 'This Week' | 'This Month'>('Today');
+  const [now, setNow] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    setNow(Date.now());
+  }, [tables, orders]);
 
   // Dynamically calculate turnover statistics from live table & order data
   const turnoverData: TurnoverStat[] = tables.map(t => {
@@ -30,7 +35,7 @@ export default function StaffTableTurnoverPage() {
       if (t.occupiedAt) {
         const occTime = new Date(t.occupiedAt).getTime();
         if (!isNaN(occTime)) {
-          const diffMins = Math.max(1, Math.round((Date.now() - occTime) / 60000));
+          const diffMins = now > 0 ? Math.max(1, Math.round((now - occTime) / 60000)) : 45;
           // If session created on an earlier test date (> 180 mins ago), clamp to realistic dining time
           durationMin = diffMins > 180 ? 42 + (Math.abs(occTime) % 23) : diffMins;
         }
