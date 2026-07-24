@@ -96,9 +96,39 @@ export async function requestFinalBill() {
   return response.data.data;
 }
 
+export async function downloadInvoicePdf(billId: string): Promise<void> {
+  // Use relative path — apiClient already has baseURL set to VITE_API_URL
+  const url = `/billing/customer/bill/${billId}/receipt/pdf`;
+  try {
+    const response = await apiClient.get(url, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `Invoice-${billId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error('Invoice download failed:', error);
+    throw error;
+  }
+}
+
 export function getInvoicePdfUrl(billId: string): string {
-  // Uses backend route to download the PDF
-  return `${import.meta.env.VITE_API_URL || '/api/v1'}/billing/customer/bill/${billId}/receipt/pdf`;
+  // Relative path — apiClient adds the baseURL
+  return `/billing/customer/bill/${billId}/receipt/pdf`;
+}
+
+export async function applyBillCoupon(couponCode: string) {
+  const response = await apiClient.post<ApiResponse<any>>('/billing/customer/bill/coupon', { code: couponCode });
+  return response.data.data;
+}
+
+export async function removeBillCoupon(couponCode: string) {
+  const response = await apiClient.delete<ApiResponse<any>>(`/billing/customer/bill/coupon/${couponCode}`);
+  return response.data.data;
 }
 
 // ── Reservation APIs (customer panel) ────────────────────────────────

@@ -4,7 +4,7 @@ import { PaymentStatus } from '../../constants/statuses';
 export interface IPayment extends Document {
   restaurantId: Types.ObjectId;
   billId?: Types.ObjectId | null;
-  orderId: Types.ObjectId;
+  orderId?: Types.ObjectId | null;
   sessionId?: Types.ObjectId | null;
   amount: number;
   currency: string;
@@ -30,7 +30,7 @@ const paymentSchema = new Schema<IPayment>(
   {
     restaurantId: { type: Schema.Types.ObjectId, ref: 'Restaurant', required: true, index: true },
     billId: { type: Schema.Types.ObjectId, ref: 'Bill', default: null, index: true },
-    orderId: { type: Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
+    orderId: { type: Schema.Types.ObjectId, ref: 'Order', default: null, index: true },
     sessionId: { type: Schema.Types.ObjectId, ref: 'TableSession', default: null },
     amount: { type: Number, required: true, min: 0 },
     currency: { type: String, default: 'INR', trim: true, uppercase: true },

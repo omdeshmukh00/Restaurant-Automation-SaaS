@@ -218,6 +218,32 @@ export class PaymentsService {
         }
       }
 
+      // Determine payment method from payment record for order-level storage.
+      // For Razorpay payments, try to detect the actual method used (card vs online)
+      // by fetching payment details from Razorpay. Fall back to 'ONLINE' on failure.
+      let orderPaymentMethod: string = 'ONLINE';
+      if (paymentRecord.method === 'CASH') {
+        orderPaymentMethod = 'CASH';
+      } else if (paymentRecord.method === 'CARD') {
+        orderPaymentMethod = 'CARD';
+      } else if (razorpayFields?.razorpay_payment_id && env.RAZORPAY_KEY_ID) {
+        // Try to fetch actual Razorpay payment method (card, upi, netbanking, etc.)
+        try {
+          const { fetchRazorpayPayment } = await import('../../services/razorpay.service');
+          const rzpPayment = await fetchRazorpayPayment(razorpayFields.razorpay_payment_id);
+          const rzpMethod: string = rzpPayment?.method || '';
+          if (rzpMethod === 'card' || rzpMethod === 'emi') {
+            orderPaymentMethod = 'CARD';
+            // Also update the payment record's method so future lookups see it
+            paymentRecord.method = 'CARD';
+          } else {
+            orderPaymentMethod = 'ONLINE';
+          }
+        } catch {
+          orderPaymentMethod = 'ONLINE';
+        }
+      }
+
       // 4. Wrap the rest in transaction
       let dbSession: mongoose.ClientSession | null = null;
       try {
@@ -262,7 +288,7 @@ export class PaymentsService {
         } else {
           // Dine-and-pay-later model: verify final bill
           const { BillingService } = await import('../billing/billing.service');
-          const { bill, updatedOrders } = await BillingService.settleSession(sessionId, session || undefined);
+          const { bill, updatedOrders } = await BillingService.settleSession(sessionId, session || undefined, orderPaymentMethod);
 
           return {
             success: true,
@@ -510,7 +536,7 @@ export class PaymentsService {
       await payment.save({ session: dbSession });
 
       const { BillingService } = await import('../billing/billing.service');
-      const result = await BillingService.settleSession(payment.sessionId!.toString(), dbSession || undefined);
+      const result = await BillingService.settleSession(payment.sessionId!.toString(), dbSession || undefined, 'CASH');
       bill = result.bill;
       updatedOrders = result.updatedOrders;
 

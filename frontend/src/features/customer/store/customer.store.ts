@@ -164,6 +164,7 @@ export type LiveBill = {
     paymentsApplied: number;
     outstandingBalance: number;
   };
+  appliedCoupons?: { couponId: string; code: string; discountAmount: number }[];
 };
 
 export function isValidLiveBill(value: any): value is LiveBill {
