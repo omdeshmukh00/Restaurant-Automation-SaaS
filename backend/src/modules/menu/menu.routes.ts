@@ -111,6 +111,13 @@ router.get(
   MenuController.getAdminCategories
 );
 
+router.get(
+  '/staff/menu/categories',
+  requireAuth,
+  roleGuard(...menuRoles),
+  MenuController.getAdminCategories
+);
+
 router.patch(
   '/admin/menu/categories/reorder',
   requireAuth,
@@ -168,6 +175,13 @@ router.get(
   MenuController.getAdminItems
 );
 
+router.get(
+  '/staff/menu/items',
+  requireAuth,
+  roleGuard(...menuRoles),
+  MenuController.getAdminItems
+);
+
 router.patch(
   '/admin/menu/items/reorder',
   requireAuth,
@@ -203,9 +217,33 @@ router.delete(
 router.patch(
   '/admin/menu/items/:id/availability',
   requireAuth,
-  roleGuard(...adminRoles),
+  roleGuard(...menuRoles),
   validate({ params: idParamSchema, body: toggleItemAvailabilitySchema }),
   MenuController.toggleItemAvailability
+);
+
+router.patch(
+  '/staff/menu/items/:id/availability',
+  requireAuth,
+  roleGuard(...menuRoles),
+  validate({ params: idParamSchema, body: toggleItemAvailabilitySchema }),
+  MenuController.toggleItemAvailability
+);
+
+router.post(
+  '/staff/menu/items',
+  requireAuth,
+  roleGuard(...menuRoles),
+  validate({ body: createItemSchema }),
+  MenuController.createItem
+);
+
+router.delete(
+  '/staff/menu/items/:id',
+  requireAuth,
+  roleGuard(...menuRoles),
+  validate({ params: idParamSchema }),
+  MenuController.deleteItem
 );
 
 router.patch(

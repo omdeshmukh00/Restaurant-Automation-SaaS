@@ -403,23 +403,13 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
           )}
         </div>
 
-        {/* Dynamic Role Switcher (Temporary Dropdown) */}
-        <div className="relative flex items-center">
-          <span className="material-symbols-outlined absolute left-2.5 text-[18px] text-slate-400 pointer-events-none">
+        {/* Dynamic Role Indicator (Locked Role Access) */}
+        <div className="relative flex items-center bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1.5 font-sans">
+          <span className="material-symbols-outlined text-[18px] text-orange-500 mr-1.5 pointer-events-none">
             shield_person
           </span>
-          <select
-            value={['Chef', 'Kitchen Supervisor', 'Head-Chef'].includes(profile.role) ? profile.role : 'Chef'}
-            onChange={(e) => updateProfile({ role: e.target.value })}
-            className="pl-8 pr-7 py-1.5 border border-slate-200 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer appearance-none font-sans"
-            title="Switch kitchen role (Testing)"
-          >
-            <option value="Chef">Chef</option>
-            <option value="Kitchen Supervisor">Kitchen Supervisor</option>
-            <option value="Head-Chef">Head-Chef</option>
-          </select>
-          <span className="material-symbols-outlined absolute right-2.5 text-[18px] text-slate-400 pointer-events-none">
-            keyboard_arrow_down
+          <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 tracking-wider">
+            {profile.role}
           </span>
         </div>
 

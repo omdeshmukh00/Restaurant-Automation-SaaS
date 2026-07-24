@@ -21,7 +21,7 @@ export default function StaffOrdersPage() {
         return {
           ...o,
           status: newStatus,
-          rating: newStatus === 'Completed' ? parseFloat((4.2 + Math.random() * 0.8).toFixed(1)) : o.rating
+          rating: o.rating || 5.0
         };
       }
       return o;

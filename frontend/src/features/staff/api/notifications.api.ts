@@ -61,10 +61,44 @@ async function fetchAPI<T>(
 
 export const notificationsAPI = {
   getNotifications: async (): Promise<ApiResponse<NotificationItem[]>> => {
-    return fetchAPI<NotificationItem[]>('/notifications');
+    const res = await fetchAPI<any>('/notifications');
+    const rawList = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.notifications)
+      ? res.data.notifications
+      : [];
+
+    const formatted: NotificationItem[] = rawList.map((item: any, idx: number) => {
+      const typeUpper = String(item.type || item.module || '').toUpperCase();
+      const tone: NotificationTone =
+        typeUpper.includes('READY') || typeUpper.includes('URGENT')
+          ? 'urgent'
+          : typeUpper.includes('REQUEST') || typeUpper.includes('CLEANING')
+          ? 'cleaning'
+          : typeUpper.includes('SERVED') || typeUpper.includes('SUCCESS') || typeUpper.includes('COMPLETED')
+          ? 'success'
+          : 'info';
+
+      return {
+        id: item._id || item.id || idx + 1,
+        title: item.title || item.type || 'Notification',
+        message: item.message || item.text || 'Notification update',
+        time: item.createdAt
+          ? new Date(item.createdAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+          : 'Just now',
+        tone,
+        read: Boolean(item.read || item.isRead),
+      };
+    });
+
+    return {
+      success: res.success,
+      data: formatted,
+      error: res.error,
+    };
   },
 
-  markAsRead: async (id: number): Promise<ApiResponse<void>> => {
+  markAsRead: async (id: number | string): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/notifications/${id}/read`, { method: 'PATCH' });
   },
 

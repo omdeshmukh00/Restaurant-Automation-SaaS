@@ -28,6 +28,18 @@ export default function StaffTablesPage() {
   const [newTableSection, setNewTableSection] = useState<'Zone A' | 'Zone B' | 'Outdoor'>('Zone A');
   const [newTableCapacity, setNewTableCapacity] = useState('4');
 
+  // Edit Table states
+  const [editingTable, setEditingTable] = useState<any | null>(null);
+  const [editTableName, setEditTableName] = useState('');
+  const [editTableSection, setEditTableSection] = useState<'Zone A' | 'Zone B' | 'Outdoor'>('Zone A');
+  const [editTableCapacity, setEditTableCapacity] = useState('4');
+  const [editTableStatus, setEditTableStatus] = useState<string>('Available');
+  const [updatingTable, setUpdatingTable] = useState(false);
+
+  // Delete Table states
+  const [deletingTable, setDeletingTable] = useState<any | null>(null);
+  const [deletingTableLoading, setDeletingTableLoading] = useState(false);
+
   // Offer modal state & Guest Loyalty info
   const [activeOfferTable, setActiveOfferTable] = useState<any | null>(null);
   const [availableOffers, setAvailableOffers] = useState<any[]>([]);
@@ -76,10 +88,10 @@ export default function StaffTablesPage() {
               ];
             setAvailableOffers(rawOffers);
             setGuestLoyaltyInfo({
-              hasSession: true,
-              customerName: activeOfferTable.assignedGuest || 'Guest User',
-              mobile: '+91 98765 43210',
-              loyalty: { pointsBalance: 1250, lifetimePoints: 1500, tier: 'GOLD' },
+              hasSession: false,
+              customerName: activeOfferTable.assignedGuest || 'Dine-in Guest',
+              mobile: null,
+              loyalty: { pointsBalance: 0, lifetimePoints: 0, tier: 'BRONZE' },
               offers: rawOffers.map((o: any) => ({ ...o, eligible: true })),
             });
           }
@@ -121,6 +133,63 @@ export default function StaffTablesPage() {
       setActiveOfferTable(null);
       setCustomOfferCode('');
       await refreshDashboard();
+    }
+  };
+
+  useEffect(() => {
+    if (editingTable) {
+      setEditTableName(editingTable.name || `Table ${editingTable.number || ''}`);
+      setEditTableSection(editingTable.section || 'Zone A');
+      setEditTableCapacity(String(editingTable.capacity || 4));
+      setEditTableStatus(editingTable.status || 'Available');
+    }
+  }, [editingTable]);
+
+  const handleUpdateTable = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTable) return;
+    setUpdatingTable(true);
+    try {
+      const cleanNum = editTableName.replace(/^table\s+/i, '').trim() || editTableName;
+      const res = await tableAPI.update(editingTable.id, {
+        tableNumber: cleanNum,
+        capacity: Number(editTableCapacity),
+        section: editTableSection,
+        status: editTableStatus === 'Available' ? 'AVAILABLE' : editTableStatus === 'Occupied' ? 'OCCUPIED' : editTableStatus === 'Reserved' ? 'RESERVED' : 'AVAILABLE',
+      });
+      if (res.success) {
+        setToastMessage(`Updated ${editingTable.name} successfully`);
+        void refreshDashboard();
+        setEditingTable(null);
+      } else {
+        setToastMessage(res.error || 'Failed to update table');
+      }
+    } catch (err) {
+      console.error('Failed to update table', err);
+      setToastMessage('Error updating table');
+    } finally {
+      setUpdatingTable(false);
+    }
+  };
+
+  const handleDeleteTable = async () => {
+    if (!deletingTable) return;
+    setDeletingTableLoading(true);
+    try {
+      const res = await tableAPI.delete(deletingTable.id);
+      if (res.success) {
+        setToastMessage(`Deleted ${deletingTable.name}`);
+        setTables((prev) => prev.filter((t) => t.id !== deletingTable.id));
+        void refreshDashboard();
+        setDeletingTable(null);
+      } else {
+        setToastMessage(res.error || 'Failed to delete table');
+      }
+    } catch (err) {
+      console.error('Failed to delete table', err);
+      setToastMessage('Error deleting table');
+    } finally {
+      setDeletingTableLoading(false);
     }
   };
 
@@ -295,6 +364,20 @@ export default function StaffTablesPage() {
                         Queue Assigned
                       </span>
                     )}
+                    <button
+                      onClick={() => setEditingTable(table)}
+                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                      title="Edit Table"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                    </button>
+                    <button
+                      onClick={() => setDeletingTable(table)}
+                      className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                      title="Delete Table"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
                     <span className="text-[10px] text-slate-400 font-bold uppercase font-sans bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
                       {table.section}
                     </span>
@@ -574,6 +657,106 @@ export default function StaffTablesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Edit Table Modal */}
+      {editingTable && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Edit Table</h3>
+            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
+              Update capacity, section, or details for {editingTable.name}.
+            </p>
+            <form onSubmit={handleUpdateTable} className="space-y-4 font-sans text-xs">
+              <div>
+                <label htmlFor="edit-table-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Table Name / Number</label>
+                <input
+                  id="edit-table-name"
+                  type="text"
+                  value={editTableName}
+                  onChange={(e) => setEditTableName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-sans"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="edit-table-capacity" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Capacity (Pax)</label>
+                  <select
+                    id="edit-table-capacity"
+                    value={editTableCapacity}
+                    onChange={(e) => setEditTableCapacity(e.target.value)}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-sans"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12].map(n => (
+                      <option key={n} value={n.toString()}>{n} Pax</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-table-sec" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Section</label>
+                  <select
+                    id="edit-table-sec"
+                    value={editTableSection}
+                    onChange={(e) => setEditTableSection(e.target.value as typeof editTableSection)}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-sans"
+                  >
+                    <option value="Zone A">Zone A</option>
+                    <option value="Zone B">Zone B</option>
+                    <option value="Outdoor">Outdoor</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTable(null)}
+                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingTable}
+                  className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {updatingTable ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Table Confirmation Modal */}
+      {deletingTable && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm text-center">
+            <div className="w-12 h-12 bg-rose-100 dark:bg-rose-950/50 rounded-full flex items-center justify-center text-rose-600 mx-auto mb-3">
+              <span className="material-symbols-outlined text-[24px]">delete</span>
+            </div>
+            <h3 className="font-extrabold text-base text-slate-800 dark:text-slate-100 mb-1 font-sans">Delete Table?</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 font-sans leading-relaxed">
+              Are you sure you want to delete <strong className="text-slate-800 dark:text-slate-200">{deletingTable.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingTable(null)}
+                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all cursor-pointer text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteTable}
+                disabled={deletingTableLoading}
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 cursor-pointer text-xs shadow-md shadow-rose-600/20"
+              >
+                {deletingTableLoading ? 'Deleting...' : 'Delete Table'}
+              </button>
+            </div>
           </div>
         </div>
       )}

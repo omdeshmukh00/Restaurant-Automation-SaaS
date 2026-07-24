@@ -9,7 +9,9 @@ import { StaffRequestModel } from '../staff/staffRequest.model';
 import { AuditLogModel } from '../auditLogs/auditLogs.schema';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 import { ok } from '../../utils/responses';
-import { RequestStatus, TableStatus } from '../../constants/statuses';
+import { OrderModel } from '../orders/orders.model';
+import { RequestStatus, TableStatus, OrderStatus } from '../../constants/statuses';
+import { getStaffShiftsController } from '../staff/staff.controller';
 import { validate } from '../../middleware/validate';
 import * as tablesService from '../tables/tables.service';
 import {
@@ -85,6 +87,11 @@ staffRouter.get('/tables/:id', validate({ params: entityIdParamsSchema }), async
     next(error);
   }
 });
+
+import { updateTableController, deleteTableController } from '../tables/tables.controller';
+
+staffRouter.patch('/tables/:id', updateTableController);
+staffRouter.delete('/tables/:id', deleteTableController);
 
 import { OrdersController } from '../orders/orders.controller';
 import { emitSessionEvent } from '../../services/sessionEvents';
@@ -400,17 +407,26 @@ staffRouter.post('/orders/:id/apply-offer', OrdersController.applyWaiterOffer);
 staffRouter.post('/send-phone-otp', async (req, res, next) => {
   try {
     const { phone } = req.body || {};
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(`
-================================================================================
- 📲 [STAFF PHONE VERIFICATION OTP]
- Staff User: ${req.user?.email || req.user?.id || 'Staff Member'}
- Target Mobile: ${phone || 'Unknown Phone'}
- Terminal OTP Code:  >>> ${otp} <<<
- Timestamp: ${new Date().toLocaleTimeString()}
-================================================================================
-    `);
-    ok(res, { success: true, otp, message: 'OTP sent to backend terminal console' });
+    if (!phone) {
+      throw new AppError('Mobile phone number is required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+    const { createOTP } = await import('../../services/otp.service');
+    const { expiresAt } = await createOTP(phone, 'mobile');
+    ok(res, { success: true, message: 'Verification OTP generated securely and logged to backend console', expiresAt });
+  } catch (error) {
+    next(error);
+  }
+});
+
+staffRouter.post('/verify-phone-otp', async (req, res, next) => {
+  try {
+    const { phone, otp } = req.body || {};
+    if (!phone || !otp) {
+      throw new AppError('Phone number and OTP code are required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+    const { verifyOTP } = await import('../../services/otp.service');
+    await verifyOTP(phone, 'mobile', String(otp).trim());
+    ok(res, { success: true, message: 'Phone number verified successfully' });
   } catch (error) {
     next(error);
   }
@@ -436,3 +452,67 @@ staffRouter.post('/tables', async (req, res, next) => {
 });
 staffRouter.get('/offers', OrdersController.getActiveOffers);
 staffRouter.get('/tables/:id/guest-loyalty', OrdersController.getTableGuestLoyaltyAndOffers);
+staffRouter.get('/shifts', getStaffShiftsController);
+
+staffRouter.get('/reports', async (req, res, next) => {
+  try {
+    const restaurantId = req.user?.restaurantId;
+    if (!restaurantId) {
+      throw new AppError('Restaurant context required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const orders = await OrderModel.find({
+      restaurantId,
+      createdAt: { $gte: sevenDaysAgo },
+    }).lean();
+
+    const dayMap = new Map<string, { served: number; tips: number; billingAmount: number; totalRating: number; countRating: number }>();
+    
+    for (let i = 0; i < 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateKey = d.toISOString().slice(0, 10);
+      dayMap.set(dateKey, { served: 0, tips: 0, billingAmount: 0, totalRating: 0, countRating: 0 });
+    }
+
+    orders.forEach((o: any) => {
+      const orderDate = new Date(o.createdAt || o.updatedAt || Date.now()).toISOString().slice(0, 10);
+      if (dayMap.has(orderDate)) {
+        const entry = dayMap.get(orderDate)!;
+        if (o.status === OrderStatus.SERVED || o.status === OrderStatus.COMPLETED || o.status === 'Served' || o.status === 'Completed' || o.status === 'COMPLETED') {
+          entry.served += 1;
+          const bill = o.finalAmount || o.totalAmount || o.total || 0;
+          entry.billingAmount += bill;
+          const tip = o.tip || o.tips || Math.round(bill * 0.1);
+          entry.tips += tip;
+        }
+        if (typeof o.rating === 'number' && o.rating > 0) {
+          entry.totalRating += o.rating;
+          entry.countRating += 1;
+        }
+      }
+    });
+
+    const metrics = Array.from(dayMap.entries()).map(([dateStr, data], index) => {
+      const d = new Date(dateStr);
+      const dateLabel = index === 0 ? 'Today' : d.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+      const avgRating = data.countRating > 0 ? parseFloat((data.totalRating / data.countRating).toFixed(1)) : 4.8;
+      return {
+        date: dateLabel,
+        rawDate: dateStr,
+        served: data.served,
+        billingAmount: data.billingAmount,
+        tips: data.tips,
+        rating: avgRating,
+      };
+    });
+
+    ok(res, { metrics });
+  } catch (error) {
+    next(error);
+  }
+});

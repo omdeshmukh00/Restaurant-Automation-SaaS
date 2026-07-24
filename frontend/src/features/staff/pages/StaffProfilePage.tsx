@@ -22,7 +22,6 @@ export default function StaffProfilePage() {
 
   // OTP Verification states
   const [otpStep, setOtpStep] = useState<boolean>(false);
-  const [sentOtp, setSentOtp] = useState<string>('');
   const [enteredOtp, setEnteredOtp] = useState<string>('');
   const [otpError, setOtpError] = useState<string | null>(null);
   const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
@@ -38,7 +37,6 @@ export default function StaffProfilePage() {
     setEditPhone(profile.phone);
     setEditEmail(profile.email);
     setOtpStep(false);
-    setSentOtp('');
     setEnteredOtp('');
     setOtpError(null);
     setShowInfoModal(true);
@@ -54,15 +52,14 @@ export default function StaffProfilePage() {
       try {
         const { profileAPI } = await import('../api/staff.api');
         const res = await profileAPI.sendPhoneOTP(editPhone);
-        if (res.success && res.data?.otp) {
-          setSentOtp(res.data.otp);
+        if (res.success) {
           setOtpStep(true);
         } else {
           setOtpError(res.error || 'Failed to generate verification OTP.');
         }
       } catch (err) {
         console.error('OTP send failed', err);
-        setOtpError('Failed to send OTP to backend terminal.');
+        setOtpError('Failed to send OTP to backend server.');
       } finally {
         setIsSendingOtp(false);
       }
@@ -92,23 +89,41 @@ export default function StaffProfilePage() {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (enteredOtp.trim() === sentOtp.trim()) {
-      await updateProfile({
-        name: editName,
-        role: editRole,
-        id: editId,
-        section: editSection,
-        phone: editPhone,
-        email: editEmail,
-        mobileOtp: enteredOtp,
-      });
-      setShowInfoModal(false);
-      setOtpStep(false);
-      setSentOtp('');
-      setEnteredOtp('');
-      setOtpError(null);
-    } else {
-      setOtpError('Invalid OTP code. Please enter the 4-digit OTP printed in the backend terminal console.');
+    setIsSendingOtp(true);
+    setOtpError(null);
+    try {
+      const { profileAPI } = await import('../api/staff.api');
+      const verifyRes = await profileAPI.verifyPhoneOTP(editPhone, enteredOtp.trim());
+      if (verifyRes.success) {
+        try {
+          await apiClient.patch('/users/me', {
+            name: editName,
+            mobile: editPhone,
+          });
+        } catch {
+          // ignore
+        }
+        window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { name: editName, mobile: editPhone } }));
+        await updateProfile({
+          name: editName,
+          role: editRole,
+          id: editId,
+          section: editSection,
+          phone: editPhone,
+          email: editEmail,
+        });
+        setShowInfoModal(false);
+        setOtpStep(false);
+        setEnteredOtp('');
+        setOtpError(null);
+      } else {
+        setOtpError(verifyRes.error || 'Invalid OTP code. Please try again.');
+      }
+    } catch (err) {
+      console.error('OTP verification failed', err);
+      setOtpError('OTP verification failed on server.');
+    } finally {
+      setIsSendingOtp(false);
     }
   };
 

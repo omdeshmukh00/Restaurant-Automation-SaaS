@@ -3,7 +3,6 @@ export const ROLE_ACCESS: Record<string, string[]> = {
     '/staff/tables',
     '/staff/orders',
     '/staff/food-ready',
-    '/staff/requests',
     '/staff/menu',
     '/staff/profile',
     '/staff/settings'

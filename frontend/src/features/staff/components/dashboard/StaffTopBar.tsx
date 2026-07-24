@@ -76,15 +76,11 @@ export default function StaffTopBar({ onNotificationClick }: { onNotificationCli
             LIVE SHIFT
           </div>
         </div>
-        <div className="hidden xl:flex gap-8 border-l border-slate-200 dark:border-sd-outline-variant/40 pl-8">
-          <div>
-            <p className="text-[10px] text-slate-405 mb-0.5 font-sans">My Tables</p>
-            <p className="text-lg font-bold text-slate-800 dark:text-slate-200 font-sans">1, 2, 3, 4</p>
-          </div>
+        <div className="hidden xl:flex border-l border-slate-200 dark:border-sd-outline-variant/40 pl-8">
           <div>
             <p className="text-[10px] text-slate-405 mb-0.5 font-sans">Active Tables</p>
             <p className="text-lg font-bold text-dine-orange font-sans">
-              {tables.filter(t => ['Occupied', 'Reserved', 'Cleaning', 'Bill Requested', 'Food Served'].includes(t.status)).length} Active
+              {tables.filter(t => ['Occupied', 'Food Served', 'Bill Requested'].includes(t.status)).length} Active
             </p>
           </div>
         </div>
@@ -137,24 +133,12 @@ export default function StaffTopBar({ onNotificationClick }: { onNotificationCli
           )}
         </button>
 
-        {/* Dynamic Role Switcher (Temporary Dropdown) */}
-        <div className="relative flex items-center">
-          <span className="material-symbols-outlined absolute left-2.5 text-[18px] text-slate-400 pointer-events-none">
+        {/* Fixed Authenticated Role Badge */}
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-sd-surface-container-low border border-slate-200 dark:border-sd-outline-variant/40 rounded-full text-xs font-bold text-slate-700 dark:text-slate-200 font-sans">
+          <span className="material-symbols-outlined text-[16px] text-dine-orange">
             shield_person
           </span>
-          <select
-            value={['Waiter', 'Floor Staff', 'Floor Supervisor'].includes(profile.role) ? profile.role : 'Waiter'}
-            onChange={(e) => updateProfile({ role: e.target.value })}
-            className="pl-8 pr-7 py-1.5 border border-slate-200 dark:border-sd-outline-variant/40 rounded-full text-xs font-semibold bg-slate-50 dark:bg-sd-surface-container-low text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-dine-orange cursor-pointer appearance-none font-sans"
-            title="Switch staff role (Testing)"
-          >
-            <option value="Waiter">Waiter</option>
-            <option value="Floor Staff">Floor Staff</option>
-            <option value="Floor Supervisor">Floor Supervisor</option>
-          </select>
-          <span className="material-symbols-outlined absolute right-2 text-[18px] text-slate-405 pointer-events-none">
-            keyboard_arrow_down
-          </span>
+          <span>{profile.role || 'Floor Supervisor'}</span>
         </div>
 
         {/* Profile Avatar (placed on top-right) */}

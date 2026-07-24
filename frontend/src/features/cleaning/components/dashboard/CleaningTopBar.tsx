@@ -130,23 +130,13 @@ export default function CleaningTopBar() {
           )}
         </div>
 
-        {/* Dynamic Role Switcher (Temporary Dropdown) */}
-        <div className="relative flex items-center bg-slate-50 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-750 px-3 py-1.5 hover:shadow-soft transition-all duration-200">
-          <span className="material-symbols-outlined text-[18px] text-slate-400 pointer-events-none">
+        {/* Read-Only Role Indicator */}
+        <div className="relative flex items-center bg-slate-50 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-750 px-3 py-1.5">
+          <span className="material-symbols-outlined text-[18px] text-slate-400 mr-1.5 pointer-events-none">
             shield_person
           </span>
-          <select
-            value={['Cleaning Staff', 'Housekeeping', 'Cleaning Supervisor'].includes(profile.role) ? profile.role : 'Cleaning Staff'}
-            onChange={(e) => updateProfile({ role: e.target.value })}
-            className="pl-1.5 pr-6 text-[11px] font-extrabold text-slate-600 dark:text-slate-200 focus:outline-none cursor-pointer appearance-none bg-transparent font-sans uppercase tracking-wider"
-            title="Switch cleaning role (Testing)"
-          >
-            <option value="Cleaning Staff" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Cleaning Staff</option>
-            <option value="Housekeeping" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Housekeeping</option>
-            <option value="Cleaning Supervisor" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">Supervisor</option>
-          </select>
-          <span className="material-symbols-outlined absolute right-1.5 text-[18px] text-slate-400 pointer-events-none">
-            keyboard_arrow_down
+          <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-200 font-sans uppercase tracking-wider">
+            {profile.role || 'Cleaning Staff'}
           </span>
         </div>
 

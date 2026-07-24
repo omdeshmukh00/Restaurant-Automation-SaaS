@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Search,
-  Plus,
-  Trash2,
-  Flag,
-  Mail,
-  Phone,
-  Calendar,
-  User,
-  Star,
-  X,
-  Briefcase,
-  Building2,
-  DollarSign,
-  ChevronDown,
-  AlertTriangle,
-  CheckCircle2,
-} from 'lucide-react';
+// Material Symbols Icon Wrappers for Staff Monitor Page
+const Search = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>search</span>;
+const Plus = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>add</span>;
+const Trash2 = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>delete</span>;
+const Flag = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>flag</span>;
+const Mail = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>mail</span>;
+const Phone = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>call</span>;
+const Calendar = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>calendar_today</span>;
+const User = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>person</span>;
+const Star = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>star</span>;
+const X = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>close</span>;
+const Briefcase = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>work</span>;
+const Building2 = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>apartment</span>;
+const DollarSign = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>payments</span>;
+const ChevronDown = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>expand_more</span>;
+const AlertTriangle = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>warning</span>;
+const CheckCircle2 = ({ className }: { className?: string; size?: number }) => <span className={`material-symbols-outlined text-[18px] ${className || ''}`}>check_circle</span>;
 import { useStaffStore } from '../../admin/store/staff.store';
 import type { StaffRole, StaffDepartment, StaffStatus, StaffMember } from '../../admin/store/staff.store';
+import { useStaffDashboard } from '../hooks/useStaffDashboard';
 
 // ── Roles & Departments Constants ──────────────────────────────────────────
 const STATUSES: StaffStatus[] = ['Active', 'On Leave', 'Inactive'];
@@ -69,6 +69,7 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps): JSX.Element 
     if (!form.phone.trim()) e.phone = 'Phone number is required';
     if (!form.password.trim()) e.password = 'Password is required';
     else if (form.password.length < 8) e.password = 'Password must be at least 8 characters';
+    else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(form.password)) e.password = 'Must contain uppercase, lowercase, and a number (e.g. Staff@123)';
     if (!form.salary || isNaN(Number(form.salary))) e.salary = 'Valid salary is required';
     return e;
   };
@@ -104,8 +105,12 @@ function AddStaffModal({ onClose, onSuccess }: AddStaffModalProps): JSX.Element 
       });
       onSuccess(form.name.trim());
       onClose();
-    } catch (err) {
-      setErrors({ api: 'Failed to create staff member. Email might be in use.' });
+    } catch (err: any) {
+      const serverError = err?.response?.data?.error;
+      const errorMsg = typeof serverError === 'string'
+        ? serverError
+        : err?.message || 'Failed to create staff member. Email or phone number might already be in use.';
+      setErrors({ api: errorMsg });
     }
   };
 
@@ -547,8 +552,10 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps): JSX.Elem
 }
 
 // ── Main Page Component ────────────────────────────────────────────────────
+// ── Main Page Component ────────────────────────────────────────────────────
 export default function StaffMonitorPage(): JSX.Element {
   const { members, fetchMembers } = useStaffStore();
+  const { tables, setTables } = useStaffDashboard();
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
@@ -638,40 +645,78 @@ export default function StaffMonitorPage(): JSX.Element {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
-          {['Table 1', 'Table 2', 'Table 3', 'Table 4', 'Table 5', 'Table 6', 'Table 7', 'Table 8'].map((tblName, idx) => {
-            const waiters = members.filter(m => m.role === 'Server' || m.role === 'Manager' || m.department === 'Service');
-            return (
-              <div key={tblName} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-150 dark:border-slate-700/60 flex flex-col justify-between">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">{tblName}</span>
-                  <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-1.5 py-0.5 rounded">
-                    {idx < 3 ? 'Occupied' : 'Available'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 mb-2">
-                  <span>Assigned Waiter:</span>
-                </div>
-                <select
-                  defaultValue={waiters[idx % (waiters.length || 1)]?.id || ''}
-                  onChange={async (e) => {
-                    try {
-                      const { tableAPI } = await import('../api/staff.api');
-                      await tableAPI.assignWaiter(tblName.toLowerCase().replace(' ', '-'), e.target.value);
-                      setToast({ message: `Assigned ${tblName} to waiter successfully`, type: 'success' });
-                    } catch (err) {
-                      setToast({ message: `Assigned ${tblName} workload updated`, type: 'success' });
-                    }
-                  }}
-                  className="w-full text-xs p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-sans outline-none focus:ring-1 focus:ring-dine-orange"
+          {tables.length === 0 ? (
+            <div className="col-span-full py-8 text-center text-xs text-slate-400 font-sans">
+              No active tables found in database.
+            </div>
+          ) : (
+            tables.map((tbl) => {
+              const waiters = members.filter(
+                (m) => m.role === 'Server' || m.role === 'Manager' || m.department === 'Service'
+              );
+              const assignedWaiterVal = tbl.assignedWaiterId || tbl.assignedStaffId || '';
+
+              const statusColor =
+                tbl.status === 'Occupied'
+                  ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400'
+                  : tbl.status === 'Reserved'
+                  ? 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400'
+                  : tbl.status === 'Cleaning'
+                  ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400'
+                  : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400';
+
+              return (
+                <div
+                  key={tbl.id}
+                  className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-150 dark:border-slate-700/60 flex flex-col justify-between"
                 >
-                  <option value="">-- Unassigned --</option>
-                  {waiters.map(w => (
-                    <option key={w.id} value={w.id}>{w.name} ({w.role})</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-extrabold text-xs text-slate-800 dark:text-slate-200">
+                      {tbl.name}
+                    </span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${statusColor}`}>
+                      {tbl.status}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mb-2 font-sans">
+                    <span>Assigned Waiter:</span>
+                  </div>
+                  <select
+                    value={assignedWaiterVal}
+                    onChange={async (e) => {
+                      const waiterId = e.target.value;
+                      try {
+                        const { tableAPI } = await import('../api/staff.api');
+                        await tableAPI.assignWaiter(tbl.id, waiterId || null);
+                        setTables((prev) =>
+                          prev.map((t) =>
+                            t.id === tbl.id
+                              ? {
+                                  ...t,
+                                  assignedWaiterId: waiterId || null,
+                                  assignedStaffId: waiterId || null,
+                                }
+                              : t
+                          )
+                        );
+                        setToast({ message: `Assigned ${tbl.name} to waiter successfully`, type: 'success' });
+                      } catch (err) {
+                        setToast({ message: `Failed to update assignment for ${tbl.name}`, type: 'error' });
+                      }
+                    }}
+                    className="w-full text-xs p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 font-sans outline-none focus:ring-1 focus:ring-dine-orange cursor-pointer"
+                  >
+                    <option value="">-- Unassigned --</option>
+                    {waiters.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

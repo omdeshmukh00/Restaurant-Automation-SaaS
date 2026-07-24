@@ -1,5 +1,4 @@
 import React from 'react';
-import { AlertTriangle, Bell, CheckCircle2, Clock, Sparkles, X } from 'lucide-react';
 import { useNotifications } from '../hooks/useNotifications';
 
 type NotificationWindowTheme = {
@@ -13,10 +12,10 @@ type NotificationWindowTheme = {
 };
 
 const toneStyles = {
-  urgent: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', Icon: AlertTriangle },
-  success: { color: '#22c55e', bg: 'rgba(34,197,94,0.12)', Icon: CheckCircle2 },
-  info: { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', Icon: Bell },
-  cleaning: { color: '#f97316', bg: 'rgba(249,115,22,0.12)', Icon: Sparkles },
+  urgent: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', icon: 'warning' },
+  success: { color: '#22c55e', bg: 'rgba(34,197,94,0.12)', icon: 'check_circle' },
+  info: { color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', icon: 'notifications' },
+  cleaning: { color: '#f97316', bg: 'rgba(249,115,22,0.12)', icon: 'cleaning_services' },
 };
 
 export function NotificationWindow({
@@ -50,7 +49,7 @@ export function NotificationWindow({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(8, 12, 20, 0.78)',
+        background: 'rgba(0, 0, 0, 0.85)',
         backdropFilter: 'blur(8px)',
         zIndex: 90,
         display: 'grid',
@@ -84,7 +83,7 @@ export function NotificationWindow({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(249,115,22,0.12)', display: 'grid', placeItems: 'center' }}>
-              <Bell size={18} color="#f97316" />
+              <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#f97316' }}>notifications</span>
             </div>
             <div>
               <p style={{ margin: 0, color: theme.textPrimary, fontSize: '16px', fontWeight: 800 }}>Notifications</p>
@@ -109,7 +108,7 @@ export function NotificationWindow({
               placeItems: 'center',
             }}
           >
-            <X size={16} />
+            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
           </button>
         </div>
 
@@ -151,13 +150,12 @@ export function NotificationWindow({
         <div style={{ overflowY: 'auto', padding: '14px 18px 18px', display: 'grid', gap: '10px' }}>
           {notifications.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '34px 10px', color: theme.textMuted, fontSize: '13px' }}>
-              <Clock size={22} style={{ margin: '0 auto 10px', display: 'block' }} />
+              <span className="material-symbols-outlined" style={{ fontSize: '22px', margin: '0 auto 10px', display: 'block' }}>schedule</span>
               No notifications right now.
             </div>
           ) : (
             notifications.map((item) => {
               const tone = toneStyles[item.tone];
-              const Icon = tone.Icon;
 
               return (
                 <button
@@ -179,7 +177,7 @@ export function NotificationWindow({
                   }}
                 >
                   <span style={{ width: '34px', height: '34px', borderRadius: '11px', background: tone.bg, display: 'grid', placeItems: 'center' }}>
-                    <Icon size={16} color={tone.color} />
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px', color: tone.color }}>{tone.icon}</span>
                   </span>
                   <span>
                     <span style={{ display: 'block', color: theme.textPrimary, fontSize: '13px', fontWeight: 800 }}>{item.title}</span>

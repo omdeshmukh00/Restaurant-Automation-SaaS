@@ -2,11 +2,17 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { useStaffProfile } from '../hooks/useStaffProfile';
 import { tableAPI } from '../api/staff.api';
 
 export default function StaffDashboard() {
   const { query } = useStaffSearch();
-  const { orders, readyItems, requests, tables, setTables, reservations } = useStaffDashboard();
+  const { profile } = useStaffProfile();
+  const { orders, readyItems, requests, tables, setTables, reservations, error, refreshDashboard } = useStaffDashboard();
+
+  const staffName = profile?.name ? profile.name.trim() : 'Staff Member';
+  const firstName = staffName.split(' ')[0] || 'Staff';
+  const staffSection = profile?.section || 'Zone A';
 
   const pendingRequestsCount = requests.filter(r => r.status !== 'Resolved').length;
   const readyFoodCount = readyItems.length;
@@ -15,7 +21,7 @@ export default function StaffDashboard() {
   const activeQueueCount = reservations.filter(r => r.type === 'Walk-in' && r.status === 'Confirmed').length;
 
   const stats = [
-    { label: 'Active Tables', value: `${tables.filter(t => t.status === 'Occupied' || t.status === 'Reserved' || t.status === 'Cleaning' || t.status === 'Bill Requested' || t.status === 'Food Served').length}/${tables.length}`, icon: 'table_restaurant', color: 'text-dine-orange bg-orange-50 dark:bg-orange-950/40', link: '/staff/tables' },
+    { label: 'Active Tables', value: `${tables.filter(t => t.status === 'Occupied' || t.status === 'Bill Requested' || t.status === 'Food Served').length}/${tables.length}`, icon: 'table_restaurant', color: 'text-dine-orange bg-orange-50 dark:bg-orange-950/40', link: '/staff/tables' },
     { label: 'Pending Requests', value: `${pendingRequestsCount}`, icon: 'notifications_active', color: 'text-red-500 bg-red-50 dark:bg-red-950/45', link: '/staff/requests', badge: pendingRequestsCount > 0 ? 'Action Required' : undefined },
     { label: 'Food Ready', value: `${readyFoodCount} Item${readyFoodCount !== 1 ? 's' : ''}`, icon: 'restaurant', color: 'text-green-500 bg-green-50 dark:bg-green-950/40', link: '/staff/food-ready' },
     { label: "Today's Orders", value: `${orders.length}`, icon: 'receipt_long', color: 'text-blue-500 bg-blue-50 dark:bg-blue-950/40', link: '/staff/orders' },
@@ -23,18 +29,14 @@ export default function StaffDashboard() {
     { label: 'Walk-in Queue', value: `${activeQueueCount} Group${activeQueueCount !== 1 ? 's' : ''}`, icon: 'groups', color: 'text-teal-500 bg-teal-50 dark:bg-teal-950/40', link: '/staff/reservations' },
   ];
 
-  const zoneATables = tables.filter(t => t.section === 'Zone A');
-  const activeTables = zoneATables.map(t => {
+  const activeTables = tables.map(t => {
     let action = 'Order';
     if (t.status === 'Cleaning') action = 'Clean';
-    else if (t.status === 'Occupied') {
-      if (t.id === '2') action = 'Pay';
-      else if (t.id === '3') action = 'Service';
-      else action = 'Order';
-    }
+    else if (t.status === 'Bill Requested') action = 'Pay';
+    else if (t.status === 'Occupied') action = 'Order';
     return {
       ...t,
-      bill: t.currentBill ? `₹${t.currentBill}` : '₹0',
+      bill: typeof t.currentBill === 'number' && t.currentBill > 0 ? `₹${t.currentBill}` : '₹0',
       action
     };
   });
@@ -59,10 +61,10 @@ export default function StaffDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
-            Hello, Om!
+            Hello, {firstName}!
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-455 mt-1">
-            Here is what&apos;s happening in your section (Zone A) today.
+            Here is what&apos;s happening in your section ({staffSection}) today.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -84,6 +86,24 @@ export default function StaffDashboard() {
           </Link>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-800 dark:text-amber-300 font-sans text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-amber-600 text-[20px]">warning</span>
+            <div>
+              <p className="font-bold">Backend Sync Notice</p>
+              <p className="text-[11px] opacity-90">{error}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => void refreshDashboard()}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[11px] transition-all shrink-0 cursor-pointer"
+          >
+            Retry Sync
+          </button>
+        </div>
+      )}
 
       {/* 6 Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
