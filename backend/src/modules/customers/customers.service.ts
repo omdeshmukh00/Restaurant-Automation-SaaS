@@ -66,7 +66,7 @@ function isGarbledName(name: string): boolean {
   if (!name || name.length < 10) return false;
 
   // Base64 signatures
-  if (/[+\/=]/.test(name)) return true;
+  if (/[+/=]/.test(name)) return true;
 
   // Long string with no word breaks — likely machine-generated
   if (name.length > 50 && !name.includes(' ')) {

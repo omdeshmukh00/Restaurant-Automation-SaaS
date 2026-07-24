@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { OrderModel } from './orders.model';
 import { Cart } from '../cart/cart.model';
-import { PlaceOrderInput, AdminOrderCreateInput, AdminOrderUpdateInput, OrderStatus, PaymentMethod, PaymentStatus } from './orders.schema';
+import { PlaceOrderInput, AdminOrderCreateInput, AdminOrderUpdateInput, OrderStatus, PaymentStatus } from './orders.schema';
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 import { Priority, SessionStatus, TableStatus } from '../../constants/statuses';
