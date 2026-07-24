@@ -129,15 +129,16 @@ function mapReadyItem(order: any): ReadyItem {
   const items = Array.isArray(order?.items) ? order.items : [];
   const totalQty = items.reduce((sum: number, item: any) => sum + Number(item?.quantity ?? 1), 0);
   const itemNames = items.map((item: any) => item?.name).filter(Boolean).join(', ');
+  const tableNum = order?.tableId?.tableNumber ?? order?.tableNumber ?? order?.table ?? '1';
 
   return {
     id: String(order?._id || order?.id || 0),
-    table: order?.tableId?.tableNumber ? `Table ${order.tableId.tableNumber}` : 'Table 1',
+    table: typeof tableNum === 'string' && tableNum.toLowerCase().startsWith('table') ? tableNum : `Table ${tableNum}`,
     item: itemNames || 'Ready food',
     qty: totalQty || 1,
     station: 'Main Kitchen',
     readySince: toRelativeTime(order?.updatedAt || order?.readyAt || order?.createdAt),
-    elapsedSec: Math.max(30, Math.round((Date.now() - new Date(order?.updatedAt || order?.readyAt || order?.createdAt).getTime()) / 1000)),
+    elapsedSec: Math.max(0, Math.round((Date.now() - new Date(order?.updatedAt || order?.readyAt || order?.createdAt).getTime()) / 1000)),
   };
 }
 
@@ -197,6 +198,7 @@ export const refreshDashboard = async () => {
   }
   refreshInProgress = true;
   queuedRefresh = false;
+  staffStore.setLoading(true);
   
   try {
     const [tablesRes, requestsRes, reservationsRes, readyOrdersRes, allOrdersRes, menuRes, alertsRes] = await Promise.all([
@@ -209,38 +211,79 @@ export const refreshDashboard = async () => {
       notificationsAPI.getAll(),
     ]);
 
-    if (tablesRes.success && Array.isArray(tablesRes.data)) {
-      staffStore.setTables(tablesRes.data.map(mapTable));
-    }
-
-    if (requestsRes.success && Array.isArray(requestsRes.data)) {
-      staffStore.setRequests(requestsRes.data.map(mapRequest));
-    }
-
-    if (reservationsRes.success && Array.isArray(reservationsRes.data)) {
-      staffStore.setReservations(reservationsRes.data.map(mapReservation));
-    }
-
-    if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
-      staffStore.setReadyItems(readyOrdersRes.data.map(mapReadyItem));
-    }
+    let anySuccess = false;
+    const failedEndpoints: string[] = [];
+    let mappedOrders: Order[] = [];
 
     if (allOrdersRes.success && Array.isArray(allOrdersRes.data)) {
-      staffStore.setOrders(allOrdersRes.data.map(mapOrder));
+      anySuccess = true;
+      mappedOrders = allOrdersRes.data.map(mapOrder);
+      staffStore.setOrders(mappedOrders);
     } else if (readyOrdersRes.success && Array.isArray(readyOrdersRes.data)) {
-      staffStore.setOrders(readyOrdersRes.data.map(mapOrder));
+      anySuccess = true;
+      mappedOrders = readyOrdersRes.data.map(mapOrder);
+      staffStore.setOrders(mappedOrders);
+    } else if (!allOrdersRes.success) {
+      failedEndpoints.push(`Orders (${allOrdersRes.error || 'API error'})`);
+    }
+
+    if (tablesRes.success && Array.isArray(tablesRes.data)) {
+      anySuccess = true;
+      const mappedTables = tablesRes.data.map((rawTbl: any) => {
+        const tableObj = mapTable(rawTbl);
+        const rawNum = String(rawTbl?.tableNumber ?? rawTbl?.name ?? rawTbl?._id ?? '').toLowerCase();
+        const activeOrdersForTable = mappedOrders.filter((o: Order) => {
+          const orderTableClean = String(o.table || '').replace(/^table\s+/i, '').toLowerCase().trim();
+          const tableObjClean = String(tableObj.name || '').replace(/^table\s+/i, '').toLowerCase().trim();
+          const matches =
+            orderTableClean === rawNum ||
+            orderTableClean === tableObjClean ||
+            String(o.table || '').toLowerCase().trim() === String(tableObj.id || '').toLowerCase().trim();
+          const isActive = ['Pending', 'Preparing', 'Ready', 'Served'].includes(o.status);
+          return matches && isActive;
+        });
+        const calculatedBill = activeOrdersForTable.reduce((acc: number, order: Order) => acc + (Number(order.total) || 0), 0);
+        return {
+          ...tableObj,
+          currentBill: calculatedBill > 0 ? calculatedBill : Number(rawTbl?.currentBill ?? 0),
+        };
+      });
+      staffStore.setTables(mappedTables);
+    } else if (!tablesRes.success) {
+      failedEndpoints.push(`Tables (${tablesRes.error || 'API error'})`);
     }
 
     if (menuRes.success && Array.isArray(menuRes.data)) {
+      anySuccess = true;
       staffStore.setMenuItems(menuRes.data.map(mapMenuItem));
+    } else if (!menuRes.success) {
+      failedEndpoints.push(`Menu Items (${menuRes.error || 'API error'})`);
     }
 
     if (alertsRes.success && Array.isArray(alertsRes.data)) {
+      anySuccess = true;
       staffStore.setAlerts(alertsRes.data.map(mapAlert));
+    } else if (!alertsRes.success) {
+      failedEndpoints.push(`Notifications (${alertsRes.error || 'API error'})`);
+    }
+
+    if (failedEndpoints.length > 0) {
+      const errorMsg = `Unable to fetch live backend data: ${failedEndpoints.join('; ')}`;
+      console.warn(`[Staff API Sync Warning]: ${errorMsg}`);
+      staffStore.setApiError(errorMsg);
+    } else {
+      staffStore.setApiError(null);
+    }
+
+    if (anySuccess) {
+      staffStore.setHasSyncedWithBackend(true);
     }
   } catch (err) {
+    const errorString = err instanceof Error ? err.message : 'Connection failed';
     console.error('Unable to refresh staff data', err);
+    staffStore.setApiError(`Backend Connection Error: ${errorString}`);
   } finally {
+    staffStore.setLoading(false);
     refreshInProgress = false;
     if (queuedRefresh) {
       queuedRefresh = false;
@@ -257,6 +300,8 @@ export function useStaffDashboard() {
   const [tables, setTablesState] = useState(() => staffStore.tables);
   const [reservations, setReservationsState] = useState(() => staffStore.reservations);
   const [menuItems, setMenuItemsState] = useState(() => staffStore.menuItems);
+  const [loading, setLoadingState] = useState(() => staffStore.loading);
+  const [error, setErrorState] = useState(() => staffStore.apiError);
 
   useEffect(() => {
     const unsubscribe = staffStore.subscribe(() => {
@@ -267,6 +312,8 @@ export function useStaffDashboard() {
       setTablesState(staffStore.tables);
       setReservationsState(staffStore.reservations);
       setMenuItemsState(staffStore.menuItems);
+      setLoadingState(staffStore.loading);
+      setErrorState(staffStore.apiError);
     });
     return () => {
       unsubscribe();
@@ -275,6 +322,11 @@ export function useStaffDashboard() {
 
   useEffect(() => {
     void refreshDashboard();
+
+    // 5-second interval poll to ensure ready food notifications arrive in real time even without websockets
+    const pollInterval = setInterval(() => {
+      scheduleRefresh();
+    }, 5000);
 
     connectSocket();
     const socket = getSocket();
@@ -293,6 +345,9 @@ export function useStaffDashboard() {
       socket.on('order.created', handleSync);
       socket.on('order.updated', handleSync);
       socket.on('order.ready', handleSync);
+      socket.on('ORDER_READY', handleSync);
+      socket.on('order_ready', handleSync);
+      socket.on('food.ready', handleSync);
       socket.on('order.served', handleSync);
       socket.on('staff:request-new', handleSync);
       socket.on('staff:request-updated', handleSync);
@@ -301,6 +356,7 @@ export function useStaffDashboard() {
       socket.on('notification:new', handleSync);
 
       return () => {
+        clearInterval(pollInterval);
         socket.off('table.status.changed', handleSync);
         socket.off('table.cleaned', handleSync);
         socket.off('cleaning.completed', handleSync);
@@ -312,6 +368,9 @@ export function useStaffDashboard() {
         socket.off('order.created', handleSync);
         socket.off('order.updated', handleSync);
         socket.off('order.ready', handleSync);
+        socket.off('ORDER_READY', handleSync);
+        socket.off('order_ready', handleSync);
+        socket.off('food.ready', handleSync);
         socket.off('order.served', handleSync);
         socket.off('staff:request-new', handleSync);
         socket.off('staff:request-updated', handleSync);
@@ -320,6 +379,10 @@ export function useStaffDashboard() {
         socket.off('notification:new', handleSync);
       };
     }
+
+    return () => {
+      clearInterval(pollInterval);
+    };
   }, []);
 
   return {
@@ -330,8 +393,8 @@ export function useStaffDashboard() {
     tables,
     reservations,
     menuItems,
-    loading: false,
-    error: null,
+    loading,
+    error,
     refreshDashboard,
     setOrders: (newOrders: Order[] | ((prev: Order[]) => Order[])) => staffStore.setOrders(newOrders),
     setReadyItems: (newReadyItems: ReadyItem[] | ((prev: ReadyItem[]) => ReadyItem[])) => staffStore.setReadyItems(newReadyItems),

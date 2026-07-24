@@ -1,56 +1,22 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { notificationsAPI, type NotificationItem } from '../api/notifications.api';
 
-const initialStaffNotifications: NotificationItem[] = [
-  {
-    id: 1,
-    title: 'Table T03 order ready',
-    message: 'Order for Table T03 (Paneer Butter Masala) is ready in the kitchen.',
-    time: '2 min ago',
-    tone: 'urgent',
-    read: false,
-  },
-  {
-    id: 2,
-    title: 'New customer request',
-    message: 'Table T05 has requested extra cutlery.',
-    time: '5 min ago',
-    tone: 'cleaning',
-    read: false,
-  },
-  {
-    id: 3,
-    title: 'Staff attendance summary',
-    message: '32 active staff members are checked in for today\'s shift.',
-    time: '15 min ago',
-    tone: 'info',
-    read: true,
-  },
-  {
-    id: 4,
-    title: 'Table status updated',
-    message: 'Table T02 is now marked as served.',
-    time: '30 min ago',
-    tone: 'success',
-    read: true,
-  },
-];
-
 // Module-level global state variables
-let globalNotifications: NotificationItem[] = [...initialStaffNotifications];
+let globalNotifications: NotificationItem[] = [];
 let globalLoading = false;
 let globalError: string | null = null;
+let hasFetchedInitially = false;
 const listeners = new Set<() => void>();
 
 function notifyListeners() {
-  listeners.forEach(l => l());
+  listeners.forEach((l) => l());
 }
 
 export function useNotifications() {
   const [state, setState] = useState({
     notifications: globalNotifications,
     loading: globalLoading,
-    error: globalError
+    error: globalError,
   });
 
   useEffect(() => {
@@ -58,7 +24,7 @@ export function useNotifications() {
       setState({
         notifications: globalNotifications,
         loading: globalLoading,
-        error: globalError
+        error: globalError,
       });
     };
     listeners.add(handler);
@@ -75,27 +41,28 @@ export function useNotifications() {
     notifyListeners();
     try {
       const res = await notificationsAPI.getNotifications();
-      if (res.success && res.data && res.data.length > 0) {
+      if (res.success && Array.isArray(res.data)) {
         globalNotifications = res.data;
       } else {
-        globalNotifications = [...initialStaffNotifications];
+        globalNotifications = [];
       }
     } catch (err) {
       globalError = err instanceof Error ? err.message : 'Failed to fetch notifications';
-      globalNotifications = [...initialStaffNotifications];
+      globalNotifications = [];
     } finally {
       globalLoading = false;
+      hasFetchedInitially = true;
       notifyListeners();
     }
   }, []);
 
-  const markAsRead = useCallback(async (id: number) => {
+  const markAsRead = useCallback(async (id: number | string) => {
     globalNotifications = globalNotifications.map((item) => (item.id === id ? { ...item, read: true } : item));
     notifyListeners();
     void notificationsAPI.markAsRead(id);
   }, []);
 
-  const toggleRead = useCallback(async (id: number) => {
+  const toggleRead = useCallback(async (id: number | string) => {
     let targetState = false;
     globalNotifications = globalNotifications.map((item) => {
       if (item.id === id) {
@@ -122,8 +89,7 @@ export function useNotifications() {
   }, []);
 
   useEffect(() => {
-    // Only fetch on mount if empty or default values are unchanged
-    if (globalNotifications.length === initialStaffNotifications.length && globalNotifications[0].id === 1 && !globalLoading) {
+    if (!hasFetchedInitially && !globalLoading) {
       void fetchNotifications();
     }
   }, [fetchNotifications]);

@@ -14,13 +14,31 @@ import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGua
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 import { refreshDashboard, scheduleRefresh } from '../features/staff/hooks/useStaffDashboard';
 
+import { getStoredUser } from '../auth/tokenStore';
+import { mapBackendRoleToStaffRole } from '../features/staff/api/staff.api';
+
 export default function StaffLayout(): JSX.Element {
   const { settings } = usePlatformSettingsGuard();
   const { profile } = useStaffProfile();
   const location = useLocation();
 
-  const allowedPaths = getRolePermissions(profile.role);
-  const isAllowed = isPathAllowed(profile.role, location.pathname);
+  const storedStaffUser = getStoredUser('staff');
+  const rawRole = storedStaffUser
+    ? (storedStaffUser as any).internal_role || (storedStaffUser as any).staff_role || (storedStaffUser as any).staffRole || storedStaffUser.role
+    : null;
+  const effectiveRole = profile.role && profile.role !== 'Senior Waiter'
+    ? profile.role
+    : rawRole
+    ? mapBackendRoleToStaffRole(storedStaffUser?.role, rawRole)
+    : profile.role || 'Floor Supervisor';
+
+  const allowedPaths = getRolePermissions(effectiveRole);
+  const isAllowed = isPathAllowed(effectiveRole, location.pathname);
+
+  if (!isAllowed) {
+    const fallbackPath = allowedPaths[0] || '/staff/tables';
+    return <Navigate to={fallbackPath} replace />;
+  }
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -187,12 +205,12 @@ export default function StaffLayout(): JSX.Element {
         open={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}
         theme={{
-          cardBg: '#1e293b', // slate-800
-          cardBorder: '#334155', // slate-700
-          miniCardBg: '#0f172a', // slate-900
+          cardBg: '#090d16', // Deep Black
+          cardBorder: '#1e293b', // Subtle Slate Dark border
+          miniCardBg: '#0f172a', // Dark slate item cards
           textPrimary: '#ffffff',
-          textSecondary: '#cbd5e1', // slate-300
-          textMuted: '#94a3b8', // slate-400
+          textSecondary: '#94a3b8', // Clean slate text
+          textMuted: '#64748b', // Muted slate text
           font: 'sans-serif'
         }}
       />

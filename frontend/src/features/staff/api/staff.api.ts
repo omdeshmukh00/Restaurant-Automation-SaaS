@@ -95,7 +95,7 @@ export interface StaffMember {
   id: string;
   name: string;
   email: string;
-  role: 'Manager' | 'Server' | 'Chef' | 'Bartender';
+  role: 'Manager' | 'Server' | 'Chef' | 'Bartender' | 'Floor Supervisor' | 'Floor Staff' | 'Waiter';
   department: string;
   phone: string;
   status: 'active' | 'on_leave';
@@ -203,22 +203,34 @@ export interface BirthdayItem {
   initials: string;
   color: string;              // hex avatar color
 }
-function mapBackendRoleToStaffRole(role?: string): StaffMember['role'] {
+export function mapBackendRoleToStaffRole(role?: string, staffRole?: string): StaffMember['role'] {
+  const sRole = String(staffRole || '').trim().toUpperCase();
+  if (sRole === 'FLOOR_SUPERVISOR' || sRole === 'SUPERVISOR' || sRole === 'FLOOR SUPERVISOR') {
+    return 'Floor Supervisor';
+  }
+  if (sRole === 'FLOOR_STAFF' || sRole === 'FLOOR STAFF' || sRole === 'FLOOR') {
+    return 'Floor Staff';
+  }
+  if (sRole === 'WAITER' || sRole === 'SERVER') {
+    return 'Waiter';
+  }
+
   switch (role) {
     case 'kitchen-staff':
       return 'Chef';
     case 'cleaning-staff':
       return 'Bartender';
     case 'restaurant-admin':
-      return 'Manager';
+    case 'super-admin':
+      return 'Floor Supervisor';
     case 'service-staff':
     case 'staff':
     default:
-      return 'Server';
+      return 'Waiter';
   }
 }
 
-function buildStaffProfile(user: Partial<StaffMember> & { mobile?: string; role?: string; restaurantName?: string; id?: string }): StaffMember {
+function buildStaffProfile(user: Partial<StaffMember> & { mobile?: string; role?: string; staff_role?: string; staffRole?: string; restaurantName?: string; id?: string }): StaffMember {
   const name = user.name || 'Staff Member';
   const initials = name
     .split(' ')
@@ -227,11 +239,13 @@ function buildStaffProfile(user: Partial<StaffMember> & { mobile?: string; role?
     .map((part) => part[0]?.toUpperCase())
     .join('') || 'ST';
 
+  const assignedRole = mapBackendRoleToStaffRole(user.role, user.staff_role || user.staffRole);
+
   return {
     id: String(user.id || ''),
     name,
     email: user.email ?? '',
-    role: mapBackendRoleToStaffRole(user.role),
+    role: assignedRole,
     department: user.restaurantName ? `${user.restaurantName}` : 'Service',
     phone: user.mobile ?? '',
     status: 'active',
@@ -286,10 +300,16 @@ export const tableAPI = {
 
   /** PATCH /staff/tables/:id/assign-waiter — assign a specific waiter to table */
   assignWaiter: async (id: string, waiterId?: string | null): Promise<ApiResponse<Table>> => {
-    const res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/assign-waiter`, {
+    let res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/assign-waiter`, {
       method: 'PATCH',
       body: JSON.stringify({ waiterId: waiterId ?? null }),
     });
+    if (!res.success) {
+      res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}/assign`, {
+        method: 'PATCH',
+        body: JSON.stringify({ staffId: waiterId ?? null }),
+      });
+    }
     return {
       success: res.success,
       data: res.data?.table,
@@ -381,6 +401,42 @@ export const tableAPI = {
       data: res.data?.table,
       error: res.error,
     };
+  },
+
+  update: async (id: string, payload: {
+    tableNumber?: string;
+    capacity?: number;
+    section?: string;
+    floor?: number;
+    status?: string;
+  }): Promise<ApiResponse<Table>> => {
+    let res = await fetchAPI<{ table: Table }>(`/staff/tables/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    if (!res.success) {
+      res = await fetchAPI<{ table: Table }>(`/admin/tables/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    }
+    return {
+      success: res.success,
+      data: res.data?.table,
+      error: res.error,
+    };
+  },
+
+  delete: async (id: string): Promise<ApiResponse<void>> => {
+    let res = await fetchAPI<void>(`/staff/tables/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.success) {
+      res = await fetchAPI<void>(`/admin/tables/${id}`, {
+        method: 'DELETE',
+      });
+    }
+    return res;
   },
 };
 
@@ -572,10 +628,16 @@ export const offersAPI = {
 };
 
 export const profileAPI = {
-  sendPhoneOTP: (phone: string): Promise<ApiResponse<{ otp: string }>> => {
-    return fetchAPI<{ otp: string }>('/users/me/request-mobile-otp', {
+  sendPhoneOTP: (phone: string): Promise<ApiResponse<{ message: string; expiresAt?: string }>> => {
+    return fetchAPI<{ message: string; expiresAt?: string }>('/auth/request-otp', {
       method: 'POST',
-      body: JSON.stringify({ mobile: phone }),
+      body: JSON.stringify({ identifier: phone, mobile: phone }),
+    });
+  },
+  verifyPhoneOTP: (phone: string, otp: string): Promise<ApiResponse<{ message: string }>> => {
+    return fetchAPI<{ message: string }>('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ identifier: phone, mobile: phone, otp }),
     });
   },
   updateProfile: (updates: any): Promise<ApiResponse<StaffMember>> => {
@@ -658,7 +720,10 @@ export const notificationsAPI = {
 
 export const menuAPI = {
   getItems: async (): Promise<ApiResponse<any[]>> => {
-    const res = await fetchAPI<{ items: any[]; meta?: unknown }>('/admin/menu/items');
+    let res = await fetchAPI<{ items: any[]; meta?: unknown }>('/staff/menu/items');
+    if (!res.success) {
+      res = await fetchAPI<{ items: any[]; meta?: unknown }>('/admin/menu/items');
+    }
     return {
       success: res.success,
       data: res.data?.items,
@@ -666,9 +731,12 @@ export const menuAPI = {
     };
   },
 
-  /** GET /admin/menu/categories */
+  /** GET /staff/menu/categories */
   getCategories: async (): Promise<ApiResponse<any[]>> => {
-    const res = await fetchAPI<{ categories: any[] }>('/admin/menu/categories');
+    let res = await fetchAPI<{ categories: any[] }>('/staff/menu/categories');
+    if (!res.success) {
+      res = await fetchAPI<{ categories: any[] }>('/admin/menu/categories');
+    }
     return {
       success: res.success,
       data: res.data?.categories,
@@ -676,27 +744,47 @@ export const menuAPI = {
     };
   },
 
-  /** PATCH /admin/menu/items/:id/availability */
+  /** PATCH /staff/menu/items/:id/availability */
   toggleAvailability: async (id: string, isAvailable: boolean): Promise<ApiResponse<void>> => {
-    return fetchAPI<void>(`/admin/menu/items/${id}/availability`, {
+    let res = await fetchAPI<void>(`/staff/menu/items/${id}/availability`, {
       method: 'PATCH',
       body: JSON.stringify({ isAvailable }),
     });
+    if (!res.success) {
+      res = await fetchAPI<void>(`/admin/menu/items/${id}/availability`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isAvailable }),
+      });
+    }
+    return res;
   },
 
-  /** POST /admin/menu/items */
+  /** POST /staff/menu/items */
   createItem: async (item: any): Promise<ApiResponse<any>> => {
-    return fetchAPI<any>('/admin/menu/items', {
+    let res = await fetchAPI<any>('/staff/menu/items', {
       method: 'POST',
       body: JSON.stringify(item),
     });
+    if (!res.success) {
+      res = await fetchAPI<any>('/admin/menu/items', {
+        method: 'POST',
+        body: JSON.stringify(item),
+      });
+    }
+    return res;
   },
 
-  /** DELETE /admin/menu/items/:id */
+  /** DELETE /staff/menu/items/:id */
   deleteItem: async (id: string): Promise<ApiResponse<void>> => {
-    return fetchAPI<void>(`/admin/menu/items/${id}`, {
+    let res = await fetchAPI<void>(`/staff/menu/items/${id}`, {
       method: 'DELETE',
     });
+    if (!res.success) {
+      res = await fetchAPI<void>(`/admin/menu/items/${id}`, {
+        method: 'DELETE',
+      });
+    }
+    return res;
   },
 };
 
@@ -737,7 +825,25 @@ export const staffAPI = {
   },
 };
 
-// ── Analytics ──
+export interface ReportMetricItem {
+  date: string;
+  rawDate?: string;
+  served: number;
+  billingAmount?: number;
+  tips: number;
+  rating: number;
+}
+
+export const reportsAPI = {
+  getReports: async (): Promise<ApiResponse<ReportMetricItem[]>> => {
+    const res = await fetchAPI<{ metrics: ReportMetricItem[] }>('/staff/reports');
+    return {
+      success: res.success,
+      data: res.data?.metrics,
+      error: res.error,
+    };
+  },
+};
 
 export const analyticsAPI = {
   /** GET /admin/staff/attendance */
@@ -760,9 +866,16 @@ export const analyticsAPI = {
     return fetchAPI<RolesData>('/admin/staff/roles');
   },
 
-  /** GET /admin/staff/shifts/list */
-  getSchedule: (): Promise<ApiResponse<ScheduleItem[]>> => {
-    return fetchAPI<ScheduleItem[]>('/admin/staff/shifts/list');
+  /** GET /staff/shifts */
+  getSchedule: async (): Promise<ApiResponse<ScheduleItem[]>> => {
+    let res = await fetchAPI<any>('/staff/shifts');
+    if (res.success && Array.isArray(res.data?.shifts)) {
+      return { success: true, data: res.data.shifts };
+    }
+    if (!res.success) {
+      res = await fetchAPI<ScheduleItem[]>('/admin/staff/shifts/list');
+    }
+    return res;
   },
 
   /** GET /admin/staff/birthdays */

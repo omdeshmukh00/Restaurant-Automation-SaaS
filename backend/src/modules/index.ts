@@ -56,7 +56,7 @@ apiRouter.use('/notifications', requireAuth, notificationsRouter);
 apiRouter.use('/customer/cart', cartRouter);
 apiRouter.use('/customer/feedback', feedbackRouter);
 apiRouter.use('/customer', customerRouter);
-apiRouter.use('/staff', authenticateStaff, roleGuard(roles.serviceStaff, roles.restaurantAdmin), tenantGuard, staffRouter);
+apiRouter.use('/staff', authenticateStaff, roleGuard(roles.serviceStaff, roles.restaurantAdmin, roles.superAdmin), tenantGuard, staffRouter);
 apiRouter.use('/kitchen', authenticateKitchen, roleGuard(roles.kitchenStaff, roles.restaurantAdmin), tenantGuard, kitchenRouter);
 apiRouter.use('/cleaning', authenticateCleaning, roleGuard(roles.cleaningStaff, roles.restaurantAdmin), tenantGuard, cleaningRouter);
 apiRouter.use('/admin', authenticateAdmin, roleGuard(roles.restaurantAdmin, roles.superAdmin), tenantGuard, adminRouter);
