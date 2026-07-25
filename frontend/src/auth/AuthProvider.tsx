@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, type PropsWithChildren } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type PropsWithChildren } from 'react';
 import { apiClient } from '../shared/services/apiClient';
 import {
   getAccessToken,
@@ -248,14 +248,43 @@ export function AuthProvider({ children }: PropsWithChildren): JSX.Element {
 
   // ── Panel switching ───────────────────────────────────────────────
   const switchPanel = useCallback((panel: Panel) => {
-    setActivePanel(panel);
-    setActivePanelState(panel);
-
+    // Early-return when nothing actually changed (Root Cause A fix).
+    // Avoids creating a new user object reference that would cascade
+    // through every useAuth() consumer.
     const token = getAccessToken(panel);
     const stored = getStoredUser(panel);
 
+    setActivePanel(panel);
+    setActivePanelState(panel);
     setAccessTokenStateRaw(token);
-    setUserState(stored ? toAuthUser(stored, panel) : null);
+    // Only build a new AuthUser if the underlying stored data changed,
+    // otherwise React's setState-with-same-value bailout handles it
+    setUserState((prev) => {
+      if (!stored) return prev === null ? null : prev; // return prev to avoid re-render if already null
+      const next = toAuthUser(stored, panel);
+      // Shallow compare key fields to avoid new reference when data is identical
+      if (
+        prev &&
+        prev.id === next.id &&
+        prev.panel === next.panel &&
+        prev.role === next.role &&
+        prev.name === next.name &&
+        prev.email === next.email &&
+        prev.mobile === next.mobile &&
+        prev.restaurantId === next.restaurantId &&
+        prev.restaurantName === next.restaurantName &&
+        prev.internal_role === next.internal_role &&
+        prev.mustResetPassword === next.mustResetPassword &&
+        prev.firstLogin === next.firstLogin &&
+        prev.themeMode === next.themeMode &&
+        prev.avatar === next.avatar &&
+        prev.location === next.location &&
+        prev.bio === next.bio
+      ) {
+        return prev; // same data → keep old reference → no re-render
+      }
+      return next;
+    });
   }, []);
 
   // ── Session Restoration on startup ─────────────────────────────────
@@ -520,28 +549,46 @@ export function AuthProvider({ children }: PropsWithChildren): JSX.Element {
 
   // ── Context value ─────────────────────────────────────────────────
 
-  const value: AuthContextValue = {
-    user: userState,
-    accessToken: accessTokenState,
-    isAuthenticated: Boolean(userState && accessTokenState),
-    initializing,
-    activePanel,
+  const value: AuthContextValue = useMemo(
+    () => ({
+      user: userState,
+      accessToken: accessTokenState,
+      isAuthenticated: Boolean(userState && accessTokenState),
+      initializing,
+      activePanel,
 
-    getPanelUser,
-    getPanelToken,
-    isPanelAuthenticated,
+      getPanelUser,
+      getPanelToken,
+      isPanelAuthenticated,
 
-    signIn,
-    signInWithOtp,
-    signInAs,
-    signOut,
-    signOutAll,
-    switchPanel,
+      signIn,
+      signInWithOtp,
+      signInAs,
+      signOut,
+      signOutAll,
+      switchPanel,
 
-    setUser: setUserState,
-    updateUser,
-    setAccessTokenState: setAccessTokenStateRaw,
-  };
+      setUser: setUserState,
+      updateUser,
+      setAccessTokenState: setAccessTokenStateRaw,
+    }),
+    [
+      userState,
+      accessTokenState,
+      initializing,
+      activePanel,
+      getPanelUser,
+      getPanelToken,
+      isPanelAuthenticated,
+      signIn,
+      signInWithOtp,
+      signInAs,
+      signOut,
+      signOutAll,
+      switchPanel,
+      updateUser,
+    ]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

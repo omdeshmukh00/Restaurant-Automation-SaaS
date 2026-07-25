@@ -15,49 +15,55 @@ export async function processReservationReminders() {
       status: ReservationStatus.CONFIRMED,
       reminderSent: false,
       notificationPreference: { $ne: NotificationPreference.NONE }
-    });
+    }).lean();
 
-    for (const reservation of reservations) {
-      try {
-        const [year, month, day] = reservation.date.split('-').map(Number);
-        const [hour, minute] = reservation.slot.split(':').map(Number);
+    if (reservations.length > 0) {
+      const restIds = Array.from(new Set(reservations.map((r: any) => r.restaurantId).filter(Boolean)));
+      const restaurants = await RestaurantModel.find({ _id: { $in: restIds } }).select('name').lean();
+      const restMap = new Map(restaurants.map((r: any) => [r._id.toString(), r.name]));
 
-        const reservationTime = new Date(year, month - 1, day, hour, minute);
+      for (const reservation of reservations) {
+        try {
+          const [year, month, day] = reservation.date.split('-').map(Number);
+          const [hour, minute] = reservation.slot.split(':').map(Number);
 
-        // If the reservation is within the next 1 hour and in the future
-        if (reservationTime > now && reservationTime <= oneHourFromNow) {
-          const restaurant = await RestaurantModel.findById(reservation.restaurantId).lean();
-          if (!restaurant) continue;
+          const reservationTime = new Date(year, month - 1, day, hour, minute);
 
-          const data = {
-            customerName: reservation.customerName,
-            restaurantName: restaurant.name,
-            time: reservation.slot,
-            date: reservation.date,
-            guestCount: String(reservation.guests)
-          };
+          // If the reservation is within the next 1 hour and in the future
+          if (reservationTime > now && reservationTime <= oneHourFromNow) {
+            const restName = restMap.get(reservation.restaurantId?.toString() || '');
+            if (!restName) continue;
 
-          let success = false;
-          if (reservation.notificationPreference === NotificationPreference.SMS) {
-            success = await MessagingService.sendSMS(reservation.mobile, 'reservation-reminder', data);
-          } else if (reservation.notificationPreference === NotificationPreference.WHATSAPP) {
-            success = await MessagingService.sendWhatsApp(reservation.mobile, 'reservation-reminder', data);
+            const data = {
+              customerName: reservation.customerName,
+              restaurantName: restName,
+              time: reservation.slot,
+              date: reservation.date,
+              guestCount: String(reservation.guests)
+            };
+
+            let success = false;
+            if (reservation.notificationPreference === NotificationPreference.SMS) {
+              success = await MessagingService.sendSMS(reservation.mobile, 'reservation-reminder', data);
+            } else if (reservation.notificationPreference === NotificationPreference.WHATSAPP) {
+              success = await MessagingService.sendWhatsApp(reservation.mobile, 'reservation-reminder', data);
+            }
+
+            if (success) {
+              await ReservationModel.updateOne({ _id: reservation._id }, {
+                reminderSent: true,
+                reminderSentAt: new Date(),
+                reminderFailureReason: null
+              });
+            } else {
+              await ReservationModel.updateOne({ _id: reservation._id }, {
+                reminderFailureReason: 'Failed to send reminder via provider'
+              });
+            }
           }
-
-          if (success) {
-            await ReservationModel.updateOne({ _id: reservation._id }, {
-              reminderSent: true,
-              reminderSentAt: new Date(),
-              reminderFailureReason: null
-            });
-          } else {
-            await ReservationModel.updateOne({ _id: reservation._id }, {
-              reminderFailureReason: 'Failed to send reminder via provider'
-            });
-          }
+        } catch (err) {
+          logger.error(`Error parsing date/time for reservation ${reservation._id}`, err);
         }
-      } catch (err) {
-        logger.error(`Error parsing date/time for reservation ${reservation._id}`, err);
       }
     }
   } catch (error) {

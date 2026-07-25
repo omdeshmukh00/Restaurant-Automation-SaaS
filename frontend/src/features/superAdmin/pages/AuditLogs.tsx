@@ -54,14 +54,19 @@ function formatActorRole(role?: string): string {
   return role;
 }
 
+import { useAuditLogsStore } from '../store/AuditLogsStore';
+
 export default function AuditLogsPage() {
   const [activeTab, setActiveTab] = useState<'audit' | 'details'>('audit');
   const [searchTerm, setSearchTerm] = useState('');
   const [detailsSearchInput, setDetailsSearchInput] = useState('');
   const [detailsSearchTerm, setDetailsSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<LogType | 'All'>('All');
-  const [logs, setLogs] = useState<LogItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  const logs = useAuditLogsStore((state) => state.logs);
+  const loading = useAuditLogsStore((state) => state.loading);
+  const fetchLogs = useAuditLogsStore((state) => state.fetchLogs);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selectedLog, setSelectedLog] = useState<LogItem | null>(null);
@@ -94,66 +99,10 @@ export default function AuditLogsPage() {
     document.documentElement.classList.toggle('dark', darkMode);
   }, [darkMode]);
 
-  // Fetch live audit logs from backend API
+  // Fetch live audit logs from backend API via store
   useEffect(() => {
-    let isMounted = true;
-    const fetchAuditLogs = async () => {
-      try {
-        setLoading(true);
-        const res = await apiClient.get('/super-admin/audit-logs');
-        const rawLogs = res.data?.data?.auditLogs || res.data?.data?.logs || res.data?.auditLogs || [];
-
-        if (isMounted && Array.isArray(rawLogs) && rawLogs.length > 0) {
-          const formatted: LogItem[] = rawLogs.map((item: any) => {
-            const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Recent';
-            const type = mapEntityTypeToLogType(item.entityType, item.action);
-            
-            const restName = item.restaurantId?.name || item.metadata?.restaurantName || item.metadata?.target || 'Platform Wide';
-            const custName = item.metadata?.customerName || item.metadata?.userName || item.actorId?.name || (item.actorRole === 'CUSTOMER' ? 'Customer' : undefined);
-            const custPhone = item.metadata?.customerPhone || item.metadata?.userPhone || item.metadata?.userMobile || item.metadata?.mobile || item.metadata?.phone || item.actorId?.mobile || item.actorId?.phone || undefined;
-            const custEmail = item.metadata?.customerEmail || item.metadata?.email || item.metadata?.userEmail || item.actorId?.email || undefined;
-            const target = restName;
-            const details = item.metadata?.details || item.metadata?.reason || `${item.action} recorded`;
-
-            return {
-              id: item._id || String(Math.random()),
-              type,
-              action: item.action || 'System Action',
-              performedBy: formatActorRole(item.actorRole),
-              target,
-              details,
-              ipAddress: formatCleanIp(item.ipAddress),
-              timestamp: dateStr,
-              restaurantName: restName,
-              restaurantId: item.restaurantId?._id?.toString() || item.restaurantId?.toString(),
-              customerName: custName,
-              customerPhone: custPhone,
-              customerEmail: custEmail,
-              entityType: item.entityType,
-              entityId: item.entityId,
-              metadata: item.metadata || {},
-              rawLog: item,
-            };
-          });
-          setLogs(formatted);
-          setLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.error("Failed to fetch live audit logs:", err);
-      }
-
-      if (isMounted) {
-        setLogs(initialLogs);
-        setLoading(false);
-      }
-    };
-
-    fetchAuditLogs();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    fetchLogs();
+  }, [fetchLogs]);
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {

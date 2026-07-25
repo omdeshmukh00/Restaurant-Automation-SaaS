@@ -138,7 +138,8 @@ export function AdminSubscriptionCheckoutModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, restaurant, admin, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, restaurant, admin, user?.id]);
 
   if (!isOpen) return null;
 

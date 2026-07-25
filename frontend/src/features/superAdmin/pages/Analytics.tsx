@@ -31,6 +31,8 @@ interface LayoutContextType {
   darkMode: boolean;
 }
 
+import { useAnalyticsStore } from "../store/AnalyticsStore";
+
 export default function Analytics() {
   const { darkMode } = useOutletContext<LayoutContextType>();
   const approvedRestaurants = useRestaurantRequestsStore((state) => state.restaurants);
@@ -47,10 +49,11 @@ export default function Analytics() {
   // Refresh state
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Live platform orders state
-  const [platformOrders, setPlatformOrders] = useState<PlatformOrder[]>([]);
-  const [commissionRate, setCommissionRate] = useState<number>(10);
-  const [isLoading, setIsLoading] = useState(true);
+  // Live platform orders store state
+  const platformOrders = useAnalyticsStore((state) => state.platformOrders);
+  const commissionRate = useAnalyticsStore((state) => state.commissionRate);
+  const isLoading = useAnalyticsStore((state) => state.loading);
+  const fetchOrders = useAnalyticsStore((state) => state.fetchOrders);
 
   // Reservation & Queue analytics state
   const [rqData, setRqData] = useState<any>(null);
@@ -66,18 +69,6 @@ export default function Analytics() {
     analytics: 35,
     automation: 22,
   });
-
-  const fetchOrders = async () => {
-    try {
-      const data = await superAdminRestaurantRequestsApi.getAnalyticsOrders();
-      setPlatformOrders(data.orders);
-      setCommissionRate(data.commissionRate);
-    } catch (error) {
-      console.error("Failed to fetch analytics orders", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const fetchReservationQueueData = async () => {
     setRqLoading(true);
@@ -115,7 +106,7 @@ export default function Analytics() {
     fetchRequests();
     fetchChartsData();
     fetchOverview();
-  }, [fetchRequests]);
+  }, [fetchOrders, fetchRequests, fetchOverview]);
 
   // Fetch reservation/queue data when tab is activated
   useEffect(() => {

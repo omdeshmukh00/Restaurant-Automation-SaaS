@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useRestaurantRequestsStore, type RestaurantRequest } from "../store/RestaurantRequests";
 import { useSuperAdminDashboardStore } from "../store/Superadmindashboard";
-import { getSocket, connectSocket } from "../../../lib/socket";
+import { getSocket } from "../../../lib/socket";
 
 interface OutletContext {
   darkMode: boolean;
@@ -56,7 +56,7 @@ export default function SuperAdminDashboard() {
     fetchRequests();
     fetchOverview();
 
-    connectSocket();
+    // Socket connection is handled by SocketProvider at the app root.
     const socket = getSocket();
     if (socket) {
       socket.on('restaurant_request_created', (newReq) => {

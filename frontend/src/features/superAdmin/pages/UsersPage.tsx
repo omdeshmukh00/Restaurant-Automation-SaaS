@@ -113,10 +113,14 @@ export function exportUsersAsPDF(users: UserItem[]) {
   }, 250);
 }
 
+import { useUsersStore } from '../store/UsersStore';
+
 export default function UsersPage() {
   const { darkMode } = useOutletContext<LayoutContextType>();
-  const [users, setUsers] = useState<UserItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const users = useUsersStore((state) => state.users);
+  const loading = useUsersStore((state) => state.loading);
+  const fetchUsers = useUsersStore((state) => state.fetchUsers);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -130,31 +134,8 @@ export default function UsersPage() {
   }, [searchTerm, roleFilter]);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const res = await apiClient.get('/super-admin/users');
-        const rawUsers = res.data?.data?.users || res.data?.users || [];
-
-        if (isMounted && Array.isArray(rawUsers)) {
-          setUsers(rawUsers);
-          setLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.error("Failed to fetch platform users:", err);
-      }
-      if (isMounted) {
-        setLoading(false);
-      }
-    };
-
     fetchUsers();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [fetchUsers]);
 
   // Filter users based on search term & role filter
   const filteredUsers = useMemo(() => {

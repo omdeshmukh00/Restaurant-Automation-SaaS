@@ -258,6 +258,7 @@ const userSchema = new Schema<IUser>(
 userSchema.index({ role: 1 });
 userSchema.index({ restaurantId: 1 });
 userSchema.index({ isDeleted: 1 });
+userSchema.index({ 'refreshTokens.tokenHash': 1 });
 // TTL index for auto-clearing locked accounts (lock expires naturally)
 userSchema.index({ lockUntil: 1 }, { expireAfterSeconds: 0, sparse: true });
 

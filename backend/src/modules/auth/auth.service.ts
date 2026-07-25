@@ -151,25 +151,30 @@ export async function refresh(oldRefreshToken: string) {
       (refreshToken) => refreshToken.tokenHash === hashedToken
     );
   } else {
-    // 2. Fallback to slow search for legacy bcrypt tokens
+    // 2. Fallback to search for unexpired legacy bcrypt tokens (only if legacy tokens exist)
+    const now = new Date();
     const legacyUsers = await UserModel.find({
       'refreshTokens.tokenHash': { $regex: /^\$2/ },
-    }).select('+refreshTokens');
+      'refreshTokens.expiresAt': { $gt: now },
+    }).select('+refreshTokens').lean();
 
-    for (const user of legacyUsers) {
-      for (let index = 0; index < user.refreshTokens.length; index += 1) {
-        const refreshToken = user.refreshTokens[index];
-        if (
-          refreshToken.tokenHash.startsWith('$2') &&
-          (await compareToken(oldRefreshToken, refreshToken.tokenHash))
-        ) {
-          matchedUser = user;
-          matchedTokenIndex = index;
+    if (legacyUsers.length > 0) {
+      for (const user of legacyUsers) {
+        for (let index = 0; index < user.refreshTokens.length; index += 1) {
+          const refreshToken = user.refreshTokens[index];
+          if (
+            refreshToken.tokenHash.startsWith('$2') &&
+            new Date(refreshToken.expiresAt) > now &&
+            (await compareToken(oldRefreshToken, refreshToken.tokenHash))
+          ) {
+            matchedUser = (await UserModel.findById(user._id).select('+refreshTokens')) as any;
+            matchedTokenIndex = index;
+            break;
+          }
+        }
+        if (matchedUser) {
           break;
         }
-      }
-      if (matchedUser) {
-        break;
       }
     }
   }
