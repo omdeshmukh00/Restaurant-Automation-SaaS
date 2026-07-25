@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CreditCard, AlertCircle, RefreshCw, X, Check } from 'lucide-react';
 import { apiClient } from '../../shared/services/apiClient';
+import { usePlatformSettingsGuard } from '../../shared/hooks/usePlatformSettingsGuard';
 
 interface PaymentDialogProps {
   isOpen: boolean;
@@ -34,6 +35,8 @@ export default function PaymentDialog({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const { settings } = usePlatformSettingsGuard();
+  const platformName = settings?.platformName || 'RestoHub';
 
   if (!isOpen) return null;
 
@@ -65,7 +68,7 @@ export default function PaymentDialog({
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
         amount: amount * 100, // Razorpay expects paise
         currency: currency,
-        name: 'RestoHub Partner Onboarding',
+        name: `${platformName} Partner Onboarding`,
         description: 'Application Processing Fee',
         order_id: orderId,
         handler: async function (response: any) {
@@ -99,6 +102,32 @@ export default function PaymentDialog({
         },
         readonly: {
           contact: true,
+        },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay via UPI',
+                instruments: [
+                  {
+                    method: 'upi',
+                  },
+                ],
+              },
+              wallets: {
+                name: 'Pay via Wallets',
+                instruments: [
+                  {
+                    method: 'wallet',
+                  },
+                ],
+              },
+            },
+            sequence: ['block.upi', 'block.wallets', 'block.other'],
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
         },
         notes: {
           requestId,

@@ -3,6 +3,7 @@ import { CreditCard, Check, Sparkles, X, AlertCircle, Phone, Mail, User, ArrowRi
 import { useSettingsStore } from '../../store/settings.store';
 import { useAuth } from '../../../../auth/AuthProvider';
 import { apiClient } from '../../../../shared/services/apiClient';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 export interface PlanItem {
   _id?: string;
@@ -91,6 +92,9 @@ export function AdminSubscriptionCheckoutModal({
 }: AdminSubscriptionCheckoutModalProps) {
   const { user } = useAuth();
   const { admin, restaurant, fetchSettings } = useSettingsStore();
+
+  const { settings: platformSettings } = usePlatformSettingsGuard();
+  const platformName = platformSettings?.platformName || 'RestoHub';
 
   const [plans, setPlans] = useState<PlanItem[]>(DEFAULT_PLANS);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -185,7 +189,7 @@ export function AdminSubscriptionCheckoutModal({
           key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
           amount: Math.round(orderData.amount * 100),
           currency: orderData.currency || 'INR',
-          name: 'RestoHub SaaS Plan',
+          name: `${platformName} SaaS Plan`,
           description: `Subscription for ${selectedPlan.name} Plan (${billingCycle})`,
           order_id: orderData.orderId,
           prefill: {
@@ -196,6 +200,32 @@ export function AdminSubscriptionCheckoutModal({
           readonly: {
             contact: true,
             email: true,
+          },
+          config: {
+            display: {
+              blocks: {
+                upi: {
+                  name: 'Pay via UPI',
+                  instruments: [
+                    {
+                      method: 'upi',
+                    },
+                  ],
+                },
+                wallets: {
+                  name: 'Pay via Wallets',
+                  instruments: [
+                    {
+                      method: 'wallet',
+                    },
+                  ],
+                },
+              },
+              sequence: ['block.upi', 'block.wallets', 'block.other'],
+              preferences: {
+                show_default_blocks: true,
+              },
+            },
           },
           theme: {
             color: '#FF6B1A',
