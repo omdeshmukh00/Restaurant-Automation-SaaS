@@ -63,8 +63,8 @@ export default function StaffDashboard() {
           <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
             Hello, {firstName}!
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-455 mt-1">
-            Here is what&apos;s happening in your section ({staffSection}) today.
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
+            Welcome back! Here&apos;s what&apos;s happening today.
           </p>
         </div>
         <div className="flex items-center gap-2">

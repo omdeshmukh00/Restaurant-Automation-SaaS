@@ -9,14 +9,20 @@ import { getCleaningRolePermissions } from '../features/cleaning/utils/cleaningR
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 import { useTranslation } from '../features/cleaning/hooks/useTranslation';
+import { useAuth } from '../auth/AuthProvider';
+
+import CleaningBottomNav from '../features/cleaning/components/dashboard/CleaningBottomNav';
 
 export default function CleaningLayout(): JSX.Element {
   const { settings } = usePlatformSettingsGuard();
   const { profile } = useCleaning();
+  const { user, getPanelUser } = useAuth();
   const { t } = useTranslation();
   const location = useLocation();
 
-  const allowedPaths = getCleaningRolePermissions(profile.role);
+  const activeUser = getPanelUser('cleaning') || user;
+  const userRole = activeUser?.internal_role || activeUser?.role || profile.role;
+  const allowedPaths = getCleaningRolePermissions(userRole);
   const currentPath = location.pathname.replace(/\/$/, '');
 
   const isAllowed = allowedPaths.includes(currentPath);
@@ -30,10 +36,10 @@ export default function CleaningLayout(): JSX.Element {
   });
 
   // Determine page title based on path
-  const getPageDetails = (): { title: string; subtitle: string; badge?: React.ReactNode } => {
+  const getPageDetails = (): { title: string; subtitle: string; badge?: React.ReactNode } | null => {
     switch (location.pathname) {
       case '/cleaning':
-        return { title: t('dashboardTitle'), subtitle: t('dashboardSubtitle') };
+        return null;
       case '/cleaning/tables':
         return { title: t('tablesTitle'), subtitle: t('tablesSubtitle') };
       case '/cleaning/requests':
@@ -43,16 +49,16 @@ export default function CleaningLayout(): JSX.Element {
         };
       case '/cleaning/tasks':
         return { title: t('tasksTitle'), subtitle: t('tasksSubtitle') };
+      case '/cleaning/monitor':
       case '/cleaning/profile':
-        return { title: t('profileTitle'), subtitle: t('profileSubtitle') };
       case '/cleaning/settings':
-        return { title: t('settingsTitle'), subtitle: t('settingsSubtitle') };
+        return null;
       default:
         return { title: 'CleanServe', subtitle: 'Management Panel' };
     }
   };
 
-  const { title, subtitle, badge } = getPageDetails();
+  const pageDetails = getPageDetails();
 
   if (!isAllowed && allowedPaths.length > 0) {
     return <Navigate to={allowedPaths[0]} replace />;
@@ -61,7 +67,7 @@ export default function CleaningLayout(): JSX.Element {
   return (
     <ToastProvider>
     <CleaningSearchProvider>
-      <div className="flex min-h-screen bg-sd-surface text-sd-on-surface font-sans cleaning-panel">
+      <div className="flex h-screen max-h-screen overflow-hidden bg-sd-surface text-sd-on-surface font-sans cleaning-panel w-full">
         {/* Sidebar */}
         <CleaningSidebar
           collapsed={sidebarCollapsed}
@@ -89,25 +95,36 @@ export default function CleaningLayout(): JSX.Element {
 
         {/* Main Area */}
         <div
-          className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-60'
+          className={`flex-1 flex flex-col h-full min-w-0 transition-all duration-300 ml-0 ${
+            sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-60'
           }`}
         >
-          <CleaningTopBar />
+          <CleaningTopBar
+            onToggleSidebar={() => {
+              const next = !sidebarCollapsed;
+              setSidebarCollapsed(next);
+              localStorage.setItem('cleaning-sidebar-collapsed', String(next));
+            }}
+          />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 lg:pb-8">
             {/* Dynamic Page Header below the Navbar */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 font-sans tracking-tight leading-snug flex items-center">
-                {title}
-                {badge}
-              </h1>
-              <p className="text-xs text-slate-400 dark:text-slate-400 font-sans mt-0.5">{subtitle}</p>
-            </div>
+            {pageDetails && (
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 font-sans tracking-tight leading-snug flex items-center">
+                  {pageDetails.title}
+                  {pageDetails.badge}
+                </h1>
+                <p className="text-xs text-slate-400 dark:text-slate-400 font-sans mt-0.5">{pageDetails.subtitle}</p>
+              </div>
+            )}
             <Outlet />
           </main>
         </div>
+
+        {/* Mobile Bottom Nav */}
+        <CleaningBottomNav />
 
         {/* Maintenance Alert Modal overlay */}
         <MaintenanceAlertModal

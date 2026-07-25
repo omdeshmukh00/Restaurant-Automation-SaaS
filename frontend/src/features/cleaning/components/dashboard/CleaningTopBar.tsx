@@ -4,163 +4,156 @@ import { useCleaningSearch } from './CleaningSearchContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useCleaning } from '../../hooks/usecleaning';
 
-export default function CleaningTopBar() {
+interface CleaningTopBarProps {
+  onToggleSidebar?: () => void;
+}
+
+export default function CleaningTopBar({ onToggleSidebar }: CleaningTopBarProps) {
   const navigate = useNavigate();
   const { searchQuery, setSearchQuery } = useCleaningSearch();
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [showSearchInput, setShowSearchInput] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
   const { notifications, unreadCount, markAsRead } = useNotifications();
-  const { profile, updateProfile } = useCleaning();
+  const { profile } = useCleaning();
 
-  if (mobileSearchOpen) {
-    return (
-      <header className="h-[72px] flex items-center px-4 bg-white dark:bg-sd-surface-container border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shrink-0">
-        <div className="flex items-center gap-3 w-full">
-          <button
-            onClick={() => {
-              setMobileSearchOpen(false);
-              setSearchQuery('');
-            }}
-            className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
-            aria-label="Back"
-          >
-            <span className="material-symbols-outlined text-[22px]">arrow_back</span>
-          </button>
-          <div className="flex-1 flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full px-4 py-2">
-            <span className="material-symbols-outlined text-slate-400 mr-2 text-[18px]">
-              search
-            </span>
-            <input
-              className="bg-transparent border-none focus:ring-0 focus:outline-none text-sm w-full font-sans text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-              placeholder="Search by ID, location, priority..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
+  const getInitials = (name?: string) => {
+    if (!name) return 'RS';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const initials = getInitials(profile?.name || 'Ramesh Sharma');
+
+  return (
+    <header className="h-[72px] flex items-center justify-between px-4 lg:px-8 bg-[#18181b] dark:bg-[#121214] border-b border-slate-800/80 sticky top-0 z-30 shrink-0 text-slate-100">
+      {/* Left side: Sidebar Toggle */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onToggleSidebar}
+          className="p-2 text-slate-300 hover:text-white hover:bg-[#27272a] rounded-xl transition-colors cursor-pointer"
+          title="Toggle Navigation Menu"
+          aria-label="Toggle Navigation Menu"
+        >
+          <span className="material-symbols-outlined text-[22px]">menu</span>
+        </button>
+      </div>
+
+      {/* Right side: Search, Notifications, Role Badge, Avatar */}
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+        {/* Search Toggle / Input */}
+        <div className="relative flex items-center">
+          {showSearchInput ? (
+            <div className="flex items-center bg-[#27272a] border border-slate-700/80 rounded-full px-3 py-1 text-xs animate-fadeIn">
+              <span className="material-symbols-outlined text-slate-400 text-[18px] mr-1.5">search</span>
+              <input
+                autoFocus
+                className="bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-xs text-slate-100 placeholder-slate-400 w-28 sm:w-48 font-sans"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
               <button
-                onClick={() => setSearchQuery('')}
-                className="text-slate-400 hover:text-slate-650"
+                onClick={() => {
+                  setShowSearchInput(false);
+                  setSearchQuery('');
+                }}
+                className="text-slate-400 hover:text-slate-200 ml-1 cursor-pointer"
+                aria-label="Close search"
               >
                 <span className="material-symbols-outlined text-[16px]">close</span>
               </button>
-            )}
-          </div>
-        </div>
-      </header>
-    );
-  }
-
-  return (
-    <header className="h-[72px] flex items-center justify-end px-4 lg:px-8 bg-white dark:bg-sd-surface-container border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shrink-0">
-      {/* Right side: Search, Notifications, Profile (all grouped at top right) */}
-      <div className="flex items-center gap-4">
-        {/* Desktop Search Box */}
-        <div className="relative hidden md:block">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-            search
-          </span>
-          <input
-            className="pl-10 pr-4 py-1.5 border border-slate-200 dark:border-slate-700 rounded-full text-xs bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cleanserve-primary w-48 lg:w-56 font-sans text-slate-800 dark:text-slate-200"
-            placeholder="Search..."
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowSearchInput(true)}
+              className="p-2 text-slate-300 hover:text-white hover:bg-[#27272a] rounded-full transition-colors cursor-pointer"
+              title="Search"
+              aria-label="Search"
+            >
+              <span className="material-symbols-outlined text-[20px]">search</span>
+            </button>
+          )}
         </div>
 
-        {/* Mobile Search Icon Toggle */}
-        <button
-          onClick={() => setMobileSearchOpen(true)}
-          className="flex md:hidden p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
-          aria-label="Search"
-        >
-          <span className="material-symbols-outlined text-[22px]">search</span>
-        </button>
-
+        {/* Notifications Bell */}
         <div className="relative">
-          {/* Notification Icon */}
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="relative p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+            className="relative p-2 text-slate-300 hover:text-white hover:bg-[#27272a] rounded-full transition-colors cursor-pointer"
+            title="Notifications"
             aria-label="Notifications"
           >
-            <span className="material-symbols-outlined text-[22px]">notifications</span>
+            <span className="material-symbols-outlined text-[20px]">notifications</span>
 
-            {/* Dynamic Badge */}
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold animate-pulse">
+              <span className="absolute top-1 right-1 w-4 h-4 bg-orange-500 text-white text-[9px] flex items-center justify-center rounded-full font-extrabold animate-pulse">
                 {unreadCount}
               </span>
             )}
           </button>
 
-          {/* Dropdown UI */}
+          {/* Notifications Dropdown */}
           {showDropdown && (
-            <div className="absolute top-16 right-0 w-72 bg-white dark:bg-sd-surface-container border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 p-4">
-              <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100 mb-3">
-                Notifications
-              </h3>
-              <div className="max-h-60 overflow-y-auto">
+            <div className="absolute top-14 right-0 w-72 sm:w-80 bg-[#1f1f23] border border-slate-800 rounded-2xl shadow-2xl z-50 p-4 animate-fadeIn">
+              <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                <h3 className="text-xs font-bold text-slate-100 font-sans tracking-wide">Notifications</h3>
+                {unreadCount > 0 && (
+                  <span className="text-[10px] font-bold text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-2">
                 {notifications.length > 0 ? (
                   notifications.map((n: any) => (
                     <div
                       key={n.id}
-                      className={`p-3 rounded-xl mb-2 border ${n.read ? 'bg-slate-50' : 'bg-orange-50'}`}
+                      className={`p-3 rounded-xl border text-xs ${
+                        n.read ? 'bg-[#27272a]/50 border-slate-800 text-slate-300' : 'bg-[#2a1e19] border-orange-500/30 text-slate-100'
+                      }`}
                     >
-                      <p className="text-xs font-bold text-slate-800">{n.title}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{n.message}</p>
+                      <p className="font-bold">{n.title}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">{n.message}</p>
                       {!n.read && (
                         <button
                           onClick={() => markAsRead(n.id)}
-                          className="text-[9px] font-bold text-orange-600 mt-2"
+                          className="text-[10px] font-extrabold text-orange-400 mt-2 hover:underline cursor-pointer"
                         >
-                          Mark Read
+                          Mark as read
                         </button>
                       )}
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-center text-slate-400 py-4">
-                    Koi notification nahi hai.
-                  </p>
+                  <p className="text-xs text-center text-slate-400 py-4">No notifications yet.</p>
                 )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Read-Only Role Indicator */}
-        <div className="relative flex items-center bg-slate-50 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-750 px-3 py-1.5">
-          <span className="material-symbols-outlined text-[18px] text-slate-400 mr-1.5 pointer-events-none">
-            shield_person
+        {/* Role Pill Badge */}
+        <div className="flex items-center bg-[#1f1f23] hover:bg-[#27272a] transition-colors rounded-full border border-slate-700/60 px-2.5 sm:px-4 py-1 sm:py-1.5 gap-1.5 sm:gap-2 shadow-sm cursor-default select-none shrink-0">
+          <span className="material-symbols-outlined text-[#ff5522] text-[16px] sm:text-[19px] leading-none">
+            verified_user
           </span>
-          <span className="text-[11px] font-extrabold text-slate-600 dark:text-slate-200 font-sans uppercase tracking-wider">
-            {profile.role || 'Cleaning Staff'}
+          <span className="text-[11px] sm:text-[13px] font-bold text-slate-100 font-sans tracking-tight leading-none max-w-[85px] sm:max-w-[130px] truncate">
+            {profile?.role || 'Cleaning Staff'}
           </span>
         </div>
 
-        {/* Divider */}
-        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
-
-        {/* Profile Card & Avatar */}
+        {/* Initials Avatar Circle */}
         <button
           onClick={() => navigate('/cleaning/profile')}
-          className="flex items-center gap-3 text-left hover:opacity-85 transition-opacity focus:outline-none cursor-pointer"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#2e1914] border border-[#4a241b] flex items-center justify-center text-[#ff5522] font-extrabold text-xs sm:text-sm hover:opacity-90 transition-all cursor-pointer shadow-md active:scale-95 shrink-0"
+          title={`Profile: ${profile?.name || 'Staff'}`}
           aria-label="View Profile"
         >
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 font-sans leading-none">{profile.name}</p>
-            <p className="text-[10px] text-slate-400 font-sans leading-none mt-1">{profile.id}</p>
-          </div>
-          <div className="relative shrink-0">
-            <img
-              alt={profile.name}
-              className="w-10 h-10 rounded-full object-cover border border-slate-150 dark:border-slate-700 shadow-sm"
-              src={profile.avatar}
-            />
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white dark:border-sd-surface-container rounded-full" />
-          </div>
+          {initials}
         </button>
       </div>
     </header>

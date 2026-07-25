@@ -17,6 +17,64 @@ interface ProcessedTask extends UrgentTask {
   queueWaitingCount?: number;
 }
 
+function formatLastCleanedTime(timestamp?: string | number | Date): string {
+  if (!timestamp) return 'Just Now';
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return 'Just Now';
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMins / 60);
+
+  if (diffMins < 2) return 'Just Now';
+  if (diffMins < 60) return `${diffMins} mins ago`;
+  if (diffHours < 24) return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function to24HexObjectId(str: string): string {
+  let hex = '';
+  for (let i = 0; i < str.length; i++) {
+    hex += str.charCodeAt(i).toString(16);
+  }
+  return hex.padEnd(24, '0').slice(0, 24);
+}
+
+/** Resolve a MongoDB ObjectId from the store's table list or display label */
+function resolveObjectId(taskIdOrLabel: string | undefined): string | undefined {
+  if (!taskIdOrLabel) return undefined;
+
+  if (/^[a-fA-F0-9]{24}$/.test(taskIdOrLabel)) {
+    return taskIdOrLabel;
+  }
+
+  const table = cleaningStore.tables.find(
+    (t) => t.id === taskIdOrLabel || (t as any).taskId === taskIdOrLabel || `Table ${t.id}` === taskIdOrLabel || t.id === `Table ${taskIdOrLabel}`
+  );
+  if ((table as any)?.taskId && /^[a-fA-F0-9]{24}$/.test((table as any).taskId)) {
+    return (table as any).taskId;
+  }
+
+  const matchNum = taskIdOrLabel.match(/\d+/);
+  if (matchNum) {
+    const numStr = matchNum[0];
+    const matchTable = cleaningStore.tables.find(
+      (t) => t.id === numStr || t.id === `Table ${numStr}` || t.id === `T${numStr}` || t.id === `T-0${numStr}` || t.id === `T${numStr.padStart(2, '0')}`
+    );
+    if ((matchTable as any)?.taskId && /^[a-fA-F0-9]{24}$/.test((matchTable as any).taskId)) {
+      return (matchTable as any).taskId;
+    }
+  }
+
+  const rawResult = table?.id || taskIdOrLabel;
+  if (/^[a-fA-F0-9]{24}$/.test(rawResult)) {
+    return rawResult;
+  }
+
+  return to24HexObjectId(rawResult);
+}
+
 export function useCleaning() {
   const [metrics, setMetrics] = useState<CleaningMetric[]>([]);
   const [urgentTasks, setUrgentTasks] = useState<UrgentTask[]>([]);
@@ -193,13 +251,16 @@ export function useCleaning() {
           const rawTableNum = String(table.tableNumber ?? table.number ?? '1');
           const displayTableId = rawTableNum.toLowerCase().startsWith('table') ? rawTableNum : `Table ${rawTableNum}`;
 
+          const realTimestamp = activeTask?.completedAt || activeTask?.updatedAt || activeTask?.createdAt || (table as any).updatedAt || (table as any).lastCleanedAt;
+          const formattedTimeAgo = formatLastCleanedTime(realTimestamp);
+
           return {
             id: displayTableId,
             area: table.section || 'Dining Area A',
             seats: Number(table.capacity || 4),
             status: status as any,
             priority: priority as any,
-            timeAgo: activeTask?.createdAt ? new Date(activeTask.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Just Now',
+            timeAgo: formattedTimeAgo,
             assignedTo,
             progress,
             taskId: taskId || String(table._id || table.id),
@@ -212,7 +273,12 @@ export function useCleaning() {
         cleaningStore.syncAllTables(mappedTables);
       }
 
-      const staffRes = await apiClient.get<{ success: boolean; data: { staff: any[] } }>('/admin/staff?role=cleaning-staff');
+      let staffRes: any;
+      try {
+        staffRes = await apiClient.get<{ success: boolean; data: { staff: any[] } }>('/cleaning/staff?role=cleaning-staff');
+      } catch {
+        staffRes = await apiClient.get<{ success: boolean; data: { staff: any[] } }>('/admin/staff?role=cleaning-staff');
+      }
       if (staffRes.data?.success && Array.isArray(staffRes.data.data?.staff)) {
         const apiMembers = staffRes.data.data.staff.map((m: any) => {
           let displayRole = 'Cleaning Staff';
@@ -267,20 +333,30 @@ export function useCleaning() {
       };
       socket.on('cleaning.started', handleSync);
       socket.on('cleaning.completed', handleSync);
+      socket.on('cleaning.created', handleSync);
+      socket.on('cleaning:task_created', handleSync);
+      socket.on('cleaning:task_updated', handleSync);
       socket.on('cleaning.issue.reported', handleSync);
+      socket.on('cleaning.issue.updated', handleSync);
       socket.on('cleaning.task.assigned', handleSync);
       socket.on('cleaning.task.paused', handleSync);
       socket.on('cleaning.task.deepclean', handleSync);
       socket.on('table.status.changed', handleSync);
+      socket.on('table:status_changed', handleSync);
 
       return () => {
         socket.off('cleaning.started', handleSync);
         socket.off('cleaning.completed', handleSync);
+        socket.off('cleaning.created', handleSync);
+        socket.off('cleaning:task_created', handleSync);
+        socket.off('cleaning:task_updated', handleSync);
         socket.off('cleaning.issue.reported', handleSync);
+        socket.off('cleaning.issue.updated', handleSync);
         socket.off('cleaning.task.assigned', handleSync);
         socket.off('cleaning.task.paused', handleSync);
         socket.off('cleaning.task.deepclean', handleSync);
         socket.off('table.status.changed', handleSync);
+        socket.off('table:status_changed', handleSync);
       };
     }
   }, [loadDashboard]);
@@ -307,14 +383,26 @@ export function useCleaning() {
           cleaningRole = 'CLEANING_SUPERVISOR';
         }
 
-        const res = await apiClient.post<{ success: boolean; data: { staff: any } }>('/admin/staff', {
-          name: member.name,
-          email,
-          mobile: sanitizedMobile,
-          role: apiRole,
-          cleaning_role: cleaningRole,
-          assignedArea: member.area,
-        });
+        let res: any;
+        try {
+          res = await apiClient.post<{ success: boolean; data: { staff: any } }>('/cleaning/staff', {
+            name: member.name,
+            email,
+            mobile: sanitizedMobile,
+            role: apiRole,
+            cleaning_role: cleaningRole,
+            assignedArea: member.area,
+          });
+        } catch {
+          res = await apiClient.post<{ success: boolean; data: { staff: any } }>('/admin/staff', {
+            name: member.name,
+            email,
+            mobile: sanitizedMobile,
+            role: apiRole,
+            cleaning_role: cleaningRole,
+            assignedArea: member.area,
+          });
+        }
 
         if (res.data?.success && res.data.data?.staff) {
           const m = res.data.data.staff;
@@ -341,10 +429,17 @@ export function useCleaning() {
     removeStaffMember: async (id: string) => {
       cleaningStore.removeStaffMember(id);
       try {
-        await apiClient.delete(`/admin/staff/${id}`);
+        try {
+          await apiClient.delete(`/cleaning/staff/${id}`);
+        } catch {
+          await apiClient.delete(`/admin/staff/${id}`);
+        }
       } catch (e) {
         console.warn('Failed to delete staff member from backend', e);
       }
+    },
+    updateStaffMember: (id: string, updates: any) => {
+      cleaningStore.updateStaffMember(id, updates);
     },
     activeJobs: [],
     recentActivity: [],
@@ -375,8 +470,15 @@ export function useCleaning() {
         return { success: false, error: 'Failed to request OTP' };
       }
     },
+    createTask: async (data: { tableId: string; priority?: string; notes?: string }) => {
+      const resolvedId = resolveObjectId(data.tableId) || data.tableId;
+      const res = await cleaningAPI.createTask({ ...data, tableId: resolvedId });
+      await loadDashboard();
+      return res;
+    },
     assignTask: async (taskId: string) => {
-      await cleaningAPI.startTask(taskId);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.startTask(resolvedId);
       await loadDashboard();
     },
     assignTaskToStaff: async (taskId: string, staffId?: string | null) => {
@@ -390,7 +492,8 @@ export function useCleaning() {
       } else {
         cleaningStore.addActivity(`Unassigned staff from ${label}`, area, 'person_remove', 'blue');
       }
-      await cleaningAPI.assignTask(taskId, staffId);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.assignTask(resolvedId, staffId);
       await loadDashboard();
     },
     startTask: async (taskId: string) => {
@@ -398,7 +501,8 @@ export function useCleaning() {
       const label = table ? table.id : 'Table';
       const area = table ? table.area : 'Dining Area A';
       cleaningStore.addActivity(`Started cleaning ${label}`, area, 'timer', 'orange');
-      await cleaningAPI.startTask(taskId);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.startTask(resolvedId);
       await loadDashboard();
     },
     completeTask: async (taskId: string) => {
@@ -406,7 +510,8 @@ export function useCleaning() {
       const label = table ? table.id : 'Table';
       const area = table ? table.area : 'Dining Area A';
       cleaningStore.addActivity(`Completed cleaning ${label}`, area, 'check_circle', 'green');
-      await cleaningAPI.completeTask(taskId);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.completeTask(resolvedId);
       await loadDashboard();
     },
     verifyTask: async (taskId: string) => {
@@ -414,7 +519,8 @@ export function useCleaning() {
       const label = table ? table.id : 'Table';
       const area = table ? table.area : 'Dining Area A';
       cleaningStore.addActivity(`Verified & approved ${label}`, area, 'verified', 'purple');
-      await cleaningAPI.verifyTask(taskId);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.verifyTask(resolvedId);
       await loadDashboard();
     },
     pauseTask: async (taskId: string, isPaused?: boolean) => {
@@ -422,7 +528,8 @@ export function useCleaning() {
       const label = table ? table.id : 'Table';
       const area = table ? table.area : 'Dining Area A';
       cleaningStore.addActivity(isPaused ? `Paused cleaning ${label}` : `Resumed cleaning ${label}`, area, 'pause', 'orange');
-      await cleaningAPI.pauseTask(taskId, isPaused);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.pauseTask(resolvedId, isPaused);
       await loadDashboard();
     },
     triggerDeepClean: async (taskId: string, isDeepCleaning?: boolean) => {
@@ -430,7 +537,8 @@ export function useCleaning() {
       const label = table ? table.id : 'Table';
       const area = table ? table.area : 'Dining Area A';
       cleaningStore.addActivity(`Triggered deep clean for ${label}`, area, 'cleaning_services', 'purple');
-      await cleaningAPI.triggerDeepClean(taskId, isDeepCleaning);
+      const resolvedId = resolveObjectId(taskId) || taskId;
+      await cleaningAPI.triggerDeepClean(resolvedId, isDeepCleaning);
       await loadDashboard();
     },
     reportMaintenanceIssue: async (data: {
@@ -441,10 +549,10 @@ export function useCleaning() {
     }) => {
       const table = cleaningStore.tables.find(t => t.id === data.tableId);
       const label = table ? table.id : 'Table';
-      const area = table ? table.area : 'Dining Area A';
       const desc = data.issueType ? data.issueType.replace(/_/g, ' ') : 'Maintenance issue';
       cleaningStore.addActivity(`Reported maintenance for ${label}`, desc, 'warning', 'orange');
-      const res = await cleaningAPI.reportMaintenanceIssue(data);
+      const resolvedId = resolveObjectId(data.tableId) || data.tableId;
+      const res = await cleaningAPI.reportMaintenanceIssue({ ...data, tableId: resolvedId });
       await loadDashboard();
       return res;
     },

@@ -903,14 +903,18 @@ export async function seedDevelopmentData(): Promise<void> {
       { new: true, upsert: true, setDefaultsOnInsert: true },
     ),
     OfferModel.findOneAndUpdate(
-      { restaurantId: amberTable._id, code: 'LUNCH10' },
+      { restaurantId: amberTable._id, promoCode: 'LUNCH10' },
       {
         $set: {
           restaurantId: amberTable._id,
-          name: 'Lunch Saver',
-          code: 'LUNCH10',
-          discountPercent: 10,
-          active: true,
+          title: 'Lunch Saver',
+          promoCode: 'LUNCH10',
+          discountType: 'PERCENTAGE',
+          discountValue: 10,
+          startDate: new Date(),
+          expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          status: 'ACTIVE',
+          image: '',
         },
       },
       { new: true, upsert: true, setDefaultsOnInsert: true },

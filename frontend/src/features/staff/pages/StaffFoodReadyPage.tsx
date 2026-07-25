@@ -46,7 +46,7 @@ export default function StaffFoodReadyPage() {
         {items.length > 0 && (
           <button
             onClick={markAllServed}
-            className="border border-green-500 text-green-605 hover:bg-green-50 dark:hover:bg-green-950/20 font-bold text-xs py-2 px-4 rounded-xl transition-all"
+            className="border border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 font-bold text-xs py-2 px-4 rounded-xl transition-all"
           >
             Mark All Picked Up
           </button>
@@ -71,7 +71,7 @@ export default function StaffFoodReadyPage() {
       )}
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {filteredItems.length > 0 ? (
           filteredItems.map(item => {
             const isDelayed = item.elapsedSec >= 300;
@@ -98,16 +98,16 @@ export default function StaffFoodReadyPage() {
                       isDelayed
                         ? 'bg-red-600 text-white animate-bounce'
                         : item.elapsedSec >= 240
-                          ? 'bg-orange-50 text-orange-650 dark:bg-orange-950/40 dark:text-orange-400'
-                          : 'bg-green-50 text-green-650 dark:bg-green-950/40 dark:text-green-400'
+                          ? 'bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400'
+                          : 'bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400'
                     }`}>
                       {isDelayed ? '⚠️ PICKUP DELAYED (>5 mins)' : `Ready: ${item.readySince}`}
                     </span>
                   </div>
 
                   <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center">
-                    <span className="font-bold text-sm text-slate-750 dark:text-slate-200 font-sans">{item.item}</span>
-                    <span className="text-xs font-black bg-white dark:bg-slate-850 text-dine-orange border border-slate-200 rounded-lg px-2.5 py-1">
+                    <span className="font-bold text-sm text-slate-700 dark:text-slate-200 font-sans">{item.item}</span>
+                    <span className="text-xs font-black bg-white dark:bg-slate-800 text-dine-orange border border-slate-200 rounded-lg px-2.5 py-1">
                       Qty: {item.qty}
                     </span>
                   </div>
@@ -119,7 +119,7 @@ export default function StaffFoodReadyPage() {
                     className={`flex-1 font-bold text-xs py-2 px-3 rounded-lg shadow-md transition-all ${
                       isDelayed
                         ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20'
-                        : 'bg-green-500 hover:bg-green-650 text-white shadow-green-500/10'
+                        : 'bg-green-500 hover:bg-green-600 text-white shadow-green-500/10'
                     }`}
                   >
                     Served to Guest

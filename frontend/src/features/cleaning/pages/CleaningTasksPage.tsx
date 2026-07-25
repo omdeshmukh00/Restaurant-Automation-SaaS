@@ -260,10 +260,10 @@ export default function CleaningTasksPage() {
   return (
     <div className="space-y-6 lg:space-y-8 animate-fadeIn cleaning-panel">
       {/* Header Info Action Buttons */}
-      <div className="flex justify-end gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:flex sm:justify-end gap-2.5 mb-4">
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
+          className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           {t('addTask')}
@@ -271,7 +271,7 @@ export default function CleaningTasksPage() {
         {/* 🔥 Connected onClick Trigger for Export button */}
         <button 
           onClick={handleExportTasksCSV}
-          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-all active:scale-95 text-xs cursor-pointer"
+          className="w-full sm:w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-all active:scale-95 text-xs cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">download</span>
           {t('export')}

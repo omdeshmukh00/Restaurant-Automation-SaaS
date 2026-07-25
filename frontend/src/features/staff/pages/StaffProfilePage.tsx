@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
+import { User, Bell, Settings2, LogOut, Edit2, Camera, Check, Shield, Globe, Monitor, Moon, Sun } from 'lucide-react';
 import { useStaffProfile } from '../hooks/useStaffProfile';
+import { useTheme, ThemeMode } from '../../../app/providers/ThemeProvider';
 import ImageCropperModal from '../../customer/components/dashboard/ImageCropperModal';
 import { useAuth } from '../../../auth/AuthProvider';
 import { apiClient } from '../../../shared/services/apiClient';
@@ -7,10 +9,17 @@ import { apiClient } from '../../../shared/services/apiClient';
 export default function StaffProfilePage() {
   const { signOut } = useAuth();
   const { profile, updateProfile } = useStaffProfile();
+  const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [activeSection, setActiveSection] = useState<'profile' | 'notifications' | 'system'>('profile');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showCropModal, setShowCropModal] = useState(false);
+
+  // Settings states
+  const [assistanceCalls, setAssistanceCalls] = useState(true);
+  const [foodReady, setFoodReady] = useState(true);
+  const [systemWarnings, setSystemWarnings] = useState(true);
 
   // Info Modal states
   const [editName, setEditName] = useState('');
@@ -45,7 +54,6 @@ export default function StaffProfilePage() {
   const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check if phone number was modified
     if (editPhone.trim() !== (profile.phone || '').trim()) {
       setIsSendingOtp(true);
       setOtpError(null);
@@ -66,7 +74,6 @@ export default function StaffProfilePage() {
       return;
     }
 
-    // Direct save if phone number was not changed
     try {
       await apiClient.patch('/users/me', {
         name: editName,
@@ -157,206 +164,250 @@ export default function StaffProfilePage() {
     setShowCropModal(false);
   };
 
-  interface ScheduleItem {
-    day: string;
-    shift: string;
-    defaultStatus: string;
-  }
-
-  const [scheduleData, setScheduleData] = useState<ScheduleItem[]>(() => {
-    const defaults = [
-      { day: 'Monday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
-      { day: 'Tuesday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
-      { day: 'Wednesday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
-      { day: 'Thursday', shift: 'Weekly Off', defaultStatus: 'Off' },
-      { day: 'Friday', shift: '04:00 PM - 11:00 PM', defaultStatus: 'Upcoming' },
-      { day: 'Saturday', shift: '12:00 PM - 11:00 PM (Double Shift)', defaultStatus: 'Upcoming' },
-      { day: 'Sunday', shift: '12:00 PM - 09:00 PM', defaultStatus: 'Upcoming' },
-    ];
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dineease-staff-schedule');
-      if (saved) {
-        try { return JSON.parse(saved); } catch (e) { return defaults; }
-      }
-    }
-    return defaults;
-  });
-
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [tempShifts, setTempShifts] = useState<Record<string, string>>({});
-
-  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const todayIndex = new Date().getDay(); // 0 is Sunday, 1 is Monday...
-
-  const schedule = scheduleData.map(item => {
-    const itemDayIndex = weekdays.indexOf(item.day);
-    const adjustedItemIdx = itemDayIndex === 0 ? 7 : itemDayIndex;
-    const adjustedTodayIdx = todayIndex === 0 ? 7 : todayIndex;
-
-    let status = 'Upcoming';
-    let dayLabel = item.day;
-
-    const isOff = item.shift.toLowerCase().includes('off');
-
-    if (isOff) {
-      status = 'Off';
-    } else if (adjustedItemIdx === adjustedTodayIdx) {
-      status = 'Active';
-      dayLabel = `${item.day} (Today)`;
-    } else if (adjustedItemIdx < adjustedTodayIdx) {
-      status = 'Completed';
-    }
-
-    return {
-      day: dayLabel,
-      shift: item.shift,
-      status
-    };
-  });
+  const navSections = [
+    { id: 'profile', label: 'Profile Settings', icon: User },
+    { id: 'notifications', label: 'Notification Preferences', icon: Bell },
+    { id: 'system', label: 'System Preferences', icon: Settings2 },
+  ];
 
   return (
     <>
-      <div className="space-y-6 animate-fadeIn">
+      <div className="space-y-6 max-w-6xl animate-fadeIn font-sans">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">My Profile</h1>
-          <p className="text-sm text-slate-550 mt-0.5">Manage your shift schedules, profile, and status.</p>
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
+            Settings
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Manage your personal profile, notification preferences, and system settings.
+          </p>
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Side: Profile Card */}
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative dark:bg-sd-surface-container dark:border-sd-outline-variant/40">
-            {/* Edit Pencil Button */}
-            <button
-              onClick={openInfoModal}
-              className="absolute top-4 right-4 text-slate-400 hover:text-dine-orange transition-colors cursor-pointer focus:outline-none"
-              title="Edit Profile Information"
-            >
-              <span className="material-symbols-outlined text-[18px]">edit</span>
-            </button>
+        {/* Sidebar + Main Content Layout */}
+        <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start">
+          {/* Vertical Settings Sidebar (matching design screenshot) */}
+          <nav className="w-full lg:w-64 shrink-0">
+            <ul className="flex lg:flex-col gap-1.5 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0">
+              {navSections.map(({ id, label, icon: Icon }) => {
+                const isActive = activeSection === id;
+                return (
+                  <li key={id} className="shrink-0 lg:shrink lg:w-full">
+                    <button
+                      onClick={() => setActiveSection(id as any)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left whitespace-nowrap lg:w-full lg:whitespace-normal cursor-pointer ${isActive
+                          ? 'bg-orange-500/10 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border border-orange-500/20 font-extrabold shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-100'
+                        }`}
+                    >
+                      <Icon
+                        className={`w-4 h-4 shrink-0 ${isActive
+                            ? 'text-orange-500 dark:text-orange-400'
+                            : 'text-slate-400 dark:text-slate-500'
+                          }`}
+                      />
+                      <span className="lg:truncate">{label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
 
-            <div className="text-center space-y-4">
-              <button
-                onClick={handlePhotoClick}
-                className="w-24 h-24 rounded-full bg-dine-orange/15 hover:scale-105 transition-transform mx-auto flex items-center justify-center text-dine-orange font-black text-3xl shadow-sm border border-dine-orange/10 overflow-hidden cursor-pointer relative group focus:outline-none"
-                title="Change Photo"
-              >
-                {profile.avatar ? (
-                  <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" />
-                ) : (
-                  profile.name.split(' ').map(n => n[0]).join('').toUpperCase()
-                )}
-                {/* Overlay camera icon on hover */}
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="material-symbols-outlined text-white text-[20px]">photo_camera</span>
-                </div>
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handlePhotoChange}
-                accept="image/*"
-                className="hidden"
-              />
+          {/* Main Active Section Content */}
+          <div className="flex-1 w-full space-y-6">
+            {/* 1. Profile Settings Section */}
+            {activeSection === 'profile' && (
+              <div className="space-y-6">
+                <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm relative dark:bg-sd-surface-container dark:border-sd-outline-variant/40">
+                  <button
+                    onClick={openInfoModal}
+                    className="absolute top-4 right-4 text-slate-400 hover:text-dine-orange transition-colors cursor-pointer focus:outline-none p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800"
+                    title="Edit Profile Information"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
 
-              <div>
-                <h2 className="font-extrabold text-lg text-slate-850 dark:text-slate-150 font-sans">{profile.name}</h2>
-                <p className="text-xs text-slate-455 dark:text-slate-400 font-sans mt-0.5">{profile.role} ({profile.id})</p>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-650 dark:bg-green-950/40 dark:text-green-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                {profile.status}
-              </div>
-            </div>
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                    <button
+                      onClick={handlePhotoClick}
+                      className="w-24 h-24 rounded-full bg-dine-orange/15 hover:scale-105 transition-transform flex items-center justify-center text-dine-orange font-black text-3xl shadow-sm border border-dine-orange/10 overflow-hidden cursor-pointer relative group focus:outline-none shrink-0"
+                      title="Change Photo"
+                    >
+                      {profile.avatar ? (
+                        <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" />
+                      ) : (
+                        profile.name.split(' ').map((n) => n[0]).join('').toUpperCase()
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="w-5 h-5 text-white" />
+                      </div>
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handlePhotoChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
 
-            <div className="mt-8 space-y-3 border-t border-slate-100 dark:border-sd-outline-variant/40 pt-4 text-xs font-sans">
-              <div className="flex justify-between">
-                <span className="text-slate-455 dark:text-slate-400">Assigned Section:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">{profile.section}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-455 dark:text-slate-400">Email:</span>
-                <span className="font-bold text-slate-850 dark:text-slate-200 truncate max-w-[150px]" title={profile.email}>{profile.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-455 dark:text-slate-400">Phone:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">{profile.phone}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-455 dark:text-slate-400">Joined DineEase:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-200">{profile.joined}</span>
-              </div>
-            </div>
+                    <div className="flex-1 text-center sm:text-left space-y-2">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h2 className="font-extrabold text-xl text-slate-850 dark:text-slate-150 font-sans">
+                          {profile.name}
+                        </h2>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">
+                        {profile.role} • ID: <span className="font-mono">{profile.id}</span>
+                      </p>
 
-            {/* Quick Actions */}
-            <div className="mt-8 pt-4 border-t border-slate-100 dark:border-sd-outline-variant/40 space-y-2.5">
-              <button
-                onClick={() => alert('Break request submitted to manager.')}
-                className="w-full border border-slate-200 dark:border-sd-outline-variant/60 dark:text-slate-300 hover:border-dine-orange hover:text-dine-orange font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer"
-              >
-                Request Break
-              </button>
-              <button
-                onClick={() => alert('Clocked out successfully. Enjoy your rest!')}
-                className="w-full bg-red-500 hover:bg-red-650 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-md transition-all cursor-pointer"
-              >
-                Clock Out
-              </button>
-              <button
-                onClick={() => signOut()}
-                className="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs py-2.5 px-4 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">logout</span>
-                Logout
-              </button>
-            </div>
-          </div>
-
-          {/* Right Side: Shift Schedule */}
-          <div className="lg:col-span-2 bg-white border border-slate-100 rounded-2xl p-6 shadow-sm dark:bg-sd-surface-container dark:border-sd-outline-variant/40">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-sd-outline-variant/40">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-dine-orange">calendar_month</span>
-                <h2 className="font-bold text-base text-slate-850 dark:text-slate-150 font-sans">Shift Schedule</h2>
-              </div>
-              <button
-                onClick={() => {
-                  setTempShifts(scheduleData.reduce((acc: Record<string, string>, curr) => ({ ...acc, [curr.day]: curr.shift }), {}));
-                  setShowScheduleModal(true);
-                }}
-                className="text-dine-orange hover:text-orange-655 font-bold text-xs flex items-center gap-1 transition-all border-none bg-transparent cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
-                Edit Schedule
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {schedule.map((sch, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-xl border flex items-center justify-between transition-all ${
-                    sch.status === 'Active'
-                      ? 'bg-dine-light-orange/30 border-dine-orange/30 dark:bg-orange-950/20 dark:border-dine-orange/40'
-                      : 'bg-slate-50 border border-slate-100 dark:bg-sd-surface-container-low dark:border-sd-outline-variant/20'
-                  }`}
-                >
-                  <div>
-                    <p className="font-bold text-xs text-slate-800 dark:text-slate-200 font-sans">{sch.day}</p>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-sans">{sch.shift}</p>
+                      <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="bg-slate-50 dark:bg-sd-surface-container-low p-3 rounded-xl border border-slate-100 dark:border-sd-outline-variant/30">
+                          <span className="text-[10px] text-slate-400 block">Assigned Zone</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{profile.section}</span>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-sd-surface-container-low p-3 rounded-xl border border-slate-100 dark:border-sd-outline-variant/30">
+                          <span className="text-[10px] text-slate-400 block">Email Address</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 truncate block" title={profile.email}>
+                            {profile.email}
+                          </span>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-sd-surface-container-low p-3 rounded-xl border border-slate-100 dark:border-sd-outline-variant/30">
+                          <span className="text-[10px] text-slate-400 block">Phone Number</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{profile.phone}</span>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-sd-surface-container-low p-3 rounded-xl border border-slate-100 dark:border-sd-outline-variant/30">
+                          <span className="text-[10px] text-slate-400 block">Joined Platform</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{profile.joined}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                    sch.status === 'Active' ? 'bg-orange-100 text-dine-orange dark:bg-orange-950/50 dark:text-orange-400 animate-pulse' :
-                    sch.status === 'Off' ? 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
-                    sch.status === 'Completed' ? 'bg-green-105 text-green-600 dark:bg-green-950/40 dark:text-green-400' :
-                    'bg-blue-50 text-blue-600 dark:bg-blue-950/40'
-                  }`}>
-                    {sch.status}
-                  </span>
+
+                  <div className="mt-6 pt-4 border-t border-slate-100 dark:border-sd-outline-variant/40 flex justify-end">
+                    <button
+                      onClick={() => signOut()}
+                      className="bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 font-bold text-xs py-2.5 px-5 rounded-xl transition-all cursor-pointer flex items-center gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* 2. Notification Preferences Section */}
+            {activeSection === 'notifications' && (
+              <div className="bg-white border border-slate-100 dark:bg-sd-surface-container dark:border-sd-outline-variant/40 rounded-2xl p-6 shadow-sm space-y-6">
+                <div>
+                  <h2 className="font-extrabold text-base text-slate-800 dark:text-slate-100 font-sans">
+                    Notification Preferences
+                  </h2>
+                  <p className="text-xs text-slate-450 dark:text-slate-400 mt-0.5 font-sans">
+                    Control sound, vibration, and push notification alerts for your shift assignments.
+                  </p>
+                </div>
+
+                <div className="space-y-4 font-sans text-xs">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">Customer Assistance Calls</p>
+                      <p className="text-[11px] text-slate-450 dark:text-slate-400 mt-0.5">
+                        Vibrate or sound when a guest calls for waiter assistance at assigned tables.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setAssistanceCalls(!assistanceCalls)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${assistanceCalls ? 'bg-dine-orange' : 'bg-slate-200 dark:bg-slate-700'
+                        }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${assistanceCalls ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">Food Ready Notifications</p>
+                      <p className="text-[11px] text-slate-450 dark:text-slate-400 mt-0.5">
+                        Alert immediately when food dishes are marked ready by kitchen chefs.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setFoodReady(!foodReady)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${foodReady ? 'bg-dine-orange' : 'bg-slate-200 dark:bg-slate-700'
+                        }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${foodReady ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">System Warnings & Alerts</p>
+                      <p className="text-[11px] text-slate-450 dark:text-slate-400 mt-0.5">
+                        Receive shift reassignments or high table delay warnings from supervisors.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setSystemWarnings(!systemWarnings)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${systemWarnings ? 'bg-dine-orange' : 'bg-slate-200 dark:bg-slate-700'
+                        }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${systemWarnings ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. System Preferences Section */}
+            {activeSection === 'system' && (
+              <div className="space-y-6">
+                {/* Theme Options */}
+                <div className="bg-white border border-slate-100 dark:bg-sd-surface-container dark:border-sd-outline-variant/40 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div>
+                    <h2 className="font-extrabold text-base text-slate-800 dark:text-slate-100 font-sans">
+                      Display Theme
+                    </h2>
+                    <p className="text-xs text-slate-450 dark:text-slate-400 mt-0.5 font-sans">
+                      Choose light or dark appearance, or sync with your system theme.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[
+                      { id: 'light', label: 'Light Mode', icon: Sun },
+                      { id: 'dark', label: 'Dark Mode', icon: Moon },
+                      { id: 'system', label: 'System Theme', icon: Monitor },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => setTheme(item.id as ThemeMode)}
+                          className={`flex flex-col items-center justify-center p-4 rounded-2xl border font-sans text-xs font-bold transition-all gap-2 cursor-pointer ${theme === item.id
+                              ? 'border-dine-orange bg-dine-light-orange/30 text-dine-orange dark:bg-orange-950/20'
+                              : 'border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-700 bg-slate-50 dark:bg-slate-800/50'
+                            }`}
+                        >
+                          <Icon className="w-5 h-5" />
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -366,16 +417,17 @@ export default function StaffProfilePage() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
             {otpStep ? (
-              /* Step 2: OTP Verification Form */
               <div>
-                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Verify Phone Change</h3>
+                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">
+                  Verify Phone Change
+                </h3>
                 <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-                  An OTP has been generated for changing phone number to <strong className="text-slate-700 dark:text-slate-200">{editPhone}</strong>.
+                  An OTP has been generated for changing phone number to{' '}
+                  <strong className="text-slate-700 dark:text-slate-200">{editPhone}</strong>.
                 </p>
 
                 <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded-xl text-[11px] text-amber-700 dark:text-amber-300 font-sans mb-4 space-y-1">
                   <p className="font-extrabold flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px]">terminal</span>
                     Terminal OTP Sent!
                   </p>
                   <p>Check your running backend server terminal console to get the 6-digit OTP code.</p>
@@ -383,7 +435,9 @@ export default function StaffProfilePage() {
 
                 <form onSubmit={handleVerifyOtp} className="space-y-4 font-sans text-xs">
                   <div>
-                    <label htmlFor="otp-input" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Enter 6-Digit OTP</label>
+                    <label htmlFor="otp-input" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                      Enter 6-Digit OTP
+                    </label>
                     <input
                       id="otp-input"
                       type="text"
@@ -400,9 +454,7 @@ export default function StaffProfilePage() {
                     />
                   </div>
 
-                  {otpError && (
-                    <p className="text-[11px] font-bold text-red-500 font-sans">{otpError}</p>
-                  )}
+                  {otpError && <p className="text-[11px] font-bold text-red-500 font-sans">{otpError}</p>}
 
                   <div className="flex gap-3 pt-2">
                     <button
@@ -425,15 +477,18 @@ export default function StaffProfilePage() {
                 </form>
               </div>
             ) : (
-              /* Step 1: Info Edit Form */
               <div>
-                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Edit Profile Information</h3>
+                <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">
+                  Edit Profile Information
+                </h3>
                 <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
                   Update your employee details below.
                 </p>
                 <form onSubmit={handleSaveInfo} className="space-y-4 font-sans text-xs">
                   <div>
-                    <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Full Name</label>
+                    <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                      Full Name
+                    </label>
                     <input
                       id="edit-name"
                       type="text"
@@ -444,51 +499,35 @@ export default function StaffProfilePage() {
                     />
                   </div>
                   <div>
-                    <label htmlFor="edit-role" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Role</label>
+                    <label htmlFor="edit-role" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                      Role
+                    </label>
                     <input
                       id="edit-role"
                       type="text"
                       value={editRole}
-                      onChange={(e) => setEditRole(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
+                      disabled
+                      readOnly
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 cursor-not-allowed font-medium opacity-80"
                     />
                   </div>
                   <div>
-                    <label htmlFor="edit-id" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Staff ID</label>
-                    <input
-                      id="edit-id"
-                      type="text"
-                      value={editId}
-                      onChange={(e) => setEditId(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="edit-section" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Assigned Section</label>
-                    <input
-                      id="edit-section"
-                      type="text"
-                      value={editSection}
-                      onChange={(e) => setEditSection(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Email</label>
+                    <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                      Email
+                    </label>
                     <input
                       id="edit-email"
                       type="email"
                       value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
+                      disabled
+                      readOnly
+                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-100 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400 cursor-not-allowed font-medium opacity-80"
                     />
                   </div>
                   <div>
-                    <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Phone</label>
+                    <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
+                      Phone
+                    </label>
                     <input
                       id="edit-phone"
                       type="text"
@@ -499,9 +538,7 @@ export default function StaffProfilePage() {
                     />
                   </div>
 
-                  {otpError && (
-                    <p className="text-[11px] font-bold text-red-500 font-sans">{otpError}</p>
-                  )}
+                  {otpError && <p className="text-[11px] font-bold text-red-500 font-sans">{otpError}</p>}
 
                   <div className="flex gap-3 pt-2">
                     <button
@@ -533,58 +570,6 @@ export default function StaffProfilePage() {
         onClose={() => setShowCropModal(false)}
         onConfirm={handleCropConfirm}
       />
-
-      {/* Edit Shift Schedule Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-md">
-            <h3 className="font-extrabold text-sm text-slate-850 dark:text-slate-100 mb-1 font-sans">Modify Shift Schedule</h3>
-            <p className="text-[11px] text-slate-400 mb-4 font-sans leading-relaxed">
-              Update your shift durations for each weekday.
-            </p>
-            <div className="space-y-3.5 max-h-[300px] overflow-y-auto pr-1">
-              {scheduleData.map(item => (
-                <div key={item.day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span className="font-bold text-xs text-slate-700 dark:text-slate-350 w-24 shrink-0 font-sans">{item.day}</span>
-                  <input
-                    type="text"
-                    value={tempShifts[item.day] || ''}
-                    onChange={e => setTempShifts({ ...tempShifts, [item.day]: e.target.value })}
-                    className="w-full sm:flex-1 p-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs"
-                    placeholder="e.g. 04:00 PM - 11:00 PM or Weekly Off"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
-              <button
-                type="button"
-                onClick={() => setShowScheduleModal(false)}
-                className="flex-1 py-2 bg-slate-105 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const updatedData = scheduleData.map(item => ({
-                    ...item,
-                    shift: tempShifts[item.day] || item.shift
-                  }));
-                  setScheduleData(updatedData);
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('dineease-staff-schedule', JSON.stringify(updatedData));
-                  }
-                  setShowScheduleModal(false);
-                }}
-                className="flex-1 py-2 bg-dine-orange text-white rounded-xl font-bold hover:bg-orange-600 transition-all cursor-pointer border-none"
-              >
-                Save Shifts
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

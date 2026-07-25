@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCleaning } from '../hooks/usecleaning';
 import { useNotifications } from '../hooks/useNotifications';
 import { useCleaningSearch } from '../components/dashboard/CleaningSearchContext';
 import { cleaningStore, CleaningRequest, CleaningStaffMember } from '../store/cleaning.store';
 import { useToast } from '../components/dashboard/Toast';
 import { useTranslation } from '../hooks/useTranslation';
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 interface HygieneTask {
   id: string;
@@ -31,51 +30,103 @@ interface TableTask {
   floor?: number;
 }
 
+interface TableRow {
+  id: string;
+  area: string;
+  seats: number;
+  status: string;
+  priority: 'High' | 'Medium' | 'Low';
+  lastCleaned: string;
+  assignedTo: { name: string; avatar: string } | null;
+  rawId: string;
+}
+
 export default function CleaningDashboard() {
   const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Store data states
+  const [tables, setTables] = useState(cleaningStore.tables);
+  const [staffList, setStaffList] = useState<CleaningStaffMember[]>(cleaningStore.staffMembers);
   const [requests, setRequests] = useState(cleaningStore.requests);
+
+  // Filter & Toolbar States
+  const [statusFilter, setStatusFilter] = useState('All Status');
+  const [priorityFilter, setPriorityFilter] = useState('All Priority');
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [isPriorityOpen, setIsPriorityOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const priorityRef = useRef<HTMLDivElement>(null);
+
+  // Table Management Modals State
+  const [showEditTableModal, setShowEditTableModal] = useState(false);
+  const [editingTable, setEditingTable] = useState<TableRow | null>(null);
+  const [editTableArea, setEditTableArea] = useState('Dining Area A');
+  const [editTableSeats, setEditTableSeats] = useState(4);
+  const [editTablePriority, setEditTablePriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningTableId, setAssigningTableId] = useState<string | null>(null);
+  const [assigningTableLabel, setAssigningTableLabel] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Cleaning Feature Modals State
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const [newRequestTable, setNewRequestTable] = useState('');
   const [newRequestPriority, setNewRequestPriority] = useState('Medium');
-  const [showRequestModal, setShowRequestModal] = useState(false);
   const [showSpecialModal, setShowSpecialModal] = useState(false);
   const [specialNotes, setSpecialNotes] = useState('');
-  const [selectedRequest, setSelectedRequest] = useState<CleaningRequest | null>(null);
-  const [tables, setTables] = useState(cleaningStore.tables);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  // Staff Management State
-  const [staffList, setStaffList] = useState<CleaningStaffMember[]>(cleaningStore.staffMembers);
-  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
-  const [newStaffName, setNewStaffName] = useState('');
-  const [newStaffRole, setNewStaffRole] = useState('Cleaning Staff');
-  const [newStaffArea, setNewStaffArea] = useState('Dining Area A');
-  const [newStaffPhone, setNewStaffPhone] = useState('');
+  // Store subscriptions
   useEffect(() => {
     const unsubscribe = cleaningStore.subscribe(() => {
       setTables([...cleaningStore.tables]);
       setStaffList([...cleaningStore.staffMembers]);
+      setRequests([...cleaningStore.requests]);
     });
     return () => { unsubscribe(); };
   }, []);
 
-  const { unreadCount, addNotification } = useNotifications();
   useEffect(() => {
-    const unsubscribe = cleaningStore.subscribe(() => {
-      setRequests([...cleaningStore.requests]);
-    });
-    return () => {
-      unsubscribe();
-    };
+    function handleClickOutside(event: MouseEvent) {
+      if (statusRef.current && !statusRef.current.contains(event.target as Node)) setIsStatusOpen(false);
+      if (priorityRef.current && !priorityRef.current.contains(event.target as Node)) setIsPriorityOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const { urgentTasks, startTask, completeTask, verifyTask, reportIssue } = useCleaning();
-  const allRequests = cleaningStore.requests;
+  const { urgentTasks, startTask, completeTask, verifyTask, createTask, assignTaskToStaff, profile } = useCleaning();
+
+  const staffName = profile?.name ? profile.name.trim() : 'Riya';
+  const firstName = staffName.split(' ')[0] || 'Riya';
 
   const safeTasks = (urgentTasks || []) as unknown as TableTask[];
-  const requestCount =
-    (urgentTasks as unknown as TableTask[])?.filter((t) => t.rawStatus === 'REQUESTED').length || 0;
+  const requestCount = safeTasks.filter((t) => t.rawStatus === 'REQUESTED').length || 0;
+
+  // Filtered lists
+  const tableRows: TableRow[] = tables.map((t) => ({
+    id: t.id,
+    area: t.area || t.section || 'Dining Area A',
+    seats: t.seats || 4,
+    status: t.status,
+    priority: t.priority,
+    lastCleaned: t.timeAgo || 'Just Now',
+    assignedTo: t.assignedTo || null,
+    rawId: t.taskId || t.id,
+  }));
+
+  const filteredTables = tableRows.filter((t) => {
+    const matchesSearch =
+      t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.area.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'All Status' || t.status === statusFilter;
+    const matchesPriority = priorityFilter === 'All Priority' || t.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
 
   const tablesToClean = tables
     .filter((t) => t.status === 'Needs Cleaning' || t.status === 'Cleaning Requested')
@@ -103,7 +154,7 @@ export default function CleaningDashboard() {
     }));
 
   const completedToday = tables
-    .filter((t) => t.status === 'Ready for Inspection' || t.status === 'Done')
+    .filter((t) => (t.status as string) === 'Ready for Inspection' || (t.status as string) === 'Done' || (t.status as string) === 'Completed')
     .map((t) => ({
       id: t.id,
       time: t.timeAgo || 'Just Now',
@@ -114,7 +165,12 @@ export default function CleaningDashboard() {
       floor: t.floor || 1,
     }));
 
-  // Maintain original static array context for Hygiene checklist items
+  const filteredTablesToClean = tablesToClean.filter((t) =>
+    t.id.toLowerCase().includes(searchQuery.toLowerCase()) || t.priority.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const filteredInProgress = inProgress.filter((i) => i.id.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredCompleted = completedToday.filter((c) => c.id.toLowerCase().includes(searchQuery.toLowerCase()));
+
   const [hygieneTasks, setHygieneTasks] = useState<HygieneTask[]>([
     {
       id: '1',
@@ -145,479 +201,749 @@ export default function CleaningDashboard() {
     },
   ]);
 
-  // Operational pipeline click interceptors wrapping original layout events
-  const handleStartCleaning = (table: TableTask) => {
-    startTask(table.rawId || '');
-  };
-
-  const handleContinue = (item: TableTask) => {
-    completeTask(item.rawId || '');
-  };
-
-  const handleToggleHygieneTask = (id: string) => {
+  const handleToggleHygieneTask = (taskId: string) => {
     setHygieneTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === id) {
-          const completed = !t.completed;
-          const now = new Date();
-          const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-          return {
-            ...t,
-            completed,
-            lastDone: completed ? `Completed at ${timeStr}` : '09:15 AM',
-          };
-        }
-        return t;
-      })
+      prev.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task))
     );
   };
 
- const handleCreateRequest = (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!newRequestTable.trim()) return;
-  const tableId = newRequestTable.toUpperCase().startsWith('T')
-    ? newRequestTable.toUpperCase()
-    : `T${newRequestTable}`;
 
-    cleaningStore.addCleaningRequest({
-      id: `CR-2026-${Math.floor(Math.random() * 999)}`,
-      type: 'Cleaning Request',
-      icon: 'table_restaurant',
-      iconColor: 'text-orange-500',
-      location: `Table ${tableId}`,
-      requestedBy: {
-        name: 'Staff',
-        avatar:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuANsaeL1qIrdjS8VjlskxOHt17ofWL0mQA8HTEyUyGUmb0WZEoFeVIhAYDxByw8LuxWxFKIdV270hwAPBmZFNJdIOoLB7X4CRStTLzQ66uJ709k9Kvpbt3yDChYZmi0IOgzaKGIARmUFWTp8fiuOG-poilaUus94iK5MEMaPofwxQGipJFvuis9fWEp53IS84fln5N1GSiP7xWII9WnJi1qTw5gFY4eKQQgrXVlslMwV6TbZi4nnm2vGRG3hjoOoFQyNc23SGR4j9U',
-      },
-      priority: 'High',
-      status: 'Pending',
-      requestedOn: new Date().toLocaleDateString(),
-      requestedTime: new Date().toLocaleTimeString(),
+
+  const handleToggleStatus = async (rawId: string, currentStatus: string) => {
+    const tableObj = tables.find((t) => t.id === rawId || t.taskId === rawId);
+    const taskId = tableObj?.taskId || rawId;
+
+    if (currentStatus === 'Needs Cleaning' || currentStatus === 'Cleaning Requested') {
+      cleaningStore.startCleaning(taskId);
+      await startTask(taskId);
+      showToast(`Started cleaning ${tableObj?.id || rawId}.`, 'success');
+    } else if (currentStatus === 'In Progress') {
+      cleaningStore.completeInspection(taskId);
+      await completeTask(taskId);
+      showToast(`Finished cleaning ${tableObj?.id || rawId}. Sent for inspection.`, 'success');
+    } else if (currentStatus === 'Ready for Inspection') {
+      cleaningStore.verifyInspection(taskId);
+      await verifyTask(taskId);
+      showToast(`Table ${tableObj?.id || rawId} verified as Available.`, 'success');
+    }
+  };
+
+  const handleOpenEditModal = (row: TableRow) => {
+    setEditingTable(row);
+    setEditTableArea(row.area);
+    setEditTableSeats(row.seats);
+    setEditTablePriority(row.priority);
+    setOpenMenuId(null);
+    setShowEditTableModal(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTable) return;
+    cleaningStore.editTable(editingTable.rawId, {
+      area: editTableArea,
+      seats: editTableSeats,
+      priority: editTablePriority,
     });
-    cleaningStore.addTable({
-    id: tableId,
-    area: 'Dining Area A',
-    seats: 4,
-    status: 'Needs Cleaning',
-    priority: 'High',
-    timeAgo: 'Just Now',
-    assignedTo: null
-  });
+    showToast(`Table ${editingTable.id} updated.`, 'success');
+    setShowEditTableModal(false);
+    setEditingTable(null);
+  };
 
-    window.dispatchEvent(
-      new CustomEvent('new-cleaning-request', {
-        detail: {
-          id: Date.now(),
-          title: `New Request: ${tableId}`,
-          message: 'Table requires immediate cleaning.',
-          read: false,
-        },
-      })
-    );
+  const handleDeleteTable = (id: string) => {
+    cleaningStore.deleteTable(id);
+    showToast(`Table ${id} removed.`, 'warning');
+    setDeleteConfirmId(null);
+    setOpenMenuId(null);
+  };
 
+  const handleAssignStaff = async (member: CleaningStaffMember) => {
+    if (!assigningTableId) return;
+    const tableObj = tables.find((t) => t.id === assigningTableId || t.taskId === assigningTableId);
+    const taskId = tableObj?.taskId || assigningTableId;
+
+    try {
+      await assignTaskToStaff(taskId, member.id);
+      showToast(`${member.name} assigned to ${tableObj?.id || assigningTableId}.`, 'success');
+      setShowAssignModal(false);
+      setAssigningTableId(null);
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error('Failed to assign staff', err);
+    }
+  };
+
+  const handleExportData = () => {
+    const csvRows = [
+      ['Table ID', 'Area / Zone', 'Seats Configuration', 'Operational Status', 'Priority Vector', 'Last Cleaned Time'],
+      ...filteredTables.map((t) => [t.id, t.area, t.seats, t.status, t.priority, t.lastCleaned]),
+    ];
+    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.map((e) => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', encodedUri);
+    downloadAnchor.setAttribute('download', `CleanServe_Tables_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+  };
+
+  const handleCreateRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRequestTable.trim()) return;
+
+    await createTask({ tableId: newRequestTable.trim(), priority: newRequestPriority });
+    showToast(`Cleaning request for ${newRequestTable.toUpperCase()} created.`, 'success');
     setNewRequestTable('');
     setShowRequestModal(false);
   };
 
-  const filteredTablesToClean = tablesToClean.filter(
-    (t) =>
-      t.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.priority.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredInProgress = inProgress.filter((i) =>
-    i.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredCompleted = completedToday.filter((c) =>
-    c.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const filteredHygiene = hygieneTasks.filter((h) =>
-    h.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Stats Counters driven cleanly by store array lengths
+  const totalTablesCount = tables.length;
   const totalTablesToClean = tablesToClean.length;
   const totalInProgress = inProgress.length;
   const totalCleanedToday = completedToday.length;
-  const hygieneScore = '98%';
 
   return (
     <div className="space-y-6 lg:space-y-8 animate-fadeIn cleaning-panel">
+      {/* Welcome Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-sd-surface-container p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
+            Hello, {firstName}!
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 font-sans">
+            Welcome back! Monitor live restaurant tables and cleaning operations.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {requestCount > 0 && (
+            <button
+              onClick={() => setShowHistoryModal(true)}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md shadow-red-500/10 transition-all animate-pulse cursor-pointer border-none outline-none font-sans"
+            >
+              <span className="material-symbols-outlined text-[16px]">notifications_active</span>
+              {requestCount} Urgent Request{requestCount !== 1 ? 's' : ''}
+            </button>
+          )}
+          <button
+            onClick={() => setShowRequestModal(true)}
+            className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/10 transition-all cursor-pointer border-none outline-none font-sans"
+          >
+            <span className="material-symbols-outlined text-[16px]">add_task</span>
+            New Request
+          </button>
+        </div>
+      </div>
+
       {/* Top Stats Grid */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <div className="bg-white dark:bg-sd-surface-container p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
-          <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
-            <span className="material-symbols-outlined text-[24px]">table_restaurant</span>
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="bg-white dark:bg-sd-surface-container p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
+          <div className="w-11 h-11 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
+            <span className="material-symbols-outlined text-[22px]">table_restaurant</span>
           </div>
           <div>
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
-              {totalTablesToClean}
+              {totalTablesCount}
             </h3>
             <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">
-              {t('tablesToClean')}
+              Total Tables ({totalTablesToClean} Needs Cleaning)
             </p>
-            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5 inline-block">
-              {t('pending')}
-            </span>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-sd-surface-container p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
-          <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
-            <span className="material-symbols-outlined text-[24px]">restaurant_menu</span>
+        <div className="bg-white dark:bg-sd-surface-container p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
+          <div className="w-11 h-11 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
+            <span className="material-symbols-outlined text-[22px]">cleaning_services</span>
           </div>
           <div>
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
               {totalInProgress}
             </h3>
             <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">{t('inProgress')}</p>
-            <span className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mt-0.5 inline-block">
-              {t('cleaning')}
-            </span>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-sd-surface-container p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
-          <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-950/40 flex items-center justify-center text-green-600 dark:text-green-455 shrink-0">
-            <span className="material-symbols-outlined text-[24px]">check_circle</span>
+        <div className="bg-white dark:bg-sd-surface-container p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
+          <div className="w-11 h-11 rounded-full bg-green-100 dark:bg-green-950/40 flex items-center justify-center text-green-600 dark:text-green-455 shrink-0">
+            <span className="material-symbols-outlined text-[22px]">check_circle</span>
           </div>
           <div>
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
               {totalCleanedToday}
             </h3>
-            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">
-              {t('cleanedToday')}
-            </p>
-            <span className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-wider mt-0.5 inline-block font-sans">
-              {t('completed')}
-            </span>
+            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">{t('cleanedToday')}</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-sd-surface-container p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
-          <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
-            <span className="material-symbols-outlined text-[24px]">verified_user</span>
+        <div className="bg-white dark:bg-sd-surface-container p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4 transition-transform hover:-translate-y-1">
+          <div className="w-11 h-11 rounded-full bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+            <span className="material-symbols-outlined text-[22px]">verified_user</span>
           </div>
           <div>
             <h3 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-none">
-              {hygieneScore}
+              98%
             </h3>
-            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">
-              {t('hygieneScore')}
-            </p>
-            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-455 uppercase tracking-wider mt-0.5 inline-block font-sans">
-              {t('excellent')}
-            </span>
+            <p className="text-xs text-slate-450 dark:text-slate-400 mt-1 font-sans">{t('hygieneScore')}</p>
           </div>
         </div>
       </section>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-12 gap-6 lg:gap-8">
-        {/* Left Column: Tables to Clean */}
-        <div className="col-span-12 lg:col-span-7 space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-                  {t('tablesToClean')}
-                </h2>
-                <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                  {filteredTablesToClean.length}
-                </span>
-              </div>
-            </div>
-
-            {filteredTablesToClean.length === 0 ? (
-              <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-8 text-center text-slate-400">
-                <span className="material-symbols-outlined text-4xl mb-2 text-slate-300 dark:text-slate-700">
-                  playlist_add_check
-                </span>
-                <p className="text-xs font-semibold">{t('noPendingTables')}</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {filteredTablesToClean.map((table) => (
-                  <div
-                    key={table.rawId}
-                    className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-orange-500/40 transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className={`material-symbols-outlined ${table.iconColor}`}>
-                            table_restaurant
-                          </span>
-                          <span className="font-extrabold text-base text-slate-800 dark:text-slate-200">
-                            {table.id}
-                          </span>
-                        </div>
-                        <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${table.priorityClass}`}
-                        >
-                          {t(table.priority.toLowerCase())} {t('priority')}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400 text-[11px] mb-3 font-sans font-bold">
-                        <span className="material-symbols-outlined text-[14px] text-slate-400 shrink-0">location_on</span>
-                        <span>{table.section} · Floor {table.floor}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-slate-450 dark:text-slate-400 text-[10px] mb-4 font-sans font-semibold">
-                        <div className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">groups</span>
-                          {table.seats} {t('seats')}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px]">schedule</span>
-                          {table.timeAgo}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleStartCleaning(table)}
-                      className="w-full py-2 bg-transparent border border-orange-500 text-orange-500 rounded-xl text-xs font-bold hover:bg-orange-500 hover:text-white transition-all duration-200 active:scale-95 cursor-pointer"
-                    >
-                      {t('startCleaning')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Comprehensive Table Management Section */}
+      <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden space-y-4 p-5">
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
+              Table Overview & Management
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-sans">
+              View all restaurant tables, update cleaning status, assign staff, and edit layout.
+            </p>
           </div>
 
-          {/* Completed Today List */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-                  {t('completedTodayHeader')}
-                </h2>
-                <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                  {filteredCompleted.length}
-                </span>
-              </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Status Filter */}
+            <div className="relative" ref={statusRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStatusOpen(!isStatusOpen);
+                  setIsPriorityOpen(false);
+                }}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
+              >
+                <span>{t(statusFilter)}</span>
+                <span className="material-symbols-outlined text-sm text-slate-400">keyboard_arrow_down</span>
+              </button>
+              {isStatusOpen && (
+                <div className="absolute left-0 mt-1.5 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden flex flex-col font-sans text-xs z-30">
+                  {['All Status', 'Needs Cleaning', 'In Progress', 'Ready for Inspection', 'Available'].map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(st);
+                        setIsStatusOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 font-bold transition-colors cursor-pointer ${
+                        statusFilter === st
+                          ? 'bg-orange-500 text-white'
+                          : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
+                      }`}
+                    >
+                      {t(st)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {filteredCompleted.length === 0 ? (
-              <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400">
-                <p className="text-xs">{t('noCompletedTables')}</p>
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredCompleted.map((item) => (
-                  <div
-                    key={item.rawId}
-                    className="flex items-center justify-between p-4 font-sans text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="material-symbols-outlined text-green-500"
-                        style={{ fontVariationSettings: "'FILL' 1" }}
-                      >
-                        check_circle
-                      </span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200">
-                        {item.id}
-                      </span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
-                        ({t(item.section || '')} · {t('floor')} {item.floor})
-                      </span>
-                    </div>
-                    <span className="text-slate-400 dark:text-slate-500 font-semibold">
-                      {item.seats} {t('seats')}
-                    </span>
-                    <span className="text-slate-450 dark:text-slate-400 font-bold">
-                      {item.rawStatus === 'COMPLETED' ? (
-                        <button
-                         onClick={() => {
-        verifyTask(item.rawId || '');
-     }}
-                          className="bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-150 active:scale-95 cursor-pointer"
-                        >
-                          {t('verifyAudit')}
-                        </button>
-                      ) : (
-                        item.time
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+
+            {/* Priority Filter */}
+            <div className="relative" ref={priorityRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPriorityOpen(!isPriorityOpen);
+                  setIsStatusOpen(false);
+                }}
+                className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans py-2 px-3 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 outline-none hover:border-orange-500 transition-colors cursor-pointer"
+              >
+                <span>{t(priorityFilter)}</span>
+                <span className="material-symbols-outlined text-sm text-slate-400">keyboard_arrow_down</span>
+              </button>
+              {isPriorityOpen && (
+                <div className="absolute left-0 mt-1.5 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden flex flex-col font-sans text-xs z-30">
+                  {['All Priority', 'High', 'Medium', 'Low'].map((pr) => (
+                    <button
+                      key={pr}
+                      type="button"
+                      onClick={() => {
+                        setPriorityFilter(pr);
+                        setIsPriorityOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 font-bold transition-colors cursor-pointer ${
+                        priorityFilter === pr
+                          ? 'bg-orange-500 text-white'
+                          : 'text-slate-700 dark:text-slate-200 hover:bg-orange-500/10 hover:text-orange-500'
+                      }`}
+                    >
+                      {t(pr)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleExportData}
+              type="button"
+              className="flex items-center gap-1.5 px-3.5 py-2 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-sans font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">download</span>
+              {t('export')}
+            </button>
           </div>
         </div>
 
-        {/* Right Column: In Progress & Features */}
-        <div className="col-span-12 lg:col-span-5 space-y-6 md:space-y-8">
-          {/* In Progress */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-                  {t('inProgress')}
-                </h2>
-                <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
-                  {filteredInProgress.length}
-                </span>
-              </div>
-            </div>
-
-            {filteredInProgress.length === 0 ? (
-              <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400">
-                <p className="text-xs">{t('noActiveCleaningTasks')}</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {filteredInProgress.map((item) => (
-                  <div
-                    key={item.rawId}
-                    className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center text-center"
-                  >
-                    <div className="relative w-16 h-16 mb-3">
-                      <svg className="w-full h-full transform -rotate-90">
-                        <circle
-                          className="text-slate-100 dark:text-slate-800"
-                          cx="32"
-                          cy="32"
-                          fill="transparent"
-                          r="26"
-                          stroke="currentColor"
-                          strokeWidth="3.5"
-                        />
-                        <circle
-                          className="text-orange-500"
-                          cx="32"
-                          cy="32"
-                          fill="transparent"
-                          r="26"
-                          stroke="currentColor"
-                          strokeDasharray="163.3"
-                          strokeDashoffset={163.3 - (163.3 * item.progress) / 100}
-                          strokeWidth="3.5"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center font-bold text-xs font-sans text-slate-850 dark:text-slate-200">
-                        {item.progress}%
+        {/* Table list view */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse font-sans text-xs">
+            <thead>
+              <tr className="bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 font-bold">
+                <th className="px-4 py-3 uppercase tracking-wider">{t('tableNo')}</th>
+                <th className="px-4 py-3 uppercase tracking-wider">{t('area')}</th>
+                <th className="px-4 py-3 uppercase tracking-wider">{t('seats')}</th>
+                <th className="px-4 py-3 uppercase tracking-wider">{t('status')}</th>
+                <th className="px-4 py-3 uppercase tracking-wider">{t('priority')}</th>
+                <th className="px-4 py-3 uppercase tracking-wider">Last Cleaned</th>
+                <th className="px-4 py-3 uppercase tracking-wider">{t('assignedTo')}</th>
+                <th className="px-4 py-3 uppercase tracking-wider text-right">{t('actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredTables.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                    No tables found matching current search and filters.
+                  </td>
+                </tr>
+              ) : (
+                filteredTables.map((row) => (
+                  <tr key={row.rawId} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                    <td className="px-4 py-3 font-extrabold text-slate-800 dark:text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-orange-500 text-base">table_bar</span>
+                        <span>{row.id}</span>
                       </div>
-                    </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium">{row.area}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300">{row.seats} Seats</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => handleToggleStatus(row.rawId, row.status)}
+                        className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider border cursor-pointer transition-colors ${
+                          row.status === 'Available' || row.status === 'Done'
+                            ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400'
+                            : row.status === 'In Progress'
+                            ? 'bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/20 dark:text-orange-400'
+                            : row.status === 'Ready for Inspection'
+                            ? 'bg-purple-50 text-purple-750 border-purple-200 dark:bg-purple-950/20 dark:text-purple-400'
+                            : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-slate-800 dark:text-orange-400'
+                        }`}
+                      >
+                        {row.status}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          row.priority === 'High'
+                            ? 'bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400'
+                            : row.priority === 'Medium'
+                            ? 'bg-orange-50 text-orange-600 dark:bg-orange-950/20 dark:text-orange-400'
+                            : 'bg-green-50 text-green-600 dark:bg-green-950/20 dark:text-green-400'
+                        }`}
+                      >
+                        {row.priority}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-medium">{row.lastCleaned}</td>
+                    <td className="px-4 py-3">
+                      {row.assignedTo ? (
+                        <div className="flex items-center gap-1.5">
+                          <img
+                            src={row.assignedTo.avatar}
+                            alt={row.assignedTo.name}
+                            className="w-5 h-5 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                          />
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
+                            {row.assignedTo.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => {
+                            setAssigningTableId(row.rawId);
+                            setAssigningTableLabel(row.id);
+                            setShowAssignModal(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-orange-500 rounded-lg transition-colors cursor-pointer"
+                          title="Assign Staff"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">person_add</span>
+                        </button>
+                        <button
+                          onClick={() => handleOpenEditModal(row)}
+                          className="p-1 text-slate-400 hover:text-orange-500 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Table"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirmId(row.rawId)}
+                          className="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Table"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">delete</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-                    <div className="font-extrabold text-sm text-slate-800 dark:text-slate-200 mb-0.5">
-                      {item.id}
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 font-sans font-semibold">
-                      {t(item.section || '')} · {t('floor')} {item.floor}
-                    </div>
-                    <p className="text-[10px] text-slate-400 mb-3 font-sans font-semibold">
-                      {item.timeAgo}
-                    </p>
-                    <button
-                      onClick={() => handleContinue(item)}
-                      className="w-full py-1.5 bg-orange-500 text-white rounded-xl text-[11px] font-bold hover:bg-orange-600 transition-all duration-200 active:scale-95 shadow-sm shadow-orange-500/20 cursor-pointer"
-                    >
-                      {item.progress >= 90 ? t('complete') : t('continue')}
-                    </button>
-                  </div>
-                ))}
+      {/* Operations & Features Section (Zero Empty Space Layout) */}
+      <div className="space-y-6 lg:space-y-8">
+        {/* Cleaning Request Features (3 Action Cards across full width) */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
+            {t('cleaningRequestFeatures')}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <button
+              onClick={() => setShowRequestModal(true)}
+              className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-orange-500/40 transition-all flex items-center gap-3.5 group cursor-pointer text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center text-orange-500 shrink-0 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-[20px]">add_task</span>
               </div>
-            )}
-          </div>
-
-          {/* Action Grid */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-              {t('cleaningRequestFeatures')}
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                onClick={() => setShowRequestModal(true)}
-                className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm text-center hover:scale-[1.02] transition-transform flex flex-col items-center group cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center text-orange-500 mb-3 group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">add_task</span>
-                </div>
-                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-1">
+              <div>
+                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
                   {t('newRequest')}
                 </span>
-                <span className="text-[9px] text-slate-400 leading-tight">
+                <span className="text-[10px] text-slate-400 font-sans leading-tight block mt-0.5">
                   {t('newRequestDesc')}
                 </span>
-              </button>
+              </div>
+            </button>
 
-              <button
-                onClick={() => setShowHistoryModal(true)}
-                className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm text-center hover:scale-[1.02] transition-transform flex flex-col items-center group cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center text-purple-600 mb-3 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">history</span>
-                </div>
-                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-1">
+            <button
+              onClick={() => setShowHistoryModal(true)}
+              className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-purple-500/40 transition-all flex items-center gap-3.5 group cursor-pointer text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center text-purple-600 shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-[20px]">history</span>
+              </div>
+              <div>
+                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
                   {t('requestHistory')}
                 </span>
-                <span className="text-[9px] text-slate-400 leading-tight">
+                <span className="text-[10px] text-slate-400 font-sans leading-tight block mt-0.5">
                   {t('requestHistoryDesc')}
                 </span>
-              </button>
+              </div>
+            </button>
 
-              <button
-                onClick={() => setShowSpecialModal(true)}
-                className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm text-center hover:scale-[1.02] transition-transform flex flex-col items-center group cursor-pointer col-span-2"
-              >
-                <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center text-orange-600 mb-3 group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">stars</span>
-                </div>
-                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 mb-1">
+            <button
+              onClick={() => setShowSpecialModal(true)}
+              className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-orange-500/40 transition-all flex items-center gap-3.5 group cursor-pointer text-left"
+            >
+              <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-950/30 flex items-center justify-center text-orange-600 shrink-0 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                <span className="material-symbols-outlined text-[20px]">stars</span>
+              </div>
+              <div>
+                <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">
                   {t('specialRequest')}
                 </span>
-                <span className="text-[9px] text-slate-400 leading-tight">
+                <span className="text-[10px] text-slate-400 font-sans leading-tight block mt-0.5">
                   {t('specialRequestDesc')}
                 </span>
-              </button>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        {/* Hygiene Tasks (3 Checklist Cards across full width) */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
+            {t('hygieneTasks')}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {hygieneTasks.map((task) => (
+              <div
+                key={task.id}
+                className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3 font-sans">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${task.colorClass}`}>
+                    <span className="material-symbols-outlined text-[18px]">{task.icon}</span>
+                  </div>
+                  <div>
+                    <p className={`font-bold text-xs ${task.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                      {t(task.name)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-semibold">{task.lastDone}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggleHygieneTask(task.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border font-sans transition-all active:scale-95 shrink-0 ${
+                    task.completed
+                      ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
+                      : 'bg-orange-500 text-white border-transparent hover:bg-orange-600'
+                  }`}
+                >
+                  {task.completed ? t('completed') : t('markDone')}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* In Progress Tasks */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
+                {t('inProgress')} Tasks
+              </h2>
+              <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                {filteredInProgress.length}
+              </span>
             </div>
           </div>
 
+          {filteredInProgress.length === 0 ? (
+            <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400 flex flex-col items-center justify-center">
+              <span className="material-symbols-outlined text-3xl mb-1.5 text-slate-300 dark:text-slate-700">cleaning_services</span>
+              <p className="text-xs font-semibold">{t('noActiveCleaningTasks')}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filteredInProgress.map((item) => (
+                <div
+                  key={item.rawId}
+                  className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center text-center"
+                >
+                  <div className="relative w-16 h-16 mb-3">
+                    <svg className="w-full h-full transform -rotate-90">
+                      <circle
+                        className="text-slate-100 dark:text-slate-800"
+                        cx="32"
+                        cy="32"
+                        fill="transparent"
+                        r="26"
+                        stroke="currentColor"
+                        strokeWidth="3.5"
+                      />
+                      <circle
+                        className="text-orange-500"
+                        cx="32"
+                        cy="32"
+                        fill="transparent"
+                        r="26"
+                        stroke="currentColor"
+                        strokeDasharray="163.3"
+                        strokeDashoffset={163.3 - (163.3 * item.progress) / 100}
+                        strokeWidth="3.5"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center font-bold text-xs font-sans text-slate-850 dark:text-slate-200">
+                      {item.progress}%
+                    </div>
+                  </div>
 
-        </div>
+                  <div className="font-extrabold text-sm text-slate-800 dark:text-slate-200 mb-0.5">
+                    {item.id}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 font-sans font-semibold">
+                    {item.section} · {t('floor')} {item.floor}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mb-3 font-sans font-semibold">
+                    {item.timeAgo}
+                  </p>
+                  <button
+                    onClick={() => handleToggleStatus(item.rawId, 'In Progress')}
+                    className="w-full py-1.5 bg-orange-500 text-white rounded-xl text-[11px] font-bold hover:bg-orange-600 transition-all duration-200 active:scale-95 shadow-sm shadow-orange-500/20 cursor-pointer"
+                  >
+                    {item.progress >= 90 ? t('complete') : t('continue')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Completed Today Audit Feed */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
+                {t('completedTodayHeader')}
+              </h2>
+              <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                {filteredCompleted.length}
+              </span>
+            </div>
+          </div>
+          {filteredCompleted.length === 0 ? (
+            <div className="bg-white dark:bg-sd-surface-container border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-center text-slate-400">
+              <p className="text-xs">{t('noCompletedTables')}</p>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredCompleted.map((item) => (
+                <div key={item.rawId} className="flex items-center justify-between p-4 font-sans text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-green-500" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      check_circle
+                    </span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{item.id}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
+                      ({item.section} · {t('floor')} {item.floor})
+                    </span>
+                  </div>
+                  <span className="text-slate-400 dark:text-slate-500 font-semibold">{item.seats} {t('seats')}</span>
+                  <span className="text-slate-450 dark:text-slate-400 font-bold">
+                    {item.rawStatus === 'COMPLETED' ? (
+                      <button
+                        onClick={() => verifyTask(item.rawId || '')}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all duration-150 active:scale-95 cursor-pointer"
+                      >
+                        {t('verifyAudit')}
+                      </button>
+                    ) : (
+                      item.time
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
 
-      {/* Hygiene Tasks Footer */}
-      <section className="space-y-4 pb-8">
-        <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-150 font-sans tracking-tight">
-          {t('hygieneTasks')}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-          {filteredHygiene.map((task) => (
-            <div
-              key={task.id}
-              className="bg-white dark:bg-sd-surface-container p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between gap-4"
-            >
-              <div className="flex items-center gap-3 font-sans">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${task.colorClass}`}
-                >
-                  <span className="material-symbols-outlined text-[20px]">{task.icon}</span>
+      {/* --- MODALS --- */}
+
+      {/* Edit Table Modal */}
+      {showEditTableModal && editingTable && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">
+              Edit Table {editingTable.id}
+            </h3>
+            <form onSubmit={handleSaveEdit} className="space-y-4 font-sans text-xs mt-3">
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Area / Zone</label>
+                <input
+                  type="text"
+                  value={editTableArea}
+                  onChange={(e) => setEditTableArea(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Seats</label>
+                  <input
+                    type="number"
+                    value={editTableSeats}
+                    onChange={(e) => setEditTableSeats(Number(e.target.value))}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  />
                 </div>
                 <div>
-                  <p
-                    className={`font-bold text-sm ${task.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}
+                  <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Priority</label>
+                  <select
+                    value={editTablePriority}
+                    onChange={(e) => setEditTablePriority(e.target.value as any)}
+                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
                   >
-                    {t(task.name)}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-semibold">{task.lastDone}</p>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
                 </div>
               </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditTableModal(false)}
+                  className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Staff Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm font-sans text-xs">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">
+              Assign Staff Member to {assigningTableLabel || 'Table'}
+            </h3>
+            <p className="text-[11px] text-slate-400 mb-4 font-sans">Select staff member for table sanitization.</p>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {staffList.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => handleAssignStaff(m)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-orange-500/50 bg-slate-50/50 dark:bg-slate-800/40 transition-all cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <img src={m.avatar} alt={m.name} className="w-7 h-7 rounded-full object-cover" />
+                    <div className="text-left">
+                      <p className="font-bold text-slate-800 dark:text-slate-200 text-xs">{m.name}</p>
+                      <p className="text-[10px] text-slate-400">{m.role}</p>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-orange-500 text-base">person_add</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAssignModal(false)}
+              className="w-full mt-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm font-sans text-xs">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Delete Table</h3>
+            <p className="text-[11px] text-slate-500 mb-4 leading-relaxed">
+              Are you sure you want to remove table <strong className="text-slate-700 dark:text-slate-200">{deleteConfirmId}</strong> from cleaning management?
+            </p>
+            <div className="flex gap-2">
               <button
-                onClick={() => handleToggleHygieneTask(task.id)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border font-sans transition-all active:scale-95 shrink-0 ${
-                  task.completed
-                    ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500'
-                    : 'bg-orange-500 text-white border-transparent hover:bg-orange-600'
-                }`}
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300"
               >
-                {task.completed ? t('completed') : t('markDone')}
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteTable(deleteConfirmId)}
+                className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-md"
+              >
+                Delete Table
               </button>
             </div>
-          ))}
+          </div>
         </div>
-      </section>
+      )}
 
       {/* New Request Modal */}
       {showRequestModal && (
@@ -631,14 +957,10 @@ export default function CleaningDashboard() {
             </p>
             <form onSubmit={handleCreateRequest} className="space-y-4 font-sans text-xs">
               <div>
-                <label
-                  htmlFor="new-request-table"
-                  className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5"
-                >
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
                   {t('tableNo')}
                 </label>
                 <input
-                  id="new-request-table"
                   type="text"
                   placeholder="e.g. T08, T14"
                   value={newRequestTable}
@@ -647,7 +969,6 @@ export default function CleaningDashboard() {
                   required
                 />
               </div>
-
               <div>
                 <span className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">
                   {t('priority')}
@@ -658,321 +979,113 @@ export default function CleaningDashboard() {
                       key={p}
                       type="button"
                       onClick={() => setNewRequestPriority(p)}
-                      className={`py-2 rounded-lg font-bold border transition-all ${
+                      className={`py-2 text-xs font-bold rounded-xl border transition-all ${
                         newRequestPriority === p
-                          ? 'border-orange-500 bg-orange-500/10 text-orange-500 dark:bg-slate-800'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-850'
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
                       }`}
                     >
-                      {t(p)}
+                      {t(p.toLowerCase())}
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowHistoryModal(false)}
-                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
+                  onClick={() => setShowRequestModal(false)}
+                  className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300"
                 >
                   {t('cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
+                  className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md"
                 >
-                  {t('newRequest')}
+                  {t('submit')}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-      {/* Request History Modal */}
-      {showHistoryModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">
-                Request History
-              </h3>
-              <button
-                onClick={() => setShowHistoryModal(false)}
-                type="button"
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
 
-            <div className="space-y-3">
-              {requests.length > 0 ? (
-                requests.map((req) => (
-                  <button
-                    type="button"
-                    key={req.id}
-                    onClick={() => setSelectedRequest(req)}
-                    className="p-3 border border-slate-100 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 flex justify-between items-center cursor-pointer hover:bg-slate-100"
-                  >
-                    <div>
-                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        {req.location}
-                      </p>
-                      <p className="text-[10px] text-slate-400">
-                        {req.requestedOn} • {req.requestedTime}
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-bold text-orange-500 bg-orange-100 dark:bg-orange-950/30 px-2 py-1 rounded-full">
-                      {req.status}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <p className="text-xs text-slate-500 font-sans text-center">
-                  Koi request history nahi mili.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Special Request Modal - Ye history modal ke bahar hai */}
+      {/* Special Request Modal */}
       {showSpecialModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
             <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">
-              Special Cleaning Request
+              {t('specialRequest')}
             </h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              Enter your special cleaning notes below.
+            <p className="text-[11px] text-slate-400 mb-4 font-sans leading-relaxed">
+              Add special sanitization notes or spill handling instructions.
             </p>
-
-            <textarea
-              placeholder="e.g., Deep clean the sofa, check for stains..."
-              value={specialNotes}
-              onChange={(e) => setSpecialNotes(e.target.value)}
-              className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs mb-4 h-24"
-            />
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowSpecialModal(false)}
-                className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold text-xs text-slate-600 dark:text-slate-400"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  cleaningStore.addCleaningRequest({
-                    id: `CR-2026-${Math.floor(Math.random() * 999)}`,
-                    type: 'Special Request',
-                    icon: 'stars',
-                    iconColor: 'text-orange-600',
-                    location: 'Special Note',
-                    requestedBy: {
-                      name: 'Staff',
-                      avatar:
-                        'https://lh3.googleusercontent.com/aida-public/AB6AXuANsaeL1qIrdjS8VjlskxOHt17ofWL0mQA8HTEyUyGUmb0WZEoFeVIhAYDxByw8LuxWxFKIdV270hwAPBmZFNJdIOoLB7X4CRStTLzQ66uJ709k9Kvpbt3yDChYZmi0IOgzaKGIARmUFWTp8fiuOG-poilaUus94iK5MEMaPofwxQGipJFvuis9fWEp53IS84fln5N1GSiP7xWII9WnJi1qTw5gFY4eKQQgrXVlslMwV6TbZi4nnm2vGRG3hjoOoFQyNc23SGR4j9U',
-                    },
-                    priority: 'Medium',
-                    status: 'Pending',
-                    requestedOn: new Date().toLocaleDateString(),
-                    requestedTime: new Date().toLocaleTimeString(),
-                    notes: specialNotes,
-                  });
-
-                  window.dispatchEvent(
-                    new CustomEvent('new-cleaning-request', {
-                      detail: {
-                        id: Date.now(),
-                        title: `Special Request Added`,
-                        message: 'Note submitted.',
-                        read: false,
-                      },
-                    })
-                  );
-                  setSpecialNotes('');
-                  setShowSpecialModal(false);
-                }}
-                className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold text-xs"
-              >
-                Submit Note
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Details Modal - Note dekhne ke liye */}
-      {selectedRequest && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-[60] p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-2 font-sans">
-              Request Details
-            </h3>
-            <p className="text-[11px] text-slate-400 mb-2">Note content:</p>
-            <div className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs mb-4 min-h-[80px]">
-              {selectedRequest.notes || 'No special notes provided.'}
-            </div>
-            <button
-              onClick={() => setSelectedRequest(null)}
-              className="w-full py-2 bg-slate-900 text-white rounded-xl font-bold text-xs"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-      {/* ===== Cleaning Staff Management Panel ===== */}
-      <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800/60 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">{t('cleaningStaff')}</h2>
-            <p className="text-[11px] text-slate-400 dark:text-slate-455 mt-0.5 font-sans">
-              {staffList.length} {t('teamMembersRegistered')}
-            </p>
-          </div>
-          <button
-            onClick={() => { setNewStaffName(''); setNewStaffPhone(''); setShowAddStaffModal(true); }}
-            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">person_add</span>
-            {t('addCleaner')}
-          </button>
-        </div>
-
-        {staffList.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
-            <span className="material-symbols-outlined text-4xl">group_off</span>
-            <p className="text-xs font-semibold">No staff added yet. Click "Add Staff" to begin.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {staffList.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40"
-              >
-                <img
-                  src={member.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=f97316&color=fff&bold=true`}
-                  alt={member.name}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-orange-200 shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-xs text-slate-800 dark:text-slate-100 truncate">{member.name}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-455 truncate">{t(member.role)} · {t(member.area)}</p>
-                </div>
+            <div className="space-y-4 font-sans text-xs">
+              <textarea
+                rows={4}
+                value={specialNotes}
+                onChange={(e) => setSpecialNotes(e.target.value)}
+                placeholder="Enter details (e.g. Spill on Table T04, deep carpet wash needed)..."
+                className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+              />
+              <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    cleaningStore.removeStaffMember(member.id);
-                    showToast(`${member.name} removed from staff.`, 'info');
-                  }}
-                  className="text-slate-400 hover:text-red-500 transition-colors cursor-pointer p-1"
-                  title="Remove staff member"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Add Staff Modal */}
-      {showAddStaffModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Add Cleaning Staff</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-455 mb-4 font-sans">Register a new team member to assign to tables.</p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!newStaffName.trim()) return;
-                const newMember: CleaningStaffMember = {
-                  id: `STF-${Date.now()}`,
-                  name: newStaffName.trim(),
-                  role: newStaffRole,
-                  area: newStaffArea,
-                  phone: newStaffPhone,
-                  avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newStaffName)}&background=f97316&color=fff&bold=true`,
-                };
-                cleaningStore.addStaffMember(newMember);
-                showToast(`${newMember.name} added to staff!`, 'success');
-                setShowAddStaffModal(false);
-              }}
-              className="space-y-3 font-sans text-xs"
-            >
-              <div>
-                <label htmlFor="staff-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Full Name</label>
-                <input
-                  id="staff-name"
-                  type="text"
-                  placeholder="e.g. Sunil Kumar"
-                  value={newStaffName}
-                  onChange={(e) => setNewStaffName(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:border-orange-500"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="staff-role" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Role</label>
-                  <select
-                    id="staff-role"
-                    value={newStaffRole}
-                    onChange={(e) => setNewStaffRole(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none"
-                  >
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Cleaning Staff">Cleaning Staff</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Senior Cleaner">Senior Cleaner</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Supervisor">Supervisor</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Janitor">Janitor</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="staff-area" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Area</label>
-                  <select
-                    id="staff-area"
-                    value={newStaffArea}
-                    onChange={(e) => setNewStaffArea(e.target.value)}
-                    className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none"
-                  >
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Dining Area A">Dining Area A</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Dining Area B">Dining Area B</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Terrace Area">Terrace Area</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Floor 1">Floor 1</option>
-                    <option className="bg-white dark:bg-slate-850 text-slate-900 dark:text-slate-100" value="Restroom">Restroom</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="staff-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Phone (optional)</label>
-                <input
-                  id="staff-phone"
-                  type="text"
-                  placeholder="+91 XXXXX XXXXX"
-                  value={newStaffPhone}
-                  onChange={(e) => setNewStaffPhone(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 outline-none focus:border-orange-500"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddStaffModal(false)}
-                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all"
+                  onClick={() => setShowSpecialModal(false)}
+                  className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all"
+                  onClick={() => {
+                    showToast('Special request logged.', 'success');
+                    setSpecialNotes('');
+                    setShowSpecialModal(false);
+                  }}
+                  className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold shadow-md"
                 >
-                  Add Staff
+                  Submit Special Request
                 </button>
               </div>
-            </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 font-sans">
+                {t('requestHistory')}
+              </h3>
+              <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-slate-600 text-sm">
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-3 font-sans text-xs">
+              {requests.length === 0 ? (
+                <p className="text-slate-400 text-center py-6">No request history recorded yet.</p>
+              ) : (
+                requests.map((r) => (
+                  <div key={r.id} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">{r.location || r.type}</p>
+                      <p className="text-[10px] text-slate-400">{r.priority} Priority · {r.requestedTime || r.requestedOn}</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 dark:bg-orange-950/20 dark:text-orange-400">
+                      {r.status}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            <button
+              onClick={() => setShowHistoryModal(false)}
+              className="mt-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

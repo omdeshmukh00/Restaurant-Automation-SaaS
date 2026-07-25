@@ -10,7 +10,7 @@ export interface ApiResponse<T> {
 export type NotificationTone = 'urgent' | 'success' | 'info' | 'cleaning';
 
 export interface NotificationItem {
-  id: number;
+  id: number | string;
   title: string;
   message: string;
   time: string;
