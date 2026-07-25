@@ -92,7 +92,9 @@ function mergeProfileData(base: ProfileData, incoming?: Partial<ProfileData> | n
 export function useProfile() {
   const { user } = useAuth();
   const userRef = useRef(user);
-  userRef.current = user;
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const [profile, setProfile] = useState<ProfileData | null>(() => {
     return user ? buildFallbackProfile(user) : null;
   });
