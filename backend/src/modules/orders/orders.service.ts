@@ -862,7 +862,7 @@ export class OrdersService {
   static async cancelStaffOrder(
     restaurantId: string | Types.ObjectId,
     orderId: string | Types.ObjectId,
-    cancelledByStaffId?: string,
+    _cancelledByStaffId?: string,
   ) {
     const order = await OrderModel.findOne({
       _id: orderId,
