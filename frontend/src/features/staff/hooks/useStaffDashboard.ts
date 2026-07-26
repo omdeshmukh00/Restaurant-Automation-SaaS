@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { menuAPI, ordersAPI, requestsAPI, reservationsAPI, tableAPI, notificationsAPI } from '../api/staff.api';
 import { staffStore, type Order, type ReadyItem, type RequestItem, type AlertItem, type StaffTable, type StaffReservation, type MenuItem } from '../store/staff.store';
-import { connectSocket, getSocket } from '../../../lib/socket';
+import { onSocketEvent } from '../../../lib/socket';
 
 function toDisplayTime(value?: string | Date | null) {
   if (!value) return 'Just now';
@@ -326,65 +326,45 @@ export function useStaffDashboard() {
   useEffect(() => {
     void refreshDashboard();
 
-    // 5-second interval poll to ensure ready food notifications arrive in real time even without websockets
+    // Socket connection is handled by SocketProvider.
+    // onSocketEvent handles late-binding automatically.
+    const handleSync = () => {
+      scheduleRefresh();
+    };
+
+    const events = [
+      'table.status.changed',
+      'table.cleaned',
+      'cleaning.completed',
+      'cleaning.started',
+      'cleaning.task.created',
+      'staff.table.waiter_assigned',
+      'queue.notified',
+      'staff.ticket.created',
+      'order.created',
+      'order.updated',
+      'order.ready',
+      'ORDER_READY',
+      'order_ready',
+      'food.ready',
+      'order.served',
+      'staff:request-new',
+      'staff:request-updated',
+      'bill.requested',
+      'bill.paid',
+      'notification:new',
+    ];
+
+    const unsubs = events.map((event) => onSocketEvent(event, handleSync));
+
+    // Fallback background poll (30s interval instead of 5s)
     const pollInterval = setInterval(() => {
       scheduleRefresh();
-    }, 5000);
-
-    connectSocket();
-    const socket = getSocket();
-    if (socket) {
-      const handleSync = () => {
-        scheduleRefresh();
-      };
-      socket.on('table.status.changed', handleSync);
-      socket.on('table.cleaned', handleSync);
-      socket.on('cleaning.completed', handleSync);
-      socket.on('cleaning.started', handleSync);
-      socket.on('cleaning.task.created', handleSync);
-      socket.on('staff.table.waiter_assigned', handleSync);
-      socket.on('queue.notified', handleSync);
-      socket.on('staff.ticket.created', handleSync);
-      socket.on('order.created', handleSync);
-      socket.on('order.updated', handleSync);
-      socket.on('order.ready', handleSync);
-      socket.on('ORDER_READY', handleSync);
-      socket.on('order_ready', handleSync);
-      socket.on('food.ready', handleSync);
-      socket.on('order.served', handleSync);
-      socket.on('staff:request-new', handleSync);
-      socket.on('staff:request-updated', handleSync);
-      socket.on('bill.requested', handleSync);
-      socket.on('bill.paid', handleSync);
-      socket.on('notification:new', handleSync);
-
-      return () => {
-        clearInterval(pollInterval);
-        socket.off('table.status.changed', handleSync);
-        socket.off('table.cleaned', handleSync);
-        socket.off('cleaning.completed', handleSync);
-        socket.off('cleaning.started', handleSync);
-        socket.off('cleaning.task.created', handleSync);
-        socket.off('staff.table.waiter_assigned', handleSync);
-        socket.off('queue.notified', handleSync);
-        socket.off('staff.ticket.created', handleSync);
-        socket.off('order.created', handleSync);
-        socket.off('order.updated', handleSync);
-        socket.off('order.ready', handleSync);
-        socket.off('ORDER_READY', handleSync);
-        socket.off('order_ready', handleSync);
-        socket.off('food.ready', handleSync);
-        socket.off('order.served', handleSync);
-        socket.off('staff:request-new', handleSync);
-        socket.off('staff:request-updated', handleSync);
-        socket.off('bill.requested', handleSync);
-        socket.off('bill.paid', handleSync);
-        socket.off('notification:new', handleSync);
-      };
-    }
+    }, 30000);
 
     return () => {
       clearInterval(pollInterval);
+      unsubs.forEach((unsub) => unsub());
     };
   }, []);
 

@@ -226,7 +226,7 @@ export default function KitchenSettingsPage() {
                       <span>{stn}</span>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" defaultChecked className="sr-only peer" />
-                        <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                        <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                         <span className="sr-only">Toggle {stn}</span>
                       </label>
                     </div>
@@ -252,7 +252,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setNotificationSettings({ ...notificationSettings, audioAlerts: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Audio Alerts</span>
                     </label>
                   </div>
@@ -268,7 +268,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setNotificationSettings({ ...notificationSettings, visualBanners: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Visual Banner Popups</span>
                     </label>
                   </div>
@@ -284,7 +284,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setNotificationSettings({ ...notificationSettings, toastAlerts: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Toast Dismissal Alert</span>
                     </label>
                   </div>
@@ -375,7 +375,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setAutoRules({ ...autoRules, dineIn: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Auto-Accept Dine-in Orders</span>
                     </label>
                   </div>
@@ -391,7 +391,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setAutoRules({ ...autoRules, delivery: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Auto-Accept Delivery Partners</span>
                     </label>
                   </div>

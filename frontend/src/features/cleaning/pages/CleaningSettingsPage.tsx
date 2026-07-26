@@ -128,12 +128,14 @@ export default function CleaningSettingsPage() {
               <button
                 type="button"
                 onClick={() => setUrgentAlerts(!urgentAlerts)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                  urgentAlerts ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                  urgentAlerts
+                    ? 'bg-orange-500'
+                    : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                 }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
-                  urgentAlerts ? 'translate-x-4' : 'translate-x-0'
+                <span className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                  urgentAlerts ? 'translate-x-4' : 'translate-x-0.5'
                 }`} />
               </button>
             </div>
@@ -146,12 +148,14 @@ export default function CleaningSettingsPage() {
               <button
                 type="button"
                 onClick={() => setTaskReminders(!taskReminders)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                  taskReminders ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                  taskReminders
+                    ? 'bg-orange-500'
+                    : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                 }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
-                  taskReminders ? 'translate-x-4' : 'translate-x-0'
+                <span className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                  taskReminders ? 'translate-x-4' : 'translate-x-0.5'
                 }`} />
               </button>
             </div>
@@ -164,12 +168,14 @@ export default function CleaningSettingsPage() {
               <button
                 type="button"
                 onClick={() => setShiftAlerts(!shiftAlerts)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                  shiftAlerts ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center cursor-pointer rounded-full transition-colors duration-200 ease-in-out ${
+                  shiftAlerts
+                    ? 'bg-orange-500'
+                    : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                 }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
-                  shiftAlerts ? 'translate-x-4' : 'translate-x-0'
+                <span className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                  shiftAlerts ? 'translate-x-4' : 'translate-x-0.5'
                 }`} />
               </button>
             </div>

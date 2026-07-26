@@ -27,14 +27,14 @@ export default function PartnerWithUs() {
   }, []);
 
   return (
-    <div className="partner-page min-h-screen bg-[#f8fafc] text-slate-900 font-sans antialiased overflow-x-hidden relative flex flex-col justify-between">
+    <div className="partner-page min-h-screen bg-[#f8fafc] dark:bg-neutral-950 text-slate-900 dark:text-neutral-100 font-sans antialiased overflow-x-hidden relative flex flex-col justify-between transition-colors duration-300">
       
       {/* Header / Navbar */}
       <header className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 relative z-10">
         <div className="flex items-center">
           <a
             href="/"
-            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-800 transition-colors"
+            className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-neutral-400 hover:text-slate-800 dark:hover:text-neutral-200 transition-colors"
           >
             <ArrowLeft className="w-4 h-4 text-orange-500" />
             Back to Home
@@ -58,11 +58,11 @@ export default function PartnerWithUs() {
           </span>
         </div>
         
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight font-sans">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight font-sans">
           Join <span className="text-[#FF6B1A]">{platformName}</span> as Our Partner
         </h1>
         
-        <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto leading-relaxed">
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-neutral-400 max-w-lg mx-auto leading-relaxed">
           Fill in the details below and our team will get in touch with you to help you get started.
         </p>
       </section>
@@ -73,11 +73,11 @@ export default function PartnerWithUs() {
       </main>
 
       {/* Footer disclaimer */}
-      <footer className="w-full py-8 text-center text-xs text-slate-400 relative z-10 space-y-1 mt-6">
-        <p className="text-[10px] font-bold text-slate-400/80">
+      <footer className="w-full py-8 text-center text-xs text-slate-400 dark:text-neutral-500 relative z-10 space-y-1 mt-6">
+        <p className="text-[10px] font-bold text-slate-400/80 dark:text-neutral-400/80">
           No commitment. You can change your plan anytime later.
         </p>
-        <p className="text-[9px] text-slate-400/50">
+        <p className="text-[9px] text-slate-400/50 dark:text-neutral-500/60">
           &copy; {new Date().getFullYear()} {platformName} Technologies Private Limited. All rights reserved.
         </p>
       </footer>

@@ -28,6 +28,10 @@ export const superAdminRouter = Router();
 superAdminRouter.get('/restaurants', async (req, res, next) => {
   try {
     const { status, plan, search } = req.query;
+    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+    const limit = req.query.limit ? Math.max(1, Math.min(500, Number(req.query.limit))) : 50;
+    const skip = (page - 1) * limit;
+
     const query: Record<string, unknown> = {};
 
     if (status) {
@@ -37,29 +41,41 @@ superAdminRouter.get('/restaurants', async (req, res, next) => {
     if (plan) query.plan = String(plan);
     if (search) query.name = { $regex: String(search), $options: 'i' };
 
-    const restaurants = await RestaurantModel.find(query).sort({ createdAt: -1 }).lean();
+    const restaurants = await RestaurantModel.find(query)
+      .select('_id name ownerName email phone city state country status plan customCommissionRate subscriptionPlan_id revenue mrr joinedDate lastActive tags createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    const restaurantIds = restaurants.map((r: any) => r._id);
 
-    // Fetch total revenue (sum of finalAmount for completed orders) grouped by restaurantId
-    const revenueStats = await OrderModel.aggregate([
-      {
-        $match: {
-          paymentStatus: 'PAID',
-        }
-      },
-      {
-        $group: {
-          _id: '$restaurantId',
-          totalRevenue: { $sum: '$finalAmount' }
-        }
-      }
+    // Fetch total revenue only for the target restaurants
+    const [revenueStats, subscriptions] = await Promise.all([
+      restaurantIds.length > 0
+        ? OrderModel.aggregate([
+            {
+              $match: {
+                restaurantId: { $in: restaurantIds },
+                paymentStatus: 'PAID',
+              },
+            },
+            {
+              $group: {
+                _id: '$restaurantId',
+                totalRevenue: { $sum: '$finalAmount' },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+      restaurantIds.length > 0
+        ? SubscriptionModel.find({ restaurantId: { $in: restaurantIds } }).select('restaurantId priceMonthly planId').lean()
+        : Promise.resolve([]),
     ]);
 
     const revenueMap = new Map(revenueStats.map(s => [s?._id?.toString() || '', s.totalRevenue]));
+    const subMap = new Map(subscriptions.map((s: any) => [s.restaurantId ? s.restaurantId.toString() : '', s]));
 
-    const subscriptions = await SubscriptionModel.find().lean();
-    const subMap = new Map(subscriptions.map(s => [s.restaurantId.toString(), s]));
-
-    const enrichedRestaurants = restaurants.map(r => {
+    const enrichedRestaurants = restaurants.map((r: any) => {
       const sub = subMap.get(r._id.toString());
       return {
         ...r,
@@ -317,6 +333,10 @@ superAdminRouter.get('/system/monitoring', async (_req, res, next) => {
 superAdminRouter.get('/audit-logs', async (req, res, next) => {
   try {
     const { actorId, action, from, to } = req.query;
+    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+    const limit = req.query.limit ? Math.max(1, Math.min(500, Number(req.query.limit))) : 100;
+    const skip = (page - 1) * limit;
+
     const query: Record<string, unknown> = {};
 
     if (actorId) query.actorId = String(actorId);
@@ -335,6 +355,8 @@ superAdminRouter.get('/audit-logs', async (req, res, next) => {
       .populate('restaurantId', 'name city slug logo')
       .populate('actorId', 'name email phone role')
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
     ok(res, { auditLogs });
   } catch (error) {
@@ -373,21 +395,35 @@ function formatTimestamp(date?: Date | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-superAdminRouter.get('/transactions', async (_req, res, next) => {
+superAdminRouter.get('/transactions', async (req, res, next) => {
   try {
+    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+    const limit = req.query.limit ? Math.max(1, Math.min(500, Number(req.query.limit))) : 100;
+
     const [onboardingRequests, subscriptionPayments, orderPayments, settings] = await Promise.all([
       RestaurantRequestModel.find({
         paymentStatus: 'CAPTURED',
         paymentAmount: { $gt: 0 }
-      }).setOptions({ bypassTenant: true }).lean(),
+      })
+        .select('paymentId restaurantName restaurantId paymentAmount paymentTimestamp updatedAt city')
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .setOptions({ bypassTenant: true })
+        .lean(),
       
       SubscriptionPaymentModel.find()
-        .populate('restaurantId')
+        .populate('restaurantId', 'name city')
+        .select('providerPaymentId restaurantId amount provider status paidAt createdAt')
+        .sort({ createdAt: -1 })
+        .limit(limit)
         .setOptions({ bypassTenant: true })
         .lean(),
       
       PaymentModel.find()
-        .populate('restaurantId')
+        .populate('restaurantId', 'name city')
+        .select('providerPaymentId razorpayPaymentId restaurantId amount commission commissionRate method status verifiedAt createdAt')
+        .sort({ createdAt: -1 })
+        .limit(limit)
         .setOptions({ bypassTenant: true })
         .lean(),
 
@@ -466,20 +502,28 @@ superAdminRouter.get('/transactions', async (_req, res, next) => {
 
     // Sort descending by timestamp
     transactions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const paginatedTransactions = transactions.slice((page - 1) * limit, page * limit);
 
-    ok(res, { transactions });
+    ok(res, { transactions: paginatedTransactions, count: transactions.length });
   } catch (error) {
     next(error);
   }
 });
 
-superAdminRouter.get('/analytics/orders', async (_req, res, next) => {
+superAdminRouter.get('/analytics/orders', async (req, res, next) => {
   try {
+    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+    const limit = req.query.limit ? Math.max(1, Math.min(500, Number(req.query.limit))) : 100;
+    const skip = (page - 1) * limit;
+
     const [orders, settings] = await Promise.all([
       OrderModel.find()
-        .populate('restaurantId')
+        .populate('restaurantId', 'name city')
+        .select('orderNumber status paymentStatus finalAmount totalAmount createdAt restaurantId')
         .setOptions({ bypassTenant: true })
         .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
         .lean(),
       getPlatformSettings()
     ]);
@@ -488,9 +532,12 @@ superAdminRouter.get('/analytics/orders', async (_req, res, next) => {
 
     // Fetch matching payments to retrieve stored commission values
     const orderIds = orders.map((o: any) => o._id);
-    const payments = await PaymentModel.find({ orderId: { $in: orderIds } })
-      .setOptions({ bypassTenant: true })
-      .lean();
+    const payments = orderIds.length > 0
+      ? await PaymentModel.find({ orderId: { $in: orderIds } })
+          .select('orderId commission commissionRate')
+          .setOptions({ bypassTenant: true })
+          .lean()
+      : [];
 
     const paymentMap = new Map<string, any>();
     payments.forEach((p: any) => {
@@ -680,12 +727,19 @@ superAdminRouter.get('/restaurants/:id/live-activity', async (req, res, next) =>
 });
 
 // GET /super-admin/users - List all database users with SuperAdmin as first card
-superAdminRouter.get('/users', async (_req, res, next) => {
+superAdminRouter.get('/users', async (req, res, next) => {
   try {
-    const rawUsers = await UserModel.find({ isDeleted: { $ne: true } })
-      .populate('restaurantId', 'name city slug logo')
+    const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+    const limit = req.query.limit ? Math.max(1, Math.min(500, Number(req.query.limit))) : 100;
+    const skip = (page - 1) * limit;
+
+    const rawUsers = await UserModel.find({ isDeleted: false })
+      .select('_id name email mobile phone role kitchen_role staff_role cleaning_role status restaurantId isEmailVerified isMobileVerified avatar createdAt updatedAt')
+      .populate('restaurantId', 'name city')
       .setOptions({ bypassTenant: true })
       .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
     // Sort: SUPER_ADMIN role comes FIRST always
@@ -711,11 +765,10 @@ superAdminRouter.get('/users', async (_req, res, next) => {
         createdAt: u.createdAt ? new Date(u.createdAt).toLocaleString() : 'N/A',
         lastActive: u.updatedAt ? new Date(u.updatedAt).toLocaleString() : 'N/A',
         avatar: u.avatar || undefined,
-        rawUser: u,
       };
     });
 
-    ok(res, { users });
+    ok(res, { users, count: users.length });
   } catch (error) {
     next(error);
   }

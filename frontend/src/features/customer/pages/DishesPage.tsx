@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, Utensils, Star, Clock, Heart, AlertCircle, ChevronDown } from 'lucide-react';
 import '../components/landing/landing.css';
-import { apiClient } from '../../../shared/services/apiClient';
 import { LandingNavbar, LandingFooter } from '../components/landing';
-import { landingCache } from '../../../shared/utils/landingCache';
+import { useLandingStore } from '../store/landing.store';
 
 interface Dish {
   id: number | string;
@@ -35,44 +34,31 @@ export default function DishesPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('Relevance');
   const [vegOnly, setVegOnly] = useState(false);
-  const [backendDishes, setBackendDishes] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+  const { dishes: backendDishes, isLoading, fetchDishes } = useLandingStore();
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const cached = landingCache.getDishes();
-    if (cached) {
-      setBackendDishes(cached);
-      setIsLoading(false);
-    }
-    const fetchDishes = async () => {
-      try {
-        if (!cached) {
-          setIsLoading(true);
-        }
-        const response = await apiClient.get('/public/dishes');
-        if (active && (response.data?.success || response.data?.status === 'success') && response.data?.data?.dishes) {
-          setBackendDishes(response.data.data.dishes);
-          landingCache.setDishes(response.data.data.dishes);
-        }
-      } catch (err) {
-        console.error('Failed to fetch dishes list', err);
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
+    fetchDishes();
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchDishes(false);
       }
     };
-    fetchDishes();
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
-      active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, []);
+  }, [fetchDishes]);
 
   const mapBackendDishes = (items: any[]): Dish[] => {
     return items.map((d, idx) => {

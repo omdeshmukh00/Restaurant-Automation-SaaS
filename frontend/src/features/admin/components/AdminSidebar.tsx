@@ -33,8 +33,16 @@ export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarP
   const platformName = settings?.platformName || "RestoHub";
   const location = useLocation();
   const navigate = useNavigate();
+  const { billing, fetchSettings } = useSettingsStore();
 
   const pathnameRef = useRef(location.pathname);
+
+  // Fetch settings & billing plan on mount if not loaded
+  useEffect(() => {
+    if (!billing?.plan) {
+      fetchSettings();
+    }
+  }, [billing?.plan, fetchSettings]);
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -51,6 +59,12 @@ export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarP
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [onItemClick]);
+
+  const rawPlan = billing?.plan?.trim() || '';
+  const isFreePlan = !rawPlan || rawPlan.toLowerCase() === 'free';
+  const formattedPlan = rawPlan
+    ? rawPlan.charAt(0).toUpperCase() + rawPlan.slice(1).toLowerCase()
+    : 'Free';
 
   return (
     <aside
@@ -98,8 +112,6 @@ export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarP
         </button>
       )}
 
-
-
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ label, icon: Icon, to }) => {
@@ -126,41 +138,50 @@ export function AdminSidebar({ collapsed, onToggle, onItemClick }: AdminSidebarP
         })}
       </nav>
 
-      {/* Upgrade to Pro Card — only visible when sidebar is expanded and plan is Basic/Free */}
-      {!collapsed && (() => {
-        const plan = useSettingsStore.getState().billing.plan?.toLowerCase() || '';
-        const isBasicOrFree = plan === 'free' || plan === 'basic';
-        if (!isBasicOrFree) return null;
-        return (
-          <div className="px-3 pb-4 shrink-0">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border border-orange-200/60 dark:border-orange-800/40 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center shrink-0 shadow-sm">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-gray-800 dark:text-gray-100">Upgrade to Pro</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-                    Unlock unlimited tables, staff, orders & more.
-                  </p>
-                  <button
-                    onClick={() => {
-                      navigate('/admin/settings');
-                      // Set billing section active after navigation
-                      setTimeout(() => useSettingsStore.getState().setActiveSection('billing'), 100);
-                      onItemClick?.();
-                    }}
-                    className="mt-2.5 px-4 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-sm shadow-orange-500/20 inline-flex items-center gap-1.5 cursor-pointer"
-                  >
+      {/* Subscription Status Card — visible when sidebar is expanded */}
+      {!collapsed && (
+        <div className="px-3 pb-4 shrink-0">
+          <div
+            onClick={() => {
+              navigate('/admin/settings');
+              setTimeout(() => useSettingsStore.getState().setActiveSection('billing'), 100);
+              onItemClick?.();
+            }}
+            className="p-4 rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 border border-orange-200/60 dark:border-orange-800/40 shadow-sm cursor-pointer hover:border-orange-300 dark:hover:border-orange-700/60 hover:shadow-md transition-all group"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                navigate('/admin/settings');
+                setTimeout(() => useSettingsStore.getState().setActiveSection('billing'), 100);
+                onItemClick?.();
+              }
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-800 dark:text-gray-100 group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                  Current Plan: {formattedPlan}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                  {isFreePlan
+                    ? 'Unlock unlimited tables, staff, orders & more.'
+                    : `Active ${formattedPlan} subscription for your restaurant.`}
+                </p>
+                {isFreePlan && (
+                  <div className="mt-2.5 px-4 py-1.5 rounded-full bg-orange-500 group-hover:bg-orange-600 text-white text-xs font-bold transition-all shadow-sm shadow-orange-500/20 inline-flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>View Plans</span>
-                  </button>
-                </div>
+                    <span>Upgrade Plan</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
     </aside>
   );

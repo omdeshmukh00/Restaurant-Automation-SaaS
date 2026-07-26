@@ -8,7 +8,7 @@ import StaffBottomNav from '../features/staff/components/dashboard/StaffBottomNa
 import { NotificationWindow } from '../features/staff/components/NotificationWindow';
 import { getRolePermissions, isPathAllowed } from '../features/staff/utils/roleAccess';
 import { useStaffProfile } from '../features/staff/hooks/useStaffProfile';
-import { connectSocket, getSocket } from '../lib/socket';
+import { getSocket } from '../lib/socket';
 import { staffStore } from '../features/staff/store/staff.store';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
@@ -56,8 +56,8 @@ export default function StaffLayout(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    // 1. Establish Socket Connection
-    connectSocket();
+    // Socket connection is handled by SocketProvider at the app root.
+    // This layout only attaches listeners to the existing socket.
 
     const playNotificationSound = () => {
       try {

@@ -43,7 +43,9 @@ export default function CustomerMenuPage() {
               <span className="text-sm font-semibold text-sd-on-surface-variant font-sans">Veg Mode</span>
               <div
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  vegOnly ? 'bg-sd-secondary/20' : 'bg-sd-surface-variant'
+                  vegOnly
+                    ? 'bg-sd-secondary/20 border border-sd-secondary/40'
+                    : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                 }`}
               >
                 <input
@@ -66,7 +68,9 @@ export default function CustomerMenuPage() {
               <span className="text-sm font-semibold text-sd-on-surface-variant font-sans">Extra Spicy</span>
               <div
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  spicyOnly ? 'bg-sd-primary/20' : 'bg-sd-surface-variant'
+                  spicyOnly
+                    ? 'bg-sd-primary/20 border border-sd-primary/40'
+                    : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                 }`}
               >
                 <input

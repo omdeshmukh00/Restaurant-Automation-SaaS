@@ -91,6 +91,7 @@ const restaurantRequestSchema = new Schema<IRestaurantRequest>(
 
 // Optimize query performance for Super Admin listing
 restaurantRequestSchema.index({ status: 1, submittedAt: -1 });
+restaurantRequestSchema.index({ email: 1 });
 
 export const RestaurantRequestModel =
   mongoose.models.RestaurantRequest ||

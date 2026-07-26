@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Star, Clock, MapPin, ChevronDown, Search, Filter, Flame, Crown, TrendingUp, Utensils } from 'lucide-react';
 import '../components/landing/landing.css';
-import { apiClient } from '../../../shared/services/apiClient';
 import { LandingNavbar, LandingFooter, RestaurantCard } from '../components/landing';
-import { landingCache } from '../../../shared/utils/landingCache';
+import { useLandingStore } from '../store/landing.store';
 
 const AREAS = ['All Areas', 'Bandra', 'Andheri', 'Colaba', 'Lower Parel', 'Juhu', 'Powai', 'Dadar'];
 const CUISINES = ['All', 'Indian', 'Italian', 'Chinese', 'Japanese', 'Continental', 'Mexican', 'Thai'];
@@ -38,8 +37,8 @@ export default function RestaurantsPage() {
   const [selectedCuisine, setSelectedCuisine] = useState(cuisineParam);
   const [sortBy, setSortBy] = useState('Relevance');
   const [vegOnly, setVegOnly] = useState(false);
-  const [backendRestaurants, setBackendRestaurants] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  const { restaurants: backendRestaurants, isLoading, fetchLandingData } = useLandingStore();
 
   const navigate = useNavigate();
 
@@ -54,35 +53,22 @@ export default function RestaurantsPage() {
   }, [cuisineParam]);
 
   useEffect(() => {
-    let active = true;
-    const cached = landingCache.getRestaurants();
-    if (cached) {
-      setBackendRestaurants(cached);
-      setIsLoading(false);
-    }
-    const fetchRestaurants = async () => {
-      try {
-        if (!cached) {
-          setIsLoading(true);
-        }
-        const response = await apiClient.get('/public/landing/data');
-        if (active && (response.data?.success || response.data?.status === 'success') && response.data?.data?.restaurants) {
-          setBackendRestaurants(response.data.data.restaurants);
-          landingCache.setRestaurants(response.data.data.restaurants);
-        }
-      } catch (err) {
-        console.error('Failed to fetch restaurants list', err);
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
+    fetchLandingData();
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLandingData(false);
       }
     };
-    fetchRestaurants();
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
-      active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, []);
+  }, [fetchLandingData]);
 
   const mapBackendRestaurants = (items: any[]): any[] => {
     return items.map((r, idx) => {

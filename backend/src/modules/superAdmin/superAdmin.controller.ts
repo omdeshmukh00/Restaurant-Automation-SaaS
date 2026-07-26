@@ -52,7 +52,9 @@ import { ErrorCode } from '../../constants/errors';
 import { socketService } from '../../sockets/socket.service';
 
 export const listRestaurantRequests = asyncHandler(async (req: Request, res: Response) => {
-  const requests = await superAdminService.listRestaurantRequests();
+  const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
+  const limit = req.query.limit ? Math.max(1, Number(req.query.limit)) : 50;
+  const requests = await superAdminService.listRestaurantRequests({ page, limit });
   ok(res, requests);
 });
 

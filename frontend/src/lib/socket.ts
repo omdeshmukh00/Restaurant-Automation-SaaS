@@ -7,13 +7,22 @@ import { getAccessToken, getPanelFromPath, type Panel } from '../auth/tokenStore
 import { getSessionToken } from '../shared/services/apiClient';
 
 let socket: Socket | null = null;
+const listenersMap = new Map<string, Set<(...args: any[]) => void>>();
 
 /**
  * Connect or reconnect the Socket.IO client.
  * Attaches the current JWT and session token for authentication.
  */
-export function connectSocket(): void {
-  if (socket?.connected) return;
+export function connectSocket(forceReconnect = false): Socket {
+  // If socket already exists and is either connected or connecting, do not re-create unless forced
+  if (socket && !forceReconnect) {
+    return socket;
+  }
+
+  if (socket && forceReconnect) {
+    socket.disconnect();
+    socket = null;
+  }
 
   const panel = getPanelFromPath(window.location.pathname);
   const token = getAccessToken(panel);
@@ -27,6 +36,13 @@ export function connectSocket(): void {
       token: token ?? undefined,
       sessionToken: sessionToken ?? undefined,
     },
+  });
+
+  // Re-attach all registered listeners
+  listenersMap.forEach((handlers, event) => {
+    handlers.forEach((handler) => {
+      socket?.on(event, handler);
+    });
   });
 
   socket.on('connect', () => {
@@ -46,6 +62,8 @@ export function connectSocket(): void {
       console.error('[Socket] Connection error:', error.message);
     }
   });
+
+  return socket;
 }
 
 /**
@@ -64,3 +82,26 @@ export function disconnectSocket(): void {
 export function getSocket(): Socket | null {
   return socket;
 }
+
+/**
+ * Register a socket event listener safely.
+ * The listener remains attached even if the socket reconnects or is initialized later.
+ */
+export function onSocketEvent(event: string, handler: (...args: any[]) => void): () => void {
+  if (!listenersMap.has(event)) {
+    listenersMap.set(event, new Set());
+  }
+  listenersMap.get(event)!.add(handler);
+
+  if (socket) {
+    socket.on(event, handler);
+  }
+
+  return () => {
+    listenersMap.get(event)?.delete(handler);
+    if (socket) {
+      socket.off(event, handler);
+    }
+  };
+}
+

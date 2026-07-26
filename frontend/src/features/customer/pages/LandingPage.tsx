@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QrCode } from 'lucide-react';
-import { apiClient } from '../../../shared/services/apiClient';
-import { landingCache } from '../../../shared/utils/landingCache';
-import QRScannerModal from '../components/dashboard/QRScannerModal';
+import { useLandingStore } from '../store/landing.store';
 import {
   LandingNavbar,
   HeroSection,
@@ -11,28 +9,34 @@ import {
   CuisineExplorer,
   TrendingRestaurants,
   TrendingDishes,
-  OffersDeals,
-  DigitalDiningJourney,
-  WhyChooseSection,
-  BlogSection,
-  TestimonialsSection,
-  LandingFooter
 } from '../components/landing';
 import '../components/landing/landing.css';
+
+// Lazy loaded below-the-fold and modal components for speed and lazy loading
+const OffersDeals = lazy(() => import('../components/landing/OffersDeals'));
+const DigitalDiningJourney = lazy(() => import('../components/landing/DigitalDiningJourney'));
+const WhyChooseSection = lazy(() => import('../components/landing/WhyChooseSection'));
+const BlogSection = lazy(() => import('../components/landing/BlogSection'));
+const TestimonialsSection = lazy(() => import('../components/landing/TestimonialsSection'));
+const LandingFooter = lazy(() => import('../components/landing/LandingFooter'));
+const QRScannerModal = lazy(() => import('../components/dashboard/QRScannerModal'));
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [scannerOpen, setScannerOpen] = useState(false);
-  const cachedData = landingCache.getLandingData();
-  const [landingData, setLandingData] = useState<{
-    restaurants?: any[];
-    dishes?: any[];
-    offers?: any[];
-    stats?: any;
-    cuisines?: string[];
-  }>(cachedData || {});
-  const [selectedCuisine, setSelectedCuisine] = useState<string>('All');
-  const [isLoading, setIsLoading] = useState(!cachedData);
+
+  const {
+    landingData,
+    restaurants,
+    dishes,
+    offers,
+    stats,
+    cuisines,
+    selectedCuisine,
+    setSelectedCuisine,
+    isLoading,
+    fetchLandingData,
+  } = useLandingStore();
 
   const openLogin = (targetPath?: string) => {
     if (targetPath) {
@@ -161,48 +165,43 @@ export default function LandingPage() {
     };
   }, [isDraggingMobile, mobilePos]);
 
+  // Fetch landing data from store + background revalidation on tab return
   useEffect(() => {
-    let active = true;
-    const cached = landingCache.getLandingData();
-    if (cached) {
-      setLandingData(cached);
-      setIsLoading(false);
-    }
-    const fetchData = async () => {
-      try {
-        if (!cached) {
-          setIsLoading(true);
-        }
-        const response = await apiClient.get('/public/landing/data');
-        if (active && (response.data?.success || response.data?.status === 'success') && response.data?.data) {
-          setLandingData(response.data.data);
-          landingCache.setLandingData(response.data.data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch landing page data', err);
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
+    fetchLandingData();
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        // Silently revalidate in background when user returns to tab (no skeleton flicker)
+        fetchLandingData(false);
       }
     };
-    fetchData();
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
     return () => {
-      active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, []);
+  }, [fetchLandingData]);
+
+  const activeRestaurants = restaurants.length > 0 ? restaurants : landingData?.restaurants;
+  const activeDishes = dishes.length > 0 ? dishes : landingData?.dishes;
+  const activeOffers = offers.length > 0 ? offers : landingData?.offers;
+  const activeStats = stats || landingData?.stats;
+  const activeCuisines = cuisines.length > 0 ? cuisines : landingData?.cuisines;
 
   return (
     <div className="landing-page-container min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-100 transition-colors duration-300 font-sans relative overflow-hidden">
       <LandingNavbar onLoginOpen={openLogin} />
       
-      <HeroSection onLoginOpen={openLogin} restaurants={landingData.restaurants} />
+      <HeroSection onLoginOpen={openLogin} restaurants={activeRestaurants} />
       
-      <LiveAvailabilityStrip stats={landingData.stats} />
+      <LiveAvailabilityStrip stats={activeStats} />
       
       <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
         <CuisineExplorer
-          cuisines={landingData.cuisines}
+          cuisines={activeCuisines}
           activeCuisine={selectedCuisine}
           onCuisineSelect={setSelectedCuisine}
         />
@@ -211,29 +210,41 @@ export default function LandingPage() {
       <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
         <TrendingRestaurants
           onLoginOpen={openLogin}
-          restaurants={landingData.restaurants}
+          restaurants={activeRestaurants}
           selectedCuisine={selectedCuisine}
           isLoading={isLoading}
         />
       </div>
 
-      <TrendingDishes onLoginOpen={openLogin} dishes={landingData.dishes} isLoading={isLoading} />
+      <TrendingDishes onLoginOpen={openLogin} dishes={activeDishes} isLoading={isLoading} />
       
-      <OffersDeals offers={landingData.offers} />
-      
-      <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
-        <DigitalDiningJourney />
-      </div>
-      
-      <WhyChooseSection />
-      
-      <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
-        <BlogSection />
-      </div>
-      
-      <TestimonialsSection />
-      
-      <LandingFooter />
+      <Suspense fallback={<div className="py-12 text-center text-slate-400">Loading offers...</div>}>
+        <OffersDeals offers={activeOffers} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
+          <DigitalDiningJourney />
+        </div>
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <WhyChooseSection />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <div className="bg-white dark:bg-neutral-900 transition-colors duration-300">
+          <BlogSection />
+        </div>
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <TestimonialsSection />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <LandingFooter />
+      </Suspense>
 
       {/* Floating QR Scanner Button */}
       {/* Desktop: Draggable anywhere */}
@@ -314,14 +325,18 @@ export default function LandingPage() {
       </div>
 
       {/* QR Code Scanner Modal */}
-      <QRScannerModal
-        isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScanSuccess={(cleanId) => {
-          setScannerOpen(false);
-          navigate(`/customer/home?qr_token=${cleanId}`);
-        }}
-      />
+      {scannerOpen && (
+        <Suspense fallback={null}>
+          <QRScannerModal
+            isOpen={scannerOpen}
+            onClose={() => setScannerOpen(false)}
+            onScanSuccess={(cleanId) => {
+              setScannerOpen(false);
+              navigate(`/customer/home?qr_token=${cleanId}`);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -252,7 +252,7 @@ export default function Restaurant() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/superadmin?requests=new')}
+              onClick={() => navigate({ search: '?requests=new' })}
               className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
                 darkMode
                   ? 'bg-slate-900/50 border-slate-800 text-slate-300'
