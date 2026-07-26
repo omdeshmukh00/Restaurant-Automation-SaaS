@@ -20,7 +20,6 @@ import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
 import { acceptOrder, startOrder, readyOrder, delayOrder, rejectOrder, addInternalNote } from '../api/kitchen.api';
 import { apiClient } from '../../../shared/services/apiClient';
 import { POPULAR_ITEMS } from '../constants';
-import ETAModal from '../components/ETAModal';
 import MenuAvailabilityModal from '../components/MenuAvailabilityModal';
 import InternalNotesModal from '../components/InternalNotesModal';
 import DelayOrderModal from '../components/DelayOrderModal';
@@ -29,7 +28,6 @@ export default function KitchenOverviewPage() {
   const { query } = useKitchenSearch();
 
   const { ordersById, orderIds, refreshDashboard, executeOptimisticOrderUpdate } = useKitchenDashboard();
-  const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [notesOrderId, setNotesOrderId] = useState<string | null>(null);
   const [delayModalOrderId, setDelayModalOrderId] = useState<string | null>(null);
@@ -69,7 +67,10 @@ export default function KitchenOverviewPage() {
         : '';
 
       const tableNum = bo.tableNumber || bo.tableId?.tableNumber || bo.tableId;
-      const tableStr = tableNum ? (String(tableNum).startsWith('Table') ? tableNum : `Table ${tableNum}`) : 'Table ?';
+      const rawTableStr = tableNum ? String(tableNum).trim() : '';
+      const tableStr = rawTableStr
+        ? (rawTableStr.toLowerCase().startsWith('table') ? rawTableStr : `Table ${rawTableStr}`)
+        : 'Table ?';
 
       return {
         id: bo._id || bo.id,
@@ -115,14 +116,9 @@ export default function KitchenOverviewPage() {
   const ready = orders.filter(o => o.status === 'ready' && filterByQuery(o));
   const delayed = orders.filter(o => o.status === 'delayed' && filterByQuery(o));
 
-  const handleAccept = (id: string) => { setEtaOrderId(id); };
-  
-  const handleEtaConfirm = async (eta: number) => {
-    if (!etaOrderId) return;
-    const id = etaOrderId;
-    setEtaOrderId(null);
+  const handleAccept = async (id: string) => {
     await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, async () => {
-      await acceptOrder(id, eta);
+      await acceptOrder(id, 15);
       return startOrder(id);
     });
   };
@@ -260,7 +256,7 @@ export default function KitchenOverviewPage() {
               <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 font-sans">Quick Chef Controls</h3>
             </div>
             <div className="space-y-3">
-              <button onClick={() => setIsMenuModalOpen(true)} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
+              <button onClick={() => setIsMenuModalOpen(true)} className="w-full py-3 bg-red-50 text-red-600 border border-red-100/80 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 font-sans transition-colors active:scale-[0.98]">
                 <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
                 Menu Availability
               </button>
@@ -327,13 +323,7 @@ export default function KitchenOverviewPage() {
         </div>
       </div>
 
-      <ETAModal
-        isOpen={!!etaOrderId}
-        onCancel={() => setEtaOrderId(null)}
-        onConfirm={handleEtaConfirm}
-        orderId={etaOrderId || ''}
-      />
-      
+
       <InternalNotesModal
         isOpen={!!notesOrderId}
         onClose={() => setNotesOrderId(null)}

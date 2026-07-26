@@ -24,7 +24,7 @@ const DEFAULT_NOTIFICATIONS: KitchenNotification[] = [
   { id: 'nt-02', message: 'Paneer stock critically low - 3 kg remaining', time: '12 mins ago', read: false, route: '/kitchen/inventory', type: 'inventory' },
   { id: 'nt-03', message: 'Tandoor Station is under maintenance', time: '20 mins ago', read: false, route: '/kitchen/stations', type: 'station' },
   { id: 'nt-04', message: 'Chef Arjun completed 48 orders in this shift', time: '1 hour ago', read: true, route: '/kitchen/staff', type: 'staff' },
-  { id: 'nt-05', message: 'Analytics report generated for yesterday', time: '2 hours ago', read: true, route: '/kitchen/analytics', type: 'analytics' },
+  { id: 'nt-05', message: 'Analytics report generated for yesterday', time: '2 hours ago', read: true, route: '/kitchen', type: 'analytics' },
 ];
 
 export default function KitchenTopBar({ onProfileClick }: Props) {
@@ -214,7 +214,7 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
   }
 
   return (
-    <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
+    <header className="h-16 flex items-center justify-between px-3 sm:px-4 lg:px-8 bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0 min-w-0">
       {/* Left: Stats */}
       <div className="hidden md:flex gap-8 lg:gap-12 items-center">
         <div>
@@ -255,15 +255,15 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
       </div>
 
       {/* Mobile: Brand */}
-      <div className="flex md:hidden items-center gap-2">
-        <div className="bg-orange-100 p-1.5 rounded-lg">
+      <div className="flex md:hidden items-center gap-1.5 min-w-0 mr-1">
+        <div className="bg-orange-100 p-1.5 rounded-lg shrink-0">
           <span className="material-symbols-outlined text-orange-600 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
         </div>
-        <span className="font-bold text-sm text-slate-800 font-sans">{platformName}</span>
+        <span className="font-bold text-xs sm:text-sm text-slate-800 font-sans truncate max-w-[90px] sm:max-w-none">{platformName}</span>
       </div>
 
       {/* Right: Search, Notifications, Profile */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Desktop Search */}
         <div className="relative hidden md:block">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
@@ -404,7 +404,7 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
         </div>
 
         {/* Dynamic Role Indicator (Locked Role Access) */}
-        <div className="relative flex items-center bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1.5 font-sans">
+        <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1.5 font-sans shrink-0">
           <span className="material-symbols-outlined text-[18px] text-orange-500 mr-1.5 pointer-events-none">
             shield_person
           </span>

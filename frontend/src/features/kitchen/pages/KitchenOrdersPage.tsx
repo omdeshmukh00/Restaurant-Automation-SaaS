@@ -12,11 +12,10 @@ import {
 } from '../api/kitchen.api';
 import { apiClient } from '../../../shared/services/apiClient';
 import { useKitchenDashboard } from '../hooks/useKitchenDashboard';
-import ETAModal from '../components/ETAModal';
 
 const STATUS_TABS: { label: string; value: OrderStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
-  { label: 'New', value: 'all' }, // Treat New tab as 'all' or filter on mapped state
+  { label: 'New', value: 'new' },
   { label: 'Preparing', value: 'preparing' },
   { label: 'Ready', value: 'ready' },
   { label: 'Delayed', value: 'delayed' },
@@ -43,7 +42,6 @@ export default function KitchenOrdersPage() {
   const { query } = useKitchenSearch();
 
   const { ordersById, orderIds, refreshDashboard, executeOptimisticOrderUpdate } = useKitchenDashboard();
-  const [etaOrderId, setEtaOrderId] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(() => {
     if (typeof window !== 'undefined') {
@@ -96,7 +94,10 @@ export default function KitchenOrdersPage() {
         : '';
 
       const tableNum = bo.tableNumber || bo.tableId?.tableNumber || bo.tableId;
-      const tableStr = tableNum ? (String(tableNum).startsWith('Table') ? tableNum : `Table ${tableNum}`) : 'Table ?';
+      const rawTableStr = tableNum ? String(tableNum).trim() : '';
+      const tableStr = rawTableStr
+        ? (rawTableStr.toLowerCase().startsWith('table') ? rawTableStr : `Table ${rawTableStr}`)
+        : 'Table ?';
 
       return {
         id: bo._id || bo.id,
@@ -133,7 +134,10 @@ export default function KitchenOrdersPage() {
 
   const handleAction = async (id: string, newStatus: OrderStatus) => {
     if (newStatus === 'preparing') {
-      setEtaOrderId(id);
+      await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, async () => {
+        await acceptOrder(id, 15);
+        return startOrder(id);
+      });
       return;
     }
     if (newStatus === 'ready') {
@@ -141,16 +145,6 @@ export default function KitchenOrdersPage() {
     } else if (newStatus === 'cancelled') {
       await executeOptimisticOrderUpdate(id, { status: 'REJECTED' }, () => rejectOrder(id));
     }
-  };
-
-  const handleEtaConfirm = async (eta: number) => {
-    if (!etaOrderId) return;
-    const id = etaOrderId;
-    setEtaOrderId(null);
-    await executeOptimisticOrderUpdate(id, { status: 'PREPARING' }, async () => {
-      await acceptOrder(id, eta);
-      return startOrder(id);
-    });
   };
 
   return (
@@ -218,7 +212,7 @@ export default function KitchenOrdersPage() {
               ) : (
                 filtered.map(order => (
                   <tr key={order.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-slate-800">#{order.id}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800 font-mono text-xs break-all">#{order.id}</td>
                     <td className="px-6 py-4 text-slate-600 max-w-[200px]">
                       {order.items.map(i => `${i.qty}× ${i.name}`).join(', ')}
                     </td>
@@ -259,13 +253,6 @@ export default function KitchenOrdersPage() {
           </table>
         </div>
       </div>
-      
-      <ETAModal
-        isOpen={!!etaOrderId}
-        orderId={etaOrderId}
-        onConfirm={handleEtaConfirm}
-        onCancel={() => setEtaOrderId(null)}
-      />
     </div>
   );
 }

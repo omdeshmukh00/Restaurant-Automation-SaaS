@@ -27,31 +27,36 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
   return (
     <div className={`bg-white border-l-4 ${colors.border} rounded-xl shadow-sm p-4 border border-slate-100`}>
       {/* Header */}
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex flex-col gap-1">
-          <h4 className="font-bold text-base font-sans text-slate-800">#{order.id}</h4>
-          {order.serviceFlags && (
-            <div className="flex flex-wrap gap-1">
-              {order.serviceFlags.isVip && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wider">VIP</span>
-              )}
-              {order.serviceFlags.isRush && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 uppercase tracking-wider">RUSH</span>
-              )}
-              {order.serviceFlags.allergyAlert && (
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-100 text-yellow-800 uppercase tracking-wider">ALLERGY</span>
-              )}
-            </div>
-          )}
+      <div className="mb-3">
+        <div className="flex items-center justify-between gap-2 mb-0.5">
+          <h4 className="font-bold text-base font-sans text-slate-800 whitespace-nowrap">{order.table}</h4>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onAddNote && (
+              <button onClick={() => onAddNote(order.id)} className="text-slate-400 hover:text-slate-600 transition-colors" title="Add Note">
+                <span className="material-symbols-outlined text-[16px]">edit_note</span>
+              </button>
+            )}
+            <span className="text-[10px] text-slate-400 font-medium font-sans whitespace-nowrap">{order.timeAgo || order.time}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {onAddNote && (
-            <button onClick={() => onAddNote(order.id)} className="text-slate-400 hover:text-slate-600 transition-colors" title="Add Note">
-              <span className="material-symbols-outlined text-[16px]">edit_note</span>
-            </button>
-          )}
-          <span className="text-[10px] text-slate-400 font-medium font-sans">{order.timeAgo || order.time}</span>
+
+        <div className="text-[11px] font-semibold text-slate-500 font-mono break-all leading-tight">
+          {order.id}
         </div>
+
+        {order.serviceFlags && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {order.serviceFlags.isVip && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 uppercase tracking-wider">VIP</span>
+            )}
+            {order.serviceFlags.isRush && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 uppercase tracking-wider">RUSH</span>
+            )}
+            {order.serviceFlags.allergyAlert && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-yellow-100 text-yellow-800 uppercase tracking-wider">ALLERGY</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Items */}
@@ -104,9 +109,7 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
 
       {/* Table & Type */}
       <div className="flex items-center gap-2 text-[10px] mb-4 font-sans">
-        <span className={`font-bold ${colors.text}`}>Table {order.table}</span>
-        <span className="text-slate-300">•</span>
-        <span className="text-slate-400 capitalize">{order.type.replace('-', ' ')}</span>
+        <span className={`font-bold ${colors.text} capitalize`}>{order.type.replace('-', ' ')}</span>
         {order.chef && (
           <>
             <span className="text-slate-300">•</span>
