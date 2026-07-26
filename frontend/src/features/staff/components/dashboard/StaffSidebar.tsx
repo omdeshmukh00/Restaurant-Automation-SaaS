@@ -48,7 +48,7 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
       {/* Header */}
       <div className={`flex ${collapsed ? 'flex-col items-center gap-3 px-2' : 'items-center justify-between px-6'} py-5 border-b border-slate-100 shrink-0`}>
         <div className="flex items-center gap-3">
-          <div className="bg-dine-orange p-2 rounded-xl shrink-0 text-white shadow-sm shadow-dine-orange/20">
+          <div className="w-10 h-10 rounded-full shrink-0 aspect-square flex items-center justify-center bg-orange-500 text-white shadow-sm shadow-orange-500/20">
             <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
           </div>
           {!collapsed && (

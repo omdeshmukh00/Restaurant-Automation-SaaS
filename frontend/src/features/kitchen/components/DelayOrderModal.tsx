@@ -40,69 +40,63 @@ export default function DelayOrderModal({ isOpen, onClose, onConfirm, orderId }:
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <h2 className="text-lg font-bold text-slate-800 font-sans">Delay Order #{orderId}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
-            <span className="material-symbols-outlined">close</span>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] text-slate-800 dark:text-slate-100">
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/60">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white font-sans">Delay Order #{orderId}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-full">
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4">
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2 font-sans">
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-200 mb-2 font-sans">
               Delay Duration (Minutes)
             </label>
             <input
               type="number"
               min="1"
               max="120"
-              className="w-full border border-slate-200 rounded-lg p-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl p-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               value={delayMinutes}
-              onChange={(e) => setDelayMinutes(parseInt(e.target.value) || 0)}
+              onChange={(e) => setDelayMinutes(parseInt(e.target.value, 10) || 0)}
               disabled={isSubmitting}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2 font-sans">
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-200 mb-2 font-sans">
               Reason for Delay
             </label>
             <select
-              className="w-full border border-slate-200 rounded-lg p-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white"
+              className="w-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white rounded-xl p-3 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               disabled={isSubmitting}
             >
               {REASONS.map((r) => (
-                <option key={r.value} value={r.value}>
+                <option key={r.value} value={r.value} className="dark:bg-slate-800 dark:text-white">
                   {r.label}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="flex gap-3 justify-end pt-4 border-t border-slate-100 mt-6">
+          <div className="flex gap-3 justify-end pt-3 border-t border-slate-100 dark:border-slate-800 mt-4">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg font-sans transition-colors"
+              className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition-all"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting || delayMinutes <= 0}
-              className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg font-sans transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all shadow-md disabled:opacity-50"
             >
-              {isSubmitting ? 'Delaying...' : (
-                <>
-                  <span className="material-symbols-outlined text-[16px]">schedule</span>
-                  Confirm Delay
-                </>
-              )}
+              Confirm Delay
             </button>
           </div>
         </form>

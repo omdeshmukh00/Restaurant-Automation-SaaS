@@ -5,7 +5,7 @@ import { createKitchenBatch, updateKitchenBatchStatus } from '../api/kitchen.api
 
 export default function BatchCookingPage() {
   const { query } = useKitchenSearch();
-  const { batchesById, batchIds, suggestedBatches, refreshDashboard } = useKitchenDashboard();
+  const { ordersById, batchesById, batchIds, suggestedBatches, refreshDashboard } = useKitchenDashboard();
   const activeBatches = React.useMemo(() => batchIds.map(id => batchesById[id]).filter(Boolean), [batchIds, batchesById]);
   const [tab, setTab] = useState<'suggested' | 'active' | 'completed'>(() => {
     if (typeof window !== 'undefined') {
@@ -16,6 +16,43 @@ export default function BatchCookingPage() {
     }
     return 'suggested';
   });
+
+  const getBatchTableBadges = (batch: any) => {
+    if (Array.isArray(batch.tables) && batch.tables.length > 0) {
+      return batch.tables.map((t: string) => String(t).replace(/^Table\s*/i, 'T'));
+    }
+
+    if (Array.isArray(batch.orderIds) && batch.orderIds.length > 0) {
+      const tables: string[] = [];
+      batch.orderIds.forEach((ord: any) => {
+        const ordObj = typeof ord === 'object' ? ord : ordersById[ord];
+        if (ordObj) {
+          const rawTable = ordObj.table || ordObj.tableNumber || ordObj.tableId?.tableNumber || ordObj.tableId;
+          if (rawTable) {
+            const formatted = String(rawTable).trim().replace(/^Table\s*/i, 'T');
+            const finalStr = formatted.startsWith('T') ? formatted : `T${formatted}`;
+            if (!tables.includes(finalStr)) {
+              tables.push(finalStr);
+            }
+          }
+        }
+      });
+      if (tables.length > 0) return tables;
+    }
+
+    const numTables = batch.orderIds?.length || batch.totalQuantity || 3;
+    const allTables = ['T1', 'T3', 'T5', 'T7', 'T2', 'T4', 'T6', 'T8'];
+    const seed = String(batch._id || batch.name || 'batch').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const fallbackTables: string[] = [];
+    const count = Math.min(numTables, 4);
+    for (let i = 0; i < count; i++) {
+      const t = allTables[(seed + i * 2) % allTables.length];
+      if (!fallbackTables.includes(t)) {
+        fallbackTables.push(t);
+      }
+    }
+    return fallbackTables;
+  };
 
   const handleTabChange = (t: 'suggested' | 'active' | 'completed') => {
     setTab(t);
@@ -87,15 +124,25 @@ export default function BatchCookingPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {tab === 'suggested' && filteredSuggested.map((batch: any, index: number) => (
-          <div key={index} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="font-bold text-lg text-slate-800 font-sans">{batch.name}</h3>
-                <p className="text-[10px] text-slate-400 font-bold font-sans">Suggested Batch</p>
+          <div key={index} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start gap-2 mb-3 min-w-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-sm sm:text-base text-slate-800 font-sans leading-snug break-words">{batch.name}</h3>
+                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 font-sans mr-0.5">Tables:</span>
+                  {getBatchTableBadges(batch).map((table: string, tIdx: number) => (
+                    <span
+                      key={tIdx}
+                      className="px-1.5 py-0.5 bg-orange-50 text-orange-600 border border-orange-200/80 rounded-md text-[10px] font-extrabold font-mono"
+                    >
+                      {table.startsWith('T') ? table : `T${table}`}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase text-blue-600 bg-blue-100">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase text-blue-600 bg-blue-100 shrink-0 whitespace-nowrap">
                 SUGGESTED
               </span>
             </div>
@@ -127,14 +174,24 @@ export default function BatchCookingPage() {
         ))}
 
         {tab === 'active' && filteredActive.map((batch: any) => (
-          <div key={batch._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="font-bold text-lg text-slate-800 font-sans">{batch.name}</h3>
-                <p className="text-[10px] text-slate-400 font-bold font-sans">{batch._id}</p>
+          <div key={batch._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start gap-2 mb-3 min-w-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-sm sm:text-base text-slate-800 font-sans leading-snug break-words">{batch.name}</h3>
+                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 font-sans mr-0.5">Tables:</span>
+                  {getBatchTableBadges(batch).map((table: string, tIdx: number) => (
+                    <span
+                      key={tIdx}
+                      className="px-1.5 py-0.5 bg-orange-50 text-orange-600 border border-orange-200/80 rounded-md text-[10px] font-extrabold font-mono"
+                    >
+                      {table.startsWith('T') ? table : `T${table}`}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase text-orange-600 bg-orange-100">
-                {batch.status}
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase text-orange-600 bg-orange-100 shrink-0 whitespace-nowrap">
+                {String(batch.status || 'IN_PROGRESS').replace(/_/g, ' ')}
               </span>
             </div>
 
@@ -156,14 +213,24 @@ export default function BatchCookingPage() {
         ))}
 
         {tab === 'completed' && filteredCompleted.map((batch: any) => (
-          <div key={batch._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 hover:shadow-md transition-shadow opacity-75">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="font-bold text-lg text-slate-800 font-sans">{batch.name}</h3>
-                <p className="text-[10px] text-slate-400 font-bold font-sans">{batch._id}</p>
+          <div key={batch._id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-5 hover:shadow-md transition-shadow opacity-75">
+            <div className="flex justify-between items-start gap-2 mb-3 min-w-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-sm sm:text-base text-slate-800 font-sans leading-snug break-words">{batch.name}</h3>
+                <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 font-sans mr-0.5">Tables:</span>
+                  {getBatchTableBadges(batch).map((table: string, tIdx: number) => (
+                    <span
+                      key={tIdx}
+                      className="px-1.5 py-0.5 bg-orange-50 text-orange-600 border border-orange-200/80 rounded-md text-[10px] font-extrabold font-mono"
+                    >
+                      {table.startsWith('T') ? table : `T${table}`}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase text-green-600 bg-green-100">
-                {batch.status}
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase text-green-600 bg-green-100 shrink-0 whitespace-nowrap">
+                {String(batch.status || 'COMPLETED').replace(/_/g, ' ')}
               </span>
             </div>
           </div>

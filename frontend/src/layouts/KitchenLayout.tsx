@@ -11,6 +11,8 @@ import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGua
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 import { onSocketEvent } from '../lib/socket';
 import { refreshDashboard, scheduleRefresh } from '../features/kitchen/hooks/useKitchenDashboard';
+import KitchenBottomNav from '../features/kitchen/components/dashboard/KitchenBottomNav';
+
 export default function KitchenLayout(): JSX.Element {
   const { settings } = usePlatformSettingsGuard();
   const { profile } = useKitchenStore();
@@ -25,10 +27,11 @@ export default function KitchenLayout(): JSX.Element {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       if (window.innerWidth < 1024) {
-        return true; // Always collapsed (minimized) by default on mobile/tablet viewports
+        return true; // Collapsed (minimized drawer) on mobile/tablet viewports
       }
-      const stored = localStorage.getItem('kitchen_sidebar_collapsed');
+      const stored = localStorage.getItem('kitchen_sidebar_desktop_user_toggled');
       if (stored !== null) return stored === 'true';
+      return false; // Expanded by default on desktop viewports (>= 1024px)
     }
     return false;
   });
@@ -36,9 +39,9 @@ export default function KitchenLayout(): JSX.Element {
   const handleToggleSidebar = () => {
     setSidebarCollapsed(prev => {
       const next = !prev;
-      // Only store user preference for desktop viewports
+      // Only store explicit user toggle preference for desktop viewports
       if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-        localStorage.setItem('kitchen_sidebar_collapsed', String(next));
+        localStorage.setItem('kitchen_sidebar_desktop_user_toggled', String(next));
       }
       return next;
     });
@@ -108,7 +111,7 @@ export default function KitchenLayout(): JSX.Element {
         {/* Mobile Backdrop when Sidebar is expanded */}
         {!sidebarCollapsed && (
           <button
-            className="lg:hidden fixed inset-0 bg-slate-900/30 backdrop-blur-[2px] z-40 w-full h-full border-none outline-none cursor-default"
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-[2px] z-40 w-full h-full border-none outline-none cursor-default"
             onClick={() => {
               setSidebarCollapsed(true);
               localStorage.setItem('kitchen_sidebar_collapsed', 'true');
@@ -120,16 +123,19 @@ export default function KitchenLayout(): JSX.Element {
         {/* Main Area */}
         <div
           className={`flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
+            sidebarCollapsed ? 'ml-0 lg:ml-[72px]' : 'ml-0 lg:ml-64'
           }`}
         >
-          <KitchenTopBar onProfileClick={() => setIsProfileOpen(true)} />
+          <KitchenTopBar onToggleSidebar={handleToggleSidebar} onProfileClick={() => setIsProfileOpen(true)} />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-hidden pb-0 lg:pb-14">
+          <main className="flex-1 overflow-hidden pb-16 lg:pb-14">
             <Outlet />
           </main>
         </div>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <KitchenBottomNav />
 
         {/* Live Alerts Footer (Desktop) */}
         <LiveAlertsBar sidebarCollapsed={sidebarCollapsed} />

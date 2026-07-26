@@ -175,9 +175,9 @@ export default function KitchenOverviewPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row gap-6 p-4 lg:p-8 overflow-hidden h-full">
+    <div className="flex-1 flex flex-col lg:flex-row gap-6 p-4 lg:p-8 overflow-y-auto lg:overflow-hidden h-full">
       {/* Mobile/Tablet Column Selector Tabs */}
-      <div className="flex lg:hidden overflow-x-auto bg-white border border-slate-100 rounded-2xl p-1.5 shrink-0 gap-1.5 mb-2 scrollbar-none">
+      <div className="flex lg:hidden overflow-x-auto bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-1.5 shrink-0 gap-1.5 mb-2 scrollbar-none">
         {mobileTabs.map(({ title, icon, color }) => {
           const c = colorMap[color];
           const isActive = activeTab === title;
@@ -191,13 +191,13 @@ export default function KitchenOverviewPage() {
               className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                 isActive
                   ? `${c.bg} ${c.text} shadow-sm`
-                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
               <span className="material-symbols-outlined text-[16px]">{icon}</span>
               <span>{title.split(' ')[0]}</span>
               {count !== null && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/50' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/50 dark:bg-black/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
                   {String(count).padStart(2, '0')}
                 </span>
               )}
@@ -229,12 +229,12 @@ export default function KitchenOverviewPage() {
                   <OrderCard key={order.id} order={order} onAccept={handleAccept} onReject={handleReject} onMarkReady={handleMarkReady} onDelay={handleDelayClick} onPickup={() => {}} onRush={handleRush} onAddNote={handleAddNote} />
                 ))}
                 {items.length > 3 && (
-                  <button onClick={() => toggleColumnExpand(title)} className={`w-full text-center py-2 ${c.text} font-bold text-xs font-sans bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors`}>
+                  <button onClick={() => toggleColumnExpand(title)} className={`w-full text-center py-2 ${c.text} font-bold text-xs font-sans bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors`}>
                     {expandedColumns[title] ? 'Show Less' : `+ ${items.length - 3} More Orders`}
                   </button>
                 )}
                 {items.length === 0 && (
-                  <div className="text-center text-slate-400 text-xs font-sans py-8">No orders</div>
+                  <div className="text-center text-slate-400 dark:text-slate-500 text-xs font-sans py-8">No orders</div>
                 )}
               </div>
             </div>
@@ -242,25 +242,25 @@ export default function KitchenOverviewPage() {
         })}
       </div>
 
-      {/* Right Sidebar */}
+      {/* Right Sidebar / Controls Section */}
       <div
         className={`w-full lg:w-72 xl:w-80 shrink-0 ${
-          activeTab === 'CONTROLS' ? 'block' : 'hidden lg:block'
-        } overflow-y-auto lg:max-h-[calc(100vh-140px)]`}
+          activeTab === 'CONTROLS' ? 'flex flex-col' : 'hidden lg:flex lg:flex-col'
+        } overflow-y-auto max-h-[calc(100vh-210px)] lg:max-h-[calc(100vh-140px)] pb-16 lg:pb-0`}
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6 pb-6 lg:pb-0">
           {/* Quick Chef Controls */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm">
             <div className="flex items-center gap-2 mb-5">
               <span className="text-red-500 text-sm">⚡</span>
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 font-sans">Quick Chef Controls</h3>
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-white font-sans">Quick Chef Controls</h3>
             </div>
             <div className="space-y-3">
-              <button onClick={() => setIsMenuModalOpen(true)} className="w-full py-3 bg-red-50 text-red-600 border border-red-100/80 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 font-sans transition-colors active:scale-[0.98]">
+              <button onClick={() => setIsMenuModalOpen(true)} className="w-full py-3 bg-red-50 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-100/80 dark:border-red-900/50 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-100 dark:hover:bg-red-900/60 font-sans transition-colors active:scale-[0.98]">
                 <span className="material-symbols-outlined text-[18px]">restaurant_menu</span>
                 Menu Availability
               </button>
-              <button onClick={handleRefreshFeed} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 font-sans transition-colors active:scale-[0.98]">
+              <button onClick={handleRefreshFeed} className="w-full py-3 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 font-sans transition-colors active:scale-[0.98]">
                 <span className="material-symbols-outlined text-[18px]">refresh</span>
                 Refresh Feed
               </button>
@@ -268,19 +268,19 @@ export default function KitchenOverviewPage() {
           </div>
 
           {/* Kitchen Pressure Gauge */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col items-center">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center">
             <div className="w-full flex items-center gap-2 mb-6">
               <span className="text-orange-500 text-sm">🔥</span>
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 font-sans">Kitchen Pressure</h3>
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800 dark:text-white font-sans">Kitchen Pressure</h3>
             </div>
             <div className="relative w-44 h-44 mb-6">
               <svg className="w-full h-full" viewBox="0 0 180 180">
-                <circle cx="90" cy="90" r="70" fill="none" stroke="#F1F5F9" strokeWidth="12" strokeLinecap="round" transform="rotate(-90 90 90)" />
+                <circle cx="90" cy="90" r="70" fill="none" stroke="currentColor" className="text-slate-100 dark:text-slate-800" strokeWidth="12" strokeLinecap="round" transform="rotate(-90 90 90)" />
                 <circle cx="90" cy="90" r="70" fill="none" stroke="#F97316" strokeWidth="12" strokeLinecap="round" transform="rotate(-90 90 90)" strokeDasharray="439.8" strokeDashoffset="96.7" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-black text-slate-800 font-sans">78%</span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 font-sans">Medium Load</span>
+                <span className="text-4xl font-black text-slate-800 dark:text-white font-sans">78%</span>
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mt-1 font-sans">Medium Load</span>
               </div>
             </div>
             <div className="w-full grid grid-cols-2 gap-y-3 gap-x-4">
@@ -292,8 +292,8 @@ export default function KitchenOverviewPage() {
               ].map(({ color, label, range }) => (
                 <div key={label} className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${color}`} />
-                  <span className="text-[10px] text-slate-600 font-medium font-sans">{label}</span>
-                  <span className="text-[10px] text-slate-400 ml-auto font-sans">{range}</span>
+                  <span className="text-[10px] text-slate-600 dark:text-slate-300 font-medium font-sans">{label}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-400 ml-auto font-sans">{range}</span>
                 </div>
               ))}
             </div>

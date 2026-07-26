@@ -14,6 +14,7 @@ export const kitchenRoutes: RouteObject[] = [
     element: <KitchenLayout />,
     children: [
       { index: true, element: <KitchenOverviewPage /> },
+      { path: 'overview', element: <KitchenOverviewPage /> },
       { path: 'orders', element: <KitchenOrdersPage /> },
       { path: 'batch-cooking', element: <BatchCookingPage /> },
       { path: 'inventory', element: <KitchenInventoryPage /> },

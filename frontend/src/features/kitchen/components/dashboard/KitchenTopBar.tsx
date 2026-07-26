@@ -6,6 +6,7 @@ import { useKitchenStore } from '../../store/kitchen.store';
 import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 interface Props {
+  onToggleSidebar?: () => void;
   onProfileClick?: () => void;
 }
 
@@ -27,7 +28,7 @@ const DEFAULT_NOTIFICATIONS: KitchenNotification[] = [
   { id: 'nt-05', message: 'Analytics report generated for yesterday', time: '2 hours ago', read: true, route: '/kitchen', type: 'analytics' },
 ];
 
-export default function KitchenTopBar({ onProfileClick }: Props) {
+export default function KitchenTopBar({ onToggleSidebar, onProfileClick }: Props) {
   const { settings } = usePlatformSettingsGuard();
   const platformName = settings?.platformName || "Flavoroast";
   const { profile, updateProfile } = useKitchenStore();
@@ -256,12 +257,22 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
         </div>
       </div>
 
-      {/* Mobile: Brand */}
-      <div className="flex md:hidden items-center gap-1.5 min-w-0 mr-1">
-        <div className="bg-orange-100 p-1.5 rounded-lg shrink-0">
-          <span className="material-symbols-outlined text-orange-600 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
+      {/* Mobile: Hamburger Button & Brand */}
+      <div className="flex lg:hidden items-center gap-2 min-w-0 mr-1">
+        <button
+          onClick={onToggleSidebar}
+          className="p-1.5 text-slate-700 hover:bg-slate-100 active:bg-slate-200 rounded-xl transition-colors shrink-0 flex items-center justify-center cursor-pointer border border-slate-200/80 shadow-xs"
+          title="Toggle Navigation Menu"
+          aria-label="Toggle Navigation Menu"
+        >
+          <span className="material-symbols-outlined text-[22px] block">menu</span>
+        </button>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-8 h-8 rounded-full shrink-0 aspect-square flex items-center justify-center bg-orange-100 text-orange-600">
+            <span className="material-symbols-outlined text-orange-600 text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
+          </div>
+          <span className="font-bold text-xs sm:text-sm text-slate-800 font-sans truncate max-w-[90px] sm:max-w-none">{platformName}</span>
         </div>
-        <span className="font-bold text-xs sm:text-sm text-slate-800 font-sans truncate max-w-[90px] sm:max-w-none">{platformName}</span>
       </div>
 
       {/* Right: Search, Notifications, Profile */}
