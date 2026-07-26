@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import type {
   ProfileActivityItem,
@@ -91,14 +91,20 @@ function mergeProfileData(base: ProfileData, incoming?: Partial<ProfileData> | n
 
 export function useProfile() {
   const { user } = useAuth();
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const [profile, setProfile] = useState<ProfileData | null>(() => {
     return user ? buildFallbackProfile(user) : null;
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Depend on user?.id, not the full user object, so this doesn't
+  // re-create when user reference changes but ID stays the same.
   const refresh = useCallback(async () => {
-    const fallback = buildFallbackProfile(user);
+    const fallback = buildFallbackProfile(userRef.current);
     setLoading(true);
     setError(null);
     const res = await profileAPI.getProfile();
@@ -109,7 +115,8 @@ export function useProfile() {
       setProfile(fallback);
     }
     setLoading(false);
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const saveProfile = async (updates: Partial<ProfileData>) => {
     const fallback = profile ?? buildFallbackProfile(user);

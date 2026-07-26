@@ -6,7 +6,7 @@ import { AdminSearchProvider } from '../features/admin/context/Adminsearchcontex
 import { AdminNotificationsProvider } from '../features/admin/context/Adminnotificationscontext';
 import OnboardingWizard from '../features/admin/components/dashboard/OnboardingWizard';
 import { apiClient } from '../shared/services/apiClient';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
 
@@ -21,7 +21,6 @@ export default function AdminLayout(): JSX.Element {
   });
 
   const [restaurant, setRestaurant] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
 
   const fetchOverview = async () => {
     try {
@@ -29,8 +28,6 @@ export default function AdminLayout(): JSX.Element {
       setRestaurant(response.data?.data?.restaurant);
     } catch (err) {
       console.error('Failed to load restaurant status overview', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -49,15 +46,6 @@ export default function AdminLayout(): JSX.Element {
     setSidebarCollapsed(true);
     localStorage.setItem('admin-sidebar-collapsed', 'true');
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 text-slate-400 gap-3">
-        <RefreshCw className="w-8 h-8 animate-spin text-orange-500" />
-        <span className="text-xs">Loading RestoHub...</span>
-      </div>
-    );
-  }
 
   return (
     <AdminNotificationsProvider>

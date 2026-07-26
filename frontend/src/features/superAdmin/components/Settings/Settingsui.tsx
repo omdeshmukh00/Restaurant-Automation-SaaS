@@ -128,17 +128,17 @@ export function Toggle({ checked, onChange, disabled = false }: ToggleProps) {
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 ${
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
       } ${
         checked
           ? "bg-orange-500 border-orange-500 shadow-sm shadow-orange-500/30"
-          : "bg-slate-700/80 border-slate-500/80 shadow-inner"
+          : "bg-slate-700 border-slate-500 shadow-inner"
       }`}
     >
       <span
-        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
-          checked ? "translate-x-5" : "translate-x-0"
+        className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ${
+          checked ? "translate-x-5.5" : "translate-x-1"
         }`}
       />
     </button>

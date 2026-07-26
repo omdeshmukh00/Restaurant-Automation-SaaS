@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cleaningStore, type StaffProfile } from '../store/cleaning.store';
 import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleaning.api';
-import { connectSocket, getSocket } from '../../../lib/socket';
+import { onSocketEvent } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
 
 interface ProcessedTask extends UrgentTask {
@@ -259,30 +259,26 @@ export function useCleaning() {
 
   // Socket sync effect
   useEffect(() => {
-    connectSocket();
-    const socket = getSocket();
-    if (socket) {
-      const handleSync = () => {
-        loadDashboard();
-      };
-      socket.on('cleaning.started', handleSync);
-      socket.on('cleaning.completed', handleSync);
-      socket.on('cleaning.issue.reported', handleSync);
-      socket.on('cleaning.task.assigned', handleSync);
-      socket.on('cleaning.task.paused', handleSync);
-      socket.on('cleaning.task.deepclean', handleSync);
-      socket.on('table.status.changed', handleSync);
+    // Socket connection is handled by SocketProvider.
+    const handleSync = () => {
+      loadDashboard();
+    };
 
-      return () => {
-        socket.off('cleaning.started', handleSync);
-        socket.off('cleaning.completed', handleSync);
-        socket.off('cleaning.issue.reported', handleSync);
-        socket.off('cleaning.task.assigned', handleSync);
-        socket.off('cleaning.task.paused', handleSync);
-        socket.off('cleaning.task.deepclean', handleSync);
-        socket.off('table.status.changed', handleSync);
-      };
-    }
+    const events = [
+      'cleaning.started',
+      'cleaning.completed',
+      'cleaning.issue.reported',
+      'cleaning.task.assigned',
+      'cleaning.task.paused',
+      'cleaning.task.deepclean',
+      'table.status.changed',
+    ];
+
+    const unsubs = events.map((event) => onSocketEvent(event, handleSync));
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
   }, [loadDashboard]);
 
   return {

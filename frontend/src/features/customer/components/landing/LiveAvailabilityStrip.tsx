@@ -36,12 +36,12 @@ function useCountUp(target: number, duration: number, trigger: boolean) {
 
 interface LiveAvailabilityStripProps {
   stats?: {
-    tablesAvailable: number;
-    restaurantsOpen: number;
-    reservationsToday: number;
-    offersRunning: number;
-    averageWaitTime: number;
-    averageRating: number;
+    tablesAvailable?: number;
+    restaurantsOpen?: number;
+    reservationsToday?: number;
+    offersRunning?: number;
+    averageWaitTime?: number;
+    averageRating?: number;
   };
 }
 

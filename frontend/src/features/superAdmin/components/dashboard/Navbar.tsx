@@ -517,7 +517,7 @@ export default function Navbar({
                             onClick={() => {
                               setNotificationsOpen(false);
                               if ("request" in item && item.request) {
-                                navigate("/superadmin?requests=new");
+                                navigate({ search: "?requests=new" });
                               } else if ("alert" in item && item.alert) {
                                 navigate("/superadmin/alerts");
                               }
@@ -527,7 +527,7 @@ export default function Navbar({
                                 e.preventDefault();
                                 setNotificationsOpen(false);
                                 if ("request" in item && item.request) {
-                                  navigate("/superadmin?requests=new");
+                                  navigate({ search: "?requests=new" });
                                 } else if ("alert" in item && item.alert) {
                                   navigate("/superadmin/alerts");
                                 }

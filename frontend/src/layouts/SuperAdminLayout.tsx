@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { useTheme } from "../app/providers/ThemeProvider";
 import Navbar from "../features/superAdmin/components/dashboard/Navbar";
 import Sidebar from "../features/superAdmin/components/Sidebar";
+import RestaurantRequestsModal from "../features/superAdmin/components/dashboard/RestaurantRequestsModal";
 import { useRestaurantRequestsStore } from "../features/superAdmin/store/RestaurantRequests";
 import { apiClient } from "../shared/services/apiClient";
 import { getStoredUser, setStoredUser } from "../auth/tokenStore";
 
 export default function SuperAdminLayout() {
   const { user, setUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  const requestsOpen = searchParams.get("requests") === "new";
 
   const fetchRequests = useRestaurantRequestsStore((state) => state.fetchRequests);
 
@@ -159,6 +162,11 @@ export default function SuperAdminLayout() {
           <Outlet context={{ darkMode, themePreference, setThemePreference: updateThemePreference }} />
         </div>
       </main>
+
+      {/* Global New Restaurant Requests Modal */}
+      {requestsOpen && (
+        <RestaurantRequestsModal darkMode={darkMode} />
+      )}
     </div>
   );
 }

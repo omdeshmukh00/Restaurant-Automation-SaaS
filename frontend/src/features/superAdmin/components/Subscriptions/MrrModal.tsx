@@ -110,21 +110,13 @@ export default function MrrModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
-      {/* Backdrop */}
-      <button
-        type="button"
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-0 cursor-default"
-        onClick={onClose}
-        aria-label="Close MRR Modal"
-      />
-
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
       {/* Modal Container */}
       <div
-        className={`w-full max-w-5xl rounded-2xl border p-6 shadow-2xl z-10 max-h-[90vh] flex flex-col transition-all duration-300 ${
+        className={`w-full max-w-5xl max-h-[88vh] overflow-y-auto rounded-2xl border p-6 shadow-2xl flex flex-col ${
           darkMode
-            ? "bg-slate-950 border-slate-800 text-white shadow-black/80"
-            : "bg-white border-slate-200 text-slate-900 shadow-slate-300/40"
+            ? "bg-slate-950 border-slate-800 text-slate-100"
+            : "bg-white border-slate-200 text-slate-900"
         }`}
       >
         {/* Header */}

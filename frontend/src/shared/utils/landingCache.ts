@@ -1,32 +1,26 @@
-let cachedRestaurants: any[] | null = null;
-let cachedDishes: any[] | null = null;
-let cachedOffers: any[] | null = null;
-let cachedLandingData: any = null;
+import { useLandingStore } from '../../features/customer/store/landing.store';
 
 export const landingCache = {
-  getRestaurants: () => cachedRestaurants,
+  getRestaurants: () => useLandingStore.getState().restaurants,
   setRestaurants: (data: any[]) => {
-    cachedRestaurants = data;
+    const current = useLandingStore.getState().landingData || {};
+    useLandingStore.getState().setLandingData({ ...current, restaurants: data });
   },
-  getDishes: () => cachedDishes,
+  getDishes: () => useLandingStore.getState().dishes,
   setDishes: (data: any[]) => {
-    cachedDishes = data;
+    const current = useLandingStore.getState().landingData || {};
+    useLandingStore.getState().setLandingData({ ...current, dishes: data });
   },
-  getOffers: () => cachedOffers,
+  getOffers: () => useLandingStore.getState().offers,
   setOffers: (data: any[]) => {
-    cachedOffers = data;
+    const current = useLandingStore.getState().landingData || {};
+    useLandingStore.getState().setLandingData({ ...current, offers: data });
   },
-  getLandingData: () => cachedLandingData,
+  getLandingData: () => useLandingStore.getState().landingData,
   setLandingData: (data: any) => {
-    cachedLandingData = data;
-    if (data?.restaurants) cachedRestaurants = data.restaurants;
-    if (data?.dishes) cachedDishes = data.dishes;
-    if (data?.offers) cachedOffers = data.offers;
+    useLandingStore.getState().setLandingData(data);
   },
   clear: () => {
-    cachedRestaurants = null;
-    cachedDishes = null;
-    cachedOffers = null;
-    cachedLandingData = null;
+    useLandingStore.getState().clearCache();
   }
 };

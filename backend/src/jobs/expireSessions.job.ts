@@ -22,39 +22,48 @@ export async function runSessionCleanup(): Promise<void> {
     // Query active sessions, batched at 100 to prevent memory pressure
     const sessions = await TableSessionModel.find({
       status: SessionStatus.ACTIVE,
-    }).limit(100);
+    })
+      .limit(100)
+      .lean();
 
     scannedCount = sessions.length;
 
-    for (const session of sessions) {
-      try {
-        const isHardExpired = session.expiresAt.getTime() < now.getTime();
-        let shouldExpire = isHardExpired;
+    if (scannedCount > 0) {
+      const sessionIds = sessions.map((s: any) => s._id);
+      const activeOrderSessions = await OrderModel.distinct('sessionId', {
+        sessionId: { $in: sessionIds },
+        status: { $ne: OrderStatus.CANCELLED },
+      });
+      const activeSessionSet = new Set(activeOrderSessions.map((id: any) => id.toString()));
 
-        if (!shouldExpire) {
-          // Check order immunity: if no order has been placed within 5 minutes, expire session
-          const hasOrders = await OrderModel.exists({
-            sessionId: session._id,
-            status: { $ne: OrderStatus.CANCELLED },
-          });
+      for (const session of sessions) {
+        try {
+          const isHardExpired = new Date(session.expiresAt).getTime() < now.getTime();
+          let shouldExpire = isHardExpired;
 
-          if (!hasOrders) {
-            const idleLimitMs = 5 * 60_000; // 5 minutes
-            if (now.getTime() - session.lastActivityAt.getTime() > idleLimitMs) {
-              shouldExpire = true;
+          if (!shouldExpire) {
+            // Check order immunity: if no order has been placed within 5 minutes, expire session
+            const hasOrders = activeSessionSet.has(session._id.toString());
+
+            if (!hasOrders) {
+              const idleLimitMs = 5 * 60_000; // 5 minutes
+              const lastActivity = new Date(session.lastActivityAt || session.createdAt).getTime();
+              if (now.getTime() - lastActivity > idleLimitMs) {
+                shouldExpire = true;
+              }
             }
           }
-        }
 
-        if (shouldExpire) {
-          // Isolated try/catch: one failure won't halt the entire batch cleanup
-          await expireSession(session._id.toString());
-          expiredCount++;
+          if (shouldExpire) {
+            // Isolated try/catch: one failure won't halt the entire batch cleanup
+            await expireSession(session._id.toString());
+            expiredCount++;
+          }
+        } catch (error) {
+          failedCount++;
+          errors.push({ sessionId: session._id, error });
+          logger.error(`Failed to cleanly expire session ${session._id}`, { error });
         }
-      } catch (error) {
-        failedCount++;
-        errors.push({ sessionId: session._id, error });
-        logger.error(`Failed to cleanly expire session ${session._id}`, { error });
       }
     }
   } catch (error) {

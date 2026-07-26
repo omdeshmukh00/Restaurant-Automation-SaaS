@@ -58,11 +58,13 @@ export function ProtectedRoute(): JSX.Element {
         }
       }
 
-      if (shouldSwitchPanel) {
+      // Only call switchPanel when the panel actually changes —
+      // not on every same-panel navigation (Root Cause A fix)
+      if (shouldSwitchPanel && matched.panel !== activePanel) {
         switchPanel(matched.panel);
       }
     }
-  }, [location.pathname, matched, isPanelAuthenticated, switchPanel]);
+  }, [location.pathname, matched, isPanelAuthenticated, switchPanel, activePanel]);
 
   if (initializing) {
     return (
@@ -88,16 +90,6 @@ export function ProtectedRoute(): JSX.Element {
     } else {
       return <Navigate replace state={{ from: location }} to={matched.loginPath} />;
     }
-  }
-
-  // To prevent rendering children with the wrong/stale user context during
-  // the transition, only render Outlet after the active panel has switched.
-  if (activePanel !== matched.panel) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-      </div>
-    );
   }
 
   // Redirect first-time Restaurant Admins who must reset their password
