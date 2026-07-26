@@ -63,26 +63,6 @@ export default function RootErrorBoundary(): JSX.Element {
             Go to Home
           </button>
         </div>
-
-        {/* Developer details accordion */}
-        <div className="w-full text-left border-t border-slate-200 pt-6">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center justify-between w-full text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
-          >
-            <span>DEVELOPER DETAILS</span>
-            <span className="material-symbols-outlined text-[16px] transition-transform duration-300" style={{ transform: showDetails ? 'rotate(180deg)' : 'none' }}>
-              expand_more
-            </span>
-          </button>
-
-          {showDetails && (
-            <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-4 overflow-x-auto max-h-48 text-left text-xs font-mono text-red-600 leading-relaxed sd-custom-scrollbar">
-              <div className="font-bold text-slate-900 mb-1.5">{errorMessage}</div>
-              {errorStack && <pre className="whitespace-pre text-[10px] text-slate-500 select-all">{errorStack}</pre>}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

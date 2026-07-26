@@ -17,23 +17,20 @@ export const customerRoutes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to="home" replace /> },
       
-      // Account routes (no session required, protected by AuthGuard internally or ProtectedRoute)
+      // Account & Order tracking routes (accessible without QR scan modal block)
+      { path: 'orders', element: <CustomerOrderTrackingPage /> },
       { path: 'reservations', element: <CustomerReservationPage /> },
       { path: 'feedback', element: <CustomerFeedbackPage /> },
       { path: 'profile', element: <CustomerProfilePage /> },
-      // Placeholders for Phase 3 pages:
-      // { path: 'order-history', element: <CustomerOrderHistoryPage /> },
-      // { path: 'previous-invoices', element: <CustomerPreviousInvoicesPage /> },
+      { path: 'live-bill', element: <Navigate to="orders" replace /> },
 
-      // Session routes (require active dining session)
+      // Session routes (require active dining session / QR scan)
       {
         element: <CustomerSessionGuard />,
         children: [
           { path: 'home', element: <CustomerHomePage /> },
           { path: 'menu', element: <CustomerMenuPage /> },
           { path: 'checkout', element: <CustomerCheckoutPage /> },
-          { path: 'orders', element: <CustomerOrderTrackingPage /> },
-          { path: 'live-bill', element: <Navigate to="orders" replace /> }, // Placeholder mapping
         ]
       }
     ],

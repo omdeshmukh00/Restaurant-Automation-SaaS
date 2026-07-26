@@ -107,11 +107,17 @@ apiClient.interceptors.response.use(
       // Use dynamic import to prevent circular dependency with customer.store.ts
       import('../../features/customer/store/customer.store').then(({ useCustomerStore }) => {
         useCustomerStore.getState().clearDiningSession(true);
-        // Toast via notification system or standard toast
       });
 
-      // Redirect to QR scanner
-      window.location.href = '/customer?scan=true&expired=true';
+      // Only redirect to QR scanner if currently on a session-mandatory route (home, menu, checkout)
+      const currentPath = window.location.pathname;
+      const isSessionRoute = ['/customer/home', '/customer/menu', '/customer/cart', '/customer/checkout'].some(
+        (p) => currentPath === p || currentPath.startsWith(p + '/')
+      );
+
+      if (isSessionRoute) {
+        window.location.href = '/customer?scan=true&expired=true';
+      }
       return Promise.reject(error);
     }
 
