@@ -26,7 +26,6 @@ export const ROLE_ACCESS: Record<string, string[]> = {
     '/staff/reservations',
     '/staff/table-turnover',
     '/staff/menu',
-    '/staff/reports',
     '/staff/alerts',
     '/staff/profile',
     '/staff/settings',

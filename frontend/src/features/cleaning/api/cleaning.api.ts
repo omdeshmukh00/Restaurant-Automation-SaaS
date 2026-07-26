@@ -236,6 +236,13 @@ export const cleaningAPI = {
     return fetchAPI<{ task: CleaningTask }>(`/cleaning/tasks/${taskId}`);
   },
 
+  createTask: async (data: { tableId: string; priority?: string; notes?: string }): Promise<ApiResponse<{ task: CleaningTask }>> => {
+    return fetchAPI<{ task: CleaningTask }>('/cleaning/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   assignTask: async (taskId: string, staffId?: string | null): Promise<ApiResponse<void>> => {
     return fetchAPI<void>(`/cleaning/tasks/${taskId}/assign`, {
       method: 'PATCH',

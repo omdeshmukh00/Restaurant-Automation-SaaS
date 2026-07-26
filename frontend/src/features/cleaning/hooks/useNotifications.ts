@@ -145,6 +145,9 @@ export function useNotifications() {
         if (playAlert) {
           try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            if (ctx.state === 'suspended') {
+              void ctx.resume();
+            }
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);

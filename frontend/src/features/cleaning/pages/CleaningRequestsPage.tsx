@@ -39,6 +39,7 @@ export default function CleaningRequestsPage() {
   const { t } = useTranslation();
   const { searchQuery } = useCleaningSearch();
   const { showToast } = useToast();
+  const { startTask, completeTask, verifyTask, reportMaintenanceIssue, createTask, urgentTasks } = useCleaning();
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [priorityFilter, setPriorityFilter] = useState('All Priority');
   const [typeFilter, setTypeFilter] = useState('All Type');
@@ -73,7 +74,6 @@ export default function CleaningRequestsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const { urgentTasks, startTask, completeTask, verifyTask, reportIssue, reportMaintenanceIssue } = useCleaning();
   const safeTasks = (urgentTasks || []) as unknown as TableTask[];
 
   const [allRequests, setAllRequests] = useState(cleaningStore.requests);
@@ -131,12 +131,14 @@ export default function CleaningRequestsPage() {
 
     let assignedStaff = null;
     if (reqStatus === 'In Progress' || reqStatus === 'Completed') {
+      const rawTask = t as unknown as Record<string, unknown>;
+      const staffObj = rawTask.assignedStaffId as Record<string, unknown> | null;
+      const staffName = staffObj && typeof staffObj.name === 'string' ? staffObj.name : 'Staff';
       assignedStaff = {
-        name: tableLabel === 'T12' ? 'Vikram P.' : 'Anita S.',
-        avatar:
-          tableLabel === 'T12'
-            ? 'https://lh3.googleusercontent.com/aida-public/AB6AXuA--L3CSbZtR0isayAQeKWVqEYUnJm50z5jjO9pkKQN7ksNy8Vgt62aZwgUrLRnYBtnpNDDk4IRK7ognEaSVtSVSsdI0zIDiq4N90jHPW5P1ONLpdO51I3sP-vvCRQnQTsfxs1Via1HEmQcJeHVGQ6-nNWKCActOegeFVwkpjBzRiXJlzDX15TkbA-90HDUzdz54FoQmsFcObFCGuXAmvK2KTyMt9nyMhl5nHPEV0d4sIjpe9An60OytiSZxSfYVdBG1nSHlTyW1aA'
-            : 'https://lh3.googleusercontent.com/aida-public/AB6AXuANsaeL1qIrdjS8VjlskxOHt17ofWL0mQA8HTEyUyGUmb0WZEoFeVIhAYDxByw8LuxWxFKIdV270hwAPBmZFNJdIOoLB7X4CRStTLzQ66uJ709k9Kvpbt3yDChYZmi0IOgzaKGIARmUFWTp8fiuOG-poilaUus94iK5MEMaPofwxQGipJFvuis9fWEp53IS84fln5N1GSiP7xWII9WnJi1qTw5gFY4eKQQgrXVlslMwV6TbZi4nnm2vGRG3hjoOoFQyNc23SGR4j9U',
+        name: staffName,
+        avatar: staffObj && typeof staffObj.avatar === 'string' && staffObj.avatar
+          ? staffObj.avatar
+          : `https://ui-avatars.com/api/?name=${encodeURIComponent(staffName)}&background=f97316&color=fff&bold=true`,
       };
     }
 
@@ -145,11 +147,10 @@ export default function CleaningRequestsPage() {
       type: type,
       icon: icon,
       iconColor: iconColor,
-      location: t.section ? `Table ${tableLabel} - ${t.section} (Floor ${t.floor})` : (tableLabel === 'T15' ? 'Terrace Area' : `Table ${tableLabel} - Dining Zone`),
+      location: t.section ? `Table ${tableLabel} - ${t.section} (Floor ${t.floor})` : `Table ${tableLabel}`,
       requestedBy: {
-        name: tableLabel === 'T07' ? 'Ramesh K.' : tableLabel === 'T03' ? 'Neha P.' : 'Rahul S.',
-        avatar:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuCZ1EeclPIzb65zLML4Z-Ep8QnCj_Ey68uOYKOfFtZuK_k5ILmHPwi-DSDwYreE9ju4D4Z79Hp6UeAKZXSwBOURkmGSQ7hNQ8-lDeQGBfmjcHltnwofvxh67WrZSDukcUkwZiuZjqYa74AhkTFTcLWqysc21n_T9l3J9vkmkj_lFhXuaPU189ige8Tlb5foWMvGnW27LhowBJk4dHeUfzWcmeRluinE4acRYrVtfGNEr0sYCTnJ1sdGsg1NYN3HFCrqzkH0-TJrClE',
+        name: 'Cleaning Staff',
+        avatar: 'https://ui-avatars.com/api/?name=Cleaning+Staff&background=f97316&color=fff&bold=true',
       },
       priority: (t.rawPriority === 'High' || t.rawStatus === 'REQUESTED'
         ? 'High'
@@ -172,21 +173,21 @@ export default function CleaningRequestsPage() {
   const cancelledCount = allRequests.filter((r) => r.status === 'Cancelled').length;
 
   // Add request via central system trigger
-  const handleAddRequest = (e: React.FormEvent) => {
+  const handleAddRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     const now = new Date();
     if (!newRequestLocation.trim()) return;
 
+    const requestLocation = newRequestLocation.trim();
     cleaningStore.addCleaningRequest({
       id: `CR-2026-${Math.floor(Math.random() * 999)}`,
       type: newRequestType,
       icon: 'water_drop',
       iconColor: 'text-blue-500',
-      location: `Table ${newRequestLocation}`,
+      location: `Table ${requestLocation}`,
       requestedBy: {
         name: 'Staff',
-        avatar:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuCZ1EeclPIzb65zLML4Z-Ep8QnCj_Ey68uOYKOfFtZuK_k5ILmHPwi-DSDwYreE9ju4D4Z79Hp6UeAKZXSwBOURkmGSQ7hNQ8-lDeQGBfmjcHltnwofvxh67WrZSDukcUkwZiuZjqYa74AhkTFTcLWqysc21n_T9l3J9vkmkj_lFhXuaPU189ige8Tlb5foWMvGnW27LhowBJk4dHeUfzWcmeRluinE4acRYrVtfGNEr0sYCTnJ1sdGsg1NYN3HFCrqzkH0-TJrClE',
+        avatar: 'https://ui-avatars.com/api/?name=Staff&background=f97316&color=fff&bold=true',
       },
       priority: newRequestPriority as 'High' | 'Medium' | 'Low',
       status: 'Scheduled',
@@ -197,18 +198,23 @@ export default function CleaningRequestsPage() {
       }),
       requestedTime: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       assignedTo: null,
-      rawId: newRequestLocation,
+      rawId: requestLocation,
     });
 
-    window.dispatchEvent(
-      new CustomEvent('new-cleaning-request', {
-        detail: {
-          id: Date.now(),
-          title: `New Request: ${newRequestType}`,
-          message: `Location: ${newRequestLocation}`,
-          read: false,
-        },
-      })
+    try {
+      await createTask({
+        tableId: requestLocation,
+        priority: newRequestPriority,
+        notes: newRequestType,
+      });
+      showToast(`Request for Table ${requestLocation} created successfully`, 'success');
+    } catch (err) {
+      console.warn('Failed to post cleaning request to backend', err);
+    }
+
+    addNotification(
+      `New Request: ${newRequestType}`,
+      `Location: ${requestLocation}`
     );
 
     setShowAddModal(false);
@@ -335,24 +341,24 @@ export default function CleaningRequestsPage() {
   return (
     <div className="space-y-6 lg:space-y-8 animate-fadeIn cleaning-panel">
       {/* Header Info Action Buttons */}
-      <div className="flex justify-end gap-3 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
         <button
           onClick={() => setShowMaintenanceModal(true)}
-          className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-amber-500/10 cursor-pointer text-xs"
+          className="w-full bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-amber-500/10 cursor-pointer text-xs"
         >
           <span className="material-symbols-outlined text-[18px]">build</span>
           {t('reportMaintenance')}
         </button>
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
+          className="w-full bg-orange-500 hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md shadow-orange-500/10 cursor-pointer text-xs"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           {t('newRequest')}
         </button>
         <button 
           onClick={handleExportCSV}
-          className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-all active:scale-95 text-xs cursor-pointer"
+          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700 hover:border-orange-500 dark:hover:border-orange-500 transition-all active:scale-95 text-xs cursor-pointer"
         >
           <span className="material-symbols-outlined text-[18px]">download</span>
           {t('export')}

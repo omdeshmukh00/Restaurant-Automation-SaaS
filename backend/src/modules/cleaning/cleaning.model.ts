@@ -6,6 +6,7 @@ export interface ICleaningTask extends Document {
   tableId: Types.ObjectId;
   priority: Priority;
   status: CleaningStatus;
+  notes?: string;
   assignedStaffId?: Types.ObjectId | null;
   isPaused?: boolean;
   isDeepCleaning?: boolean;
@@ -34,6 +35,7 @@ const cleaningTaskSchema = new Schema<ICleaningTask>(
       enum: Object.values(CleaningStatus),
       default: CleaningStatus.PENDING,
     },
+    notes: { type: String, default: '' },
     assignedStaffId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     isPaused: { type: Boolean, default: false },
     isDeepCleaning: { type: Boolean, default: false },

@@ -37,6 +37,17 @@ export default function StaffOrdersPage() {
           turns: (t.turns || 0) + 1
         } : t));
       }
+    } else if (newStatus === 'Cancelled') {
+      const orderObj = orders.find(o => o.id === id);
+      if (orderObj) {
+        setTables(prev => prev.map(t => (t.name === orderObj.table || t.name === `Table ${orderObj.table}` || t.id === String(orderObj.id || '')) ? {
+          ...t,
+          status: 'Available',
+          guests: 0,
+          currentBill: 0,
+          action: 'Order'
+        } : t));
+      }
     }
 
     // 2. Sync status update with backend
@@ -45,6 +56,8 @@ export default function StaffOrdersPage() {
         await ordersAPI.serveOrder(id);
       } else if (newStatus === 'Completed') {
         await ordersAPI.completeOrder(id);
+      } else if (newStatus === 'Cancelled') {
+        await ordersAPI.cancelOrder(id);
       }
     } catch (err) {
       console.error('Failed to sync order status update with backend', err);
@@ -108,12 +121,12 @@ export default function StaffOrdersPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200">
+      <div className="flex items-center gap-1 overflow-x-auto max-w-full no-scrollbar border-b border-slate-200">
         {(['Active', 'Completed', 'Cancelled', 'All'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`py-3 px-4 font-sans text-xs font-bold transition-all relative border-b-2 ${
+            className={`shrink-0 py-3 px-3 sm:px-4 font-sans text-xs font-bold transition-all relative border-b-2 whitespace-nowrap ${
               activeTab === tab
                 ? 'border-dine-orange text-dine-orange'
                 : 'border-transparent text-slate-450 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'

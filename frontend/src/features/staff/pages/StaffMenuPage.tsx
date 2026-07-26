@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { useStaffProfile } from '../hooks/useStaffProfile';
 import { menuAPI } from '../api/staff.api';
 
 interface MenuItem {
@@ -15,6 +16,12 @@ interface MenuItem {
 }
 
 export default function StaffMenuPage() {
+  const { profile } = useStaffProfile();
+  const normalizedRole = (profile?.role || '').toLowerCase();
+  const isSupervisor = normalizedRole.includes('supervisor') || normalizedRole.includes('manager') || normalizedRole.includes('admin');
+  const canModifyMenu = isSupervisor;
+  const canAddDish = isSupervisor;
+
   const { query } = useStaffSearch();
   const [selectedCategory, setSelectedCategory] = useState<'All' | 'Starters' | 'Mains' | 'Desserts' | 'Beverages'>('All');
   const { menuItems, setMenuItems } = useStaffDashboard();
@@ -45,6 +52,10 @@ export default function StaffMenuPage() {
   }, [showAddModal]);
 
   const toggleAvailability = async (id: string) => {
+    if (!canModifyMenu) {
+      alert('Menu modifications are only permitted for Floor Supervisors.');
+      return;
+    }
     try {
       const item = menuItems.find(i => i.id === id);
       if (item) {
@@ -58,6 +69,11 @@ export default function StaffMenuPage() {
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canAddDish) {
+      alert('Only Floor Supervisors are permitted to add dishes to the menu.');
+      setShowAddModal(false);
+      return;
+    }
     if (!newItemName || !newItemPrice || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -116,6 +132,10 @@ export default function StaffMenuPage() {
   };
 
   const deleteItem = async (id: string) => {
+    if (!canModifyMenu) {
+      alert('Menu modifications are only permitted for Floor Supervisors.');
+      return;
+    }
     if (confirm("Are you sure you want to delete this menu item?")) {
       try {
         await menuAPI.deleteItem(id);
@@ -144,12 +164,12 @@ export default function StaffMenuPage() {
           <p className="text-sm text-slate-550 mt-0.5">Browse menu items and manage real-time availability status.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto max-w-full no-scrollbar pb-1">
             {(['All', 'Starters', 'Mains', 'Desserts', 'Beverages'] as const).map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`text-xs font-bold py-2 px-3 rounded-lg border transition-all ${
+                className={`shrink-0 text-xs font-bold py-2 px-3 rounded-lg border transition-all ${
                   selectedCategory === cat
                     ? 'bg-dine-orange text-white border-dine-orange shadow-sm'
                     : 'bg-white text-slate-655 border border-slate-100 hover:bg-slate-55'
@@ -159,18 +179,20 @@ export default function StaffMenuPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-dine-orange hover:bg-dine-orange/90 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all border-none outline-none cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">add</span>
-            Add Item
-          </button>
+          {canAddDish && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="shrink-0 bg-dine-orange hover:bg-dine-orange/90 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all border-none outline-none cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              Add Item
+            </button>
+          )}
         </div>
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {searchedItems.length > 0 ? (
           searchedItems.map(item => (
             <div
@@ -199,13 +221,15 @@ export default function StaffMenuPage() {
                     {item.spicy && (
                       <span className="material-symbols-outlined text-red-500 text-[18px]" title="Spicy">local_fire_department</span>
                     )}
-                    <button
-                      onClick={() => deleteItem(item.id)}
-                      className="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg border-none bg-transparent cursor-pointer flex items-center justify-center focus:outline-none"
-                      title="Delete Item"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
+                    {canModifyMenu && (
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        className="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg border-none bg-transparent cursor-pointer flex items-center justify-center focus:outline-none"
+                        title="Delete Item"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -219,6 +243,11 @@ export default function StaffMenuPage() {
                 <span className="font-black text-sm text-slate-800 dark:text-slate-150 font-sans">₹{item.price}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 font-semibold font-sans">{item.available ? 'In Stock' : 'Out of Stock'}</span>
+                  {canModifyMenu ? (
+                    <button
+                      onClick={() => toggleAvailability(item.id)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        item.available ? 'bg-dine-orange' : 'bg-slate-200'
                   <button
                     onClick={() => toggleAvailability(item.id)}
                     className={`relative inline-flex h-5 w-9 shrink-0 items-center cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -230,9 +259,18 @@ export default function StaffMenuPage() {
                     <span
                       className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
                         item.available ? 'translate-x-4' : 'translate-x-0.5'
+
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                          item.available ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  ) : (
+                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${item.available ? 'bg-emerald-500' : 'bg-slate-300'}`} title={item.available ? 'In Stock' : 'Out of Stock'} />
+                  )}
                 </div>
               </div>
             </div>

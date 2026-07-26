@@ -4,10 +4,9 @@ import { useTranslation } from '../../hooks/useTranslation';
 
 const MOBILE_NAV_ITEMS = [
   { to: '/cleaning', icon: 'dashboard', label: 'Dashboard', end: true },
-  { to: '/cleaning/tables', icon: 'table_restaurant', label: 'Tables' },
   { to: '/cleaning/requests', icon: 'notification_important', label: 'Requests' },
   { to: '/cleaning/tasks', icon: 'assignment', label: 'Tasks' },
-  { to: '/cleaning/settings', icon: 'settings', label: 'Settings' },
+  { to: '/cleaning/profile', icon: 'person', label: 'Profile' },
 ];
 
 const getTranslationKey = (label: string): any => {
@@ -16,6 +15,8 @@ const getTranslationKey = (label: string): any => {
     case 'Tables': return 'tables';
     case 'Requests': return 'requests';
     case 'Tasks': return 'tasks';
+    case 'Monitor Staff': return 'staff';
+    case 'Profile': return 'profile';
     case 'Settings': return 'settings';
     default: return 'dashboard';
   }

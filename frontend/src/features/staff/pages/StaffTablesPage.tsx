@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStaffSearch } from '../components/dashboard/StaffSearchContext';
 import { useStaffDashboard } from '../hooks/useStaffDashboard';
+import { useStaffProfile } from '../hooks/useStaffProfile';
 import { tableAPI, ordersAPI, offersAPI } from '../api/staff.api';
 
 const generateOrderId = () => `ORD-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -18,6 +19,12 @@ function getEstimatedVacantText(table: any): string {
 }
 
 export default function StaffTablesPage() {
+  const { profile } = useStaffProfile();
+  const normalizedRole = (profile.role || '').toLowerCase();
+  const isSupervisor = normalizedRole.includes('supervisor') || normalizedRole.includes('manager') || normalizedRole.includes('admin');
+  const canCreateTable = isSupervisor;
+  const canEditDeleteTable = isSupervisor;
+
   const { query } = useStaffSearch();
   const [selectedSection, setSelectedSection] = useState<'All' | 'My Tables' | 'Zone A' | 'Zone B' | 'Outdoor'>('All');
   const { tables, setTables, orders, setOrders, refreshDashboard } = useStaffDashboard();
@@ -195,6 +202,11 @@ export default function StaffTablesPage() {
 
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreateTable) {
+      setToastMessage('Only Floor Supervisors can create tables');
+      setShowAddModal(false);
+      return;
+    }
     if (!newTableName) return;
 
     try {
@@ -306,12 +318,12 @@ export default function StaffTablesPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Real-time table occupancy, estimated availability, and waiter billing assistance.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar">
             {(['All', 'My Tables', 'Zone A', 'Zone B', 'Outdoor'] as const).map((sec) => (
               <button
                 key={sec}
                 onClick={() => setSelectedSection(sec)}
-                className={`text-xs font-bold py-2 px-3 rounded-lg border transition-all ${
+                className={`shrink-0 text-xs font-bold py-2 px-3 rounded-lg border transition-all ${
                   selectedSection === sec
                     ? 'bg-dine-orange text-white border-dine-orange shadow-sm'
                     : 'bg-white text-slate-605 border border-slate-100 hover:bg-slate-55'
@@ -321,18 +333,20 @@ export default function StaffTablesPage() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-dine-orange hover:bg-dine-orange/90 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all border-none outline-none cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[16px]">add</span>
-            Add Table
-          </button>
+          {canCreateTable && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="shrink-0 bg-dine-orange hover:bg-dine-orange/90 text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all border-none outline-none cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              Add Table
+            </button>
+          )}
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {[
           { label: 'Total Tables', count: statusStats.total, color: 'border-l-4 border-l-slate-400', valColor: 'text-slate-850 dark:text-slate-200' },
           { label: 'Occupied', count: statusStats.occupied, color: 'border-l-4 border-l-blue-500', valColor: 'text-blue-600 dark:text-blue-400' },
@@ -348,7 +362,7 @@ export default function StaffTablesPage() {
       </div>
 
       {/* Tables Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {searchedTables.length > 0 ? (
           searchedTables.map((table) => (
             <div
@@ -364,20 +378,24 @@ export default function StaffTablesPage() {
                         Queue Assigned
                       </span>
                     )}
-                    <button
-                      onClick={() => setEditingTable(table)}
-                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                      title="Edit Table"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
-                    </button>
-                    <button
-                      onClick={() => setDeletingTable(table)}
-                      className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
-                      title="Delete Table"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
+                    {canEditDeleteTable && (
+                      <>
+                        <button
+                          onClick={() => setEditingTable(table)}
+                          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                          title="Edit Table"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                        </button>
+                        <button
+                          onClick={() => setDeletingTable(table)}
+                          className="p-1 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                          title="Delete Table"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                      </>
+                    )}
                     <span className="text-[10px] text-slate-400 font-bold uppercase font-sans bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
                       {table.section}
                     </span>

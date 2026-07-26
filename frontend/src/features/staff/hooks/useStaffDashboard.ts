@@ -243,9 +243,12 @@ export const refreshDashboard = async () => {
           return matches && isActive;
         });
         const calculatedBill = activeOrdersForTable.reduce((acc: number, order: Order) => acc + (Number(order.total) || 0), 0);
+        const effectiveStatus = (activeOrdersForTable.length === 0 && tableObj.status === 'Occupied') ? 'Available' : tableObj.status;
         return {
           ...tableObj,
-          currentBill: calculatedBill > 0 ? calculatedBill : Number(rawTbl?.currentBill ?? 0),
+          status: effectiveStatus,
+          currentBill: calculatedBill > 0 ? calculatedBill : 0,
+          action: effectiveStatus === 'Available' ? 'Order' : tableObj.action,
         };
       });
       staffStore.setTables(mappedTables);

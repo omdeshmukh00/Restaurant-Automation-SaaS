@@ -1,7 +1,7 @@
-import React from 'react';
-import { useTheme, ThemeMode } from '../../../app/providers/ThemeProvider';
+import StaffProfilePage from './StaffProfilePage';
 
 export default function StaffSettingsPage() {
+  return <StaffProfilePage />;
   const { theme, setTheme } = useTheme();
   const [assistanceCalls, setAssistanceCalls] = React.useState(true);
   const [foodReady, setFoodReady] = React.useState(true);

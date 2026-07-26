@@ -101,4 +101,12 @@ router.patch(
   OrdersController.updateOrderItems
 );
 
+router.patch(
+  '/staff/orders/:id/cancel',
+  requireAuth,
+  roleGuard(...serviceRoles),
+  validate({ params: orderIdParamsSchema }),
+  OrdersController.cancelStaffOrder
+);
+
 export default router;

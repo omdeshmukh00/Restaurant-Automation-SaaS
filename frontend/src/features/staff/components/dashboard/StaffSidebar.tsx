@@ -31,10 +31,8 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
     { to: '/staff/reservations', icon: 'book_online', label: 'Reservations & Queue' },
     { to: '/staff/table-turnover', icon: 'hourglass_empty', label: 'Table Turnover' },
     { to: '/staff/menu', icon: 'menu_book', label: 'Menu' },
-    { to: '/staff/reports', icon: 'bar_chart', label: 'Reports' },
     { to: '/staff/alerts', icon: 'warning', label: 'Alerts', badge: alertsCount },
     { to: '/staff/monitor', icon: 'group', label: 'Monitor Staff' },
-    { to: '/staff/profile', icon: 'person', label: 'Profile' },
     { to: '/staff/settings', icon: 'settings', label: 'Settings' },
   ];
 
@@ -119,19 +117,6 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
         ))}
       </nav>
 
-      {/* Current Shift Section */}
-      {!collapsed && (
-        <div className="mx-3 mb-2 space-y-3">
-          <div className="bg-slate-50 dark:bg-sd-surface-container border border-slate-100 dark:border-sd-outline-variant/40 p-3 rounded-2xl">
-            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1 font-sans">Active Section</p>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-700 text-xs font-sans dark:text-slate-350">Zone A (Tables 1-8)</span>
-              <span className="text-[10px] bg-green-50 text-green-600 dark:bg-green-950/40 dark:text-green-400 px-2 py-0.5 rounded-full font-bold font-sans">Active</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Staff Profile Card */}
       <div className="border-t border-slate-100 dark:border-sd-outline-variant/40 px-3 py-3 shrink-0">
         <div className={`bg-slate-50 dark:bg-sd-surface-container rounded-2xl border border-slate-100 dark:border-sd-outline-variant/40 flex items-center gap-3 ${collapsed ? 'p-2 justify-center' : 'p-3'}`}>
@@ -146,10 +131,6 @@ export default function StaffSidebar({ collapsed, onToggle, onItemClick }: Props
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm truncate font-sans text-slate-800 dark:text-slate-200">{profile.name}</p>
               <p className="text-[10px] text-slate-400 font-sans">{profile.role}</p>
-              <div className="flex items-center gap-1 mt-0.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                <span className="text-[9px] font-bold text-slate-600 dark:text-slate-400 uppercase font-sans">{profile.status}</span>
-              </div>
             </div>
           )}
         </div>

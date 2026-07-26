@@ -7,55 +7,47 @@ import { useToast } from '../components/dashboard/Toast';
 import { cleaningStore } from '../store/cleaning.store';
 import { useTranslation } from '../hooks/useTranslation';
 import { apiClient } from '../../../shared/services/apiClient';
-
-interface ActivityItem {
-  icon: string;
-  iconBg: string;
-  iconColor: string;
-  title: string;
-  timestamp: string;
-  subtitle: string;
-}
-
-interface PreferenceItem {
-  icon: string;
-  label: string;
-  value: string;
-}
-
-interface BadgeItem {
-  title: string;
-  desc: string;
-  earned: string;
-  icon: string;
-  bgClass: string;
-  shadowClass: string;
-}
-
-interface TableTask {
-  id: string;
-  rawId?: string;
-  rawStatus?: 'PENDING' | 'REQUESTED' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED';
-  rawPriority?: 'High' | 'Medium' | 'Low';
-  progress?: number;
-  waiting?: string;
-}
+import { useTheme, ThemeMode } from '../../../app/providers/ThemeProvider';
 
 export default function CleaningProfilePage() {
-  const { t, lang } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🔌 Connect with dynamic system telemetry layer
+  // Dynamic system telemetry
   const { urgentTasks, profile, updateProfile, requestMobileOtp } = useCleaning();
   const { showToast } = useToast();
-  const safeTasks: TableTask[] = (urgentTasks || []) as TableTask[];
 
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'system'>('profile');
   const [tableList, setTableList] = useState(cleaningStore.tables);
   const [activitiesList, setActivitiesList] = useState(cleaningStore.activities);
-  const [showAllActivities, setShowAllActivities] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
+
+  // App Settings state
+  const [urgentAlerts, setUrgentAlerts] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cleanserve-settings-urgentAlerts');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const [taskReminders, setTaskReminders] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cleanserve-settings-taskReminders');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const [shiftAlerts, setShiftAlerts] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cleanserve-settings-shiftAlerts');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
 
   useEffect(() => {
     const unsubscribe = cleaningStore.subscribe(() => {
@@ -67,15 +59,21 @@ export default function CleaningProfilePage() {
     };
   }, []);
 
-  const liveCleanedCount = tableList.filter(t => t.status === 'Available' || t.status === 'Done').length;
-  const liveInProgressCount = tableList.filter(t => t.status === 'In Progress').length;
+  useEffect(() => {
+    localStorage.setItem('cleanserve-settings-urgentAlerts', String(urgentAlerts));
+  }, [urgentAlerts]);
+
+  useEffect(() => {
+    localStorage.setItem('cleanserve-settings-taskReminders', String(taskReminders));
+  }, [taskReminders]);
+
+  useEffect(() => {
+    localStorage.setItem('cleanserve-settings-shiftAlerts', String(shiftAlerts));
+  }, [shiftAlerts]);
 
   // Edit Modals states
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [showPrefsModal, setShowPrefsModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-
-  // Cropper states
   const [showCropModal, setShowCropModal] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState('');
 
@@ -88,17 +86,11 @@ export default function CleaningProfilePage() {
   const [userEnteredOtp, setUserEnteredOtp] = useState('');
   const [otpError, setOtpError] = useState('');
 
-  // Prefs Modal Form states
-  const [editPreferredArea, setEditPreferredArea] = useState('');
-  const [editPreferredShift, setEditPreferredShift] = useState('');
-  const [editDaysAvailable, setEditDaysAvailable] = useState('');
-  const [editBreakPreference, setEditBreakPreference] = useState('');
-  const [editPreferredTaskTypes, setEditPreferredTaskTypes] = useState('');
-
   // Password Modal states
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const openInfoModal = () => {
     setEditName(profile.name);
@@ -108,15 +100,6 @@ export default function CleaningProfilePage() {
     setUserEnteredOtp('');
     setOtpError('');
     setShowInfoModal(true);
-  };
-
-  const openPrefsModal = () => {
-    setEditPreferredArea(profile.preferredArea);
-    setEditPreferredShift(profile.preferredShift);
-    setEditDaysAvailable(profile.daysAvailable);
-    setEditBreakPreference(profile.breakPreference);
-    setEditPreferredTaskTypes(profile.preferredTaskTypes);
-    setShowPrefsModal(true);
   };
 
   const openPasswordModal = () => {
@@ -179,18 +162,6 @@ export default function CleaningProfilePage() {
     }
   };
 
-  const handleSavePrefs = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateProfile({
-      preferredArea: editPreferredArea,
-      preferredShift: editPreferredShift,
-      daysAvailable: editDaysAvailable,
-      breakPreference: editBreakPreference,
-      preferredTaskTypes: editPreferredTaskTypes
-    });
-    setShowPrefsModal(false);
-  };
-
   const handleSavePassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
@@ -232,608 +203,351 @@ export default function CleaningProfilePage() {
     setShowCropModal(false);
   };
 
-  const preferences: PreferenceItem[] = [
-    { icon: 'location_on', label: 'preferredArea', value: profile.preferredArea },
-    { icon: 'light_mode', label: 'preferredShift', value: profile.preferredShift },
-    { icon: 'calendar_month', label: 'daysAvailable', value: profile.daysAvailable },
-    { icon: 'coffee', label: 'breakPreference', value: profile.breakPreference },
-    { icon: 'fact_check', label: 'preferredTaskTypes', value: profile.preferredTaskTypes },
-  ];
-
-  const badges: BadgeItem[] = [
-    {
-      title: 'consistencyStar',
-      desc: 'completed20TasksInARow',
-      earned: 'Jun 10, 2026',
-      icon: 'star',
-      bgClass: 'bg-green-500',
-      shadowClass: 'shadow-green-250 dark:shadow-none',
-    },
-    {
-      title: 'hygieneHero',
-      desc: 'maintained95HygieneScore',
-      earned: 'Jun 5, 2026',
-      icon: 'shield',
-      bgClass: 'bg-blue-500',
-      shadowClass: 'shadow-blue-250 dark:shadow-none',
-    },
-    {
-      title: 'timeKeeper',
-      desc: 'completedTasksOnTime',
-      earned: 'May 28, 2026',
-      icon: 'schedule',
-      bgClass: 'bg-purple-500',
-      shadowClass: 'shadow-purple-250 dark:shadow-none',
-    },
-    {
-      title: 'cleanSweep',
-      desc: 'noPendingTasksFullDay',
-      earned: 'May 20, 2026',
-      icon: 'cleaning_services',
-      bgClass: 'bg-orange-500',
-      shadowClass: 'shadow-orange-250 dark:shadow-none',
-    },
-    {
-      title: 'risingStar',
-      desc: 'topPerformerMonth',
-      earned: 'May 1, 2026',
-      icon: 'workspace_premium',
-      bgClass: 'bg-teal-500',
-      shadowClass: 'shadow-teal-250 dark:shadow-none',
-    },
-  ];
+  // Get user initials
+  const initials = (profile.name || 'Riya Service')
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase();
 
   return (
-    <>
-      <div className="space-y-6 lg:space-y-8 animate-fadeIn cleaning-panel">
-        {/* Profile and Performance grid */}
-        <div className="grid grid-cols-12 gap-6 lg:gap-8">
-          {/* Profile Overview */}
-          <section className="col-span-12 lg:col-span-7 bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-155 dark:border-slate-800 p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('profileOverview')}</h3>
-              <button
-                onClick={openInfoModal}
-                className="text-slate-400 hover:text-orange-500 transition-colors flex items-center gap-1 text-[11px] font-bold font-sans cursor-pointer focus:outline-none"
-                title="Edit Profile Information"
-              >
-                <span className="material-symbols-outlined text-[16px]">edit</span>
-                {t('editInfo')}
-              </button>
-            </div>
-            <div className="flex flex-col md:flex-row gap-6 lg:gap-8">
-              <div className="flex flex-col items-center gap-3 shrink-0">
-                <div className="relative shrink-0">
-                  {profile.avatar ? (
-                    <img
-                      alt={profile.name}
-                      className="w-28 h-28 rounded-full object-cover border-4 border-slate-100 dark:border-slate-800 shadow-md"
-                      src={profile.avatar}
-                    />
-                  ) : (
-                    <div className="w-28 h-28 rounded-full border-4 border-slate-100 dark:border-slate-800 shadow-md bg-orange-500/10 flex items-center justify-center text-orange-500 font-bold text-3xl">
-                      {profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
-                    </div>
-                  )}
-                  <span className="absolute bottom-1 right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-sd-surface-container rounded-full" />
-                </div>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handlePhotoChange}
-                  accept="image/*"
-                  className="hidden"
-                />
-                <button
-                  onClick={handlePhotoClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-500 text-orange-500 dark:text-white dark:border-slate-700 rounded-lg text-[10px] font-bold hover:bg-orange-500/10 transition-all active:scale-95 font-sans cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">photo_camera</span>
-                  {t('changePhoto')}
-                </button>
-                <button
-                  onClick={() => signOut()}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-650 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:text-red-400 border border-transparent rounded-lg text-[10px] font-bold transition-all active:scale-95 font-sans cursor-pointer w-full justify-center mt-2"
-                >
-                  <span className="material-symbols-outlined text-[16px]">logout</span>
-                  {t('logout')}
-                </button>
-              </div>
-
-              <div className="flex-1 grid grid-cols-2 gap-y-4 gap-x-6 lg:gap-x-8 font-sans text-xs">
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('fullName')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.name}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('staffId')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.id}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('email')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200 truncate">{profile.email}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('phone')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.phone}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('role')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{t(profile.role)}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('department')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{t(profile.department)}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('joinedOn')}</p>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200">{profile.joinedOn}</p>
-                </div>
-                <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('status')}</p>
-                  <span className="bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-455 px-2 py-0.5 rounded text-[10px] font-bold inline-block">{t(profile.status)}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-          {/* Performance Summary */}
-          <section className="col-span-12 lg:col-span-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('performanceSummary')}</h3>
-              <select className="bg-slate-50 dark:bg-slate-800 border-none rounded-lg text-[10px] font-bold font-sans focus:ring-1 focus:ring-orange-500 px-2.5 py-1 text-slate-700 dark:text-slate-355 outline-none accent-orange-500 cursor-pointer">
-                <option value="This Month">{t('thisMonth')}</option>
-                <option value="Last Month">{t('lastMonth')}</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-sm">
-                <div className="w-8 h-8 bg-green-50 dark:bg-green-950/30 rounded-full flex items-center justify-center mb-2 text-green-600">
-                  <span className="material-symbols-outlined text-[20px]">done_all</span>
-                </div>
-                <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">{12 + liveCleanedCount}</h4>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('tablesCleaned')}</p>
-                <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
-                  <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  12% {t('vsLastMonth')}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-sm">
-                <div className="w-8 h-8 bg-orange-500/10 dark:bg-orange-950/30 rounded-full flex items-center justify-center mb-2 text-orange-500">
-                  <span className="material-symbols-outlined text-[20px]">verified_user</span>
-                </div>
-                <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">98%</h4>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('hygieneScore')}</p>
-                <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
-                  <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  5% {t('vsLastMonth')}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-sm">
-                <div className="w-8 h-8 bg-orange-50 dark:bg-orange-950/30 rounded-full flex items-center justify-center mb-2 text-orange-600">
-                  <span className="material-symbols-outlined text-[20px]">schedule</span>
-                </div>
-                <div className="flex items-baseline gap-0.5">
-                  <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">24h</h4>
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">36m</span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('totalWorkTime')}</p>
-                <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
-                  <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  8% {t('vsLastMonth')}
-                </div>
-              </div>
-
-              <div className="bg-white dark:bg-sd-surface-container p-4 rounded-2xl border border-slate-150 dark:border-slate-800 shadow-sm">
-                <div className="w-8 h-8 bg-orange-500/10 dark:bg-orange-950/30 rounded-full flex items-center justify-center mb-2 text-orange-500">
-                  <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
-                </div>
-                <h4 className="text-xl font-extrabold text-slate-855 dark:text-slate-100 leading-none">{22 + liveCleanedCount + liveInProgressCount}</h4>
-                <p className="text-[10px] text-slate-400 font-bold font-sans mt-0.5">{t('tasksCompleted')}</p>
-                <div className="flex items-center gap-0.5 text-green-600 text-[9px] font-bold font-sans mt-2">
-                  <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                  14% {t('vsLastMonth')}
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        {/* Account Settings, Activity, Work Preferences */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-5 shadow-sm">
-            <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mb-4 font-sans">{t('accountSettings')}</h3>
-            <div className="space-y-1.5">
-              {[
-                { label: 'personalInfo', desc: 'personalInfoDesc', icon: 'person', action: openInfoModal },
-                { label: 'changePassword', desc: 'changePasswordDesc', icon: 'lock', action: openPasswordModal },
-                { label: 'notificationPreferences', desc: 'notificationPrefsDesc', icon: 'notifications_active', action: () => navigate('/cleaning/settings') },
-              ].map((item, idx) => (
-                <button
-                  key={idx}
-                  onClick={item.action}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group font-sans text-xs text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-slate-400 group-hover:text-orange-500 transition-colors text-[18px]">{item.icon}</span>
-                    <div>
-                      <p className="font-bold text-slate-800 dark:text-slate-200">{t(item.label)}</p>
-                      <p className="text-[9px] text-slate-400 font-semibold">{t(item.desc)}</p>
-                    </div>
-                  </div>
-                  <span className="material-symbols-outlined text-slate-450 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
-                </button>
-              ))}
-              <button
-                onClick={() => navigate('/cleaning/settings')}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group font-sans text-xs text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-orange-500 transition-colors text-[18px]">language</span>
-                  <div>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">{t('language')}</p>
-                    <p className="text-[9px] text-slate-400 font-semibold">{t('preferredLanguageDesc')}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-orange-500">
-                    {lang === 'hi' ? 'हिन्दी' : lang === 'es' ? 'Español' : 'English'}
-                  </span>
-                  <span className="material-symbols-outlined text-slate-455 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
-                </div>
-              </button>
-              <button
-                onClick={() => navigate('/cleaning/settings')}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group font-sans text-xs text-left cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-slate-400 group-hover:text-orange-500 transition-colors text-[18px]">dark_mode</span>
-                  <div>
-                    <p className="font-bold text-slate-800 dark:text-slate-200">{t('theme')}</p>
-                    <p className="text-[9px] text-slate-400 font-semibold">{t('themeDesc')}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-bold text-orange-500">{t('active')}</span>
-                  <span className="material-symbols-outlined text-slate-455 group-hover:translate-x-0.5 transition-transform text-sm">chevron_right</span>
-                </div>
-              </button>
-            </div>
-          </section>
-
-          {/* Recent Activity */}
-          <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-5 shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 font-sans">{t('recentActivity')}</h3>
-              <button type="button" onClick={() => setShowAllActivities(!showAllActivities)} className="text-[10px] font-bold text-orange-500 cursor-pointer hover:underline font-sans">
-                {showAllActivities ? t('showLess') : t('viewAll')}
-              </button>
-            </div>
-
-            <div className="space-y-4 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2.5px] before:bg-slate-100 dark:before:bg-slate-800/80">
-              {(showAllActivities ? activitiesList : activitiesList.slice(0, 3)).map((act, idx) => (
-                <div key={idx} className="flex gap-3 relative z-10 font-sans text-xs bg-white dark:bg-sd-surface-container">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${act.iconBg}`}>
-                    <span className={`material-symbols-outlined text-[16px] ${act.iconColor}`} style={{ fontVariationSettings: "'FILL' 1" }}>{act.icon}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start">
-                      <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{t(act.title)}</p>
-                      <span className="text-[9px] text-slate-400 font-semibold shrink-0 ml-2">{act.timestamp}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-455 dark:text-slate-400 font-semibold">{t(act.subtitle)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Work Preferences */}
-          <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-5 shadow-sm md:col-span-2 lg:col-span-1">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-200 font-sans">{t('workPreferences')}</h3>
-              <button type="button" onClick={openPrefsModal} className="text-[10px] font-bold text-orange-500 cursor-pointer hover:underline font-sans">{t('edit')}</button>
-            </div>
-            <div className="space-y-4 font-sans text-xs">
-              {preferences.map((pref, idx) => (
-                <div key={idx} className="flex items-start gap-3">
-                  <div className="w-7 h-7 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-orange-500 text-[16px]">{pref.icon}</span>
-                  </div>
-                  <div>
-                    <p className="text-[9px] text-slate-455 font-bold uppercase tracking-wider leading-none mb-1">{t(pref.label)}</p>
-                    <p className="font-extrabold text-slate-800 dark:text-slate-200 leading-tight">{t(pref.value)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        {/* Badges & Achievements */}
-        <section className="bg-white dark:bg-sd-surface-container rounded-2xl border border-slate-150 dark:border-slate-800 p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 font-sans">{t('badgesAchievements')}</h3>
-            <span className="text-xs font-bold text-orange-500 cursor-pointer hover:underline font-sans">{t('viewAll')}</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-            {badges.map((badge, idx) => (
-              <div
-                key={idx}
-                className="flex flex-col items-center text-center p-4 rounded-2xl border border-transparent hover:border-slate-150 dark:hover:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-all group font-sans"
-              >
-                <div className={`w-14 h-14 ${badge.bgClass} rounded-2xl flex items-center justify-center mb-3.5 rotate-3 group-hover:rotate-0 transition-transform shadow-lg ${badge.shadowClass} shrink-0`}>
-                  <span className="material-symbols-outlined text-white text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                    {badge.icon}
-                  </span>
-                </div>
-                <p className="font-extrabold text-xs text-slate-850 dark:text-slate-250 mb-1 leading-snug">{t(badge.title)}</p>
-                <p className="text-[10px] text-slate-400 font-semibold mb-2 leading-relaxed">{t(badge.desc)}</p>
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{t('earnedOn')} {badge.earned}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+    <div className="max-w-5xl space-y-6 animate-fadeIn cleaning-panel">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-slate-100 font-sans tracking-tight">
+          Settings
+        </h1>
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-sans mt-1">
+          Manage your personal profile, notification preferences, and system settings.
+        </p>
       </div>
 
-      {/* Personal Information Edit Modal */}
+      {/* Main Settings Grid */}
+      <div className="grid grid-cols-12 gap-6 lg:gap-8 items-start">
+        {/* Left Sidebar Navigation Tabs */}
+        <div className="col-span-12 md:col-span-4 lg:col-span-3 space-y-2">
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold font-sans transition-all text-left cursor-pointer border ${
+              activeTab === 'profile'
+                ? 'bg-orange-500/10 text-orange-500 border-orange-500/40 dark:bg-orange-950/30 dark:text-orange-400'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">person</span>
+            Profile Settings
+          </button>
+
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold font-sans transition-all text-left cursor-pointer border ${
+              activeTab === 'notifications'
+                ? 'bg-orange-500/10 text-orange-500 border-orange-500/40 dark:bg-orange-950/30 dark:text-orange-400'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">notifications</span>
+            Notification Preferences
+          </button>
+
+          <button
+            onClick={() => setActiveTab('system')}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-full text-xs font-bold font-sans transition-all text-left cursor-pointer border ${
+              activeTab === 'system'
+                ? 'bg-orange-500/10 text-orange-500 border-orange-500/40 dark:bg-orange-950/30 dark:text-orange-400'
+                : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">tune</span>
+            System Preferences
+          </button>
+        </div>
+
+        {/* Right Main Card Content */}
+        <div className="col-span-12 md:col-span-8 lg:col-span-9 max-w-2xl">
+          {activeTab === 'profile' && (
+            <div className="bg-white dark:bg-sd-surface-container rounded-3xl border border-slate-100 dark:border-slate-800 p-6 md:p-8 shadow-sm flex flex-col justify-between min-h-[360px]">
+              <div>
+                {/* Profile Top Row */}
+                <div className="flex items-start justify-between gap-4 pb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="relative group shrink-0">
+                      {profile.avatar ? (
+                        <img
+                          src={profile.avatar}
+                          alt={profile.name}
+                          className="w-16 h-16 rounded-full object-cover border-2 border-orange-500/40"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-orange-950/40 border-2 border-orange-500/40 text-orange-400 font-extrabold text-xl flex items-center justify-center">
+                          {initials}
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handlePhotoChange}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      <button
+                        onClick={handlePhotoClick}
+                        className="absolute bottom-0 right-0 w-5 h-5 bg-orange-500 text-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:scale-105 transition-transform"
+                        title="Upload Photo"
+                      >
+                        <span className="material-symbols-outlined text-[12px]">photo_camera</span>
+                      </button>
+                    </div>
+
+                    <div>
+                      <h2 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 font-sans">
+                        {profile.name}
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-sans mt-0.5">
+                        {profile.role || 'Floor Supervisor'} • ID: {profile.id || 'EMP-9021'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={openInfoModal}
+                    className="p-1.5 text-slate-400 hover:text-orange-500 transition-colors rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                    title="Edit Profile"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                  </button>
+                </div>
+
+                {/* 4 Info Boxes Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-4 font-sans text-xs">
+                  <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/30 space-y-0.5">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      Assigned Zone
+                    </p>
+                    <p className="font-extrabold text-slate-800 dark:text-slate-200">
+                      {profile.preferredArea || 'Zone A (Tables 1-8)'}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/30 space-y-0.5">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      Email Address
+                    </p>
+                    <p className="font-extrabold text-slate-800 dark:text-slate-200 truncate">
+                      {profile.email}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/30 space-y-0.5">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      Phone Number
+                    </p>
+                    <p className="font-extrabold text-slate-800 dark:text-slate-200">
+                      {profile.phone}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-800/30 space-y-0.5">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                      Joined Platform
+                    </p>
+                    <p className="font-extrabold text-slate-800 dark:text-slate-200">
+                      {profile.joinedOn}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logout Button Bottom Right */}
+              <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  onClick={() => signOut()}
+                  className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 px-4 py-2 rounded-2xl text-xs font-bold font-sans transition-all active:scale-95 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[15px]">logout</span>
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="bg-white dark:bg-sd-surface-container rounded-3xl border border-slate-100 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6 min-h-[360px]">
+              <div>
+                <h3 className="text-base md:text-lg font-extrabold text-slate-800 dark:text-slate-100 font-sans">
+                  Notification Preferences
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-400 font-sans mt-0.5">
+                  Control sound, vibration, and push notification alerts for your shift assignments.
+                </p>
+              </div>
+
+              <div className="space-y-4 font-sans text-xs">
+                <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800/60">
+                  <div>
+                    <p className="font-bold text-slate-800 dark:text-slate-200">Customer Assistance Calls</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Vibrate or sound when a guest calls for waiter assistance at assigned tables.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUrgentAlerts(!urgentAlerts)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      urgentAlerts ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                      urgentAlerts ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800/60">
+                  <div>
+                    <p className="font-bold text-slate-800 dark:text-slate-200">Food Ready Notifications</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Alert immediately when food dishes are marked ready by kitchen chefs.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTaskReminders(!taskReminders)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      taskReminders ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                      taskReminders ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800/60">
+                  <div>
+                    <p className="font-bold text-slate-800 dark:text-slate-200">System Warnings & Alerts</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Receive shift reassignments or high table delay warnings from supervisors.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShiftAlerts(!shiftAlerts)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                      shiftAlerts ? 'bg-orange-500' : 'bg-slate-200 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition duration-200 ease-in-out ${
+                      shiftAlerts ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'system' && (
+            <div className="bg-white dark:bg-sd-surface-container rounded-3xl border border-slate-100 dark:border-slate-800 p-6 md:p-8 shadow-sm space-y-6 min-h-[360px]">
+              <div>
+                <h3 className="text-base md:text-lg font-extrabold text-slate-800 dark:text-slate-100 font-sans">
+                  System Preferences
+                </h3>
+                <p className="text-xs text-slate-400 dark:text-slate-400 font-sans mt-0.5">
+                  Configure application theme mode and security settings.
+                </p>
+              </div>
+
+              {/* Display Theme */}
+              <div className="space-y-3 font-sans text-xs">
+                <p className="font-extrabold text-slate-800 dark:text-slate-200">Display Theme</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { id: 'light', label: 'Light Mode', icon: 'light_mode' },
+                    { id: 'dark', label: 'Dark Mode', icon: 'dark_mode' },
+                    { id: 'system', label: 'System Theme', icon: 'desktop_windows' }
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTheme(item.id as ThemeMode)}
+                      className={`flex flex-col items-center justify-center p-3 rounded-2xl border font-sans text-xs font-bold transition-all gap-1.5 cursor-pointer ${
+                        theme === item.id
+                          ? 'border-orange-500 bg-orange-500/10 text-orange-500 dark:bg-slate-800 dark:text-white dark:border-slate-600'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 bg-slate-50 dark:bg-slate-800/40'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* --- MODALS --- */}
+
+      {/* Edit Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">{t('editInfo')}</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              {showOtpInput ? "Verify phone number change to print validation logs." : "Update your contact details below."}
-            </p>
+          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-md">
+            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">{t('editProfileInfo')}</h3>
+            <p className="text-[11px] text-slate-400 mb-4 font-sans leading-relaxed">{t('updatePersonalDetails')}</p>
             <form onSubmit={handleSaveInfo} className="space-y-4 font-sans text-xs">
-              {otpError && (
-                <div className="p-2.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 font-bold mb-2">
-                  {otpError}
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('fullName')}</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('email')}</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('phone')}</label>
+                <input
+                  type="tel"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
+                  required
+                />
+              </div>
+
+              {showOtpInput && (
+                <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/30 rounded-xl space-y-2">
+                  <label className="block font-bold text-orange-600 dark:text-orange-400">Verification OTP Code</label>
+                  <input
+                    type="text"
+                    placeholder="Enter 6-digit OTP"
+                    value={userEnteredOtp}
+                    onChange={(e) => setUserEnteredOtp(e.target.value)}
+                    className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-center tracking-widest text-sm"
+                  />
+                  {otpError && <p className="text-[10px] text-red-500 font-bold">{otpError}</p>}
                 </div>
               )}
-              
-              {showOtpInput ? (
-                <>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">{t('phone')}</p>
-                    <p className="font-bold text-slate-700 dark:text-slate-200 mt-0.5">{editPhone}</p>
-                  </div>
-                  <div>
-                    <label htmlFor="user-otp" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Verification Code (OTP)</label>
-                    <input
-                      id="user-otp"
-                      type="text"
-                      maxLength={4}
-                      placeholder="Enter 4-digit OTP"
-                      value={userEnteredOtp}
-                      onChange={(e) => setUserEnteredOtp(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 tracking-widest text-center font-extrabold text-sm"
-                      required
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowOtpInput(false)}
-                      className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
-                    >
-                      {t('saveEmployee')}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <label htmlFor="edit-name" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('fullName')}</label>
-                    <input
-                      id="edit-name"
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="edit-email" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('email')}</label>
-                    <input
-                      id="edit-email"
-                      type="email"
-                      value={editEmail}
-                      onChange={(e) => setEditEmail(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="edit-phone" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('phone')}</label>
-                    <input
-                      id="edit-phone"
-                      type="text"
-                      value={editPhone}
-                      onChange={(e) => setEditPhone(e.target.value)}
-                      className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                      required
-                    />
-                  </div>
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowInfoModal(false)}
-                      className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
-                    >
-                      {t('saveEmployee')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* Work Preferences Edit Modal */}
-      {showPrefsModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">{t('workPreferences')}</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              Update shift and assignment preferences.
-            </p>
-            <form onSubmit={handleSavePrefs} className="space-y-4 font-sans text-xs">
-              <div>
-                <label htmlFor="edit-area" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('preferredArea')}</label>
-                <input
-                  id="edit-area"
-                  type="text"
-                  value={editPreferredArea}
-                  onChange={(e) => setEditPreferredArea(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-shift" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('preferredShift')}</label>
-                <input
-                  id="edit-shift"
-                  type="text"
-                  value={editPreferredShift}
-                  onChange={(e) => setEditPreferredShift(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-days" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('daysAvailable')}</label>
-                <input
-                  id="edit-days"
-                  type="text"
-                  value={editDaysAvailable}
-                  onChange={(e) => setEditDaysAvailable(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-break" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('breakPreference')}</label>
-                <input
-                  id="edit-break"
-                  type="text"
-                  value={editBreakPreference}
-                  onChange={(e) => setEditBreakPreference(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="edit-tasks" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">{t('preferredTaskTypes')}</label>
-                <input
-                  id="edit-tasks"
-                  type="text"
-                  value={editPreferredTaskTypes}
-                  onChange={(e) => setEditPreferredTaskTypes(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowPrefsModal(false)}
-                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
+                  onClick={() => setShowInfoModal(false)}
+                  className="flex-1 py-2 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100"
                 >
                   {t('cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
+                  className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold shadow-md"
                 >
-                  {t('saveEmployee')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Change Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-sd-surface-container rounded-2xl p-6 border border-slate-100 dark:border-slate-800 shadow-xl w-full max-w-sm">
-            <h3 className="font-extrabold text-sm text-slate-800 dark:text-slate-100 mb-1 font-sans">Change Password</h3>
-            <p className="text-[11px] text-slate-400 dark:text-slate-400 mb-4 font-sans leading-relaxed">
-              Choose a strong and secure new password.
-            </p>
-            <form onSubmit={handleSavePassword} className="space-y-4 font-sans text-xs">
-              {passwordError && (
-                <div className="p-2.5 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 font-bold mb-2">
-                  {passwordError}
-                </div>
-              )}
-              <div>
-                <label htmlFor="current-pw" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Current Password</label>
-                <input
-                  id="current-pw"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="new-pw" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">New Password</label>
-                <input
-                  id="new-pw"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="confirm-pw" className="block font-bold text-slate-700 dark:text-slate-200 mb-1.5">Confirm New Password</label>
-                <input
-                  id="confirm-pw"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full p-2.5 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200"
-                  required
-                  onPaste={(e) => e.preventDefault()}
-                  onDrop={(e) => e.preventDefault()}
-                  autoComplete="new-password"
-                />
-                <p className="text-[10px] mt-1 text-slate-500 dark:text-slate-400">Please re-enter your password manually.</p>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 text-slate-640 dark:text-slate-400 rounded-xl font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 transition-all active:scale-95"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2 bg-orange-500 text-white rounded-xl font-bold hover:bg-orange-600 transition-all active:scale-95"
-                >
-                  Update Password
+                  {showOtpInput ? "Verify & Save" : t('saveChanges')}
                 </button>
               </div>
             </form>
@@ -842,12 +556,14 @@ export default function CleaningProfilePage() {
       )}
 
       {/* Image Cropper Modal */}
-      <ImageCropperModal
-        isOpen={showCropModal}
-        imageSrc={cropImageSrc}
-        onClose={() => setShowCropModal(false)}
-        onConfirm={handleCropConfirm}
-      />
-    </>
+      {showCropModal && cropImageSrc && (
+        <ImageCropperModal
+          isOpen={showCropModal}
+          imageSrc={cropImageSrc}
+          onClose={() => setShowCropModal(false)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
+    </div>
   );
 }

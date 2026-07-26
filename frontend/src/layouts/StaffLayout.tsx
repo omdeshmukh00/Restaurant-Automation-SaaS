@@ -153,7 +153,7 @@ export default function StaffLayout(): JSX.Element {
   }
   return (
     <StaffSearchProvider>
-      <div className="flex min-h-screen bg-sd-surface text-sd-on-surface font-sans staff-panel">
+      <div className="flex h-screen max-h-screen overflow-hidden bg-sd-surface text-sd-on-surface font-sans staff-panel w-full">
         {/* Sidebar */}
         <StaffSidebar
           collapsed={sidebarCollapsed}
@@ -181,14 +181,14 @@ export default function StaffLayout(): JSX.Element {
 
         {/* Main Area */}
         <div
-          className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ml-0 ${
+          className={`flex-1 flex flex-col h-full min-w-0 transition-all duration-300 ml-0 ${
             sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64'
           }`}
         >
-          <StaffTopBar onNotificationClick={() => setIsNotificationOpen(true)} />
+          <StaffTopBar />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-20 lg:pb-8">
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 pb-24 lg:pb-8">
             <Outlet />
           </main>
         </div>
@@ -196,20 +196,6 @@ export default function StaffLayout(): JSX.Element {
         {/* Mobile Bottom Nav */}
         <StaffBottomNav />
       </div>
-
-      <NotificationWindow
-        open={isNotificationOpen}
-        onClose={() => setIsNotificationOpen(false)}
-        theme={{
-          cardBg: '#090d16', // Deep Black
-          cardBorder: '#1e293b', // Subtle Slate Dark border
-          miniCardBg: '#0f172a', // Dark slate item cards
-          textPrimary: '#ffffff',
-          textSecondary: '#94a3b8', // Clean slate text
-          textMuted: '#64748b', // Muted slate text
-          font: 'sans-serif'
-        }}
-      />
 
       {/* Maintenance Alert Modal overlay */}
       <MaintenanceAlertModal

@@ -15,7 +15,11 @@ import {
   verifyCleaningBodySchema,
 } from './cleaning.schema';
 
+import staffManagementRouter from '../staff/staff.routes';
+
 const router = Router();
+
+router.use('/staff', staffManagementRouter);
 
 // Maintenance issue routes
 router.post(
@@ -36,6 +40,7 @@ router.patch(
 router.get('/tables', CleaningController.getTables);
 
 // Task routes
+router.post('/tasks', CleaningController.createTask);
 router.get('/tasks', validate({ query: cleaningTaskQuerySchema }), CleaningController.getTasks);
 router.get('/tasks/:id', validate({ params: cleaningTaskParamsSchema }), CleaningController.getTask);
 

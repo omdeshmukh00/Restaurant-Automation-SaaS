@@ -1,8 +1,7 @@
-import React from 'react';
+import { Navigate } from 'react-router-dom';
 import type { RouteObject } from 'react-router-dom';
 import CleaningLayout from '../layouts/CleaningLayout';
 import CleaningDashboard from '../features/cleaning/pages/CleaningDashboard';
-import CleaningTablesPage from '../features/cleaning/pages/CleaningTablesPage';
 import CleaningRequestsPage from '../features/cleaning/pages/CleaningRequestsPage';
 import CleaningTasksPage from '../features/cleaning/pages/CleaningTasksPage';
 import CleaningStaffMonitorPage from '../features/cleaning/pages/CleaningStaffMonitorPage';
@@ -20,7 +19,7 @@ export const cleaningRoutes: RouteObject[] = [
       },
       {
         path: 'tables',
-        element: <CleaningTablesPage />,
+        element: <Navigate to="/cleaning" replace />,
       },
       {
         path: 'requests',
@@ -40,7 +39,7 @@ export const cleaningRoutes: RouteObject[] = [
       },
       {
         path: 'settings',
-        element: <CleaningSettingsPage />,
+        element: <Navigate to="/cleaning/profile" replace />,
       },
     ],
   },
