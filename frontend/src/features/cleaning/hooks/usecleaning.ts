@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cleaningStore, type StaffProfile } from '../store/cleaning.store';
 import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleaning.api';
-import { onSocketEvent } from '../../../lib/socket';
+import { connectSocket, getSocket, onSocketEvent } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
 
 interface ProcessedTask extends UrgentTask {

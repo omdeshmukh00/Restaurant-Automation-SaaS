@@ -1,11 +1,11 @@
-import StaffProfilePage from './StaffProfilePage';
+import React, { useState } from 'react';
+import { useTheme, type ThemeMode } from '../../../app/providers/ThemeProvider';
 
 export default function StaffSettingsPage() {
-  return <StaffProfilePage />;
   const { theme, setTheme } = useTheme();
-  const [assistanceCalls, setAssistanceCalls] = React.useState(true);
-  const [foodReady, setFoodReady] = React.useState(true);
-  const [systemWarnings, setSystemWarnings] = React.useState(true);
+  const [assistanceCalls, setAssistanceCalls] = useState(true);
+  const [foodReady, setFoodReady] = useState(true);
+  const [systemWarnings, setSystemWarnings] = useState(true);
 
   return (
     <div className="space-y-6 max-w-4xl animate-fadeIn">
