@@ -439,9 +439,9 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
                 </div>
 
                 {[
-                  { role: 'Executive Chef', icon: 'skillet', desc: 'Full Access (Orders, Reports, Analytics, Admin)' },
+                  { role: 'Head-Chef', icon: 'skillet', desc: 'Full Access (Orders, Stations, Inventory & Staff)' },
                   { role: 'Kitchen Supervisor', icon: 'supervisor_account', desc: 'Manage Inventory, Stations & Staff' },
-                  { role: 'Line Chef', icon: 'cooking', desc: 'Live Orders & Cooking Stations' },
+                  { role: 'Chef', icon: 'cooking', desc: 'Live Orders & Cooking Stations' },
                 ].map((item) => {
                   const isActive = profile.role === item.role;
                   return (
