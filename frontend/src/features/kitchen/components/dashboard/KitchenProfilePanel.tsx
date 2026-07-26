@@ -16,7 +16,9 @@ const STATUS_OPTIONS: { value: KitchenProfile['status']; label: string; color: s
 ];
 
 const ROLE_OPTIONS = [
-  'Executive Chef',
+  'Head-Chef',
+  'Kitchen Supervisor',
+  'Chef',
   'Sous Chef',
   'Senior Chef',
   'Line Cook',

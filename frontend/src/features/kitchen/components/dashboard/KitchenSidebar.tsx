@@ -7,14 +7,11 @@ import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSe
 
 const NAV_ITEMS = [
   { to: '/kitchen', icon: 'dashboard', label: 'Overview', end: true },
-  { to: '/kitchen/manager', icon: 'admin_panel_settings', label: 'Manager Dashboard' },
   { to: '/kitchen/orders', icon: 'shopping_bag', label: 'Orders', badge: 24 },
   { to: '/kitchen/batch-cooking', icon: 'inventory_2', label: 'Batch Cooking' },
   { to: '/kitchen/inventory', icon: 'package_2', label: 'Inventory' },
   { to: '/kitchen/stations', icon: 'view_column', label: 'Kitchen Stations' },
   { to: '/kitchen/staff', icon: 'group', label: 'Staff' },
-  { to: '/kitchen/analytics', icon: 'bar_chart', label: 'Analytics' },
-  { to: '/kitchen/reports', icon: 'description', label: 'Reports' },
   { to: '/kitchen/settings', icon: 'settings', label: 'Settings' },
 ];
 

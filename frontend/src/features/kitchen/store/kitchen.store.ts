@@ -44,7 +44,7 @@ interface KitchenStore {
 const DEFAULT_PROFILE: KitchenProfile = {
   id: 'STF-01',
   name: 'Chef Arjun',
-  role: 'Executive Chef',
+  role: 'Head-Chef',
   status: 'on-duty',
   station: 'Grill Station',
   shift: '6:00 AM - 2:00 PM',
