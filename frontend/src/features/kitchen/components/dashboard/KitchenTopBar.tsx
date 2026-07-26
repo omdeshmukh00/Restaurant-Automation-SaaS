@@ -35,6 +35,8 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const navigate = useNavigate();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false);
+  const [showRoleToast, setShowRoleToast] = useState('');
 
   const [time, setTime] = useState(new Date());
   const [activeOrders, setActiveOrders] = useState(24);
@@ -403,14 +405,77 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
           )}
         </div>
 
-        {/* Dynamic Role Indicator (Locked Role Access) */}
-        <div className="hidden sm:flex items-center bg-slate-100 dark:bg-slate-800 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1.5 font-sans shrink-0">
-          <span className="material-symbols-outlined text-[18px] text-orange-500 mr-1.5 pointer-events-none">
-            shield_person
-          </span>
-          <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 tracking-wider">
-            {profile.role}
-          </span>
+        {/* Dynamic Role Indicator & Temporary Role Switcher Toggle */}
+        <div className="relative hidden sm:block">
+          <button
+            onClick={() => setRoleMenuOpen(!roleMenuOpen)}
+            className="flex items-center bg-slate-100 dark:bg-slate-800 hover:bg-orange-50 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 hover:border-orange-400 rounded-full px-3 py-1.5 font-sans transition-all cursor-pointer shadow-sm group shrink-0"
+            title="Temporary Role Switcher (Click to switch)"
+          >
+            <span className="material-symbols-outlined text-[18px] text-orange-500 mr-1.5 group-hover:rotate-180 transition-transform">
+              swap_horiz
+            </span>
+            <span className="text-[11px] font-extrabold text-slate-700 dark:text-slate-200 tracking-wider mr-1">
+              {profile.role}
+            </span>
+            <span className="material-symbols-outlined text-[14px] text-slate-400">
+              expand_more
+            </span>
+          </button>
+
+          {/* Role Switching Dropdown Menu */}
+          {roleMenuOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="Close role menu"
+                className="fixed inset-0 z-40 bg-transparent border-none outline-none cursor-default"
+                onClick={() => setRoleMenuOpen(false)}
+              />
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 p-2.5 animate-fadeIn">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 dark:border-slate-700 mb-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-sans">Temporary Role Switch</span>
+                  <span className="text-[9px] font-bold text-orange-600 bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full font-sans">Debug Mode</span>
+                </div>
+
+                {[
+                  { role: 'Head-Chef', icon: 'skillet', desc: 'Full Access (Orders, Stations, Inventory & Staff)' },
+                  { role: 'Kitchen Supervisor', icon: 'supervisor_account', desc: 'Manage Inventory, Stations & Staff' },
+                  { role: 'Chef', icon: 'cooking', desc: 'Live Orders & Cooking Stations' },
+                ].map((item) => {
+                  const isActive = profile.role === item.role;
+                  return (
+                    <button
+                      key={item.role}
+                      onClick={() => {
+                        updateProfile({ role: item.role });
+                        setRoleMenuOpen(false);
+                        setShowRoleToast(`Switched role to ${item.role}`);
+                        setTimeout(() => setShowRoleToast(''), 3000);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-xl transition-all flex items-start gap-2.5 cursor-pointer ${
+                        isActive
+                          ? 'bg-orange-500 text-white font-bold shadow-md shadow-orange-500/20'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <span className={`material-symbols-outlined text-[18px] mt-0.5 ${isActive ? 'text-white' : 'text-orange-500'}`}>
+                        {item.icon}
+                      </span>
+                      <div>
+                        <p className={`text-xs font-bold font-sans ${isActive ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                          {item.role}
+                        </p>
+                        <p className={`text-[10px] font-sans mt-0.5 leading-snug ${isActive ? 'text-orange-100' : 'text-slate-400 dark:text-slate-400'}`}>
+                          {item.desc}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Profile */}
@@ -427,6 +492,13 @@ export default function KitchenTopBar({ onProfileClick }: Props) {
           )}
         </button>
       </div>
+
+      {showRoleToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white border border-slate-700 px-5 py-2.5 rounded-2xl shadow-2xl z-[200] flex items-center gap-2 text-xs font-bold font-sans animate-fadeIn">
+          <span className="material-symbols-outlined text-orange-400 text-[18px]">verified_user</span>
+          {showRoleToast}
+        </div>
+      )}
     </header>
   );
 }
