@@ -98,7 +98,7 @@ export const PlatformSettingsModel = mongoose.model<IPlatformSettings>('Platform
  */
 export async function getPlatformSettings(): Promise<IPlatformSettings> {
   // Find all settings documents (there may be duplicates from tenant plugin bug)
-  const allSettings = await PlatformSettingsModel.find().sort({ updatedAt: -1 });
+  const allSettings = await PlatformSettingsModel.find().setOptions({ bypassTenant: true }).sort({ updatedAt: -1 });
 
   if (allSettings.length === 0) {
     // No document exists — create one with defaults
@@ -151,7 +151,7 @@ export async function getPlatformSettings(): Promise<IPlatformSettings> {
   // Clean up duplicates if any exist
   if (allSettings.length > 1) {
     const duplicateIds = allSettings.slice(1).map((s) => s._id);
-    await PlatformSettingsModel.deleteMany({ _id: { $in: duplicateIds } });
+    await PlatformSettingsModel.deleteMany({ _id: { $in: duplicateIds } }).setOptions({ bypassTenant: true });
   }
 
   // Strip any stale tenantId field from the canonical document
@@ -159,7 +159,7 @@ export async function getPlatformSettings(): Promise<IPlatformSettings> {
     await PlatformSettingsModel.updateOne(
       { _id: canonical._id },
       { $unset: { tenantId: '' } }
-    );
+    ).setOptions({ bypassTenant: true });
   }
 
   return canonical;

@@ -11,8 +11,17 @@ interface UsersState {
 
 let inFlightUsersPromise: Promise<void> | null = null;
 
+const initialCachedUsers = (): UserItem[] => {
+  try {
+    const saved = localStorage.getItem('superadmin_users_cache');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
 export const useUsersStore = create<UsersState>((set, get) => ({
-  users: [],
+  users: initialCachedUsers(),
   loading: false,
   lastFetchedAt: null,
 
@@ -35,6 +44,11 @@ export const useUsersStore = create<UsersState>((set, get) => ({
         const res = await apiClient.get('/super-admin/users');
         const rawUsers = res.data?.data?.users || res.data?.users || [];
         set({ users: rawUsers, lastFetchedAt: Date.now() });
+        try {
+          localStorage.setItem('superadmin_users_cache', JSON.stringify(rawUsers));
+        } catch (e) {
+          console.warn(e);
+        }
       } catch (err) {
         console.error('Failed to fetch platform users:', err);
       } finally {

@@ -75,7 +75,7 @@ export default function ViewModal({ restaurant, darkMode, onClose }: ViewModalPr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-slate-950/40 animate-fade-in overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
       {/* Backdrop listener to close when clicking outside */}
       <button
         type="button"
@@ -84,8 +84,8 @@ export default function ViewModal({ restaurant, darkMode, onClose }: ViewModalPr
         aria-label="Close backdrop overlay"
       />
 
-      <div className={`w-full max-w-2xl rounded-3xl border shadow-2xl transition-all relative ${
-        darkMode ? "bg-slate-950 border-slate-900 text-slate-100" : "bg-white border-slate-100 text-slate-800"
+      <div className={`w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border shadow-2xl relative ${
+        darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
       }`}>
         
         {/* Close Button */}

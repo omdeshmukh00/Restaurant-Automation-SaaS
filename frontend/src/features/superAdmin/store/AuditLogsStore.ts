@@ -53,8 +53,17 @@ interface AuditLogsState {
 
 let inFlightLogsPromise: Promise<void> | null = null;
 
+const initialCachedLogs = (): LogItem[] => {
+  try {
+    const saved = localStorage.getItem('superadmin_auditlogs_cache');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
 export const useAuditLogsStore = create<AuditLogsState>((set, get) => ({
-  logs: [],
+  logs: initialCachedLogs(),
   loading: false,
   lastFetchedAt: null,
 
@@ -110,6 +119,11 @@ export const useAuditLogsStore = create<AuditLogsState>((set, get) => ({
             };
           });
           set({ logs: formatted, lastFetchedAt: Date.now() });
+          try {
+            localStorage.setItem('superadmin_auditlogs_cache', JSON.stringify(formatted));
+          } catch (e) {
+            console.warn(e);
+          }
         }
       } catch (err) {
         console.error('Failed to fetch audit logs:', err);

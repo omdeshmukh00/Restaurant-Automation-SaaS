@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Copy, Check, Tag, Sparkles, Clock, Percent } from 'lucide-react';
 import '../components/landing/landing.css';
 import { LandingNavbar, LandingFooter } from '../components/landing';
-
-import { landingCache } from '../../../shared/utils/landingCache';
+import { useLandingStore } from '../store/landing.store';
 
 // Module-level constant — called once at module load, not during render.
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -29,50 +28,28 @@ interface ApiOffer {
 const CATEGORIES = ['All', 'Food', 'Beverages', 'New', 'Limited Time'];
 
 export default function OffersPage() {
-  const [offers, setOffers] = useState<ApiOffer[]>(() => {
-    const cached = landingCache.getOffers();
-    return cached || [];
-  });
-  const [loading, setLoading] = useState(() => {
-    const cached = landingCache.getOffers();
-    return !cached || cached.length === 0;
-  });
+  const { offers, isLoading: loading, fetchLandingData } = useLandingStore();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('All');
   const navigate = useNavigate();
 
   useEffect(() => {
-    const cached = landingCache.getOffers();
-    let active = true;
+    fetchLandingData();
 
-    const fetchOffers = async () => {
-      try {
-        if (!cached || cached.length === 0) {
-          setLoading(true);
-        }
-        const { apiClient } = await import('../../../shared/services/apiClient');
-        const res = await apiClient.get('/public/landing/data');
-        if (active && res.data?.data?.offers) {
-          const freshOffers = res.data.data.offers;
-          setOffers(freshOffers);
-          landingCache.setOffers(freshOffers);
-        }
-      } catch {
-        if (active && (!cached || cached.length === 0)) {
-          setOffers([]);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLandingData(false);
       }
     };
-    fetchOffers();
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
 
     return () => {
-      active = false;
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
-  }, []);
+  }, [fetchLandingData]);
 
   const filteredOffers = activeCategory === 'All' ? offers : offers.filter(o => {
     if (activeCategory === 'Limited Time') return o.status === 'ACTIVE';
