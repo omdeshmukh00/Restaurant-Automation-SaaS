@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { createCustomerPayment, verifyCustomerPayment, requestCashPayment } from '../api/customer.api';
 import { useCustomerStore } from '../store/customer.store';
+import { usePlatformSettingsGuard } from '../../../shared/hooks/usePlatformSettingsGuard';
 
 const loadRazorpayScript = () => {
   return new Promise((resolve) => {
@@ -23,7 +24,8 @@ export function useCustomerPayment() {
   const [paymentStatus, setPaymentStatus] = useState<'IDLE' | 'INITIATING' | 'PROCESSING' | 'VERIFYING' | 'SUCCESS' | 'FAILED' | 'CASH_REQUESTED'>('IDLE');
   const razorpaySuccessFiredRef = useRef(false);
   
-  const { fetchLiveBill, fetchOrders, addNotification } = useCustomerStore();
+  const { diningSession, fetchLiveBill, fetchOrders, addNotification } = useCustomerStore();
+  const { settings } = usePlatformSettingsGuard();
 
   const handleSuccess = useCallback(async () => {
     setPaymentStatus('SUCCESS');
@@ -69,13 +71,44 @@ export function useCustomerPayment() {
       setPaymentStatus('PROCESSING');
 
       // 3. Initialize Razorpay
+      const paymentName = diningSession?.restaurantName || settings?.platformName || 'RestoHub';
+
       const options = {
         key: paymentData.razorpayKeyId,
         amount: paymentData.amount * 100, // paise
         currency: paymentData.currency,
-        name: 'Smart Dining',
-        description: 'Live Bill Payment',
+        name: paymentName,
+        description: `Live Bill Payment - ${paymentName}`,
         order_id: paymentData.razorpayOrderId,
+        prefill: {
+          name: diningSession?.customerName || 'Guest Customer',
+        },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: 'Pay via UPI',
+                instruments: [
+                  {
+                    method: 'upi',
+                  },
+                ],
+              },
+              wallets: {
+                name: 'Pay via Wallets',
+                instruments: [
+                  {
+                    method: 'wallet',
+                  },
+                ],
+              },
+            },
+            sequence: ['block.upi', 'block.wallets', 'block.other'],
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
+        },
         handler: async (response: any) => {
           razorpaySuccessFiredRef.current = true;
           try {

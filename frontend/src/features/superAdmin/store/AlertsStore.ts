@@ -1,7 +1,7 @@
 // src/features/superAdmin/store/AlertsStore.ts
 import { create } from "zustand";
 import { superAdminRestaurantRequestsApi } from "../api/superAdmin.api";
-import { getSocket, connectSocket } from "../../../lib/socket";
+import { getSocket } from "../../../lib/socket";
 
 export interface Alert {
   id: string;
@@ -30,33 +30,50 @@ interface AlertsState {
   setupSocketListener: () => void;
 }
 
+let inFlightAlertsPromise: Promise<void> | null = null;
+let lastAlertsFetchedAt: number | null = null;
+
 export const useAlertsStore = create<AlertsState>((set, get) => ({
   alerts: [],
   loading: false,
 
   fetchAlerts: async () => {
-    set({ loading: true });
-    try {
-      const data = await superAdminRestaurantRequestsApi.getAlerts();
-      const mapped = data.map((d: any) => ({
-        id: d._id || d.id,
-        title: d.title,
-        description: d.description,
-        type: d.type,
-        status: d.status,
-        entityType: d.entityType,
-        tags: d.tags || [],
-        timestamp: d.timestamp || d.createdAt,
-        resolvedAt: d.resolvedAt,
-        actionLabel: d.entityType === 'restaurant' ? 'View Details' : undefined,
-        actionHref: d.entityType === 'restaurant' ? `/superadmin?restaurantId=${d.entityId}` : undefined,
-      }));
-      set({ alerts: mapped });
-    } catch (e) {
-      console.error("Failed to fetch platform alerts", e);
-    } finally {
-      set({ loading: false });
+    const now = Date.now();
+    if (lastAlertsFetchedAt && now - lastAlertsFetchedAt < 3000) {
+      return;
     }
+    if (inFlightAlertsPromise) {
+      return inFlightAlertsPromise;
+    }
+
+    set({ loading: true });
+    inFlightAlertsPromise = (async () => {
+      try {
+        const data = await superAdminRestaurantRequestsApi.getAlerts();
+        const mapped = data.map((d: any) => ({
+          id: d._id || d.id,
+          title: d.title,
+          description: d.description,
+          type: d.type,
+          status: d.status,
+          entityType: d.entityType,
+          tags: d.tags || [],
+          timestamp: d.timestamp || d.createdAt,
+          resolvedAt: d.resolvedAt,
+          actionLabel: d.entityType === 'restaurant' ? 'View Details' : undefined,
+          actionHref: d.entityType === 'restaurant' ? `/superadmin?restaurantId=${d.entityId}` : undefined,
+        }));
+        set({ alerts: mapped });
+        lastAlertsFetchedAt = Date.now();
+      } catch (e) {
+        console.error("Failed to fetch platform alerts", e);
+      } finally {
+        set({ loading: false });
+        inFlightAlertsPromise = null;
+      }
+    })();
+
+    return inFlightAlertsPromise;
   },
 
   acknowledgeAlert: async (id: string) => {
@@ -102,7 +119,7 @@ export const useAlertsStore = create<AlertsState>((set, get) => ({
   },
 
   setupSocketListener: () => {
-    connectSocket();
+    // Socket connection is handled by SocketProvider at the app root.
     const socket = getSocket();
     if (socket) {
       socket.off("system_alert_created");

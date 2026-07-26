@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cleaningStore, type StaffProfile } from '../store/cleaning.store';
 import { cleaningAPI, type CleaningMetric, type UrgentTask } from '../api/cleaning.api';
-import { connectSocket, getSocket } from '../../../lib/socket';
+import { connectSocket, getSocket, onSocketEvent } from '../../../lib/socket';
 import { apiClient } from '../../../shared/services/apiClient';
 
 interface ProcessedTask extends UrgentTask {
@@ -359,6 +359,26 @@ export function useCleaning() {
         socket.off('table:status_changed', handleSync);
       };
     }
+    // Socket connection is handled by SocketProvider.
+    const handleSync = () => {
+      loadDashboard();
+    };
+
+    const events = [
+      'cleaning.started',
+      'cleaning.completed',
+      'cleaning.issue.reported',
+      'cleaning.task.assigned',
+      'cleaning.task.paused',
+      'cleaning.task.deepclean',
+      'table.status.changed',
+    ];
+
+    const unsubs = events.map((event) => onSocketEvent(event, handleSync));
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
   }, [loadDashboard]);
 
   return {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "../services/apiClient";
-import { connectSocket, getSocket } from "../../lib/socket";
+import { onSocketEvent } from "../../lib/socket";
 
 export interface PlatformSettingsData {
   maintenanceMode: boolean;
@@ -73,12 +73,10 @@ async function fetchGlobalSettings(force = false) {
 
 function setupGlobalSocket() {
   if (socketConnected) return;
-  connectSocket();
-  const socket = getSocket();
-  if (socket) {
-    socket.on("platform.settings.updated", updateGlobalSettings);
-    socketConnected = true;
-  }
+  // Socket connection is handled by SocketProvider at the app root.
+  // onSocketEvent handles late-binding automatically (attaches when socket exists).
+  onSocketEvent("platform.settings.updated", updateGlobalSettings);
+  socketConnected = true;
 }
 
 export function usePlatformSettingsGuard() {

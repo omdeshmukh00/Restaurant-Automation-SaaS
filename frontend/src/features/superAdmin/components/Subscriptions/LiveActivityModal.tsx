@@ -150,7 +150,7 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 backdrop-blur-sm bg-black/60 outline-none"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn"
       onClick={onClose}
       onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
       role="button"
@@ -158,7 +158,9 @@ export default function LiveActivityModal({ restaurantId, restaurantName, darkMo
       aria-label="Close modal backdrop"
     >
       <div
-        className={`w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border shadow-2xl transition-all ${bg} ${border} ${textPrimary}`}
+        className={`w-full sm:max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border shadow-2xl ${
+          darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        }`}
         onClick={(e) => e.stopPropagation()}
         role="presentation"
       >

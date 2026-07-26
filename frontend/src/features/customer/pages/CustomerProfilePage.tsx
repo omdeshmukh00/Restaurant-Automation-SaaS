@@ -887,14 +887,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefEmail(!prefEmail)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefEmail ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefEmail
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefEmail ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefEmail ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -908,14 +910,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefSms(!prefSms)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefSms ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefSms
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefSms ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefSms ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -929,14 +933,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefWhatsapp(!prefWhatsapp)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefWhatsapp ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefWhatsapp
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefWhatsapp ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefWhatsapp ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -950,14 +956,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefPush(!prefPush)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefPush ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefPush
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefPush ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefPush ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>

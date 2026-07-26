@@ -14,10 +14,14 @@ interface LayoutContextType {
   darkMode: boolean;
 }
 
+import { useTransactionsStore } from "../store/TransactionsStore";
+
 export default function Transactions() {
   const { darkMode } = useOutletContext<LayoutContextType>();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const transactions = useTransactionsStore((state) => state.transactions);
+  const isLoading = useTransactionsStore((state) => state.loading);
+  const fetchTransactions = useTransactionsStore((state) => state.fetchTransactions);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -33,21 +37,10 @@ export default function Transactions() {
       }
     };
     window.addEventListener("sync-app-theme", handleThemeSync);
-
-    const fetchTransactions = async () => {
-      try {
-        const txs = await superAdminRestaurantRequestsApi.getTransactions();
-        setTransactions(txs);
-      } catch (error) {
-        console.error("Failed to fetch transactions", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchTransactions();
 
     return () => window.removeEventListener("sync-app-theme", handleThemeSync);
-  }, []);
+  }, [fetchTransactions]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");

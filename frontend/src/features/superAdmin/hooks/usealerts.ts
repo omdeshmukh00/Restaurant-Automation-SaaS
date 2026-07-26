@@ -76,7 +76,7 @@ export function useAlerts() {
         entityType: 'restaurant',
         timestamp: request.requestedAt || new Date(baseTime - index * 60_000).toISOString(),
         actionLabel: 'Review Request',
-        actionHref: '/superadmin?requests=new',
+        actionHref: '?requests=new',
         tags: ['onboarding', 'new-request'],
       }));
 

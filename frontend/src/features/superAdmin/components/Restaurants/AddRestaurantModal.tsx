@@ -141,17 +141,9 @@ export default function AddRestaurantModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/40 animate-fade-in">
-      {/* Backdrop listener to close modal */}
-      <button 
-        type="button"
-        onClick={onClose}
-        className="absolute inset-0 w-full h-full cursor-default bg-transparent border-none outline-none"
-        aria-label="Close dialog overlay"
-      />
-
-      <div className={`relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border p-6 shadow-2xl transition-all ${
-        darkMode ? "bg-slate-950 border-slate-800" : "bg-white border-slate-100"
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className={`relative w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border p-6 shadow-2xl ${
+        darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
       }`}>
         <button
           onClick={onClose}

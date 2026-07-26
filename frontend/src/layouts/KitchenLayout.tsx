@@ -9,7 +9,7 @@ import { useKitchenStore } from '../features/kitchen/store/kitchen.store';
 import { getKitchenRolePermissions } from '../features/kitchen/utils/kitchenRoleAccess';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
-import { connectSocket, getSocket } from '../lib/socket';
+import { onSocketEvent } from '../lib/socket';
 import { refreshDashboard, scheduleRefresh } from '../features/kitchen/hooks/useKitchenDashboard';
 export default function KitchenLayout(): JSX.Element {
   const { settings } = usePlatformSettingsGuard();
@@ -52,14 +52,10 @@ export default function KitchenLayout(): JSX.Element {
     };
     window.addEventListener('resize', handleResize);
     
-    // Initial fetch on mount is handled by connect event below if socket connects.
-    // We still fetch once initially in case socket is already connected.
+    // Socket connection is handled by SocketProvider at the app root.
     void refreshDashboard();
 
-    const socket = getSocket();
-    
     const handleOrderUpsert = (payload: any, ack?: (res: any) => void) => {
-      // payload could be { order, _version } or just order
       const order = payload.order || payload;
       useKitchenStore.getState().upsertOrder(order);
       if (typeof ack === 'function') ack({ status: 'ok' });
@@ -71,31 +67,21 @@ export default function KitchenLayout(): JSX.Element {
       if (typeof ack === 'function') ack({ status: 'ok' });
     };
 
-    if (socket) {
-      socket.on('connect', refreshDashboard);
-      socket.on('reconnect', refreshDashboard);
-      socket.on('order.created', handleOrderUpsert);
-      socket.on('order.updated', handleOrderUpsert);
-      socket.on('order.ready', handleOrderUpsert);
-      socket.on('order.served', handleOrderUpsert);
-      socket.on('order.cancelled', handleOrderUpsert);
-      socket.on('order.deleted', scheduleRefresh); // deleted might need a full refresh or custom store logic
-      socket.on('kitchen:batch-updated', handleBatchUpsert);
-    }
+    const unsubs = [
+      onSocketEvent('connect', refreshDashboard),
+      onSocketEvent('reconnect', refreshDashboard),
+      onSocketEvent('order.created', handleOrderUpsert),
+      onSocketEvent('order.updated', handleOrderUpsert),
+      onSocketEvent('order.ready', handleOrderUpsert),
+      onSocketEvent('order.served', handleOrderUpsert),
+      onSocketEvent('order.cancelled', handleOrderUpsert),
+      onSocketEvent('order.deleted', scheduleRefresh),
+      onSocketEvent('kitchen:batch-updated', handleBatchUpsert),
+    ];
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (socket) {
-        socket.off('connect', refreshDashboard);
-        socket.off('reconnect', refreshDashboard);
-        socket.off('order.created', handleOrderUpsert);
-        socket.off('order.updated', handleOrderUpsert);
-        socket.off('order.ready', handleOrderUpsert);
-        socket.off('order.served', handleOrderUpsert);
-        socket.off('order.cancelled', handleOrderUpsert);
-        socket.off('order.deleted', scheduleRefresh);
-        socket.off('kitchen:batch-updated', handleBatchUpsert);
-      }
+      unsubs.forEach((unsub) => unsub());
     };
   }, []);
 
