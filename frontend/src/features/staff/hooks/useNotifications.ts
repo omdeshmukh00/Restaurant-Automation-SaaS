@@ -94,6 +94,47 @@ export function useNotifications() {
     }
   }, [fetchNotifications]);
 
+  useEffect(() => {
+    import('../../../lib/socket').then(({ getSocket, connectSocket }) => {
+      connectSocket();
+      const socket = getSocket();
+      if (!socket) return;
+
+      const handleStaffRequest = (data: any) => {
+        const title = data?.tableNumber ? `New request from Table ${data.tableNumber}` : 'New Waiter Request';
+        const message = data?.message || data?.type || 'Assistance requested by guest.';
+        const newNotif: NotificationItem = {
+          id: Date.now(),
+          title,
+          message,
+          read: false,
+          time: 'Just now',
+          tone: 'urgent',
+        };
+        globalNotifications = [newNotif, ...globalNotifications];
+        notifyListeners();
+      };
+
+      const handleOrderReady = (data: any) => {
+        const title = data?.tableNumber ? `Order Ready for Table ${data.tableNumber}` : 'Order Ready for Pickup';
+        const message = data?.items ? `Items: ${Array.isArray(data.items) ? data.items.join(', ') : data.items}` : 'Food is ready to serve.';
+        const newNotif: NotificationItem = {
+          id: Date.now() + 1,
+          title,
+          message,
+          read: false,
+          time: 'Just now',
+          tone: 'success',
+        };
+        globalNotifications = [newNotif, ...globalNotifications];
+        notifyListeners();
+      };
+
+      socket.on('staff:request-new', handleStaffRequest);
+      socket.on('order.ready', handleOrderReady);
+    }).catch(err => console.warn('Socket import failed in useNotifications', err));
+  }, []);
+
   return {
     notifications: state.notifications,
     unreadCount,

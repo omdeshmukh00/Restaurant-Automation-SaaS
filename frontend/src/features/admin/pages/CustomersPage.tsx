@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { connectSocket, getSocket } from '../../../lib/socket';
+import { getSocket } from '../../../lib/socket';
 import { useCustomersStore, type SpendFilter } from '../store/customers.store';
 import {
   CustomersHeader,
@@ -43,7 +43,7 @@ export function CustomersPage() {
 
   // Live sync: new signups and admin CRUD on customers reflect immediately
   useEffect(() => {
-    connectSocket();
+    // Socket connection is handled by SocketProvider at the app root.
     const socket = getSocket();
     if (!socket) return;
 

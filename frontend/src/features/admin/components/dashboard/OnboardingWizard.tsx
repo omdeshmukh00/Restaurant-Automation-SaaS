@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, User, MapPin, CreditCard, RefreshCw, KeyRound, Building, Compass, Sparkles, AlertCircle } from 'lucide-react';
 import { apiClient } from '../../../../shared/services/apiClient';
+import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSettingsGuard';
 
 interface OnboardingWizardProps {
   restaurant: any;
@@ -8,6 +9,9 @@ interface OnboardingWizardProps {
 }
 
 export default function OnboardingWizard({ restaurant: initialRestaurant, onComplete }: OnboardingWizardProps) {
+  const { settings: platformSettings } = usePlatformSettingsGuard();
+  const platformName = platformSettings?.platformName || 'RestoHub';
+
   const [restaurant, setRestaurant] = useState(initialRestaurant);
   const [activeStep, setActiveStep] = useState(2); // Step 1 (Change Password) is already done
 
@@ -152,7 +156,7 @@ export default function OnboardingWizard({ restaurant: initialRestaurant, onComp
           key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
           amount: orderData.amount * 100, // Razorpay expects paise
           currency: orderData.currency,
-          name: 'RestoHub SaaS Plan',
+          name: `${platformName} SaaS Plan`,
           description: `Subscription for ${selectedPlan} Plan`,
           order_id: orderData.orderId,
           handler: async function (response: any) {
@@ -179,6 +183,32 @@ export default function OnboardingWizard({ restaurant: initialRestaurant, onComp
           },
           readonly: {
             contact: true,
+          },
+          config: {
+            display: {
+              blocks: {
+                upi: {
+                  name: 'Pay via UPI',
+                  instruments: [
+                    {
+                      method: 'upi',
+                    },
+                  ],
+                },
+                wallets: {
+                  name: 'Pay via Wallets',
+                  instruments: [
+                    {
+                      method: 'wallet',
+                    },
+                  ],
+                },
+              },
+              sequence: ['block.upi', 'block.wallets', 'block.other'],
+              preferences: {
+                show_default_blocks: true,
+              },
+            },
           },
           theme: {
             color: '#FF6B1A',

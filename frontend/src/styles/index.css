@@ -436,19 +436,25 @@
 }
 
 /* Inputs and textareas */
-.dark .kitchen-panel input,
-.dark .customer-panel input,
-.dark .staff-panel input,
-.dark .admin-panel input,
-.dark .superadmin-panel input,
-.dark .kitchen-panel textarea,
-.dark .customer-panel textarea,
-.dark .staff-panel textarea,
-.dark .admin-panel textarea,
-.dark .superadmin-panel textarea {
+.dark .kitchen-panel input:not(.bg-transparent),
+.dark .customer-panel input:not(.bg-transparent),
+.dark .staff-panel input:not(.bg-transparent),
+.dark .admin-panel input:not(.bg-transparent),
+.dark .superadmin-panel input:not(.bg-transparent),
+.dark .kitchen-panel textarea:not(.bg-transparent),
+.dark .customer-panel textarea:not(.bg-transparent),
+.dark .staff-panel textarea:not(.bg-transparent),
+.dark .admin-panel textarea:not(.bg-transparent),
+.dark .superadmin-panel textarea:not(.bg-transparent) {
   background-color: hsl(var(--secondary)) !important;
   color: hsl(var(--foreground)) !important;
   border-color: hsl(var(--border)) !important;
+}
+
+input.bg-transparent,
+textarea.bg-transparent {
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
 .dark .kitchen-panel input::placeholder,

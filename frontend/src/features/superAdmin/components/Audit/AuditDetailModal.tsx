@@ -27,7 +27,7 @@ export default function AuditDetailModal({ log, darkMode, onClose }: AuditDetail
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/60 outline-none animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn"
       onClick={onClose}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       role="button"
@@ -35,7 +35,9 @@ export default function AuditDetailModal({ log, darkMode, onClose }: AuditDetail
       aria-label="Close modal backdrop"
     >
       <div
-        className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden transition-all ${bg} ${textPrimary}`}
+        className={`w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border shadow-2xl ${
+          darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        }`}
         onClick={(e) => e.stopPropagation()}
         role="presentation"
       >

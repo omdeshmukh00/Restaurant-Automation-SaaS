@@ -3,6 +3,7 @@
 export const KITCHEN_ROLE_ACCESS: Record<string, string[]> = {
   'Chef': [
     '/kitchen',
+    '/kitchen/overview',
     '/kitchen/orders',
     '/kitchen/batch-cooking',
     '/kitchen/stations',
@@ -10,24 +11,22 @@ export const KITCHEN_ROLE_ACCESS: Record<string, string[]> = {
   ],
   'Kitchen Supervisor': [
     '/kitchen',
+    '/kitchen/overview',
     '/kitchen/orders',
     '/kitchen/batch-cooking',
     '/kitchen/inventory',
     '/kitchen/stations',
     '/kitchen/staff',
-    '/kitchen/manager',
     '/kitchen/settings'
   ],
   'Head-Chef': [
     '/kitchen',
+    '/kitchen/overview',
     '/kitchen/orders',
     '/kitchen/batch-cooking',
     '/kitchen/inventory',
     '/kitchen/stations',
     '/kitchen/staff',
-    '/kitchen/analytics',
-    '/kitchen/reports',
-    '/kitchen/manager',
     '/kitchen/settings'
   ]
 };

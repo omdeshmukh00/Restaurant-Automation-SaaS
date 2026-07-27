@@ -25,13 +25,7 @@ export interface SettingsSection {
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'general', title: 'General & Preferences', description: 'Kitchen name, timezone, theme and language preferences', icon: '⚙️' },
-  { id: 'stations', title: 'Station Setup', description: 'Add, edit, or remove kitchen stations', icon: '🍳' },
   { id: 'notifications', title: 'Notifications', description: 'Alert preferences, sound, auto-dismiss settings', icon: '🔔' },
-  { id: 'display', title: 'Display & KDS', description: 'Order card size, column layout, color coding', icon: '🖥️' },
-  { id: 'auto-rules', title: 'Auto-Accept Rules', description: 'Auto-accept orders based on type or table', icon: '🤖' },
-  { id: 'prep-times', title: 'Prep Time Defaults', description: 'Set default preparation times per dish category', icon: '⏱️' },
-  { id: 'integrations', title: 'Integrations', description: 'POS sync, printer setup, delivery partners', icon: '🔗' },
-  { id: 'team', title: 'Team & Access', description: 'Manage who can access the kitchen dashboard', icon: '👥' },
 ];
 
 export const POPULAR_ITEMS = [

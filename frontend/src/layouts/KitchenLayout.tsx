@@ -9,8 +9,10 @@ import { useKitchenStore } from '../features/kitchen/store/kitchen.store';
 import { getKitchenRolePermissions } from '../features/kitchen/utils/kitchenRoleAccess';
 import { usePlatformSettingsGuard } from '../shared/hooks/usePlatformSettingsGuard';
 import MaintenanceAlertModal from '../shared/components/MaintenanceAlertModal';
-import { connectSocket, getSocket } from '../lib/socket';
+import { onSocketEvent } from '../lib/socket';
 import { refreshDashboard, scheduleRefresh } from '../features/kitchen/hooks/useKitchenDashboard';
+import KitchenBottomNav from '../features/kitchen/components/dashboard/KitchenBottomNav';
+
 export default function KitchenLayout(): JSX.Element {
   const { settings } = usePlatformSettingsGuard();
   const { profile } = useKitchenStore();
@@ -25,10 +27,11 @@ export default function KitchenLayout(): JSX.Element {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       if (window.innerWidth < 1024) {
-        return true; // Always collapsed (minimized) by default on mobile/tablet viewports
+        return true; // Collapsed (minimized drawer) on mobile/tablet viewports
       }
-      const stored = localStorage.getItem('kitchen_sidebar_collapsed');
+      const stored = localStorage.getItem('kitchen_sidebar_desktop_user_toggled');
       if (stored !== null) return stored === 'true';
+      return false; // Expanded by default on desktop viewports (>= 1024px)
     }
     return false;
   });
@@ -36,9 +39,9 @@ export default function KitchenLayout(): JSX.Element {
   const handleToggleSidebar = () => {
     setSidebarCollapsed(prev => {
       const next = !prev;
-      // Only store user preference for desktop viewports
+      // Only store explicit user toggle preference for desktop viewports
       if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
-        localStorage.setItem('kitchen_sidebar_collapsed', String(next));
+        localStorage.setItem('kitchen_sidebar_desktop_user_toggled', String(next));
       }
       return next;
     });
@@ -52,14 +55,10 @@ export default function KitchenLayout(): JSX.Element {
     };
     window.addEventListener('resize', handleResize);
     
-    // Initial fetch on mount is handled by connect event below if socket connects.
-    // We still fetch once initially in case socket is already connected.
+    // Socket connection is handled by SocketProvider at the app root.
     void refreshDashboard();
 
-    const socket = getSocket();
-    
     const handleOrderUpsert = (payload: any, ack?: (res: any) => void) => {
-      // payload could be { order, _version } or just order
       const order = payload.order || payload;
       useKitchenStore.getState().upsertOrder(order);
       if (typeof ack === 'function') ack({ status: 'ok' });
@@ -71,31 +70,21 @@ export default function KitchenLayout(): JSX.Element {
       if (typeof ack === 'function') ack({ status: 'ok' });
     };
 
-    if (socket) {
-      socket.on('connect', refreshDashboard);
-      socket.on('reconnect', refreshDashboard);
-      socket.on('order.created', handleOrderUpsert);
-      socket.on('order.updated', handleOrderUpsert);
-      socket.on('order.ready', handleOrderUpsert);
-      socket.on('order.served', handleOrderUpsert);
-      socket.on('order.cancelled', handleOrderUpsert);
-      socket.on('order.deleted', scheduleRefresh); // deleted might need a full refresh or custom store logic
-      socket.on('kitchen:batch-updated', handleBatchUpsert);
-    }
+    const unsubs = [
+      onSocketEvent('connect', refreshDashboard),
+      onSocketEvent('reconnect', refreshDashboard),
+      onSocketEvent('order.created', handleOrderUpsert),
+      onSocketEvent('order.updated', handleOrderUpsert),
+      onSocketEvent('order.ready', handleOrderUpsert),
+      onSocketEvent('order.served', handleOrderUpsert),
+      onSocketEvent('order.cancelled', handleOrderUpsert),
+      onSocketEvent('order.deleted', scheduleRefresh),
+      onSocketEvent('kitchen:batch-updated', handleBatchUpsert),
+    ];
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (socket) {
-        socket.off('connect', refreshDashboard);
-        socket.off('reconnect', refreshDashboard);
-        socket.off('order.created', handleOrderUpsert);
-        socket.off('order.updated', handleOrderUpsert);
-        socket.off('order.ready', handleOrderUpsert);
-        socket.off('order.served', handleOrderUpsert);
-        socket.off('order.cancelled', handleOrderUpsert);
-        socket.off('order.deleted', scheduleRefresh);
-        socket.off('kitchen:batch-updated', handleBatchUpsert);
-      }
+      unsubs.forEach((unsub) => unsub());
     };
   }, []);
 
@@ -122,7 +111,7 @@ export default function KitchenLayout(): JSX.Element {
         {/* Mobile Backdrop when Sidebar is expanded */}
         {!sidebarCollapsed && (
           <button
-            className="lg:hidden fixed inset-0 bg-slate-900/30 backdrop-blur-[2px] z-40 w-full h-full border-none outline-none cursor-default"
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-[2px] z-40 w-full h-full border-none outline-none cursor-default"
             onClick={() => {
               setSidebarCollapsed(true);
               localStorage.setItem('kitchen_sidebar_collapsed', 'true');
@@ -134,16 +123,19 @@ export default function KitchenLayout(): JSX.Element {
         {/* Main Area */}
         <div
           className={`flex-1 flex flex-col min-w-0 h-full overflow-hidden transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
+            sidebarCollapsed ? 'ml-0 lg:ml-[72px]' : 'ml-0 lg:ml-64'
           }`}
         >
-          <KitchenTopBar onProfileClick={() => setIsProfileOpen(true)} />
+          <KitchenTopBar onToggleSidebar={handleToggleSidebar} onProfileClick={() => setIsProfileOpen(true)} />
 
           {/* Page Content */}
-          <main className="flex-1 overflow-hidden pb-0 lg:pb-14">
+          <main className="flex-1 overflow-hidden pb-16 lg:pb-14">
             <Outlet />
           </main>
         </div>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <KitchenBottomNav />
 
         {/* Live Alerts Footer (Desktop) */}
         <LiveAlertsBar sidebarCollapsed={sidebarCollapsed} />

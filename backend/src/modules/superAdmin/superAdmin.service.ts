@@ -420,7 +420,14 @@ export async function updateFeatureFlag(id: string, input: UpdateFeatureFlagInpu
 // ANALYTICS
 // ──────────────────────────────────────────────────────────────────────
 
-export async function getPlatformOverview() {
+let platformOverviewCache: { data: any; expiresAt: number } | null = null;
+
+export async function getPlatformOverview(force = false) {
+  const nowMs = Date.now();
+  if (!force && platformOverviewCache && nowMs < platformOverviewCache.expiresAt) {
+    return platformOverviewCache.data;
+  }
+
   const { OrderModel } = await import('../orders/orders.model');
   const { PaymentModel } = await import('../payments/payments.model');
   const { RestaurantRequestModel } = await import('./restaurantRequest.model');
@@ -460,7 +467,7 @@ export async function getPlatformOverview() {
           ]
         }
       }
-    ]),
+    ]).option({ bypassTenant: true }),
 
     // 2. Order Stats
     OrderModel.aggregate([
@@ -532,7 +539,7 @@ export async function getPlatformOverview() {
           ]
         }
       }
-    ]),
+    ]).option({ bypassTenant: true }),
 
     // 3. Payment Stats (Commissions)
     PaymentModel.aggregate([
@@ -585,7 +592,7 @@ export async function getPlatformOverview() {
           ]
         }
       }
-    ]),
+    ]).option({ bypassTenant: true }),
 
     // 4. Onboarding Stats (Restaurant Request payments)
     RestaurantRequestModel.aggregate([
@@ -638,7 +645,7 @@ export async function getPlatformOverview() {
           ]
         }
       }
-    ]),
+    ]).option({ bypassTenant: true }),
 
     // 5. Subscription Stats
     SubscriptionPaymentModel.aggregate([
@@ -691,7 +698,7 @@ export async function getPlatformOverview() {
           ]
         }
       }
-    ]),
+    ]).option({ bypassTenant: true }),
   ]);
 
   // Extract from facets
@@ -717,24 +724,25 @@ export async function getPlatformOverview() {
   const subscriptionFeesTrend = subscriptionResult[0]?.trend || [];
 
   // Populate names for top restaurants
-  const topRestaurants = [];
-  if (topRestaurantsStats.length > 0) {
-    const restaurantIds = topRestaurantsStats.map((item: any) => item._id);
-    const restaurantDocs = await RestaurantModel.find({ _id: { $in: restaurantIds } }).lean();
-    const restNameMap = new Map();
-    restaurantDocs.forEach((r: any) => {
-      restNameMap.set(r._id.toString(), r.name);
+  const topRestaurants: Array<{ name: string; orders: number; revenue: string; growth: string }> = [];
+  const topRestIds = topRestaurantsStats.map((t: any) => t._id).filter(Boolean);
+  if (topRestIds.length > 0) {
+    const docs = await RestaurantModel.find({ _id: { $in: topRestIds } })
+      .select('name ownerName')
+      .setOptions({ bypassTenant: true })
+      .lean();
+    const docMap = new Map(docs.map((d: any) => [d._id.toString(), d]));
+    topRestaurantsStats.forEach((t: any) => {
+      const rest = docMap.get(t._id?.toString());
+      if (rest) {
+        topRestaurants.push({
+          name: rest.name,
+          orders: t.orders,
+          revenue: `₹${(t.revenue || 0).toLocaleString('en-IN')}`,
+          growth: '+12%',
+        });
+      }
     });
-
-    for (const item of topRestaurantsStats) {
-      const name = restNameMap.get(item._id.toString()) || 'Unknown Restaurant';
-      topRestaurants.push({
-        name,
-        orders: item.orders,
-        revenue: `₹${item.revenue.toLocaleString()}`,
-        growth: '+10%'
-      });
-    }
   }
 
   // Parse status counts
@@ -812,7 +820,7 @@ export async function getPlatformOverview() {
     });
   }
 
-  return {
+  const overviewResult = {
     stats: {
       totalRestaurants,
       restaurantGrowth,
@@ -827,6 +835,13 @@ export async function getPlatformOverview() {
     revenueData: formattedTrend,
     topRestaurants,
   };
+
+  platformOverviewCache = {
+    data: overviewResult,
+    expiresAt: Date.now() + 30000,
+  };
+
+  return overviewResult;
 }
 
 export async function getRevenueAnalytics(query: AnalyticsQuery) {
@@ -1072,16 +1087,18 @@ async function isEmailOnCooldown(recipient: string): Promise<boolean> {
   return !!recentEmail;
 }
 
-export async function listRestaurantRequests() {
-  // Clean up unwanted test request for restauranttesting@mail.com
-  await RestaurantRequestModel.deleteMany({
-    email: 'restauranttesting@mail.com',
-  }).setOptions({ bypassTenant: true });
+export async function listRestaurantRequests(options?: { page?: number; limit?: number }) {
+  const page = options?.page ? Math.max(1, options.page) : 1;
+  const limit = options?.limit ? Math.max(1, Math.min(200, options.limit)) : 50;
+  const skip = (page - 1) * limit;
 
   const requests = await RestaurantRequestModel.find({
     status: { $in: ['APPLICATION_PENDING', 'APPLICATION_APPROVED', 'REJECTED', 'PENDING_PAYMENT'] }
   })
+    .select('-coverImage')
     .sort({ submittedAt: -1 })
+    .skip(skip)
+    .limit(limit)
     .setOptions({ bypassTenant: true })
     .lean();
 

@@ -19,7 +19,6 @@ export const CUSTOMER_SESSION_ROUTES = [
   '/customer/cart',
   '/customer/checkout',
   '/customer/live-bill',
-  '/customer/orders' // This is now purely Current Orders
 ];
 
 export function getCustomerRouteAccessLevel(pathname: string): RouteAccessLevel {

@@ -69,11 +69,8 @@ export const updateProfile = asyncHandler(async (req: Request, res: Response) =>
   const userId = req.user!._id;
   const userEmail = req.user?.email;
 
-  // If a new phone is provided, store as pending and trigger OTP
-  if (mobile) {
-    if (!userEmail) {
-      throw new AppError('No registered email found for OTP verification', 400, ErrorCode.INVALID_REQUEST);
-    }
+  // If a new phone is provided and user has a registered email, store as pending and trigger OTP
+  if (mobile && userEmail) {
 
     // Store other non-phone updates immediately
     if (Object.keys(otherUpdates).length > 0) {

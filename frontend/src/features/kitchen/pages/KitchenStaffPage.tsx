@@ -458,8 +458,8 @@ export default function KitchenStaffPage() {
       </div>
 
       {/* Roster Overview Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-6 sm:mb-8">
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[24px]">group</span>
           </div>
@@ -468,7 +468,7 @@ export default function KitchenStaffPage() {
             <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5">{totalChefs}</h3>
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[24px]">check_circle</span>
           </div>
@@ -477,7 +477,7 @@ export default function KitchenStaffPage() {
             <h3 className="text-2xl font-extrabold text-green-600 dark:text-green-400 mt-0.5">{onDutyCount}</h3>
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[24px]">pause_circle</span>
           </div>

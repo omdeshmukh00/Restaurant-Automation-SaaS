@@ -7,6 +7,16 @@ import { ErrorCode } from '../../constants/errors';
 import { logAudit } from '../auditLogs/auditLogs.helper';
 import { AuditAction, AuditEntity } from '../auditLogs/auditLogs.types';
 
+function checkMenuModificationPermission(req: Request) {
+  const role = (req.user?.role || '').toLowerCase();
+  const staffRole = (req.user?.internal_role || (req.user as any)?.staff_role || '').toLowerCase();
+  const isSupervisor = role.includes('admin') || staffRole.includes('supervisor') || staffRole.includes('manager');
+
+  if (!isSupervisor && (role === 'service-staff' || role === 'staff')) {
+    throw new AppError('Menu modifications are only permitted for Floor Supervisors', 403, ErrorCode.FORBIDDEN);
+  }
+}
+
 export class MenuController {
   /*
   |--------------------------------------------------------------------------
@@ -101,6 +111,7 @@ export class MenuController {
   */
 
   static createItem = asyncHandler(async (req: Request, res: Response) => {
+    checkMenuModificationPermission(req);
     const item = await MenuService.createItem(req.user!.restaurantId!, req.body, req.user!._id);
     res.status(201).json({ success: true, data: item });
     void logAudit(req, {
@@ -131,6 +142,7 @@ export class MenuController {
   });
 
   static updateItem = asyncHandler(async (req: Request, res: Response) => {
+    checkMenuModificationPermission(req);
     const item = await MenuService.updateItem(req.user!.restaurantId!, req.params.id, req.body, req.user!._id);
     res.status(200).json({ success: true, data: item });
     void logAudit(req, {
@@ -145,6 +157,7 @@ export class MenuController {
   });
 
   static deleteItem = asyncHandler(async (req: Request, res: Response) => {
+    checkMenuModificationPermission(req);
     await MenuService.deleteItem(req.user!.restaurantId!, req.params.id);
     res.status(200).json({ success: true, data: {} });
     void logAudit(req, {
@@ -158,6 +171,7 @@ export class MenuController {
   });
 
   static toggleItemAvailability = asyncHandler(async (req: Request, res: Response) => {
+    checkMenuModificationPermission(req);
     const item = await MenuService.toggleItemAvailability(
       req.user!.restaurantId!,
       req.params.id,

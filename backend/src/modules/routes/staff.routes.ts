@@ -27,7 +27,11 @@ import {
 import { AppError } from '../../utils/AppError';
 import { ErrorCode } from '../../constants/errors';
 
+import staffManagementRouter from '../staff/staff.routes';
+
 export const staffRouter = Router();
+
+staffRouter.use('/members', staffManagementRouter);
 
 function ensureFound<T>(value: T | null | undefined, message: string): T {
   if (!value) {
@@ -437,6 +441,14 @@ staffRouter.post('/tables', async (req, res, next) => {
     if (!restaurantId) {
       throw new AppError('Restaurant context required', 400, ErrorCode.VALIDATION_ERROR);
     }
+    const role = (req.user?.role || '').toLowerCase();
+    const staffRole = (req.user?.internal_role || (req.user as any)?.staff_role || '').toLowerCase();
+    const isSupervisor = role.includes('admin') || staffRole.includes('supervisor') || staffRole.includes('manager');
+
+    if (!isSupervisor && (role === 'service-staff' || role === 'staff')) {
+      throw new AppError('Only Floor Supervisors have permission to create tables', 403, ErrorCode.FORBIDDEN);
+    }
+
     const { tableNumber, capacity, section, floor } = req.body || {};
     const table = await tablesService.createTable({
       restaurantId: restaurantId.toString(),

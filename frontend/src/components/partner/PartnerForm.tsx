@@ -427,15 +427,15 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
           onSubmit={handleSubmit}
           onKeyDown={handleKeyDown}
           noValidate
-          className="bg-white border border-slate-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6"
+          className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 text-slate-800 dark:text-neutral-100 transition-colors duration-300"
         >
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-500">
               <Building2 className="w-4.5 h-4.5" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-slate-800 font-sans">Restaurant &amp; Owner Information</h3>
-              <p className="text-[11px] text-slate-500 font-sans">Provide your details to submit your partner verification application.</p>
+              <h3 className="text-sm font-extrabold text-slate-800 dark:text-white font-sans">Restaurant &amp; Owner Information</h3>
+              <p className="text-[11px] text-slate-500 dark:text-neutral-400 font-sans">Provide your details to submit your partner verification application.</p>
             </div>
           </div>
 
@@ -443,7 +443,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
           {/* Row 1: Restaurant Name & Owner Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 Restaurant Name <span className="text-orange-500">*</span>
               </label>
               <input
@@ -453,15 +453,15 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 placeholder="Enter restaurant name"
                 required
-                className={`w-full bg-white border ${
-                  errors.restaurantName ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                } rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-white dark:bg-neutral-950 border ${
+                  errors.restaurantName ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                } rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
               />
               {errors.restaurantName && <p className="text-[10px] text-red-500 mt-1">{errors.restaurantName}</p>}
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 Owner Name <span className="text-orange-500">*</span>
               </label>
               <input
@@ -471,9 +471,9 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 placeholder="Enter owner full name"
                 required
-                className={`w-full bg-white border ${
-                  errors.ownerName ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                } rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-white dark:bg-neutral-950 border ${
+                  errors.ownerName ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                } rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
               />
               {errors.ownerName && <p className="text-[10px] text-red-500 mt-1">{errors.ownerName}</p>}
             </div>
@@ -482,7 +482,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
           {/* Row 2: Email & Phone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 Business Email <span className="text-orange-500">*</span>
               </label>
               <input
@@ -492,22 +492,22 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 placeholder="Enter business email"
                 required
-                className={`w-full bg-white border ${
-                  errors.email ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                } rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-white dark:bg-neutral-950 border ${
+                  errors.email ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                } rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
               />
               {errors.email && <p className="text-[10px] text-red-500 mt-1">{errors.email}</p>}
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 Mobile Number <span className="text-orange-500">*</span>
               </label>
               <div className="flex gap-2">
                 <select
                   value={phonePrefix}
                   onChange={(e) => setPhonePrefix(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-700 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-xl px-2.5 py-2.5 text-xs text-slate-700 dark:text-neutral-200 focus:outline-none focus:border-orange-500 transition-colors"
                 >
                   <option value="+91">+91</option>
                   <option value="+1">+1</option>
@@ -521,9 +521,9 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                   onChange={handleInputChange}
                   placeholder="98765 43210"
                   required
-                  className={`w-full bg-white border ${
-                    errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                  } rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                  className={`w-full bg-white dark:bg-neutral-950 border ${
+                    errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                  } rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
                 />
               </div>
               {errors.phone && <p className="text-[10px] text-red-500 mt-1">{errors.phone}</p>}
@@ -532,7 +532,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
 
           {/* Row 3: Street Address */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
               Restaurant Address <span className="text-orange-500">*</span>
               </label>
             <input
@@ -542,9 +542,9 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
               onChange={handleInputChange}
               placeholder="Enter full address"
               required
-              className={`w-full bg-white border ${
-                errors.address ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-              } rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+              className={`w-full bg-white dark:bg-neutral-950 border ${
+                errors.address ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+              } rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
             />
             {errors.address && <p className="text-[10px] text-red-500 mt-1">{errors.address}</p>}
           </div>
@@ -552,7 +552,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
           {/* Row 4: City, State, Country, PIN Code */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 City <span className="text-orange-500">*</span>
               </label>
               <input
@@ -562,15 +562,15 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 placeholder="Enter city"
                 required
-                className={`w-full bg-white border ${
-                  errors.city ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                } rounded-xl px-3 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-white dark:bg-neutral-950 border ${
+                  errors.city ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                } rounded-xl px-3 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
               />
               {errors.city && <p className="text-[10px] text-red-500 mt-1">{errors.city}</p>}
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 State <span className="text-orange-500">*</span>
               </label>
               <input
@@ -580,22 +580,22 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 placeholder="Enter state"
                 required
-                className={`w-full bg-white border ${
-                  errors.state ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                } rounded-xl px-3 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-white dark:bg-neutral-950 border ${
+                  errors.state ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                } rounded-xl px-3 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
               />
               {errors.state && <p className="text-[10px] text-red-500 mt-1">{errors.state}</p>}
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 Country <span className="text-orange-500">*</span>
               </label>
               <select
                 name="country"
                 value={formData.country}
                 onChange={handleInputChange}
-                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2.5 text-xs text-slate-850 focus:outline-none focus:border-orange-500"
+                className="w-full bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-xl px-2.5 py-2.5 text-xs text-slate-850 dark:text-neutral-100 focus:outline-none focus:border-orange-500"
               >
                 <option value="India">India</option>
                 <option value="United States">United States</option>
@@ -605,7 +605,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
                 PIN Code <span className="text-orange-500">*</span>
               </label>
               <input
@@ -615,9 +615,9 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 placeholder="Enter PIN code"
                 required
-                className={`w-full bg-white border ${
-                  errors.pinCode ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
-                } rounded-xl px-3 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all`}
+                className={`w-full bg-white dark:bg-neutral-950 border ${
+                  errors.pinCode ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500/20' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500 focus:ring-1 focus:ring-orange-500/20'
+                } rounded-xl px-3 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-all`}
               />
               {errors.pinCode && <p className="text-[10px] text-red-500 mt-1">{errors.pinCode}</p>}
             </div>
@@ -625,8 +625,8 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
 
           {/* Row 5: GST Number */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              GST Number <span className="text-slate-400">(Optional)</span>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+              GST Number <span className="text-slate-400 dark:text-neutral-500">(Optional)</span>
             </label>
             <input
               type="text"
@@ -634,14 +634,14 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
               value={formData.gstNumber}
               onChange={handleInputChange}
               placeholder="Enter GST number"
-              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-orange-500 transition-colors"
+              className="w-full bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none focus:border-orange-500 transition-colors"
             />
           </div>
 
           {/* Row 6: Cuisine, Vegetarian Type, Number of Branches, Expected Orders */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex flex-col justify-between">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
                 <span>Cuisine / Cuisine Type <span className="text-orange-500">*</span></span>
               </label>
               <input
@@ -651,44 +651,44 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 onChange={handleInputChange}
                 required
                 placeholder="e.g. Multi-Cuisine, Italian, Cafe"
-                className={`w-full h-10 bg-white border ${
-                  errors.cuisine ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-orange-500'
-                } rounded-xl px-4 py-2 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-colors`}
+                className={`w-full h-10 bg-white dark:bg-neutral-950 border ${
+                  errors.cuisine ? 'border-red-300 focus:border-red-500' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500'
+                } rounded-xl px-4 py-2 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-colors`}
               />
               {errors.cuisine && <p className="text-[10px] text-red-500 mt-1">{errors.cuisine}</p>}
             </div>
 
             <div className="flex flex-col justify-between">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
                 <span>Vegetarian Type <span className="text-orange-500">*</span></span>
               </label>
               <select
                 name="isVeg"
                 value={formData.isVeg}
                 onChange={handleInputChange}
-                className={`w-full h-10 bg-white border ${
-                  errors.isVeg ? 'border-red-300 focus:border-red-500' : 'border-slate-200 focus:border-orange-500'
+                className={`w-full h-10 bg-white dark:bg-neutral-950 border ${
+                  errors.isVeg ? 'border-red-300 focus:border-red-500' : 'border-slate-200 dark:border-neutral-800 focus:border-orange-500'
                 } rounded-xl px-2.5 py-2 text-xs ${
-                  formData.isVeg ? 'text-slate-800' : 'text-slate-400'
+                  formData.isVeg ? 'text-slate-800 dark:text-neutral-100' : 'text-slate-400 dark:text-neutral-500'
                 } focus:outline-none cursor-pointer`}
               >
                 <option value="" disabled hidden>Select Mode</option>
-                <option value="both" className="text-slate-800">Veg &amp; Non-Veg</option>
-                <option value="veg" className="text-slate-800">Pure Veg</option>
-                <option value="non-veg" className="text-slate-800">Non-Veg Only</option>
+                <option value="both" className="text-slate-800 dark:text-neutral-100 bg-white dark:bg-neutral-900">Veg &amp; Non-Veg</option>
+                <option value="veg" className="text-slate-800 dark:text-neutral-100 bg-white dark:bg-neutral-900">Pure Veg</option>
+                <option value="non-veg" className="text-slate-800 dark:text-neutral-100 bg-white dark:bg-neutral-900">Non-Veg Only</option>
               </select>
               {errors.isVeg && <p className="text-[10px] text-red-500 mt-1">{errors.isVeg}</p>}
             </div>
 
             <div className="flex flex-col justify-between">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
                 <span>Number of Branches <span className="text-orange-500">*</span></span>
               </label>
               <select
                 name="branches"
                 value={formData.branches}
                 onChange={handleInputChange}
-                className="w-full h-10 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-orange-500 cursor-pointer"
+                className="w-full h-10 bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-xl px-2.5 py-2 text-xs text-slate-800 dark:text-neutral-100 focus:outline-none focus:border-orange-500 cursor-pointer"
               >
                 <option value="1">1</option>
                 <option value="3">2 - 5</option>
@@ -698,14 +698,14 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
             </div>
 
             <div className="flex flex-col justify-between">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
+              <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 min-h-[28px] flex items-start">
                 <span>Expected Monthly Orders <span className="text-orange-500">*</span></span>
               </label>
               <select
                 name="expectedMonthlyOrders"
                 value={formData.expectedMonthlyOrders}
                 onChange={handleInputChange}
-                className="w-full h-10 bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-orange-500 cursor-pointer"
+                className="w-full h-10 bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 rounded-xl px-2.5 py-2 text-xs text-slate-800 dark:text-neutral-100 focus:outline-none focus:border-orange-500 cursor-pointer"
               >
                 <option value="500">Under 500</option>
                 <option value="2000">500 - 2,000</option>
@@ -717,25 +717,25 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
 
           {/* Row 6.5: Restaurant Cover Image (Mandatory) */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5 font-sans">
               Restaurant Cover Image <span className="text-orange-500">*</span>
             </label>
             <div className="flex items-center gap-4">
               {coverImagePreview ? (
-                <div className="relative group w-24 h-16 rounded-xl overflow-hidden border border-slate-200 flex-shrink-0">
+                <div className="relative group w-24 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-neutral-800 flex-shrink-0">
                   <img src={coverImagePreview} alt="Cover" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() => coverImageRef.current?.click()}
-                      className="p-1 bg-white/90 rounded-full text-slate-700 hover:bg-white mr-1"
+                      className="p-1 bg-white/90 dark:bg-neutral-800/90 rounded-full text-slate-700 dark:text-white hover:bg-white mr-1"
                     >
                       <Camera className="w-3 h-3" />
                     </button>
                     <button
                       type="button"
                       onClick={() => { setCoverImagePreview(null); if (coverImageRef.current) coverImageRef.current.value = ''; }}
-                      className="p-1 bg-white/90 rounded-full text-red-600 hover:bg-white"
+                      className="p-1 bg-white/90 dark:bg-neutral-800/90 rounded-full text-red-600 dark:text-red-400 hover:bg-white"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -746,14 +746,14 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                   type="button"
                   onClick={() => coverImageRef.current?.click()}
                   className={`w-24 h-16 rounded-xl border-2 border-dashed ${
-                    errors.coverImage ? 'border-red-400 bg-red-50' : 'border-slate-300 hover:border-orange-400 bg-slate-50 hover:bg-orange-50'
+                    errors.coverImage ? 'border-red-400 bg-red-50 dark:bg-red-950/20' : 'border-slate-300 dark:border-neutral-700 hover:border-orange-400 bg-slate-50 dark:bg-neutral-950 hover:bg-orange-50 dark:hover:bg-orange-950/30'
                   } flex flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer flex-shrink-0`}
                 >
-                  <Camera className="w-4 h-4 text-slate-400" />
-                  <span className="text-[8px] font-semibold text-slate-400">Add Photo</span>
+                  <Camera className="w-4 h-4 text-slate-400 dark:text-neutral-500" />
+                  <span className="text-[8px] font-semibold text-slate-400 dark:text-neutral-500">Add Photo</span>
                 </button>
               )}
-              <p className="text-[10px] text-slate-400 leading-relaxed font-sans">Upload a cover image for your restaurant. Max 2MB. JPG, PNG, or WebP.</p>
+              <p className="text-[10px] text-slate-400 dark:text-neutral-500 leading-relaxed font-sans">Upload a cover image for your restaurant. Max 2MB. JPG, PNG, or WebP.</p>
             </div>
             {errors.coverImage && <p className="text-[10px] text-red-500 mt-1 font-medium">{errors.coverImage}</p>}
             <input ref={coverImageRef} type="file" accept="image/*" className="hidden" onChange={handleCoverImageSelect} />
@@ -773,8 +773,8 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
 
           {/* Row 8: Message */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Additional Message <span className="text-slate-400">(Optional)</span>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-neutral-400 uppercase tracking-wider mb-1.5">
+              Additional Message <span className="text-slate-400 dark:text-neutral-500">(Optional)</span>
             </label>
             <div className="relative">
               <textarea
@@ -784,9 +784,9 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
                 value={formData.message}
                 onChange={handleInputChange}
                 placeholder="Tell us more about your restaurant and requirements..."
-                className="w-full bg-white border border-slate-200 focus:border-orange-500 rounded-xl px-4 py-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none transition-colors resize-none"
+                className="w-full bg-white dark:bg-neutral-950 border border-slate-200 dark:border-neutral-800 focus:border-orange-500 rounded-xl px-4 py-2.5 text-xs text-slate-800 dark:text-neutral-100 placeholder:text-slate-400 dark:placeholder:text-neutral-600 focus:outline-none transition-colors resize-none"
               />
-              <span className="absolute bottom-3 right-3 text-[10px] text-slate-400">
+              <span className="absolute bottom-3 right-3 text-[10px] text-slate-400 dark:text-neutral-500">
                 {formData.message.length}/500
               </span>
             </div>
@@ -797,7 +797,7 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 px-6 rounded-2xl bg-[#FF6B1A] hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold text-xs shadow-md shadow-orange-500/10 flex items-center justify-center gap-2 transition-all duration-250"
+              className="w-full py-3.5 px-6 rounded-2xl bg-[#FF6B1A] hover:bg-orange-600 disabled:bg-slate-200 dark:disabled:bg-neutral-800 disabled:text-slate-400 text-white font-extrabold text-xs shadow-md shadow-orange-500/10 flex items-center justify-center gap-2 transition-all duration-250 cursor-pointer"
             >
               {submitting ? (
                 <>
@@ -817,8 +817,8 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
               )}
             </button>
             
-            <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400">
-              <ShieldAlert className="w-3.5 h-3.5 text-slate-400" />
+            <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 dark:text-neutral-500">
+              <ShieldAlert className="w-3.5 h-3.5 text-slate-400 dark:text-neutral-500" />
               <span>Your information is secure and will only be used to contact you.</span>
             </div>
           </div>
@@ -827,62 +827,62 @@ export default function PartnerForm({ platformName: propPlatformName }: PartnerF
 
       {/* Right Column: Platform Summary & Process Fee Detail */}
       <div className="space-y-6">
-        <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-6">
-          <div className="border-b border-slate-100 pb-4">
-            <h3 className="text-sm font-extrabold text-slate-800 font-sans">Application Summary</h3>
-            <p className="text-[11px] text-slate-400 font-sans">Review onboarding stages and settings</p>
+        <div className="bg-white dark:bg-neutral-900 border border-slate-100 dark:border-neutral-800 rounded-3xl p-6 shadow-sm space-y-6 text-slate-800 dark:text-neutral-100 transition-colors duration-300">
+          <div className="border-b border-slate-100 dark:border-neutral-800 pb-4">
+            <h3 className="text-sm font-extrabold text-slate-800 dark:text-white font-sans">Application Summary</h3>
+            <p className="text-[11px] text-slate-400 dark:text-neutral-400 font-sans">Review onboarding stages and settings</p>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Onboarding Process:</span>
-              <span className="font-bold text-slate-800">Two-Stage Verification</span>
+              <span className="text-slate-500 dark:text-neutral-400 font-medium">Onboarding Process:</span>
+              <span className="font-bold text-slate-800 dark:text-neutral-200">Two-Stage Verification</span>
             </div>
             
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Stage 1:</span>
-              <span className="text-slate-700 font-bold text-right">Submit details & verify location</span>
+              <span className="text-slate-500 dark:text-neutral-400 font-medium">Stage 1:</span>
+              <span className="text-slate-700 dark:text-neutral-300 font-bold text-right">Submit details & verify location</span>
             </div>
 
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">Stage 2:</span>
-              <span className="text-slate-700 font-bold text-right">Super Admin review & approval</span>
+              <span className="text-slate-500 dark:text-neutral-400 font-medium">Stage 2:</span>
+              <span className="text-slate-700 dark:text-neutral-300 font-bold text-right">Super Admin review & approval</span>
             </div>
 
-            <div className="border-t border-slate-100 pt-4 space-y-4">
+            <div className="border-t border-slate-100 dark:border-neutral-800 pt-4 space-y-4">
               {settingsLoading ? (
                 <div className="flex items-center justify-center py-4">
                   <RefreshCw className="w-5 h-5 text-orange-500 animate-spin" />
                 </div>
               ) : settings.applicationFeeEnabled ? (
-                <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-4 space-y-3">
+                <div className="bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/40 rounded-2xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-orange-850 font-bold">Onboarding Fee</span>
-                    <span className="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded-md font-bold capitalize">
+                    <span className="text-xs text-orange-850 dark:text-orange-400 font-bold">Onboarding Fee</span>
+                    <span className="text-xs bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-300 px-2 py-0.5 rounded-md font-bold capitalize">
                       {settings.refundPolicy}
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-550 leading-relaxed">
+                  <div className="text-[11px] text-slate-550 dark:text-neutral-400 leading-relaxed">
                     This platform requires a processing fee to verify your restaurant details and physical location coordinates.
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-extrabold text-orange-500 font-sans">₹{settings.applicationFeeAmount}</span>
-                    <span className="text-[10px] text-slate-400 font-medium">one-time payment</span>
+                    <span className="text-[10px] text-slate-400 dark:text-neutral-500 font-medium">one-time payment</span>
                   </div>
                 </div>
               ) : (
-                <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 space-y-2">
-                  <span className="text-xs text-emerald-850 font-bold">Free Application Review</span>
-                  <div className="text-[11px] text-slate-550 leading-relaxed">
+                <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-2xl p-4 space-y-2">
+                  <span className="text-xs text-emerald-850 dark:text-emerald-400 font-bold">Free Application Review</span>
+                  <div className="text-[11px] text-slate-550 dark:text-neutral-400 leading-relaxed">
                     There are no upfront charges to submit your restaurant details for review.
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="border-t border-slate-100 pt-4">
-              <div className="bg-slate-50 rounded-2xl p-4 text-[11px] text-slate-500 leading-relaxed space-y-2">
-                <p className="font-semibold text-slate-700">Please Note:</p>
+            <div className="border-t border-slate-100 dark:border-neutral-800 pt-4">
+              <div className="bg-slate-50 dark:bg-neutral-950 rounded-2xl p-4 text-[11px] text-slate-500 dark:text-neutral-400 leading-relaxed space-y-2">
+                <p className="font-semibold text-slate-700 dark:text-neutral-200">Please Note:</p>
                 <p>Subscription plans (Monthly/Yearly) and pricing details will be selected and purchased directly from your {settings.platformName || propPlatformName || 'RestoHub'} Admin Panel after your account is approved.</p>
               </div>
             </div>

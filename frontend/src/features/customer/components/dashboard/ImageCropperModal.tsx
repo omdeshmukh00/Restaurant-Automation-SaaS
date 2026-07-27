@@ -15,11 +15,26 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onConfirm
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [viewportSize, setViewportSize] = useState(260);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  const VIEWPORT_SIZE = 280;
+  useEffect(() => {
+    const calcSize = () => {
+      const w = window.innerWidth;
+      if (w < 360) {
+        setViewportSize(210);
+      } else if (w < 400) {
+        setViewportSize(240);
+      } else {
+        setViewportSize(280);
+      }
+    };
+    calcSize();
+    window.addEventListener('resize', calcSize);
+    return () => window.removeEventListener('resize', calcSize);
+  }, []);
 
   useEffect(() => {
     if (!imageSrc || !isOpen) return;
@@ -32,22 +47,22 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onConfirm
       // Compute scale so image covers the circular viewport
       let scale = 1;
       if (img.width > img.height) {
-        scale = VIEWPORT_SIZE / img.height;
+        scale = viewportSize / img.height;
       } else {
-        scale = VIEWPORT_SIZE / img.width;
+        scale = viewportSize / img.width;
       }
 
       setBaseScale(scale);
       setZoom(1);
       
       // Center the image within the viewport initially
-      const initX = (VIEWPORT_SIZE - img.width * scale) / 2;
-      const initY = (VIEWPORT_SIZE - img.height * scale) / 2;
+      const initX = (viewportSize - img.width * scale) / 2;
+      const initY = (viewportSize - img.height * scale) / 2;
       setPosition({ x: initX, y: initY });
       setImageLoaded(true);
     };
     img.src = imageSrc;
-  }, [imageSrc, isOpen]);
+  }, [imageSrc, isOpen, viewportSize]);
 
   if (!isOpen) return null;
 
@@ -103,10 +118,6 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onConfirm
 
   const handleZoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextZoom = parseFloat(e.target.value);
-    
-    // Zoom relative to the center of the crop viewport is nice, but since we use origin-0-0
-    // let's adjust position slightly to keep the image centered, or let the user adjust with drag.
-    // For simplicity and standard behavior, just adjust zoom scale and let the user pan.
     setZoom(nextZoom);
   };
 
@@ -121,8 +132,8 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onConfirm
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // We scale coordinates from the viewport size (280) to output size (500)
-    const factor = OUTPUT_SIZE / VIEWPORT_SIZE;
+    // We scale coordinates from the viewport size to output size (500)
+    const factor = OUTPUT_SIZE / viewportSize;
 
     // Clear with transparency
     ctx.clearRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
@@ -141,16 +152,17 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onConfirm
       // Get base64 string
       const croppedBase64 = canvas.toDataURL('image/jpeg', 0.9);
       onConfirm(croppedBase64);
+      onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-fadeIn">
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[200] flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
       <div className="bg-white dark:bg-sd-surface-container rounded-3xl border border-sd-surface-variant w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[95vh] animate-scaleIn">
         
         {/* Header */}
-        <div className="px-6 py-4 border-b border-sd-surface-variant bg-sd-surface-container-low flex justify-between items-center shrink-0">
-          <h3 className="font-bold text-lg font-sans text-sd-on-surface flex items-center gap-2">
+        <div className="px-5 sm:px-6 py-4 border-b border-sd-surface-variant bg-sd-surface-container-low flex justify-between items-center shrink-0">
+          <h3 className="font-bold text-base sm:text-lg font-sans text-sd-on-surface flex items-center gap-2">
             <span className="material-symbols-outlined text-sd-primary">crop</span>
             Align Profile Image
           </h3>
@@ -164,14 +176,14 @@ export default function ImageCropperModal({ isOpen, imageSrc, onClose, onConfirm
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 overflow-y-auto">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 gap-4 sm:gap-6 overflow-y-auto">
           
           {/* Crop Viewport container */}
           {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
           <div 
             ref={containerRef}
-            className="relative overflow-hidden rounded-full border-4 border-white shadow-2xl bg-sd-surface-container-high cursor-move select-none"
-            style={{ width: VIEWPORT_SIZE, height: VIEWPORT_SIZE }}
+            className="relative overflow-hidden rounded-full border-4 border-white shadow-2xl bg-sd-surface-container-high cursor-move select-none shrink-0 aspect-square"
+            style={{ width: viewportSize, height: viewportSize, minWidth: viewportSize, minHeight: viewportSize }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUpOrLeave}

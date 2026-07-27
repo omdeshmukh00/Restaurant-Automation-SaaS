@@ -297,35 +297,45 @@ export default function Subscriptions() {
   }, [fetchRequests, fetchRestaurants]);
 
   // Platform Settings State
-  const [platformSettings, setPlatformSettings] = useState({
-    applicationFeeEnabled: false,
-    applicationFeeAmount: 0,
-    currency: "INR",
-    refundPolicy: "refundable",
-    enablePartnerRegistration: true,
-    maxPendingApplications: 50,
-    applicationExpiryDays: 30,
-    platformCommissionRate: 10,
-    totalRevenue: 0,
-    history: [] as Array<{
-      id: string;
-      restaurantName: string;
-      ownerName: string;
-      amount: number;
-      currency: string;
-      paymentId: string;
-      timestamp: string;
-    }>,
-    totalSubscriptionRevenue: 0,
-    subscriptionHistory: [] as Array<{
-      id: string;
-      restaurantName: string;
-      ownerName: string;
-      amount: number;
-      currency: string;
-      paymentId: string;
-      timestamp: string;
-    }>
+  const [platformSettings, setPlatformSettings] = useState(() => {
+    try {
+      const cached = localStorage.getItem('superadmin_platform_settings');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.warn('Failed to load cached platform settings', e);
+    }
+    return {
+      applicationFeeEnabled: false,
+      applicationFeeAmount: 0,
+      currency: "INR",
+      refundPolicy: "refundable",
+      enablePartnerRegistration: true,
+      maxPendingApplications: 50,
+      applicationExpiryDays: 30,
+      platformCommissionRate: 10,
+      totalRevenue: 0,
+      history: [] as Array<{
+        id: string;
+        restaurantName: string;
+        ownerName: string;
+        amount: number;
+        currency: string;
+        paymentId: string;
+        timestamp: string;
+      }>,
+      totalSubscriptionRevenue: 0,
+      subscriptionHistory: [] as Array<{
+        id: string;
+        restaurantName: string;
+        ownerName: string;
+        amount: number;
+        currency: string;
+        paymentId: string;
+        timestamp: string;
+      }>
+    };
   });
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -334,7 +344,16 @@ export default function Subscriptions() {
     try {
       const res = await apiClient.get('/superadmin/platform-settings');
       if (res.data?.data) {
-        setPlatformSettings(res.data.data);
+        const data = res.data.data;
+        setPlatformSettings((prev: any) => {
+          const updated = { ...prev, ...data };
+          try {
+            localStorage.setItem('superadmin_platform_settings', JSON.stringify(updated));
+          } catch (e) {
+            console.warn(e);
+          }
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Failed to fetch platform settings', err);
@@ -346,6 +365,12 @@ export default function Subscriptions() {
   useEffect(() => {
     fetchPlatformSettings();
   }, []);
+
+  useEffect(() => {
+    if (isSettingsModalOpen) {
+      fetchPlatformSettings();
+    }
+  }, [isSettingsModalOpen]);
 
   const handleSavePlatformSettings = async () => {
     try {
@@ -360,10 +385,15 @@ export default function Subscriptions() {
         platformCommissionRate: platformSettings.platformCommissionRate,
       });
       if (res.data?.data) {
-        setPlatformSettings(prev => ({
-          ...prev,
-          ...res.data.data
-        }));
+        setPlatformSettings((prev: any) => {
+          const updated = { ...prev, ...res.data.data };
+          try {
+            localStorage.setItem('superadmin_platform_settings', JSON.stringify(updated));
+          } catch (e) {
+            console.warn(e);
+          }
+          return updated;
+        });
         setSettingsSaved(true);
         setTimeout(() => setSettingsSaved(false), 2000);
       }
@@ -647,7 +677,7 @@ export default function Subscriptions() {
 
 
           <button
-            onClick={() => navigate('/superadmin?requests=new')}
+            onClick={() => navigate({ search: '?requests=new' })}
             className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
               darkMode
                 ? 'bg-slate-900/50 border-slate-800 text-slate-300'
@@ -813,18 +843,9 @@ export default function Subscriptions() {
 
       {/* Platform Settings Modal */}
       {isSettingsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
-          {/* Backdrop */}
-          <button 
-            type="button" 
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-0" 
-            onClick={() => setIsSettingsModalOpen(false)} 
-            aria-label="Close modal"
-          />
-          
-          {/* Modal Container */}
-          <div className={`w-full max-w-4xl rounded-2xl border p-6 shadow-2xl z-10 max-h-[90vh] overflow-y-auto ${
-            darkMode ? "bg-slate-950 border-slate-800 text-white shadow-black/85" : "bg-white border-slate-200 text-slate-800 shadow-slate-300/40"
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className={`w-full max-w-4xl max-h-[88vh] overflow-y-auto rounded-2xl border p-6 sm:p-8 shadow-2xl ${
+            darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className="flex items-center justify-between border-b pb-4 mb-6 border-slate-800/10 dark:border-slate-800">
               <div>
@@ -862,16 +883,18 @@ export default function Subscriptions() {
                     type="button"
                     role="switch"
                     aria-checked={platformSettings.applicationFeeEnabled}
-                    onClick={() => setPlatformSettings(prev => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                    onClick={() => setPlatformSettings((prev: any) => ({ ...prev, applicationFeeEnabled: !prev.applicationFeeEnabled }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500/40 cursor-pointer ${
                       platformSettings.applicationFeeEnabled
                         ? 'bg-orange-500'
-                        : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                        : darkMode
+                        ? 'bg-slate-700 border border-slate-500'
+                        : 'bg-slate-300 border border-slate-400'
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        platformSettings.applicationFeeEnabled ? 'translate-x-5' : 'translate-x-0'
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+                        platformSettings.applicationFeeEnabled ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -884,7 +907,7 @@ export default function Subscriptions() {
                       type="number"
                       min="0"
                       value={platformSettings.applicationFeeAmount}
-                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
+                      onChange={(e) => setPlatformSettings((prev: any) => ({ ...prev, applicationFeeAmount: Number(e.target.value) }))}
                       className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
                         darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
                       }`}
@@ -895,7 +918,7 @@ export default function Subscriptions() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Currency</label>
                     <select
                       value={platformSettings.currency}
-                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, currency: e.target.value }))}
+                      onChange={(e) => setPlatformSettings((prev: any) => ({ ...prev, currency: e.target.value }))}
                       className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
                         darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
                       }`}
@@ -913,7 +936,7 @@ export default function Subscriptions() {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Refund Policy</label>
                     <select
                       value={platformSettings.refundPolicy}
-                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, refundPolicy: e.target.value }))}
+                      onChange={(e) => setPlatformSettings((prev: any) => ({ ...prev, refundPolicy: e.target.value }))}
                       className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
                         darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
                       }`}
@@ -929,7 +952,7 @@ export default function Subscriptions() {
                       type="number"
                       min="1"
                       value={platformSettings.maxPendingApplications}
-                      onChange={(e) => setPlatformSettings(prev => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
+                      onChange={(e) => setPlatformSettings((prev: any) => ({ ...prev, maxPendingApplications: Number(e.target.value) }))}
                       className={`w-full h-9 rounded-xl border px-3 text-xs outline-none focus:border-orange-500 ${
                         darkMode ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-200 text-slate-800"
                       }`}
@@ -946,16 +969,18 @@ export default function Subscriptions() {
                     type="button"
                     role="switch"
                     aria-checked={platformSettings.enablePartnerRegistration}
-                    onClick={() => setPlatformSettings(prev => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:ring-offset-2 ${
+                    onClick={() => setPlatformSettings((prev: any) => ({ ...prev, enablePartnerRegistration: !prev.enablePartnerRegistration }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500/40 cursor-pointer ${
                       platformSettings.enablePartnerRegistration
                         ? 'bg-orange-500'
-                        : darkMode ? 'bg-slate-700' : 'bg-slate-300'
+                        : darkMode
+                        ? 'bg-slate-700 border border-slate-500'
+                        : 'bg-slate-300 border border-slate-400'
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        platformSettings.enablePartnerRegistration ? 'translate-x-5' : 'translate-x-0'
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+                        platformSettings.enablePartnerRegistration ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -993,7 +1018,7 @@ export default function Subscriptions() {
                             </tr>
                           </thead>
                           <tbody>
-                            {platformSettings.history.map(row => (
+                            {platformSettings.history.map((row: any) => (
                               <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
                                 <td className="p-2 font-semibold">{row.restaurantName}</td>
                                 <td className="p-2 text-emerald-500 font-bold">
@@ -1034,7 +1059,7 @@ export default function Subscriptions() {
                             </tr>
                           </thead>
                           <tbody>
-                            {platformSettings.subscriptionHistory.map(row => (
+                            {platformSettings.subscriptionHistory.map((row: any) => (
                               <tr key={row.id} className={`border-b ${darkMode ? "border-slate-800/50 hover:bg-slate-800/20" : "border-slate-100 hover:bg-slate-50"}`}>
                                 <td className="p-2 font-semibold">{row.restaurantName}</td>
                                 <td className="p-2 text-indigo-500 font-bold">
@@ -1098,9 +1123,9 @@ export default function Subscriptions() {
 
       {/* Edit Plan Modal */}
       {editingPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
-          <div className={`w-full max-w-lg rounded-3xl p-6 border shadow-2xl flex flex-col ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className={`w-full max-w-lg max-h-[88vh] overflow-y-auto flex flex-col rounded-2xl border p-6 shadow-2xl ${
+            darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
               <div>
@@ -1123,7 +1148,7 @@ export default function Subscriptions() {
 
             <div className="space-y-4 flex-1 overflow-y-auto pr-1">
               {/* Plan Name & Active status */}
-              <div className="flex gap-4 items-center">
+              <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
                 <div className="flex-1">
                   <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Plan Name</label>
                   <input
@@ -1136,16 +1161,35 @@ export default function Subscriptions() {
                     }`}
                   />
                 </div>
-                <div className="pt-5 shrink-0">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-550 hover:text-orange-500 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={editingPlan.isActive !== false}
-                      onChange={(e) => setEditingPlan({ ...editingPlan, isActive: e.target.checked })}
-                      className="rounded text-orange-500 focus:ring-orange-500 border-slate-350"
+                <div
+                  className="shrink-0 pb-1 flex items-center gap-3 cursor-pointer select-none"
+                  onClick={() => setEditingPlan({ ...editingPlan, isActive: !(editingPlan.isActive !== false) })}
+                >
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editingPlan.isActive !== false}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingPlan({ ...editingPlan, isActive: !(editingPlan.isActive !== false) });
+                    }}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500/40 ${
+                      editingPlan.isActive !== false
+                        ? 'bg-orange-500'
+                        : darkMode
+                        ? 'bg-slate-700 border border-slate-600'
+                        : 'bg-slate-300 border border-slate-400'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ease-in-out ${
+                        editingPlan.isActive !== false ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                     />
+                  </button>
+                  <span className={`text-xs font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     Active Plan
-                  </label>
+                  </span>
                 </div>
               </div>
 
@@ -1284,9 +1328,9 @@ export default function Subscriptions() {
 
       {/* Bulk Offers Modal */}
       {isBulkOffersOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
-          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className={`w-full max-w-md max-h-[88vh] overflow-y-auto flex flex-col rounded-2xl border p-6 shadow-2xl ${
+            darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
               <div>
@@ -1392,9 +1436,9 @@ export default function Subscriptions() {
 
       {/* Commission Modal */}
       {isCommissionOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
-          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className={`w-full max-w-md max-h-[88vh] overflow-y-auto flex flex-col rounded-2xl border p-6 shadow-2xl ${
+            darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
               <div>
@@ -1423,7 +1467,7 @@ export default function Subscriptions() {
                   min="0"
                   max="100"
                   value={platformSettings.platformCommissionRate ?? 10}
-                  onChange={(e) => setPlatformSettings(prev => ({ ...prev, platformCommissionRate: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                  onChange={(e) => setPlatformSettings((prev: any) => ({ ...prev, platformCommissionRate: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
                   className={`w-full bg-transparent border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-orange-500 ${
                     darkMode ? 'border-slate-800 text-white' : 'border-slate-200 text-slate-800'
                   }`}
@@ -1462,9 +1506,9 @@ export default function Subscriptions() {
 
       {/* Add-on Features Modal */}
       {isAddonsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-4 animate-fade-in">
-          <div className={`w-full max-w-md rounded-3xl p-6 border shadow-2xl flex flex-col ${
-            darkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
+          <div className={`w-full max-w-md max-h-[88vh] overflow-y-auto flex flex-col rounded-2xl border p-6 shadow-2xl ${
+            darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
           }`}>
             <div className="flex items-center justify-between border-b pb-4 mb-4 border-slate-800/10">
               <div>

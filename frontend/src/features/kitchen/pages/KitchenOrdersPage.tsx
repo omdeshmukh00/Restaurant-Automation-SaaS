@@ -178,16 +178,19 @@ export default function KitchenOrdersPage() {
     await executeOptimisticOrderUpdate(id, { status: 'DELAYED' }, () => delayOrder(id, delayMinutes, reason));
   };
 
+  const selectedNotesOrder = notesOrderId ? orders.find(o => o.id === notesOrderId) : null;
+  const selectedDelayOrder = delayModalOrderId ? orders.find(o => o.id === delayModalOrderId) : null;
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto pb-32 lg:pb-16 bg-slate-50/50 dark:bg-slate-950 font-sans">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Orders Management</h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">Track and manage all kitchen orders</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white font-sans">Orders Management</h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5 font-sans">Track and manage all kitchen orders</p>
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-3">
-          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{filtered.length} orders</span>
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 font-sans">{filtered.length} orders</span>
 
           {/* List vs Card View Switcher */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0">
@@ -227,7 +230,7 @@ export default function KitchenOrdersPage() {
             <button
               key={value}
               onClick={() => handleStatusFilterChange(value)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border font-sans ${
                 statusFilter === value
                   ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800'
                   : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-800'
@@ -244,7 +247,7 @@ export default function KitchenOrdersPage() {
             <button
               key={value}
               onClick={() => handleTypeFilterChange(value)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border font-sans ${
                 typeFilter === value
                   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
                   : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-800'
@@ -274,7 +277,7 @@ export default function KitchenOrdersPage() {
             />
           ))}
           {filtered.length === 0 && (
-            <div className="col-span-full py-16 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl">
+            <div className="col-span-full py-16 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl font-sans">
               No orders match your filters
             </div>
           )}
@@ -283,7 +286,7 @@ export default function KitchenOrdersPage() {
         /* Table List View */
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden mb-24">
           <div className="overflow-x-auto w-full">
-            <table className="w-full text-xs sm:text-sm min-w-[850px]">
+            <table className="w-full text-xs sm:text-sm min-w-[850px] font-sans">
               <thead>
                 <tr className="border-b border-slate-100 dark:border-slate-800 text-left bg-slate-50/60 dark:bg-slate-800/40">
                   <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Order ID</th>
@@ -298,7 +301,7 @@ export default function KitchenOrdersPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {filtered.length === 0 && orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500 font-sans">
                       <div className="flex items-center justify-center gap-2">
                         <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                         <span className="w-2 h-2 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -352,7 +355,7 @@ export default function KitchenOrdersPage() {
                   ))
                 )}
                 {orders.length > 0 && filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500">No orders match your filters</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500 font-sans">No orders match your filters</td></tr>
                 )}
               </tbody>
             </table>

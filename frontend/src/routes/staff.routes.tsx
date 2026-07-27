@@ -9,7 +9,6 @@ import StaffRequestsPage from '../features/staff/pages/StaffRequestsPage';
 import StaffReservationsPage from '../features/staff/pages/StaffReservationsPage';
 import StaffTableTurnoverPage from '../features/staff/pages/StaffTableTurnoverPage';
 import StaffMenuPage from '../features/staff/pages/StaffMenuPage';
-import StaffReportsPage from '../features/staff/pages/StaffReportsPage';
 import StaffAlertsPage from '../features/staff/pages/StaffAlertsPage';
 import StaffProfilePage from '../features/staff/pages/StaffProfilePage';
 import StaffSettingsPage from '../features/staff/pages/StaffSettingsPage';
@@ -51,10 +50,6 @@ export const staffRoutes: RouteObject[] = [
       {
         path: 'menu',
         element: <StaffMenuPage />,
-      },
-      {
-        path: 'reports',
-        element: <StaffReportsPage />,
       },
       {
         path: 'alerts',

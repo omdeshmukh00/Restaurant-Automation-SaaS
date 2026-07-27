@@ -15,12 +15,10 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/cleaning', icon: 'dashboard', label: 'Dashboard', end: true },
-  { to: '/cleaning/tables', icon: 'table_restaurant', label: 'Tables' },
   { to: '/cleaning/requests', icon: 'notification_important', label: 'Requests' },
   { to: '/cleaning/tasks', icon: 'assignment', label: 'Tasks' },
   { to: '/cleaning/monitor', icon: 'supervised_user_circle', label: 'Monitor Staff' },
   { to: '/cleaning/profile', icon: 'person', label: 'Profile' },
-  { to: '/cleaning/settings', icon: 'settings', label: 'Settings' },
 ];
 
 const getTranslationKey = (label: string): any => {
@@ -53,7 +51,7 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
   return (
     <aside
       className={`flex flex-col h-screen fixed left-0 top-0 bg-white dark:bg-sd-surface-container border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-300 ${
-        collapsed ? 'w-[72px]' : 'w-60 shadow-xl lg:shadow-none'
+        collapsed ? '-translate-x-full lg:translate-x-0 w-64 lg:w-[72px]' : 'translate-x-0 w-64 shadow-xl lg:shadow-none'
       }`}
     >
       {/* Header */}
@@ -126,21 +124,6 @@ export default function CleaningSidebar({ collapsed, onToggle, onItemClick }: Pr
         })}
       </nav>
 
-      {/* Need Help Card (Hidden when collapsed) */}
-      {!collapsed && (
-        <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl mx-3 mb-4 border border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="material-symbols-outlined text-orange-500 dark:text-white">support_agent</span>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{t('needHelp')}</span>
-          </div>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3 leading-tight">
-            {t('supportDesc')}
-          </p>
-          <button className="w-full py-1.5 bg-white border border-slate-200 dark:border-slate-700 text-orange-500 font-bold rounded-lg text-xs hover:bg-orange-500/10 transition-all active:scale-95 cursor-pointer">
-            {t('contactSupport')}
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

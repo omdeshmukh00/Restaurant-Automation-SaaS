@@ -39,7 +39,9 @@ interface RestaurantRequestsState {
   restaurants: RestaurantsRow[];
   requests: RestaurantRequest[];
   plans: any[];
-  fetchRequests: () => Promise<void>;
+  isFetchingRequests: boolean;
+  lastFetchedAt: number | null;
+  fetchRequests: (force?: boolean) => Promise<void>;
   fetchRestaurants: () => Promise<void>;
   approveRequest: (id: string) => Promise<void>;
   denyRequest: (id: string, reason: string, refund?: boolean) => Promise<void>;
@@ -55,6 +57,8 @@ interface RestaurantRequestsState {
   ) => Promise<void>;
   deleteRestaurant: (id: string, reason?: string) => Promise<void>;
 }
+
+let inFlightFetchPromise: Promise<void> | null = null;
 
 const mapDbRestaurantToRow = (r: any): RestaurantsRow => ({
   id: r._id || r.id,
@@ -81,21 +85,42 @@ export const useRestaurantRequestsStore = create<RestaurantRequestsState>()(
     restaurants: [],
     requests: [],
     plans: [],
-    fetchRequests: async () => {
-      try {
-        const [reqs, dbRestaurants, dbPlans] = await Promise.all([
-          superAdminRestaurantRequestsApi.getRequests(),
-          superAdminRestaurantRequestsApi.getRestaurants(),
-          superAdminRestaurantRequestsApi.getPlans(),
-        ]);
-        set({
-          requests: reqs,
-          restaurants: dbRestaurants.map(mapDbRestaurantToRow),
-          plans: dbPlans || [],
-        });
-      } catch (error) {
-        console.error("Failed to fetch requests", error);
+    isFetchingRequests: false,
+    lastFetchedAt: null,
+    fetchRequests: async (force = false) => {
+      const now = Date.now();
+      const lastFetched = get().lastFetchedAt;
+      if (!force && lastFetched && now - lastFetched < 3000) {
+        return;
       }
+
+      if (inFlightFetchPromise) {
+        return inFlightFetchPromise;
+      }
+
+      set({ isFetchingRequests: true });
+      inFlightFetchPromise = (async () => {
+        try {
+          const [reqs, dbRestaurants, dbPlans] = await Promise.all([
+            superAdminRestaurantRequestsApi.getRequests(),
+            superAdminRestaurantRequestsApi.getRestaurants(),
+            superAdminRestaurantRequestsApi.getPlans(),
+          ]);
+          set({
+            requests: reqs,
+            restaurants: dbRestaurants.map(mapDbRestaurantToRow),
+            plans: dbPlans || [],
+            lastFetchedAt: Date.now(),
+          });
+        } catch (error) {
+          console.error("Failed to fetch requests", error);
+        } finally {
+          set({ isFetchingRequests: false });
+          inFlightFetchPromise = null;
+        }
+      })();
+
+      return inFlightFetchPromise;
     },
     fetchRestaurants: async () => {
       try {

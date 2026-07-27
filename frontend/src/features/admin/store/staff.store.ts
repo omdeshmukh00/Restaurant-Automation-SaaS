@@ -398,7 +398,12 @@ export const useStaffStore = create<StaffStore>()(
 
       fetchMembers: async () => {
         try {
-          const res = await apiClient.get('/admin/staff');
+          let res: any;
+          try {
+            res = await apiClient.get('/staff/members');
+          } catch {
+            res = await apiClient.get('/admin/staff');
+          }
           set({ members: (res.data.data.staff || []).map(mapBackendUserToStaffMember) });
           recompute(set, get);
         } catch (err) {
@@ -408,7 +413,12 @@ export const useStaffStore = create<StaffStore>()(
 
       fetchAttendance: async () => {
         try {
-          const res = await apiClient.get('/admin/staff/attendance');
+          let res: any;
+          try {
+            res = await apiClient.get('/staff/members/attendance');
+          } catch {
+            res = await apiClient.get('/admin/staff/attendance');
+          }
           set({ attendance: res.data.data.attendance || [] });
           recompute(set, get);
         } catch (err) {
@@ -418,7 +428,12 @@ export const useStaffStore = create<StaffStore>()(
 
       fetchPerformance: async () => {
         try {
-          const res = await apiClient.get('/admin/staff/performance');
+          let res: any;
+          try {
+            res = await apiClient.get('/staff/members/performance');
+          } catch {
+            res = await apiClient.get('/admin/staff/performance');
+          }
           set({ performance: res.data.data.performance || [] });
           recompute(set, get);
         } catch (err) {
@@ -428,7 +443,12 @@ export const useStaffStore = create<StaffStore>()(
 
       fetchShifts: async () => {
         try {
-          const res = await apiClient.get('/admin/staff/shifts/list');
+          let res: any;
+          try {
+            res = await apiClient.get('/staff/members/shifts/list');
+          } catch {
+            res = await apiClient.get('/admin/staff/shifts/list');
+          }
           set({ shifts: res.data.data.shifts || [] });
         } catch (err) {
           console.error('Failed to fetch shifts', err);

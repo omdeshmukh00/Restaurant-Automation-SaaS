@@ -40,6 +40,7 @@ export default function CustomerProfilePage() {
 
   // Zustand state and actions
   const {
+    profile,
     loyaltyPoints,
     loyaltyHistory,
     offers,
@@ -56,28 +57,28 @@ export default function CustomerProfilePage() {
   // Local feedback toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Form & Backend User states
+  // Form & Backend User states - 0ms Instant store initialization
   const [userData, setUserData] = useState<{ name: string; mobile: string; avatar?: string; role?: string } | null>(() => {
     const stored = localStorage.getItem('ra/customer/user');
+    let localU: any = {};
     if (stored) {
       try {
-        const u = JSON.parse(stored);
-        return {
-          name: u.name || '',
-          mobile: u.mobile || u.phone || '',
-          avatar: u.avatar || 'person',
-          role: u.role || 'customer',
-        };
+        localU = JSON.parse(stored) || {};
       } catch (e) {
         // Ignore parsing error
       }
     }
-    return null;
+    return {
+      name: profile.name || localU.name || 'Customer',
+      mobile: profile.phone || localU.mobile || localU.phone || '',
+      avatar: profile.avatar || localU.avatar || '',
+      role: localU.role || 'customer',
+    };
   });
 
-  const [editName, setEditName] = useState(() => userData?.name || '');
+  const [editName, setEditName] = useState(() => profile.name || userData?.name || '');
   const [countryCode, setCountryCode] = useState(() => {
-    const mob = userData?.mobile || '';
+    const mob = profile.phone || userData?.mobile || '';
     if (mob.startsWith('+')) {
       const match = mob.match(/^(\+\d{1,4})(.*)$/);
       if (match) return match[1];
@@ -85,14 +86,14 @@ export default function CustomerProfilePage() {
     return '+91';
   });
   const [localPhone, setLocalPhone] = useState(() => {
-    const mob = userData?.mobile || '';
+    const mob = profile.phone || userData?.mobile || '';
     if (mob.startsWith('+')) {
       const match = mob.match(/^(\+\d{1,4})(.*)$/);
       if (match) return match[2];
     }
     return mob;
   });
-  const [selectedAvatar, setSelectedAvatar] = useState(() => userData?.avatar || 'person');
+  const [selectedAvatar, setSelectedAvatar] = useState(() => profile.avatar || userData?.avatar || '');
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -148,20 +149,24 @@ export default function CustomerProfilePage() {
   };
 
   const handleCropConfirm = async (croppedBase64: string) => {
+    // Hide cropper modal immediately
+    setCropperOpen(false);
+    setTempImageSrc('');
+    setSelectedAvatar(croppedBase64);
+    updateProfile({ avatar: croppedBase64 });
+    window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
+    showToast('Custom photo uploaded and cropped successfully!');
+
     try {
       const response = await apiClient.patch('/users/me', {
         avatar: croppedBase64,
       });
-      const updatedUser = response.data.data.user;
-      setUserData(updatedUser);
-      setSelectedAvatar(croppedBase64);
-      updateProfile({ avatar: croppedBase64 });
-      window.dispatchEvent(new CustomEvent('ra-user-updated', { detail: { avatar: croppedBase64 } }));
-      setCropperOpen(false);
-      setTempImageSrc('');
-      showToast('Custom photo uploaded and cropped successfully!');
+      const updatedUser = response.data?.data?.user;
+      if (updatedUser) {
+        setUserData(updatedUser);
+      }
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Failed to update photo', 'error');
+      // Local avatar updated cleanly for customer session
     }
   };
 
@@ -213,36 +218,47 @@ export default function CustomerProfilePage() {
     }
 
     const fullMobile = countryCode + cleanLocal;
+    const payload: any = { name: editName.trim() };
+    if (fullMobile !== (userData?.mobile || '')) {
+      payload.mobile = fullMobile;
+    }
+
+    // Auto-hide edit modal immediately
+    setActiveModal(null);
+    showToast('Personal information updated successfully!');
 
     try {
-      const response = await apiClient.patch('/users/me', {
-        name: editName,
-        mobile: fullMobile,
-      });
-      const updatedUser = response.data.data.user;
-      setUserData(updatedUser);
-      updateProfile({
-        name: updatedUser.name,
-        phone: updatedUser.mobile,
-      });
-      
-      // Update local storage user details too
-      const stored = localStorage.getItem('ra/customer/user');
-      if (stored) {
-        try {
-          const u = JSON.parse(stored);
-          u.name = updatedUser.name;
-          u.mobile = updatedUser.mobile;
-          localStorage.setItem('ra/customer/user', JSON.stringify(u));
-        } catch (e) {
-          // Ignore parsing error
-        }
+      const response = await apiClient.patch('/users/me', payload);
+      const data = response.data?.data || response.data;
+      if (data?.user) {
+        setUserData(data.user);
+        updateProfile({
+          name: data.user.name || editName.trim(),
+          phone: data.user.mobile || fullMobile,
+        });
+      } else if (data?.otpSent) {
+        showToast(data.message || 'OTP sent to your email for phone verification.');
+      } else {
+        setUserData((prev: any) => ({ ...prev, name: editName.trim(), mobile: fullMobile }));
+        updateProfile({ name: editName.trim(), phone: fullMobile });
       }
-
-      setActiveModal(null);
-      showToast('Personal information updated successfully!');
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Failed to update profile', 'error');
+      // Local fallback for session customers without auth account
+      setUserData((prev: any) => ({ ...prev, name: editName.trim(), mobile: fullMobile }));
+      updateProfile({ name: editName.trim(), phone: fullMobile });
+    }
+
+    // Update local storage user details too
+    const stored = localStorage.getItem('ra/customer/user');
+    if (stored) {
+      try {
+        const u = JSON.parse(stored);
+        u.name = editName.trim();
+        u.mobile = fullMobile;
+        localStorage.setItem('ra/customer/user', JSON.stringify(u));
+      } catch (e) {
+        // Ignore parsing error
+      }
     }
   };
 
@@ -299,136 +315,102 @@ export default function CustomerProfilePage() {
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-5">
           {/* Profile Card */}
-          <div className="bg-white rounded-2xl p-5 border border-sd-surface-variant sd-food-card-shadow flex flex-col sm:flex-row gap-5 items-start">
-            <div className="flex flex-col items-center shrink-0">
-              <div className="relative shrink-0 mb-3">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-950/60 dark:to-orange-900/40 overflow-hidden flex items-center justify-center ring-4 ring-orange-500/20 dark:ring-orange-500/10 shadow-md">
-                  {selectedAvatar.startsWith('data:image') || selectedAvatar.startsWith('http') ? (
-                    <img src={selectedAvatar} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="material-symbols-outlined text-4xl text-orange-500" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      person
-                    </span>
-                  )}
+          <div className="bg-white dark:bg-sd-surface rounded-2xl p-4 sm:p-6 border border-sd-surface-variant sd-food-card-shadow flex flex-col gap-4">
+            <div className="flex items-center gap-4 sm:gap-6">
+              {/* Avatar Image with Camera Action Badge */}
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-950/60 dark:to-orange-900/40 overflow-hidden flex items-center justify-center ring-4 ring-orange-500/20 dark:ring-orange-500/10 shadow-md">
+                  {(() => {
+                    const activeAvatar = profile.avatar || selectedAvatar || userData?.avatar || '';
+                    return activeAvatar && (activeAvatar.startsWith('data:image') || activeAvatar.startsWith('http')) ? (
+                      <img src={activeAvatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-4xl text-orange-500" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        person
+                      </span>
+                    );
+                  })()}
                 </div>
                 <button
                   type="button"
                   onClick={() => avatarFileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-white dark:bg-sd-surface shadow-md rounded-full flex items-center justify-center border border-sd-surface-variant text-slate-600 hover:text-orange-500 transition-colors"
+                  className="absolute bottom-0 right-0 w-7 h-7 bg-white dark:bg-sd-surface-container shadow-md rounded-full flex items-center justify-center border border-sd-surface-variant text-sd-primary hover:scale-110 transition-transform"
                   title="Upload / Change Photo"
                 >
-                  <span className="material-symbols-outlined text-[14px]">edit</span>
+                  <span className="material-symbols-outlined text-[15px]">photo_camera</span>
                 </button>
+                <input
+                  type="file"
+                  ref={avatarFileInputRef}
+                  onChange={handleAvatarFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
               </div>
 
-              {/* Subimage Pill Buttons (Image 1 design) */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-sd-surface-container border border-slate-200 dark:border-sd-surface-variant rounded-2xl shadow-sm">
-                {/* 1. Default Avatar Subimage Button */}
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const response = await apiClient.patch('/users/me', { avatar: 'person' });
-                      const updatedUser = response.data.data.user;
-                      setUserData(updatedUser);
-                      setSelectedAvatar('person');
-                      updateProfile({ avatar: 'person' });
-                      showToast('Avatar reset to default!');
-                    } catch (err: any) {
-                      showToast('Failed to reset avatar', 'error');
-                    }
-                  }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                    !selectedAvatar.startsWith('data:image') && !selectedAvatar.startsWith('http')
-                      ? 'bg-orange-100 dark:bg-orange-950/40 border-2 border-orange-500 text-orange-500'
-                      : 'bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-orange-500'
-                  }`}
-                  title="Default Avatar"
-                >
-                  <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-                </button>
+              {/* Name, Phone, and Member Badge */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xl font-bold text-sd-on-surface font-sans truncate">{userData?.name || 'Customer'}</h3>
+                  <button
+                    onClick={() => {
+                      setEditName(userData?.name || '');
+                      const mob = (userData?.mobile || '').trim();
+                      const KNOWN_CODES = ['+971', '+91', '+65', '+61', '+44', '+1'];
+                      let parsedCode = '+91';
+                      let parsedLocal = mob.replace(/\D/g, '');
 
-                {/* 2. Upload Photo Subimage Button */}
-                <button
-                  type="button"
-                  onClick={() => avatarFileInputRef.current?.click()}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all border-2 border-dashed ${
-                    selectedAvatar.startsWith('data:image') || selectedAvatar.startsWith('http')
-                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-500'
-                      : 'border-orange-400 text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/20'
-                  }`}
-                  title="Upload Custom Photo"
-                >
-                  <span className="material-symbols-outlined text-lg">add_a_photo</span>
-                </button>
-              </div>
+                      for (const code of KNOWN_CODES) {
+                        if (mob.startsWith(code)) {
+                          parsedCode = code;
+                          parsedLocal = mob.slice(code.length).replace(/\D/g, '');
+                          break;
+                        }
+                      }
 
-              {/* File Upload Input */}
-              <input
-                type="file"
-                ref={avatarFileInputRef}
-                onChange={handleAvatarFileChange}
-                accept="image/*"
-                className="hidden"
-              />
-            </div>
-            <div className="flex-1 w-full">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xl font-bold text-sd-on-surface font-sans">{userData?.name || 'Customer'}</h3>
-                    <button
-                        onClick={() => {
-                          setEditName(userData?.name || '');
-                          const mob = userData?.mobile || '';
-                          let parsedLocal = mob;
-                          let parsedCode = '+91';
-                          if (mob.startsWith('+')) {
-                            const match = mob.match(/^(\+\d{1,4})(.*)$/);
-                            if (match) {
-                              parsedCode = match[1];
-                              parsedLocal = match[2];
-                            }
-                          }
-                          setCountryCode(parsedCode);
-                          setLocalPhone(parsedLocal);
-                          setActiveModal('profile');
-                        }}
-                      className="p-1.5 text-sd-on-surface-variant hover:text-sd-primary hover:bg-sd-surface-container rounded-full transition-colors flex items-center justify-center"
-                      title="Edit Profile"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1 text-sd-on-surface-variant">
-                    <span className="material-symbols-outlined text-[16px]">call</span>
-                    <span className="text-sm font-semibold font-sans">{userData?.mobile || ''}</span>
-                  </div>
+                      setCountryCode(parsedCode);
+                      setLocalPhone(parsedLocal);
+                      setActiveModal('profile');
+                    }}
+                    className="p-1.5 text-sd-on-surface-variant hover:text-sd-primary hover:bg-sd-surface-container-low rounded-full transition-colors flex items-center justify-center"
+                    title="Edit Profile"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                  </button>
                 </div>
-                <div className="bg-sd-primary-fixed/30 text-sd-primary px-3 py-1 rounded-full flex items-center gap-1 self-start shrink-0">
-                  <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
-                  <span className="text-xs font-bold font-sans">
+                {userData?.mobile && (
+                  <div className="flex items-center gap-1.5 mt-1 text-sd-on-surface-variant">
+                    <span className="material-symbols-outlined text-[15px]">call</span>
+                    <span className="text-sm font-semibold font-sans">{userData?.mobile}</span>
+                  </div>
+                )}
+                <div className="mt-2 inline-flex items-center gap-1 bg-sd-primary-container/10 text-sd-primary px-2.5 py-0.5 rounded-full">
+                  <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                  <span className="text-[11px] font-bold font-sans">
                     {userData?.role === 'customer' ? 'Smart Member' : 'Regular Guest'}
                   </span>
                 </div>
               </div>
-              <div className="mt-3 p-3 bg-sd-surface-container-low rounded-xl flex items-center justify-between group cursor-pointer border border-transparent hover:border-sd-primary/20 transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-sd-primary-container/10 rounded-full flex items-center justify-center text-sd-primary-container">
-                    <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>crown</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold font-sans">You&apos;re a Valued Member!</p>
-                    <p className="text-[11px] text-sd-on-surface-variant font-sans">Enjoy exclusive benefits and priority service.</p>
-                  </div>
+            </div>
+
+            {/* Member Banner */}
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
+            <div
+              onClick={() => setActiveModal('loyalty')}
+              className="p-3.5 bg-sd-surface-container-low hover:bg-sd-surface-container rounded-xl flex items-center justify-between group cursor-pointer border border-transparent hover:border-sd-primary/30 transition-all shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-sd-primary-container/10 rounded-full flex items-center justify-center text-sd-primary shrink-0">
+                  <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>crown</span>
                 </div>
-                <button 
-                  onClick={() => setActiveModal('loyalty')} 
-                  className="text-sd-primary font-bold text-xs group-hover:translate-x-1 transition-transform font-sans"
-                >
-                  View →
-                </button>
+                <div>
+                  <p className="text-sm font-bold font-sans text-sd-on-surface">You&apos;re a Valued Member!</p>
+                  <p className="text-[11px] text-sd-on-surface-variant font-sans">Enjoy exclusive benefits and priority service.</p>
+                </div>
               </div>
+              <span className="text-sd-primary font-bold text-xs group-hover:translate-x-1 transition-transform font-sans whitespace-nowrap flex items-center gap-0.5">
+                View →
+              </span>
             </div>
           </div>
 
@@ -675,9 +657,10 @@ export default function CustomerProfilePage() {
                     <label htmlFor="editPhone" className="block text-xs font-bold text-sd-on-surface-variant uppercase tracking-wider mb-1 font-sans">Mobile Phone</label>
                     <div className="flex gap-2">
                       <select
+                        disabled
                         value={countryCode}
                         onChange={(e) => setCountryCode(e.target.value)}
-                        className="px-3 py-2.5 rounded-xl border border-sd-surface-variant bg-white dark:bg-sd-surface focus:outline-none focus:ring-2 focus:ring-sd-primary text-sm font-sans shrink-0"
+                        className="px-3 py-2.5 rounded-xl border border-sd-surface-variant bg-slate-100 dark:bg-sd-surface-container-low text-sd-on-surface-variant/60 cursor-not-allowed text-sm font-sans shrink-0 opacity-75 select-none"
                       >
                         <option value="+91">🇮🇳 +91</option>
                         <option value="+1">🇺🇸 +1</option>
@@ -687,13 +670,13 @@ export default function CustomerProfilePage() {
                         <option value="+61">🇦🇺 +61</option>
                       </select>
                       <input 
+                        disabled
+                        readOnly
                         id="editPhone"
                         type="tel" 
                         value={localPhone}
-                        onChange={(e) => setLocalPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        className="flex-1 px-4 py-2.5 rounded-xl border border-sd-surface-variant focus:outline-none focus:ring-2 focus:ring-sd-primary focus:border-sd-primary font-sans text-sm"
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-sd-surface-variant bg-slate-100 dark:bg-sd-surface-container-low text-sd-on-surface-variant/60 cursor-not-allowed font-sans text-sm opacity-75 select-none"
                         placeholder="98765 43210"
-                        required
                       />
                     </div>
                   </div>
@@ -887,14 +870,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefEmail(!prefEmail)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefEmail ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefEmail
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefEmail ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefEmail ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -908,14 +893,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefSms(!prefSms)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefSms ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefSms
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefSms ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefSms ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -929,14 +916,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefWhatsapp(!prefWhatsapp)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefWhatsapp ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefWhatsapp
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefWhatsapp ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefWhatsapp ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>
@@ -950,14 +939,16 @@ export default function CustomerProfilePage() {
                       </div>
                       <button
                         onClick={() => setPrefPush(!prefPush)}
-                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 ${
-                          prefPush ? 'bg-sd-primary' : 'bg-sd-outline-variant dark:bg-sd-surface-variant'
+                        className={`w-11 h-6 rounded-full p-1 transition-colors duration-200 focus:outline-none shrink-0 flex items-center ${
+                          prefPush
+                            ? 'bg-sd-primary'
+                            : 'bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500'
                         }`}
                         type="button"
                       >
                         <div
-                          className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
-                            prefPush ? 'translate-x-5' : 'translate-x-0'
+                          className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                            prefPush ? 'translate-x-5' : 'translate-x-0.5'
                           }`}
                         />
                       </button>

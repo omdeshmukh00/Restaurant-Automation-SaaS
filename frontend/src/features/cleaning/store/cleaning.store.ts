@@ -17,6 +17,8 @@ export interface CleaningStaffMember {
   area: string;
   phone: string;
   avatar: string;
+  email?: string;
+  password?: string;
 }
 
 export interface RoutineChore {
@@ -315,6 +317,14 @@ class CleaningStore {
     this.notify();
   }
 
+  public updateStaffMember(id: string, updates: Partial<CleaningStaffMember>) {
+    this.staffMembers = this.staffMembers.map((s) => (s.id === id ? { ...s, ...updates } : s));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cleanserve-staff', JSON.stringify(this.staffMembers));
+    }
+    this.notify();
+  }
+
   public assignTableStaff(tableId: string, member: { name: string; avatar: string } | null) {
     this.tables = this.tables.map((t) =>
       t.id === tableId ? { ...t, assignedTo: member } : t
@@ -346,6 +356,18 @@ class CleaningStore {
       const tableObj = t.tableDetails as any;
       const tableLabel = tableObj?.tableNumber || 'T00';
 
+      const ts = t.completedAt || t.updatedAt || t.createdAt;
+      let timeAgo = 'Just Now';
+      if (ts) {
+        const d = new Date(ts);
+        if (!isNaN(d.getTime())) {
+          const diffMins = Math.floor((Date.now() - d.getTime()) / 60000);
+          if (diffMins < 2) timeAgo = 'Just Now';
+          else if (diffMins < 60) timeAgo = `${diffMins} mins ago`;
+          else timeAgo = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        }
+      }
+
       return {
         id: tableLabel,
         taskId: t._id || t.id,
@@ -355,7 +377,7 @@ class CleaningStore {
         section: tableObj?.section || 'Main',
         status,
         priority,
-        timeAgo: 'Just Now',
+        timeAgo,
         assignedTo: t.startedBy ? { name: 'Staff Member', avatar: '' } : null,
         notes: t.notes || '',
       };

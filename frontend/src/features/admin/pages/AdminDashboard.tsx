@@ -6,7 +6,7 @@ import { RevenueChart } from '../components/dashboard/RevenueChart';
 import { ActivityFeed } from '../components/dashboard/ActivityFeed';
 import { TableOverview } from '../components/dashboard/TableOverview';
 import { TopMenuItems } from '../components/dashboard/TopMenuItems';
-import { connectSocket, getSocket } from '../../../lib/socket';
+import { getSocket } from '../../../lib/socket';
 import { useTablesStore } from '../store/tables.store';
 import { useDashboardStore } from '../store/dashboard.store';
 import { apiClient } from '../../../shared/services/apiClient';
@@ -50,11 +50,9 @@ const AdminDashboard = () => {
       useDashboardStore.getState().fetchDashboard();
     }, 30000);
 
-    // Only open the live socket / wire realtime listeners once the
-    // restaurant is ACTIVE (live order + table events).
+    // Socket connection is handled by SocketProvider at the app root.
+    // Only wire realtime listeners when the restaurant is ACTIVE.
     if (restaurant && restaurant.status === 'ACTIVE') {
-      connectSocket();
-
       const socket = getSocket();
       if (socket) {
         const handleSync = () => {

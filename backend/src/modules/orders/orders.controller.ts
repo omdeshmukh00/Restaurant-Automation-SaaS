@@ -509,6 +509,33 @@ export class OrdersController {
     }
   }
 
+  // PATCH /staff/orders/:id/cancel
+  static async cancelStaffOrder(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = OrdersController.getRequiredRestaurantId(req);
+      const { id } = req.params;
+      const order = await OrdersService.cancelStaffOrder(
+        restaurantId,
+        id,
+        req.user?.id,
+      );
+
+      void logAudit(req, {
+        entityType: AuditEntity.ORDER,
+        entityId: order._id.toString(),
+        action: AuditAction.ORDER_CANCELLED,
+        metadata: {
+          cancelledBy: req.user?.id,
+          tableId: order.tableId,
+        },
+      });
+
+      ok(res, { order });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // POST /staff/orders/:id/apply-offer
   static async applyWaiterOffer(req: Request, res: Response, next: NextFunction) {
     try {

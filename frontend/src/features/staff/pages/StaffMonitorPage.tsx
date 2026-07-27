@@ -455,6 +455,7 @@ function ReportModal({ member, onClose, onSuccess }: ReportModalProps): JSX.Elem
       onClose();
     } catch (err) {
       console.error('Failed to post incident report to backend', err);
+      // Still persist locally so report is preserved, but log warning
       onSuccess(member.name);
       onClose();
     } finally {

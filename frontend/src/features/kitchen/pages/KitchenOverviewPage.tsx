@@ -38,7 +38,7 @@ import DelayOrderModal from '../components/DelayOrderModal';
 export default function KitchenOverviewPage() {
   const { query } = useKitchenSearch();
   const { ordersById, orderIds, refreshDashboard, executeOptimisticOrderUpdate } = useKitchenDashboard();
-  
+
   // Modals state
   const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
   const [notesOrderId, setNotesOrderId] = useState<string | null>(null);
@@ -333,8 +333,7 @@ export default function KitchenOverviewPage() {
           </div>
         </div>
       )}
-
-      {/* Modals */}
+       
       <InternalNotesModal
         isOpen={!!notesOrderId}
         onClose={() => setNotesOrderId(null)}

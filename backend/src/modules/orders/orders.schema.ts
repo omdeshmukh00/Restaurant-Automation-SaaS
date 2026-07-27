@@ -463,6 +463,8 @@ orderSchema.index({ paymentMethod: 1 });
 orderSchema.index({ kitchenStaffId: 1 });
 orderSchema.index({ serviceStaffId: 1 });
 orderSchema.index({ restaurantId: 1, stockDeducted: 1, createdAt: 1 });
+orderSchema.index({ paymentStatus: 1, restaurantId: 1, finalAmount: 1 });
+orderSchema.index({ status: 1, createdAt: -1 });
 
 export default orderSchema;
 

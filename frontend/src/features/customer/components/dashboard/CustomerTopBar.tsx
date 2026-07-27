@@ -56,13 +56,14 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
           </button>
 
-          {/* Search Input container */}
+          {/* Mobile Search Input container */}
           <div className="flex-1 flex items-center bg-sd-surface-container-low border border-sd-outline-variant rounded-full px-4 py-2 focus-within:ring-2 focus-within:ring-sd-primary-container focus-within:border-sd-primary-container transition-all">
             <span className="material-symbols-outlined text-sd-on-surface-variant mr-2 text-[20px]">search</span>
             <input
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
-              className="bg-transparent border-none focus:ring-0 focus:outline-none text-sm w-full p-0 font-sans text-sd-on-surface placeholder:text-sd-on-surface-variant/50"
+              className="bg-transparent !bg-transparent appearance-none border-none focus:ring-0 focus:outline-none text-sm w-full p-0 font-sans text-sd-on-surface placeholder:text-sd-on-surface-variant/50"
+              style={{ backgroundColor: 'transparent' }}
               placeholder="Search for dishes, cuisines..."
               type="text"
               value={query}
@@ -84,27 +85,24 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
   }
 
   return (
-    <header className="h-16 flex items-center justify-between px-4 md:px-8 bg-sd-surface border-b border-sd-surface-variant sticky top-0 z-30 shrink-0">
+    <header className="h-16 flex items-center justify-between px-3 sm:px-4 md:px-8 bg-sd-surface border-b border-sd-surface-variant sticky top-0 z-30 shrink-0">
       {/* Left: Brand Logo (mobile-only) or Search Bar (desktop-only) */}
-      <div className="flex items-center gap-4 flex-1 max-w-xl">
+      <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0 max-w-xl">
         {/* Mobile Logo */}
-        <div className="flex sm:hidden flex-col shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="bg-sd-primary-container w-7 h-7 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm">
-              <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+        <div className="flex sm:hidden flex-col min-w-0 shrink max-w-[170px]">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <div className="bg-sd-primary-container w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 shadow-md">
+              <span className="material-symbols-outlined text-[19px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                 restaurant
               </span>
             </div>
-            <span className="text-sm font-bold text-sd-primary font-sans whitespace-nowrap">{platformName}</span>
+            <span className="text-[15px] font-extrabold text-sd-primary font-sans whitespace-nowrap truncate tracking-tight">{platformName}</span>
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-sd-on-surface-variant font-sans mt-0.5">
-            <span className="flex items-center gap-0.5">
-              <span className="material-symbols-outlined text-[11px] text-sd-primary">location_on</span>
-              <span>{diningSession?.restaurantName || 'Amber Table'}</span>
-            </span>
-            <span>•</span>
-            <span className="font-semibold text-sd-secondary dark:text-sd-secondary-container bg-sd-secondary-container/10 dark:bg-sd-secondary-container/20 px-1.5 py-0.2 rounded font-sans">
-              {diningSession?.tableNumber || tableCode}
+          <div className="flex items-center gap-1.5 text-[11px] text-sd-on-surface-variant font-sans mt-0.5 min-w-0 truncate">
+            <span className="truncate font-semibold">{diningSession?.restaurantName || 'Scan QR Code'}</span>
+            <span className="shrink-0 text-sd-on-surface-variant/40">•</span>
+            <span className="font-bold text-sd-secondary dark:text-sd-secondary-container bg-sd-secondary-container/15 dark:bg-sd-secondary-container/25 px-1.5 py-0.2 rounded font-sans shrink-0 whitespace-nowrap">
+              Table {diningSession?.tableNumber || '--'}
             </span>
           </div>
         </div>
@@ -113,7 +111,8 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
         <div className="hidden sm:flex items-center bg-sd-surface-container-low border border-sd-outline-variant rounded-full px-4 py-2 w-full focus-within:ring-2 focus-within:ring-sd-primary-container focus-within:border-sd-primary-container transition-all">
           <span className="material-symbols-outlined text-sd-on-surface-variant mr-2 text-[20px]">search</span>
           <input
-            className="bg-transparent border-none focus:ring-0 focus:outline-none text-sm w-full p-0 font-sans text-sd-on-surface placeholder:text-sd-on-surface-variant/50"
+            className="bg-transparent !bg-transparent appearance-none border-none focus:ring-0 focus:outline-none text-sm w-full p-0 font-sans text-sd-on-surface placeholder:text-sd-on-surface-variant/50"
+            style={{ backgroundColor: 'transparent' }}
             placeholder="Search for dishes, cuisines..."
             type="text"
             value={query}
@@ -128,7 +127,7 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
       </div>
 
       {/* Right: Icons — Search (mobile-only), Profile, Cart, Notifications */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Mobile Search Button */}
         <button
           onClick={() => setMobileSearchOpen(true)}
@@ -314,7 +313,7 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
         </div>
 
         {/* Theme Toggle Switch */}
-        <button
+        {/* <button
           onClick={toggleTheme}
           className="w-10 h-10 bg-sd-surface-container-low border border-sd-outline-variant hover:border-sd-primary rounded-full flex items-center justify-center text-sd-on-surface hover:text-sd-primary transition-all shrink-0 cursor-pointer shadow-sm"
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -323,7 +322,7 @@ export default function CustomerTopBar({ onToggleCart, onOpenQRScanner }: Props)
           <span className="material-symbols-outlined text-[20px]">
             {theme === 'dark' ? 'light_mode' : 'dark_mode'}
           </span>
-        </button>
+        </button> */}
 
         {isAuthenticated && (
           <button

@@ -97,10 +97,10 @@ function EditPersonalInfoModal({
   const [bio, setBio] = useState(initialBio);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
       <div
-        className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 transition-all ${
-          darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        className={`w-full max-w-md max-h-[88vh] overflow-y-auto rounded-2xl border p-6 shadow-2xl space-y-5 ${
+          darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
         }`}
       >
         <div className="flex items-center justify-between">
@@ -220,10 +220,10 @@ function VerifyOtpModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-12 pb-6 px-4 overflow-y-auto bg-black/50 backdrop-blur-sm animate-fadeIn">
       <div
-        className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-5 transition-all ${
-          darkMode ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+        className={`w-full max-w-md max-h-[88vh] overflow-y-auto rounded-2xl border p-6 shadow-2xl space-y-5 ${
+          darkMode ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
         }`}
       >
         <div className="flex items-center justify-between">

@@ -16,7 +16,9 @@ const STATUS_OPTIONS: { value: KitchenProfile['status']; label: string; color: s
 ];
 
 const ROLE_OPTIONS = [
-  'Executive Chef',
+  'Head-Chef',
+  'Kitchen Supervisor',
+  'Chef',
   'Sous Chef',
   'Senior Chef',
   'Line Cook',
@@ -187,11 +189,11 @@ export default function KitchenProfilePanel({ isOpen, onClose }: Props) {
 
         {/* Slide-over panel */}
         <div
-          className={`absolute inset-y-0 right-0 pl-10 max-w-full flex transform transition-transform duration-300 ease-out ${
+          className={`absolute inset-y-0 right-0 max-w-full flex transform transition-transform duration-300 ease-out ${
             isOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
-          <div className="w-screen max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-full">
+          <div className="w-screen max-w-full sm:max-w-md bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-full">
             {/* Header */}
             <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -412,30 +414,30 @@ export default function KitchenProfilePanel({ isOpen, onClose }: Props) {
             </form>
 
             {/* Footer */}
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-3 shrink-0">
+            <div className="px-4 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-850 flex items-center justify-between gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   signOut();
                   onClose();
                 }}
-                className="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:text-red-400 rounded-xl text-xs font-bold font-sans transition-all flex items-center gap-1.5"
+                className="px-3 sm:px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:hover:bg-red-900/30 dark:text-red-400 rounded-xl text-xs font-bold font-sans transition-all flex items-center gap-1 shrink-0"
               >
                 <span className="material-symbols-outlined text-[16px]">logout</span>
                 Logout
               </button>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold font-sans transition-all"
+                  className="px-3 sm:px-4 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold font-sans transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all font-sans flex items-center gap-1.5 shadow-sm shadow-orange-500/20"
+                  className="px-3.5 sm:px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all font-sans flex items-center gap-1 shadow-sm shadow-orange-500/20 whitespace-nowrap"
                 >
                   <span className="material-symbols-outlined text-[16px]">save</span>
                   Save Details

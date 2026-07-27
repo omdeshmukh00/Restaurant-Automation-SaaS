@@ -128,13 +128,13 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
       <div className={stretch ? 'mt-auto pt-2 shrink-0' : 'pt-2 shrink-0'}>
         {order.status === 'new' && (
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => onReject?.(order.id)} className={`w-full py-2 border dark:bg-slate-800/80 rounded-xl text-xs font-bold font-sans transition-all active:scale-[0.98] ${colors.btnSecondary}`}>Reject</button>
+            <button onClick={() => onReject?.(order.id)} className={`w-full py-2 border dark:bg-slate-800/85 rounded-xl text-xs font-bold font-sans transition-all active:scale-[0.98] ${colors.btnSecondary}`}>Reject</button>
             <button onClick={() => onAccept?.(order.id)} className={`w-full py-2 text-white rounded-xl text-xs font-bold shadow-sm font-sans transition-all active:scale-[0.98] ${colors.btnPrimary}`}>Accept</button>
           </div>
         )}
         {order.status === 'preparing' && (
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => onDelay?.(order.id)} className={`w-full py-2 border dark:bg-slate-800/80 rounded-xl text-xs font-bold font-sans flex items-center justify-center gap-1 transition-all active:scale-[0.98] ${colors.btnSecondary}`}>
+            <button onClick={() => onDelay?.(order.id)} className={`w-full py-2 border dark:bg-slate-800/85 rounded-xl text-xs font-bold font-sans flex items-center justify-center gap-1 transition-all active:scale-[0.98] ${colors.btnSecondary}`}>
               <span className="material-symbols-outlined text-[14px]">schedule</span> Delay
             </button>
             <button onClick={() => onMarkReady?.(order.id)} className={`w-full py-2 text-white rounded-xl text-xs font-bold shadow-sm font-sans transition-all active:scale-[0.98] ${colors.btnPrimary}`}>Mark Ready</button>
@@ -145,10 +145,10 @@ export default function OrderCard({ order, onAccept, onReject, onMarkReady, onDe
         )}
         {order.status === 'delayed' && (
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => onRush?.(order.id)} className="w-full py-2 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 dark:bg-slate-800/80 rounded-xl text-xs font-bold font-sans flex items-center justify-center gap-1 transition-all active:scale-[0.98]">
+            <button onClick={() => onRush?.(order.id)} className="w-full py-2 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 dark:bg-slate-800/85 rounded-xl text-xs font-bold font-sans flex items-center justify-center gap-1 transition-all active:scale-[0.98]">
               <span className="material-symbols-outlined text-[14px]">bolt</span> Rush
             </button>
-            <button className="w-full py-2 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 dark:bg-slate-800/80 rounded-xl text-xs font-bold font-sans transition-all active:scale-[0.98]">Delay Info</button>
+            <button className="w-full py-2 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 dark:bg-slate-800/85 rounded-xl text-xs font-bold font-sans transition-all active:scale-[0.98]">Delay Info</button>
           </div>
         )}
       </div>

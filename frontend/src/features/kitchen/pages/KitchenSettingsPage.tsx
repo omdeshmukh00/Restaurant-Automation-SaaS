@@ -25,38 +25,12 @@ export default function KitchenSettingsPage() {
     toastAlerts: true,
   });
 
-  // Display settings
-  const [displaySettings, setDisplaySettings] = useState({
-    cardSize: 'medium',
-    columns: '4',
-    theme: 'light',
-  });
-
-  // Auto rules
-  const [autoRules, setAutoRules] = useState({
-    dineIn: true,
-    takeAway: false,
-    delivery: false,
-  });
-
-  // Prep times
-  const [prepTimes, setPrepTimes] = useState({
-    biryani: 25,
-    curry: 18,
-    grill: 12,
-    fry: 8,
-    dessert: 10,
-  });
-
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const settings = await getKitchenSettings();
         if (settings.general) setGeneralSettings(settings.general);
         if (settings.notifications) setNotificationSettings(settings.notifications);
-        if (settings.display) setDisplaySettings(settings.display);
-        if (settings.autoRules) setAutoRules(settings.autoRules);
-        if (settings.prepTimes) setPrepTimes(settings.prepTimes);
       } catch (err) {
         console.error('Failed to load kitchen settings', err);
       }
@@ -73,9 +47,6 @@ export default function KitchenSettingsPage() {
       await updateKitchenSettings({
         general: generalSettings,
         notifications: notificationSettings,
-        display: displaySettings,
-        autoRules: autoRules,
-        prepTimes: prepTimes,
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
@@ -213,28 +184,6 @@ export default function KitchenSettingsPage() {
               </div>
             )}
 
-            {/* Stations config */}
-            {activeSection === 'stations' && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-base text-slate-800 dark:text-sd-on-surface border-b border-slate-50 dark:border-sd-outline-variant/40 pb-2">Station Configurations</h3>
-                <p className="text-xs text-slate-400 dark:text-sd-on-surface-variant font-medium leading-relaxed">
-                  Toggle station availability status within the KDS. Disabled stations will not receive new kitchen orders.
-                </p>
-                <div className="space-y-3 font-semibold text-sm text-slate-700 dark:text-sd-on-surface">
-                  {['Grill Station', 'Curry Station', 'Fry Station', 'Biryani Station', 'Dessert Counter', 'Beverage Station'].map(stn => (
-                    <div key={stn} className="flex justify-between items-center p-3 bg-slate-50 dark:bg-sd-surface-container-low rounded-xl border border-slate-100 dark:border-sd-outline-variant/40">
-                      <span>{stn}</span>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" defaultChecked className="sr-only peer" />
-                        <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                        <span className="sr-only">Toggle {stn}</span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Notifications */}
             {activeSection === 'notifications' && (
               <div className="space-y-4">
@@ -252,7 +201,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setNotificationSettings({ ...notificationSettings, audioAlerts: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Audio Alerts</span>
                     </label>
                   </div>
@@ -268,7 +217,7 @@ export default function KitchenSettingsPage() {
                         onChange={e => setNotificationSettings({ ...notificationSettings, visualBanners: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Visual Banner Popups</span>
                     </label>
                   </div>
@@ -284,178 +233,11 @@ export default function KitchenSettingsPage() {
                         onChange={e => setNotificationSettings({ ...notificationSettings, toastAlerts: e.target.checked })}
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                      <div className="w-9 h-5 bg-slate-300 dark:bg-slate-700 border border-slate-300 dark:border-slate-500 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500 peer-checked:border-orange-500"></div>
                       <span className="sr-only">Toggle Toast Dismissal Alert</span>
                     </label>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Display & KDS */}
-            {activeSection === 'display' && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-base text-slate-800 dark:text-sd-on-surface border-b border-slate-50 dark:border-sd-outline-variant/40 pb-2">KDS View Customization</h3>
-                <div className="space-y-4 text-xs font-bold text-slate-600 dark:text-sd-on-surface-variant">
-                  <div className="space-y-1.5">
-                    <span className="block text-slate-500 dark:text-sd-on-surface-variant">Order Card Layout Size</span>
-                    <div className="flex gap-3">
-                      {['small', 'medium', 'large'].map(sz => (
-                        <button
-                          key={sz}
-                          type="button"
-                          onClick={() => setDisplaySettings({ ...displaySettings, cardSize: sz })}
-                          className={`flex-1 py-2 border rounded-xl text-center capitalize transition-all ${
-                            displaySettings.cardSize === sz
-                              ? 'bg-orange-50 text-orange-600 border-orange-200 font-bold dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/40'
-                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 dark:bg-sd-surface-container-low dark:text-sd-on-surface-variant dark:border-sd-outline-variant/40 dark:hover:bg-sd-surface-container'
-                          }`}
-                        >
-                          {sz}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <span className="block text-slate-500 dark:text-sd-on-surface-variant">Overview Board Columns</span>
-                    <div className="flex gap-3">
-                      {['3', '4'].map(cols => (
-                        <button
-                          key={cols}
-                          type="button"
-                          onClick={() => setDisplaySettings({ ...displaySettings, columns: cols })}
-                          className={`flex-1 py-2 border rounded-xl text-center transition-all ${
-                            displaySettings.columns === cols
-                              ? 'bg-orange-50 text-orange-600 border-orange-200 font-bold dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/40'
-                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 dark:bg-sd-surface-container-low dark:text-sd-on-surface-variant dark:border-sd-outline-variant/40 dark:hover:bg-sd-surface-container'
-                          }`}
-                        >
-                          {cols} Columns
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <span className="block text-slate-500 dark:text-sd-on-surface-variant">Appearance Theme</span>
-                    <div className="flex gap-3">
-                      {(['light', 'dark', 'system'] as const).map(mode => (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => setTheme(mode)}
-                          className={`flex-1 py-2 border rounded-xl text-center capitalize transition-all ${
-                            theme === mode
-                              ? 'bg-orange-50 text-orange-600 border-orange-200 font-bold dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/40'
-                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 dark:bg-sd-surface-container-low dark:text-sd-on-surface-variant dark:border-sd-outline-variant/40 dark:hover:bg-sd-surface-container'
-                          }`}
-                        >
-                          {mode}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Auto Rules */}
-            {activeSection === 'auto-rules' && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-base text-slate-800 dark:text-sd-on-surface border-b border-slate-50 dark:border-sd-outline-variant/40 pb-2">Auto-Accept Rules</h3>
-                <div className="space-y-3 font-semibold text-sm text-slate-700 dark:text-sd-on-surface">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-sd-surface-container-low rounded-xl border border-slate-100 dark:border-sd-outline-variant/40">
-                    <div>
-                      <p className="font-bold text-slate-800 dark:text-sd-on-surface text-xs">Auto-Accept Dine-in Orders</p>
-                      <p className="text-[10px] text-slate-400 dark:text-sd-on-surface-variant font-medium">Bypass Chef confirmation for table orders</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={autoRules.dineIn}
-                        onChange={e => setAutoRules({ ...autoRules, dineIn: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                      <span className="sr-only">Toggle Auto-Accept Dine-in Orders</span>
-                    </label>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-sd-surface-container-low rounded-xl border border-slate-100 dark:border-sd-outline-variant/40">
-                    <div>
-                      <p className="font-bold text-slate-800 dark:text-sd-on-surface text-xs">Auto-Accept Delivery Partners</p>
-                      <p className="text-[10px] text-slate-400 dark:text-sd-on-surface-variant font-medium">Automatically dispatch orders to Stations</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={autoRules.delivery}
-                        onChange={e => setAutoRules({ ...autoRules, delivery: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 dark:bg-sd-surface-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
-                      <span className="sr-only">Toggle Auto-Accept Delivery Partners</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Prep Times */}
-            {activeSection === 'prep-times' && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-base text-slate-800 dark:text-sd-on-surface border-b border-slate-50 dark:border-sd-outline-variant/40 pb-2">Default Preparation Target Times</h3>
-                <p className="text-xs text-slate-400 dark:text-sd-on-surface-variant font-medium leading-relaxed mb-4">
-                  Set target cooking limits per item category. Orders exceeding these limits will trigger &apos;delayed&apos; alarms.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-bold text-slate-600 dark:text-sd-on-surface-variant">
-                  <div className="space-y-1.5">
-                    <label htmlFor="prep-biryani" className="block text-slate-500 dark:text-sd-on-surface-variant">Biryani & Rice (mins)</label>
-                    <input
-                      id="prep-biryani"
-                      type="number"
-                      value={prepTimes.biryani}
-                      onChange={e => setPrepTimes({ ...prepTimes, biryani: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-sd-surface-container-low border border-slate-200 dark:border-sd-outline-variant/40 rounded-xl font-bold text-slate-700 dark:text-sd-on-surface focus:outline-orange-500"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="prep-curry" className="block text-slate-500 dark:text-sd-on-surface-variant">Curries & Mains (mins)</label>
-                    <input
-                      id="prep-curry"
-                      type="number"
-                      value={prepTimes.curry}
-                      onChange={e => setPrepTimes({ ...prepTimes, curry: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-sd-surface-container-low border border-slate-200 dark:border-sd-outline-variant/40 rounded-xl font-bold text-slate-700 dark:text-sd-on-surface focus:outline-orange-500"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="prep-grill" className="block text-slate-500 dark:text-sd-on-surface-variant">Grills & Tandoors (mins)</label>
-                    <input
-                      id="prep-grill"
-                      type="number"
-                      value={prepTimes.grill}
-                      onChange={e => setPrepTimes({ ...prepTimes, grill: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-sd-surface-container-low border border-slate-200 dark:border-sd-outline-variant/40 rounded-xl font-bold text-slate-700 dark:text-sd-on-surface focus:outline-orange-500"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label htmlFor="prep-fry" className="block text-slate-500 dark:text-sd-on-surface-variant">Appetizers & Fry (mins)</label>
-                    <input
-                      id="prep-fry"
-                      type="number"
-                      value={prepTimes.fry}
-                      onChange={e => setPrepTimes({ ...prepTimes, fry: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-sd-surface-container-low border border-slate-200 dark:border-sd-outline-variant/40 rounded-xl font-bold text-slate-700 dark:text-sd-on-surface focus:outline-orange-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Integrations & Team (Placeholder Forms) */}
-            {(activeSection === 'integrations' || activeSection === 'team') && (
-              <div className="space-y-4 py-8 text-center text-slate-400 dark:text-sd-on-surface-variant font-semibold text-xs">
-                <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-sd-outline block mb-2">lock</span>
-                This panel is restricted to System Administrators.
               </div>
             )}
           </form>

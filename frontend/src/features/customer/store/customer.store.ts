@@ -459,8 +459,7 @@ export const useCustomerStore = create<CustomerStore>()(
             tableCode: diningSession.tableNumber,
             lastActivity: Date.now(),
           });
-          disconnectSocket();
-          connectSocket();
+          connectSocket(true);
 
           // Socket bindings are handled by CustomerLayout.tsx to ensure proper cleanup
         } else {

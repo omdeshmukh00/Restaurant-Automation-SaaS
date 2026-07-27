@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { CleaningStatus, TableStatus } from '../../constants/statuses';
+import { CleaningStatus, TableStatus, Priority } from '../../constants/statuses';
 import { ErrorCode } from '../../constants/errors';
 import { AppError } from '../../utils/AppError';
 import { ok } from '../../utils/responses';
@@ -10,6 +10,7 @@ import { MaintenanceIssueModel } from './maintenanceIssue.model';
 import { logger } from '../../config/logger';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserRole } from '../../constants/roles';
+import { ensureCleaningTaskForTable } from './cleaning.service';
 import { socketService } from '../../sockets/socket.service';
 
 function ensureCleaningStatus(currentStatus: CleaningStatus, allowedStatuses: CleaningStatus[], message: string): void {
@@ -69,6 +70,60 @@ export class CleaningController {
     }
 
     return task;
+  }
+
+  static async createTask(req: Request, res: Response, next: NextFunction) {
+    try {
+      const restaurantId = await CleaningController.getRequiredRestaurantId(req);
+      const { tableId, priority, notes } = req.body;
+
+      let targetTableId = tableId;
+      if (tableId && !/^[a-fA-F0-9]{24}$/.test(tableId)) {
+        const match = String(tableId).match(/\d+/);
+        if (match) {
+          const tableNum = parseInt(match[0], 10);
+          const tableDoc = await TableModel.findOne({ restaurantId, tableNumber: tableNum });
+          if (tableDoc) {
+            targetTableId = tableDoc._id.toString();
+          }
+        }
+      }
+
+      if (!targetTableId) {
+        throw new AppError('Valid table identifier required', 400, ErrorCode.INVALID_REQUEST);
+      }
+
+      const task = await ensureCleaningTaskForTable({
+        restaurantId,
+        tableId: targetTableId,
+        priority: priority === 'High' ? Priority.HIGH : priority === 'Low' ? Priority.LOW : Priority.NORMAL,
+      });
+
+      if (notes) {
+        task.notes = notes;
+        await task.save();
+      }
+
+      await updateTableStatus(targetTableId.toString(), TableStatus.DIRTY, restaurantId.toString());
+
+      socketService.emitToRestaurant(restaurantId.toString(), 'cleaning.created', { task });
+
+      NotificationsService.createNotification({
+        restaurantId: restaurantId.toString(),
+        recipientRole: UserRole.CLEANING_STAFF,
+        title: 'New Cleaning Request',
+        message: `Cleaning task requested for table ${notes ? `- ${notes}` : ''}`,
+        type: 'CLEANING_TASK_CREATED' as any,
+        entityId: task._id.toString(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      }).catch((err) => {
+        logger.error(`[Cleaning] Failed to create notification for task ${task._id}:`, err);
+      });
+
+      ok(res, { task, message: 'Cleaning request created successfully' });
+    } catch (error) {
+      next(error);
+    }
   }
 
   static async getTasks(req: Request, res: Response, next: NextFunction) {

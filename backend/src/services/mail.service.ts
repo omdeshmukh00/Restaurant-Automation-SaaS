@@ -42,18 +42,22 @@ let transporter: nodemailer.Transporter | null = null;
 export function getTransporter(): nodemailer.Transporter | null {
   if (transporter) return transporter;
 
-
   if (env.NODE_ENV !== 'test' && (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS)) {
     logger.warn('SMTP not configured - email sending disabled');
     return null;
   }
 
+  const port = Number(env.SMTP_PORT || 587);
   transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST || 'localhost',
-    port: env.SMTP_PORT || 587,
+    host: env.SMTP_HOST || 'smtp.gmail.com',
+    port: port,
+    secure: port === 465,
     auth: {
-      user: env.SMTP_USER || 'test',
-      pass: env.SMTP_PASS || 'test',
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false,
     },
   });
 

@@ -341,9 +341,9 @@ export const tableAPI = {
   updateStatus: async (id: string, status: string): Promise<ApiResponse<Table>> => {
     let backendStatus = 'AVAILABLE';
     const statusUpper = status.toUpperCase();
-    if (statusUpper === 'NEEDS_CLEANING' || statusUpper === 'DIRTY' || statusUpper === 'CLEANING') {
-      backendStatus = 'AVAILABLE';
-    } else if (statusUpper === 'CLEANING_IN_PROGRESS') {
+    if (statusUpper === 'NEEDS_CLEANING' || statusUpper === 'DIRTY') {
+      backendStatus = 'NEEDS_CLEANING';
+    } else if (statusUpper === 'CLEANING_IN_PROGRESS' || statusUpper === 'CLEANING' || statusUpper === 'IN_CLEANING') {
       backendStatus = 'CLEANING_IN_PROGRESS';
     } else if (statusUpper === 'OCCUPIED') {
       backendStatus = 'OCCUPIED';
@@ -599,6 +599,10 @@ export const ordersAPI = {
     return fetchAPI<void>(`/staff/orders/${id}/complete`, { method: 'PATCH' });
   },
 
+  cancelOrder: (id: string): Promise<ApiResponse<void>> => {
+    return fetchAPI<void>(`/staff/orders/${id}/cancel`, { method: 'PATCH' });
+  },
+
   applyOffer: (id: string, offerCode?: string, offerId?: string): Promise<ApiResponse<any>> => {
     return fetchAPI<any>(`/staff/orders/${id}/apply-offer`, {
       method: 'POST',
@@ -628,17 +632,31 @@ export const offersAPI = {
 };
 
 export const profileAPI = {
-  sendPhoneOTP: (phone: string): Promise<ApiResponse<{ message: string; expiresAt?: string }>> => {
-    return fetchAPI<{ message: string; expiresAt?: string }>('/auth/request-otp', {
+  sendPhoneOTP: async (phone: string): Promise<ApiResponse<{ message: string; expiresAt?: string }>> => {
+    let res = await fetchAPI<{ message: string; expiresAt?: string }>('/staff/send-phone-otp', {
       method: 'POST',
-      body: JSON.stringify({ identifier: phone, mobile: phone }),
+      body: JSON.stringify({ phone }),
     });
+    if (!res.success) {
+      res = await fetchAPI<{ message: string; expiresAt?: string }>('/auth/request-otp', {
+        method: 'POST',
+        body: JSON.stringify({ identifier: phone, mobile: phone }),
+      });
+    }
+    return res;
   },
-  verifyPhoneOTP: (phone: string, otp: string): Promise<ApiResponse<{ message: string }>> => {
-    return fetchAPI<{ message: string }>('/auth/verify-otp', {
+  verifyPhoneOTP: async (phone: string, otp: string): Promise<ApiResponse<{ message: string }>> => {
+    let res = await fetchAPI<{ message: string }>('/staff/verify-phone-otp', {
       method: 'POST',
-      body: JSON.stringify({ identifier: phone, mobile: phone, otp }),
+      body: JSON.stringify({ phone, otp }),
     });
+    if (!res.success) {
+      res = await fetchAPI<{ message: string }>('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ identifier: phone, mobile: phone, otp }),
+      });
+    }
+    return res;
   },
   updateProfile: (updates: any): Promise<ApiResponse<StaffMember>> => {
     return userAPI.updateProfile(updates);

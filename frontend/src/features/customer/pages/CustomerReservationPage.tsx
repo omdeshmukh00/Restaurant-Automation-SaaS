@@ -627,46 +627,46 @@ export default function CustomerReservationPage() {
         </div>
 
         <div className="lg:col-span-4 space-y-6 text-left">
-          <section className="bg-white rounded-2xl p-5 border border-slate-100 shadow-lg shadow-orange-500/5">
-            <h3 className="text-base font-bold text-slate-800 mb-4 font-sans">Why Reserve with Us?</h3>
+          <section className="bg-white dark:bg-sd-surface rounded-2xl p-5 border border-slate-100 dark:border-sd-surface-variant shadow-lg shadow-orange-500/5">
+            <h3 className="text-base font-bold text-slate-800 dark:text-sd-on-surface mb-4 font-sans">Why Reserve with Us?</h3>
             <div className="space-y-3">
               {[
-                { icon: 'verified_user', label: 'Guaranteed Seating', desc: 'Your table will be reserved and ready for you.', color: 'bg-green-100 text-green-600' },
-                { icon: 'alarm', label: 'No Waiting', desc: 'Skip the wait and enjoy your time.', color: 'bg-orange-100 text-orange-600' },
-                { icon: 'card_giftcard', label: 'Special Occasions', desc: 'Celebrate your special moments with us.', color: 'bg-purple-100 text-purple-600' },
-                { icon: 'star', label: 'Best Experience', desc: 'Enjoy personalized service for a memorable dining.', color: 'bg-blue-100 text-blue-600' },
+                { icon: 'verified_user', label: 'Guaranteed Seating', desc: 'Your table will be reserved and ready for you.', color: 'bg-green-100 dark:bg-green-950/50 text-green-600 dark:text-green-400' },
+                { icon: 'alarm', label: 'No Waiting', desc: 'Skip the wait and enjoy your time.', color: 'bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400' },
+                { icon: 'card_giftcard', label: 'Special Occasions', desc: 'Celebrate your special moments with us.', color: 'bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400' },
+                { icon: 'star', label: 'Best Experience', desc: 'Enjoy personalized service for a memorable dining.', color: 'bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' },
               ].map(({ icon, label, desc, color }) => (
-                <div key={label} className="flex items-start gap-3 p-3 hover:bg-slate-50 border border-transparent hover:border-slate-100 rounded-xl transition-colors cursor-pointer group">
+                <div key={label} className="flex items-start gap-3 p-3 hover:bg-slate-50 dark:hover:bg-sd-surface-container-low border border-transparent hover:border-slate-100 dark:hover:border-sd-surface-variant rounded-xl transition-colors cursor-pointer group">
                   <div className={`w-9 h-9 rounded-full ${color} flex items-center justify-center shrink-0`}>
                     <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>{icon}</span>
                   </div>
                   <div className="flex-1">
-                    <h4 className="text-sm font-bold text-slate-800 font-sans">{label}</h4>
-                    <p className="text-xs text-slate-500 font-sans mt-0.5">{desc}</p>
+                    <h4 className="text-sm font-bold text-slate-800 dark:text-sd-on-surface font-sans">{label}</h4>
+                    <p className="text-xs text-slate-500 dark:text-sd-on-surface-variant font-sans mt-0.5">{desc}</p>
                   </div>
-                  <span className="material-symbols-outlined text-slate-400 text-[18px] self-center group-hover:translate-x-1 transition-transform">chevron_right</span>
+                  <span className="material-symbols-outlined text-slate-400 dark:text-sd-on-surface-variant/70 text-[18px] self-center group-hover:translate-x-1 transition-transform">chevron_right</span>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-orange-500/5 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-base font-bold text-slate-800 font-sans">Your Reservations</h3>
-              <span className="text-xs font-bold text-orange-600 font-sans bg-orange-50 px-2 py-0.5 rounded-full">
+          <section className="bg-white dark:bg-sd-surface rounded-2xl border border-slate-100 dark:border-sd-surface-variant shadow-lg shadow-orange-500/5 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-50 dark:border-sd-surface-variant flex justify-between items-center bg-slate-50/50 dark:bg-sd-surface-container-low">
+              <h3 className="text-base font-bold text-slate-800 dark:text-sd-on-surface font-sans">Your Reservations</h3>
+              <span className="text-xs font-bold text-orange-600 dark:text-sd-primary font-sans bg-orange-50 dark:bg-sd-primary-container/20 px-2 py-0.5 rounded-full">
                 {reservations.length}
               </span>
             </div>
             <div className="px-5 pb-5 pt-4">
               {loading ? (
-                <div className="py-8 text-center text-xs text-slate-400 font-sans">
+                <div className="py-8 text-center text-xs text-slate-400 dark:text-sd-on-surface-variant font-sans">
                   <span className="animate-pulse">Loading reservations...</span>
                 </div>
               ) : reservations.length > 0 ? (
                 <div className="space-y-4 max-h-[450px] overflow-y-auto pr-1 sd-custom-scrollbar">
                   {reservations.map((reservation) => (
-                    <div key={reservation.id} className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-sm">
-                      <div className="h-24 bg-gradient-to-br from-orange-100 via-orange-50 to-orange-100/10 flex items-center justify-center relative">
+                    <div key={reservation.id} className="border border-slate-100 dark:border-sd-surface-variant rounded-2xl overflow-hidden bg-white dark:bg-sd-surface-container shadow-sm">
+                      <div className="h-24 bg-gradient-to-br from-orange-100 via-orange-50 to-orange-100/10 dark:from-orange-950/40 dark:via-orange-900/20 dark:to-orange-950/10 flex items-center justify-center relative">
                         <span className="material-symbols-outlined text-4xl text-orange-500/20">restaurant</span>
                         <div className="absolute top-2 left-3 bg-black/60 text-[9px] font-bold text-white px-2 py-0.5 rounded">
                           {reservation.restaurantName}
@@ -675,45 +675,45 @@ export default function CustomerReservationPage() {
                       <div className="p-4">
                         <div className="flex justify-between items-start">
                           <div>
-                            <h4 className="font-bold text-xs text-slate-800 font-sans">{formatDateReadable(reservation.date)}</h4>
+                            <h4 className="font-bold text-xs text-slate-800 dark:text-sd-on-surface font-sans">{formatDateReadable(reservation.date)}</h4>
                             <div className="flex gap-3 mt-1.5">
-                              <div className="flex items-center gap-1 text-slate-500 text-[10px] font-sans">
-                                <span className="material-symbols-outlined text-[12px] text-slate-400">schedule</span> {reservation.time}
+                              <div className="flex items-center gap-1 text-slate-500 dark:text-sd-on-surface-variant text-[10px] font-sans">
+                                <span className="material-symbols-outlined text-[12px] text-slate-400 dark:text-sd-on-surface-variant/70">schedule</span> {reservation.time}
                               </div>
-                              <div className="flex items-center gap-1 text-slate-500 text-[10px] font-sans">
-                                <span className="material-symbols-outlined text-[12px] text-slate-400">group</span> {reservation.partySize} Guests
+                              <div className="flex items-center gap-1 text-slate-500 dark:text-sd-on-surface-variant text-[10px] font-sans">
+                                <span className="material-symbols-outlined text-[12px] text-slate-400 dark:text-sd-on-surface-variant/70">group</span> {reservation.partySize} Guests
                               </div>
                             </div>
                             {reservation.seating && reservation.seating !== 'Any Preference' && (
-                              <div className="mt-1 text-[10px] text-orange-600 font-semibold font-sans">
+                              <div className="mt-1 text-[10px] text-orange-600 dark:text-sd-primary font-semibold font-sans">
                                 Preference: {reservation.seating}
                               </div>
                             )}
                             {reservation.notes && (
-                              <p className="mt-1.5 text-[10px] text-slate-400 italic font-sans max-w-[170px] truncate" title={reservation.notes}>
+                              <p className="mt-1.5 text-[10px] text-slate-400 dark:text-sd-on-surface-variant/70 italic font-sans max-w-[170px] truncate" title={reservation.notes}>
                                 &ldquo;{reservation.notes}&rdquo;
                               </p>
                             )}
                           </div>
                           <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase font-sans ${
                             reservation.status === 'CONFIRMED' || reservation.status === 'Confirmed'
-                              ? 'bg-green-100 text-green-700'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
                               : reservation.status === 'CANCELLED' || reservation.status === 'Cancelled'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-orange-100 text-orange-700'
+                                ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
+                                : 'bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300'
                           }`}>{reservation.status}</span>
                         </div>
                         {reservation.status !== 'CANCELLED' && reservation.status !== 'Cancelled' && (
                           <div className="flex gap-2 mt-3">
                             <button
                               onClick={() => handleModify(reservation)}
-                              className="flex-1 py-1.5 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors font-sans"
+                              className="flex-1 py-1.5 border border-slate-200 dark:border-sd-surface-variant rounded-lg text-[10px] font-bold text-slate-700 dark:text-sd-on-surface hover:bg-slate-50 dark:hover:bg-sd-surface-container-low transition-colors font-sans"
                             >
                               Modify
                             </button>
                             <button
                               onClick={() => handleCancel(reservation.id)}
-                              className="flex-1 py-1.5 border border-red-100 text-red-600 rounded-lg text-[10px] font-bold hover:bg-red-50/50 transition-colors font-sans"
+                              className="flex-1 py-1.5 border border-red-100 dark:border-red-900/40 text-red-600 dark:text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-50/50 dark:hover:bg-red-950/30 transition-colors font-sans"
                             >
                               Cancel
                             </button>
@@ -724,10 +724,10 @@ export default function CustomerReservationPage() {
                   ))}
                 </div>
               ) : (
-                <div className="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-slate-400 font-sans">
-                  <span className="material-symbols-outlined text-4xl mb-2 opacity-30 text-slate-300">calendar_today</span>
-                  <p className="text-xs font-semibold text-slate-600">No upcoming reservations</p>
-                  <p className="text-[10px] mt-0.5 text-slate-400">Use the form to book your table</p>
+                <div className="border border-dashed border-slate-200 dark:border-sd-surface-variant rounded-2xl p-6 text-center text-slate-400 dark:text-sd-on-surface-variant font-sans">
+                  <span className="material-symbols-outlined text-4xl mb-2 opacity-30 text-slate-300 dark:text-sd-on-surface-variant/40">calendar_today</span>
+                  <p className="text-xs font-semibold text-slate-600 dark:text-sd-on-surface">No upcoming reservations</p>
+                  <p className="text-[10px] mt-0.5 text-slate-400 dark:text-sd-on-surface-variant">Use the form to book your table</p>
                 </div>
               )}
             </div>

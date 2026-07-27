@@ -7,14 +7,11 @@ import { usePlatformSettingsGuard } from '../../../../shared/hooks/usePlatformSe
 
 const NAV_ITEMS = [
   { to: '/kitchen', icon: 'dashboard', label: 'Overview', end: true },
-  { to: '/kitchen/manager', icon: 'admin_panel_settings', label: 'Manager Dashboard' },
   { to: '/kitchen/orders', icon: 'shopping_bag', label: 'Orders', badge: 24 },
   { to: '/kitchen/batch-cooking', icon: 'inventory_2', label: 'Batch Cooking' },
   { to: '/kitchen/inventory', icon: 'package_2', label: 'Inventory' },
   { to: '/kitchen/stations', icon: 'view_column', label: 'Kitchen Stations' },
   { to: '/kitchen/staff', icon: 'group', label: 'Staff' },
-  { to: '/kitchen/analytics', icon: 'bar_chart', label: 'Analytics' },
-  { to: '/kitchen/reports', icon: 'description', label: 'Reports' },
   { to: '/kitchen/settings', icon: 'settings', label: 'Settings' },
 ];
 
@@ -48,13 +45,15 @@ export default function KitchenSidebar({ collapsed, onToggle, onItemClick, onPro
   return (
     <aside
       className={`flex flex-col h-screen fixed left-0 top-0 bg-white border-r border-slate-200 z-50 transition-all duration-300 ${
-        collapsed ? 'w-[72px]' : 'w-64 shadow-xl lg:shadow-none'
+        collapsed
+          ? '-translate-x-full lg:translate-x-0 lg:w-[72px]'
+          : 'translate-x-0 w-64 shadow-xl lg:shadow-none'
       }`}
     >
       {/* Header */}
       <div className={`flex ${collapsed ? 'flex-col items-center gap-4 px-2' : 'items-center justify-between px-6'} py-5 border-b border-slate-100 shrink-0`}>
         <div className={collapsed ? 'flex flex-col items-center justify-center' : 'flex items-center gap-3'}>
-          <div className="bg-orange-500 dark:bg-orange-600 p-2.5 rounded-full shrink-0 text-white shadow-sm shadow-orange-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full shrink-0 aspect-square flex items-center justify-center bg-orange-500 dark:bg-orange-600 text-white shadow-sm shadow-orange-500/20">
             <span className="material-symbols-outlined text-white text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>restaurant</span>
           </div>
           {!collapsed && (

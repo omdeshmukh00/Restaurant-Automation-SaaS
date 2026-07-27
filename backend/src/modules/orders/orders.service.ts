@@ -827,6 +827,20 @@ export class OrdersService {
 
     await order.save();
 
+    if (order.tableId) {
+      await TableModel.findByIdAndUpdate(order.tableId, {
+        status: TableStatus.AVAILABLE,
+        currentSessionId: null,
+        occupiedAt: null,
+        currentBill: 0,
+      }).catch(() => {});
+
+      socketService.emitToRestaurant(restaurantId.toString(), 'table.updated', {
+        tableId: order.tableId,
+        status: TableStatus.AVAILABLE,
+      });
+    }
+
     socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
     socketService.emitToSession(sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
     socketService.emitToSession(sessionId.toString(), 'order.cancelled', { order });
@@ -841,6 +855,52 @@ export class OrdersService {
       entityId: order._id.toString(),
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     }).catch(() => {});
+
+    return order;
+  }
+
+  static async cancelStaffOrder(
+    restaurantId: string | Types.ObjectId,
+    orderId: string | Types.ObjectId,
+    _cancelledByStaffId?: string,
+  ) {
+    const order = await OrderModel.findOne({
+      _id: orderId,
+      restaurantId,
+    });
+    if (!order) {
+      throw new AppError('Order not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    order.status = OrderStatus.CANCELLED;
+    order.cancelledAt = new Date();
+
+    if (order.stockDeducted) {
+      await InventoryService.restoreStock(restaurantId, order.items).catch(() => {});
+      order.stockDeducted = false;
+    }
+
+    await order.save();
+
+    if (order.tableId) {
+      await TableModel.findByIdAndUpdate(order.tableId, {
+        status: TableStatus.AVAILABLE,
+        currentSessionId: null,
+        occupiedAt: null,
+        currentBill: 0,
+      }).catch(() => {});
+
+      socketService.emitToRestaurant(restaurantId.toString(), 'table.updated', {
+        tableId: order.tableId,
+        status: TableStatus.AVAILABLE,
+      });
+    }
+
+    socketService.emitToRestaurant(restaurantId.toString(), SocketEvent.ORDER_STATUS_UPDATED, { orderId: order._id, status: order.status });
+    if (order.sessionId) {
+      socketService.emitToSession(order.sessionId.toString(), 'order.updated', { orderId: order._id, status: order.status });
+      socketService.emitToSession(order.sessionId.toString(), 'order.cancelled', { order });
+    }
 
     return order;
   }

@@ -64,6 +64,8 @@ const paymentSchema = new Schema<IPayment>(
   },
 );
 
+paymentSchema.index({ createdAt: -1, status: 1 });
+paymentSchema.index({ status: 1, createdAt: -1 });
 paymentSchema.index({ restaurantId: 1, sessionId: 1, createdAt: -1 });
 paymentSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ restaurantId: 1, method: 1, createdAt: -1 });

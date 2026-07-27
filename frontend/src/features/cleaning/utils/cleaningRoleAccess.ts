@@ -1,29 +1,19 @@
 // src/features/cleaning/utils/cleaningRoleAccess.ts
 
+const ALL_CLEANING_ROUTES = [
+  '/cleaning',
+  '/cleaning/tables',
+  '/cleaning/requests',
+  '/cleaning/tasks',
+  '/cleaning/monitor',
+  '/cleaning/profile',
+  '/cleaning/settings'
+];
+
 export const CLEANING_ROLE_ACCESS: Record<string, string[]> = {
-  'Cleaning Staff': [
-    '/cleaning',
-    '/cleaning/tables',
-    '/cleaning/tasks',
-    '/cleaning/profile',
-    '/cleaning/settings'
-  ],
-  'Housekeeping': [
-    '/cleaning',
-    '/cleaning/requests',
-    '/cleaning/tasks',
-    '/cleaning/profile',
-    '/cleaning/settings'
-  ],
-  'Cleaning Supervisor': [
-    '/cleaning',
-    '/cleaning/tables',
-    '/cleaning/requests',
-    '/cleaning/tasks',
-    '/cleaning/monitor',
-    '/cleaning/profile',
-    '/cleaning/settings'
-  ]
+  'Cleaning Staff': ALL_CLEANING_ROUTES,
+  'Housekeeping': ALL_CLEANING_ROUTES,
+  'Cleaning Supervisor': ALL_CLEANING_ROUTES
 };
 
 export function getCleaningRolePermissions(role: string): string[] {
