@@ -182,18 +182,18 @@ export default function KitchenOrdersPage() {
   const selectedDelayOrder = delayModalOrderId ? orders.find(o => o.id === delayModalOrderId) : null;
 
   return (
-    <div className="p-4 lg:p-8 h-full overflow-y-auto pb-32 lg:pb-16">
+    <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto pb-32 lg:pb-16 bg-slate-50/50 dark:bg-slate-950 font-sans">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white font-sans">Orders Management</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-sans">Track and manage all kitchen orders</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white font-sans">Orders Management</h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5 font-sans">Track and manage all kitchen orders</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-3">
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400 font-sans">{filtered.length} orders</span>
 
           {/* List vs Card View Switcher */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/80 dark:border-slate-700 shrink-0">
             <button
               onClick={() => handleViewModeChange('list')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -222,34 +222,35 @@ export default function KitchenOrdersPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Filters Area */}
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
         {/* Status Tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-1">
           {STATUS_TABS.map(({ label, value }) => (
             <button
               key={value}
               onClick={() => handleStatusFilterChange(value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-colors ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border font-sans ${
                 statusFilter === value
-                  ? 'bg-orange-100 dark:bg-orange-950/60 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800'
-                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                  ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800'
+                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-800'
               }`}
             >
               {label}
             </button>
           ))}
         </div>
+        
         {/* Type Tabs */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none shrink-0">
           {TYPE_TABS.map(({ label, value }) => (
             <button
               key={value}
               onClick={() => handleTypeFilterChange(value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-sans transition-colors ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors whitespace-nowrap border font-sans ${
                 typeFilter === value
-                  ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
-                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800'
+                  : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 border-slate-200/80 dark:border-slate-800'
               }`}
             >
               {label}
@@ -261,7 +262,7 @@ export default function KitchenOrdersPage() {
       {/* Main View Area */}
       {viewMode === 'card' ? (
         /* Cards Grid View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 mb-24">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 mb-24">
           {filtered.map(order => (
             <OrderCard
               key={order.id}
@@ -276,28 +277,28 @@ export default function KitchenOrdersPage() {
             />
           ))}
           {filtered.length === 0 && (
-            <div className="col-span-full py-16 text-center text-slate-400 dark:text-slate-500 font-sans">
+            <div className="col-span-full py-16 text-center text-slate-400 dark:text-slate-500 text-xs sm:text-sm font-medium bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl font-sans">
               No orders match your filters
             </div>
           )}
         </div>
       ) : (
         /* Table List View */
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden mb-24">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm font-sans">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden mb-24">
+          <div className="overflow-x-auto w-full">
+            <table className="w-full text-xs sm:text-sm min-w-[850px] font-sans">
               <thead>
-                <tr className="border-b border-slate-100 dark:border-slate-800 text-left bg-slate-50/50 dark:bg-slate-800/40">
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Order ID</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Items</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Table</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Time</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+                <tr className="border-b border-slate-100 dark:border-slate-800 text-left bg-slate-50/60 dark:bg-slate-800/40">
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Order ID</th>
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Items</th>
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Table</th>
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Type</th>
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Time</th>
+                  <th className="px-5 sm:px-6 py-3.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {filtered.length === 0 && orders.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-slate-400 dark:text-slate-500 font-sans">
@@ -311,40 +312,42 @@ export default function KitchenOrdersPage() {
                   </tr>
                 ) : (
                   filtered.map(order => (
-                    <tr key={order.id} className="border-b border-slate-50 dark:border-slate-800/60 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="px-6 py-4 font-bold text-slate-800 dark:text-slate-200 font-mono text-xs break-all">
+                    <tr key={order.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="px-5 sm:px-6 py-4 font-bold text-slate-800 dark:text-slate-200 font-mono text-xs whitespace-nowrap">
                         {/^[0-9a-fA-F]{24}$/.test(order.id) ? `#${order.id.slice(-6).toUpperCase()}` : order.id}
                       </td>
-                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300 max-w-[220px]">
+                      <td className="px-5 sm:px-6 py-4 text-slate-600 dark:text-slate-300 max-w-[220px] truncate">
                         {order.items.map(i => `${i.qty}× ${i.name}`).join(', ')}
                       </td>
-                      <td className="px-6 py-4 font-bold text-orange-600 dark:text-orange-400">{order.table}</td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 capitalize">{order.type.replace('-', ' ')}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${STATUS_BADGE[order.status]}`}>
+                      <td className="px-5 sm:px-6 py-4 font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">{order.table}</td>
+                      <td className="px-5 sm:px-6 py-4 text-slate-500 dark:text-slate-400 capitalize whitespace-nowrap">{order.type.replace('-', ' ')}</td>
+                      <td className="px-5 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase inline-block ${STATUS_BADGE[order.status]}`}>
                           {order.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-400 dark:text-slate-500 text-xs">{order.timeAgo}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-1.5 items-center">
+                      <td className="px-5 sm:px-6 py-4 text-slate-400 dark:text-slate-500 text-xs whitespace-nowrap">{order.timeAgo}</td>
+                      <td className="px-5 sm:px-6 py-4 text-right whitespace-nowrap">
+                        <div className="flex gap-1.5 items-center justify-end">
                           {order.status === 'new' && (
                             <>
-                              <button onClick={() => handleAction(order.id, 'preparing')} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95">Accept</button>
-                              <button onClick={() => handleAction(order.id, 'cancelled')} className="px-3 py-1 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-950/40 transition-all active:scale-95">Reject</button>
+                              <button onClick={() => handleAction(order.id, 'preparing')} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95 shadow-sm">Accept</button>
+                              <button onClick={() => handleAction(order.id, 'cancelled')} className="px-3 py-1.5 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-950/40 transition-all active:scale-95">Reject</button>
                             </>
                           )}
                           {order.status === 'preparing' && (
-                            <button onClick={() => handleAction(order.id, 'ready')} className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95">Ready</button>
+                            <button onClick={() => handleAction(order.id, 'ready')} className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-[10px] font-bold transition-all active:scale-95 shadow-sm">Ready</button>
                           )}
                           {order.status === 'ready' && (
-                            <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider font-sans">Waiting for Staff</span>
+                            <span className="text-slate-400 dark:text-slate-500 text-[10px] font-bold uppercase tracking-wider">Waiting for Staff</span>
                           )}
                           {order.status === 'delayed' && (
-                            <button onClick={() => handleAction(order.id, 'preparing')} className="px-3 py-1 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-950/40 transition-all active:scale-95">⚡ Rush</button>
+                            <button onClick={() => handleAction(order.id, 'preparing')} className="px-3 py-1.5 border border-red-200 dark:border-red-900/50 text-red-500 dark:text-red-400 rounded-lg text-[10px] font-bold hover:bg-red-50 dark:hover:bg-red-950/40 transition-all active:scale-95 inline-flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">bolt</span> Rush
+                            </button>
                           )}
-                          <button onClick={() => setNotesOrderId(order.id)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-1" title="Internal Notes">
-                            <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                          <button onClick={() => setNotesOrderId(order.id)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors ml-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" title="Internal Notes">
+                            <span className="material-symbols-outlined text-[16px] block">edit_note</span>
                           </button>
                         </div>
                       </td>
