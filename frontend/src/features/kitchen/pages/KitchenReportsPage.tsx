@@ -46,29 +46,29 @@ export default function KitchenReportsPage() {
   };
 
   return (
-    <div className="p-4 lg:p-8 h-full overflow-y-auto font-sans">
+    <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto font-sans bg-slate-50/50 dark:bg-slate-950">
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">Kitchen Reports</h2>
-        <p className="text-sm text-slate-500 font-medium">Export performance statistics, kitchen logs, and inventory audit sheets</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white">Kitchen Reports</h2>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">Export performance statistics, kitchen logs, and inventory audit sheets</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Custom Report Configuration (Form) */}
-        <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm xl:col-span-1">
-          <h3 className="font-bold text-base text-slate-800 mb-4 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm xl:col-span-1">
+          <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-white mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-orange-500 text-[20px]">tune</span>
             Generate Custom Report
           </h3>
 
           <form onSubmit={handleGenerateCustom} className="space-y-4 text-xs font-semibold">
             <div>
-              <label htmlFor="report-select" className="block text-slate-500 mb-1.5">Report Type / Template</label>
+              <label htmlFor="report-select" className="block text-slate-500 dark:text-slate-400 mb-1.5">Report Type / Template</label>
               <select
                 id="report-select"
                 value={selectedTemplate}
                 onChange={e => setSelectedTemplate(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-orange-500"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 focus:outline-orange-500"
               >
                 {reports.map(r => (
                   <option key={r.id} value={r.name}>
@@ -79,12 +79,12 @@ export default function KitchenReportsPage() {
             </div>
 
             <div>
-              <label htmlFor="date-range-select" className="block text-slate-500 mb-1.5">Date Range</label>
+              <label htmlFor="date-range-select" className="block text-slate-500 dark:text-slate-400 mb-1.5">Date Range</label>
               <select
                 id="date-range-select"
                 value={dateRange}
                 onChange={e => setDateRange(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-orange-500"
+                className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 focus:outline-orange-500"
               >
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
@@ -95,17 +95,17 @@ export default function KitchenReportsPage() {
             </div>
 
             <div>
-              <span className="block text-slate-500 mb-1.5">File Format</span>
+              <span className="block text-slate-500 dark:text-slate-400 mb-1.5">File Format</span>
               <div className="flex gap-2">
                 {['PDF', 'Excel', 'CSV'].map(fmt => (
                   <button
                     key={fmt}
                     type="button"
                     onClick={() => setFileFormat(fmt)}
-                    className={`flex-1 py-2 border rounded-xl text-center transition-all ${
+                    className={`flex-1 py-2.5 border rounded-xl text-center transition-all ${
                       fileFormat === fmt
-                        ? 'bg-orange-50 text-orange-600 border-orange-200 font-bold'
-                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                        ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 border-orange-200 font-bold'
+                        : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
                     {fmt}
@@ -117,7 +117,7 @@ export default function KitchenReportsPage() {
             <button
               type="submit"
               disabled={generating}
-              className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-orange-100 disabled:opacity-50 mt-4 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-orange-100 dark:shadow-none disabled:opacity-50 mt-4 flex items-center justify-center gap-2 active:scale-[0.98]"
             >
               {generating ? (
                 <>
@@ -136,27 +136,27 @@ export default function KitchenReportsPage() {
 
         {/* Quick Report Cards */}
         <div className="xl:col-span-2 space-y-4">
-          <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
+          <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-white flex items-center gap-2">
             <span className="material-symbols-outlined text-orange-500 text-[20px]">description</span>
             Report Templates
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {reports.map(template => (
               <div
                 key={template.id}
-                className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
+                className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow"
               >
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-2xl">{template.icon}</span>
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded uppercase">
                       {template.frequency}
                     </span>
                   </div>
-                  <h4 className="font-bold text-sm text-slate-800 mb-1">{template.name}</h4>
-                  <p className="text-xs text-slate-400 font-semibold mb-3 leading-snug">{template.description}</p>
+                  <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-1">{template.name}</h4>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold mb-3 leading-snug">{template.description}</p>
                 </div>
-                <div className="flex justify-between items-center border-t border-slate-50 pt-3 text-[10px] font-semibold text-slate-400">
+                <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-800 pt-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                   <span>Last run: {template.lastGenerated}</span>
                   <button
                     onClick={() => {
@@ -175,15 +175,15 @@ export default function KitchenReportsPage() {
       </div>
 
       {/* Report History */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm mt-6">
-        <h3 className="font-bold text-base text-slate-800 mb-4 flex items-center gap-2">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm mt-6">
+        <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-white mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-orange-500 text-[20px]">history</span>
           Recently Generated Reports
         </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse min-w-[750px]">
             <thead>
-              <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase">
+              <tr className="border-b border-slate-100 dark:border-slate-800 text-slate-400 dark:text-slate-500 font-bold uppercase">
                 <th className="px-4 py-3">Report ID</th>
                 <th className="px-4 py-3">Report Name</th>
                 <th className="px-4 py-3">Date Generated</th>
@@ -195,29 +195,29 @@ export default function KitchenReportsPage() {
             </thead>
             <tbody>
               {history.map(item => (
-                <tr key={item.id} className="border-b border-slate-50 font-semibold text-slate-600 hover:bg-slate-50/50">
-                  <td className="px-4 py-3 font-bold text-slate-800">#{item.id}</td>
-                  <td className="px-4 py-3 text-slate-700">{item.name}</td>
-                  <td className="px-4 py-3 text-slate-400">{item.date}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-600 rounded font-bold uppercase text-[9px]">
+                <tr key={item.id} className="border-b border-slate-50 dark:border-slate-800/50 font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                  <td className="px-4 py-3 font-bold text-slate-800 dark:text-white whitespace-nowrap">#{item.id}</td>
+                  <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{item.name}</td>
+                  <td className="px-4 py-3 text-slate-400 dark:text-slate-500 whitespace-nowrap">{item.date}</td>
+                  <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 rounded font-bold uppercase text-[9px]">
                       {item.format}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-slate-400">{item.size}</td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 bg-green-50 border border-green-200 text-green-600 rounded-full font-bold uppercase text-[9px]">
+                  <td className="px-4 py-3 text-center text-slate-400 dark:text-slate-500 whitespace-nowrap">{item.size}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="px-2 py-0.5 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-900/50 text-green-600 dark:text-green-400 rounded-full font-bold uppercase text-[9px]">
                       {item.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
                     <div className="flex gap-2 justify-end">
-                      <button className="px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                      <button className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                         Download
                       </button>
                       <button
                         onClick={() => handleDeleteHistory(item.id)}
-                        className="px-2.5 py-1.5 border border-red-100 hover:bg-red-50 text-red-500 rounded-lg transition-colors"
+                        className="px-2.5 py-1.5 border border-red-100 dark:border-red-900/40 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-500 rounded-lg transition-colors"
                       >
                         Delete
                       </button>
@@ -227,7 +227,7 @@ export default function KitchenReportsPage() {
               ))}
               {history.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400 dark:text-slate-500">
                     No reports history yet.
                   </td>
                 </tr>

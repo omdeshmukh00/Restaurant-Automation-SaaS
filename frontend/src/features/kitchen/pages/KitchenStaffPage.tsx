@@ -32,8 +32,6 @@ export interface JoineeRequest {
   avatar?: string;
 }
 
-const SEED_JOINEES: JoineeRequest[] = [];
-
 const ROLE_OPTIONS = [
   'Executive Chef',
   'Sous Chef',
@@ -58,7 +56,6 @@ const STATION_OPTIONS = [
 
 export default function KitchenStaffPage() {
   const { user } = useAuth();
-
   const { query } = useKitchenSearch();
   const { profile: loggedInProfile, updateProfile } = useKitchenStore();
 
@@ -76,17 +73,16 @@ export default function KitchenStaffPage() {
       try {
         setLoading(true);
         const { chefs } = await getKitchenPerformance();
-        // Map backend response to UI structure temporarily
         const mappedStaff: KitchenStaff[] = chefs.map(c => ({
           id: c.id,
           name: c.name,
           role: c.role,
-          status: 'on-duty', // Missing in backend, defaulting
-          station: '-',      // Missing in backend, defaulting
-          shift: '6:00 AM - 2:00 PM', // Missing in backend, defaulting
+          status: 'on-duty',
+          station: '-',
+          shift: '6:00 AM - 2:00 PM',
           ordersCompleted: c.handledOrders,
           avgPrepTime: `${c.avgTicketMinutes} min`,
-          rating: c.completionRate * 5, // Just mapping completion rate to a 0-5 rating
+          rating: Number((c.completionRate * 5).toFixed(1)),
           avatar: ''
         }));
         setStaff(mappedStaff);
@@ -133,7 +129,7 @@ export default function KitchenStaffPage() {
   // Add staff member form state
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState(ROLE_OPTIONS[3]); // default: Line Cook
+  const [newRole, setNewRole] = useState(ROLE_OPTIONS[3]);
   const [newStatus, setNewStatus] = useState<KitchenStaff['status']>('on-duty');
   const [newStation, setNewStation] = useState('-');
   const [newShift, setNewShift] = useState('6:00 AM - 2:00 PM');
@@ -156,12 +152,10 @@ export default function KitchenStaffPage() {
   const [cropperOpen, setCropperOpen] = useState(false);
   const [tempImageSrc, setTempImageSrc] = useState('');
 
-  // Persist staff and joinees to Local Storage
+  // Persist staff to Local Storage
   useEffect(() => {
     localStorage.setItem('kitchen_staff', JSON.stringify(staff));
   }, [staff]);
-
-
 
   if (user?.internal_role === 'CHEF') {
     return <Navigate to="/kitchen" replace />;
@@ -228,7 +222,6 @@ export default function KitchenStaffPage() {
           else if (member.status === 'on-break') nextStatus = 'off-duty';
           else nextStatus = 'on-duty';
 
-          // Sync with profile store if it's the logged-in chef
           if (id === 'STF-01') {
             updateProfile({ status: nextStatus });
           }
@@ -252,11 +245,10 @@ export default function KitchenStaffPage() {
       prev.map(member => {
         if (member.id === id) {
           const currentIdx = stations.indexOf(member.station);
-          const nextIdx = (currentIdx + 1) % (stations.length + 1); // include "-"
+          const nextIdx = (currentIdx + 1) % (stations.length + 1);
           const nextStation = nextIdx === stations.length ? '-' : stations[nextIdx];
           const nextStatus = nextStation === '-' ? 'on-break' : 'on-duty';
 
-          // Sync with profile store if it's the logged-in chef
           if (id === 'STF-01') {
             updateProfile({ station: nextStation, status: nextStatus });
           }
@@ -291,7 +283,6 @@ export default function KitchenStaffPage() {
       await updateJoineeStatus(joinee.id, 'approved');
       setJoinees(prev => prev.filter(j => j.id !== joinee.id));
       showToast(`Approved! ${joinee.name} added to Roster as ${joinee.role}.`);
-      // Optionally trigger staff reload here
     } catch (err) {
       console.error('Failed to approve joinee', err);
       showToast('Failed to approve joinee.', 'error');
@@ -362,7 +353,6 @@ export default function KitchenStaffPage() {
 
     setStaff(prev => [...prev, newChef]);
 
-    // Reset Form
     setNewName('');
     setNewRole(ROLE_OPTIONS[3]);
     setNewStatus('on-duty');
@@ -386,7 +376,6 @@ export default function KitchenStaffPage() {
       return;
     }
 
-    // Update staff list state
     setStaff(prev =>
       prev.map(member => {
         if (member.id === editingStaff.id) {
@@ -406,7 +395,6 @@ export default function KitchenStaffPage() {
       })
     );
 
-    // If editing the logged-in chef Arjun (STF-01), sync to layout store
     if (editingStaff.id === 'STF-01') {
       updateProfile({
         name: editName,
@@ -434,16 +422,14 @@ export default function KitchenStaffPage() {
       .slice(0, 2);
   };
 
-  // Stats (calculated from merged roster list)
   const totalChefs = mergedStaff.length;
   const onDutyCount = mergedStaff.filter(s => s.status === 'on-duty').length;
   const onBreakCount = mergedStaff.filter(s => s.status === 'on-break').length;
-
   const pendingJoineesCount = joinees.filter(j => j.status === 'pending').length;
 
   const statusBg = {
     'on-duty': 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/20 dark:text-green-400 dark:border-green-900/50',
-    'on-break': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-955 dark:text-amber-400 dark:border-amber-900/50',
+    'on-break': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50',
     'off-duty': 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
   };
 
@@ -454,16 +440,17 @@ export default function KitchenStaffPage() {
   };
 
   return (
-    <div className="p-4 lg:p-8 h-full overflow-y-auto font-sans bg-slate-50 dark:bg-slate-950/30">
+    <div className="p-4 sm:p-6 lg:p-8 h-full overflow-y-auto font-sans bg-slate-50 dark:bg-slate-950/30">
+      
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-white leading-tight">Staff Management</h2>
-          <p className="text-sm text-slate-400 dark:text-slate-500 font-medium mt-0.5">Manage chef duties, shift hours, station allocations, and performance</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white leading-tight">Staff Management</h2>
+          <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 font-medium mt-0.5">Manage chef duties, shift hours, station allocations, and performance</p>
         </div>
         <button
           onClick={() => setAddModalOpen(true)}
-          className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-orange-500/10 flex items-center gap-2 transition-all active:scale-[0.98] self-start"
+          className="w-full sm:w-auto px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-orange-500/10 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           Add Staff Member
@@ -471,9 +458,9 @@ export default function KitchenStaffPage() {
       </div>
 
       {/* Roster Overview Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center gap-4">
-          <div className="bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 p-3 rounded-xl">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-6 sm:mb-8">
+        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[24px]">group</span>
           </div>
           <div>
@@ -481,8 +468,8 @@ export default function KitchenStaffPage() {
             <h3 className="text-2xl font-extrabold text-slate-800 dark:text-white mt-0.5">{totalChefs}</h3>
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center gap-4">
-          <div className="bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 p-3 rounded-xl">
+        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[24px]">check_circle</span>
           </div>
           <div>
@@ -490,8 +477,8 @@ export default function KitchenStaffPage() {
             <h3 className="text-2xl font-extrabold text-green-600 dark:text-green-400 mt-0.5">{onDutyCount}</h3>
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 shadow-sm flex items-center gap-4">
-          <div className="bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 p-3 rounded-xl">
+        <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-[24px]">pause_circle</span>
           </div>
           <div>
@@ -502,23 +489,23 @@ export default function KitchenStaffPage() {
       </div>
 
       {/* Main View Selector Tabs */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-6">
+      <div className="flex border-b border-slate-200 dark:border-slate-800 mb-6 gap-6 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveTab('roster')}
-          className={`pb-3 font-bold text-sm font-sans relative transition-colors ${
+          className={`pb-3 font-bold text-sm font-sans relative transition-colors shrink-0 ${
             activeTab === 'roster'
               ? 'text-orange-500 border-b-2 border-orange-500'
-              : 'text-slate-450 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              : 'text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
           Staff Roster ({totalChefs})
         </button>
         <button
           onClick={() => setActiveTab('joinees')}
-          className={`pb-3 font-bold text-sm font-sans relative transition-colors flex items-center gap-2 ${
+          className={`pb-3 font-bold text-sm font-sans relative transition-colors flex items-center gap-2 shrink-0 ${
             activeTab === 'joinees'
               ? 'text-orange-500 border-b-2 border-orange-500'
-              : 'text-slate-450 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              : 'text-slate-400 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
           }`}
         >
           Joinee Requests
@@ -534,15 +521,15 @@ export default function KitchenStaffPage() {
       {activeTab === 'roster' && (
         <div className="space-y-6">
           {/* Shift/Duty Status Filters */}
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {(['all', 'on-duty', 'on-break', 'off-duty'] as const).map(filter => (
               <button
                 key={filter}
                 onClick={() => setStatusFilter(filter)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all border ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold capitalize transition-all border ${
                   statusFilter === filter
                     ? 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/50'
-                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-855'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
                 {filter === 'all' ? 'All Staff' : filter.replace('-', ' ')}
@@ -550,10 +537,10 @@ export default function KitchenStaffPage() {
             ))}
           </div>
 
-          {/* Roster Table Layout */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-visible shadow-sm">
-            <div className="overflow-x-auto overflow-y-visible">
-              <table className="w-full border-collapse text-left text-sm">
+          {/* Responsive Roster Table Container */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full border-collapse text-left text-sm min-w-[950px]">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     <th className="px-6 py-4">Staff Member</th>
@@ -571,8 +558,7 @@ export default function KitchenStaffPage() {
                   {filteredStaff.map(member => {
                     const initials = getInitials(member.name);
                     return (
-                      <tr key={member.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors">
-                        {/* Staff */}
+                      <tr key={member.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full shrink-0 overflow-hidden bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 flex items-center justify-center font-bold text-sm border border-orange-200/55 dark:border-orange-900/40">
@@ -588,77 +574,60 @@ export default function KitchenStaffPage() {
                             </div>
                           </div>
                         </td>
-
-                        {/* Role */}
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-655 dark:text-slate-300">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-600 dark:text-slate-300">
                           {member.role}
                         </td>
-
-                        {/* Station */}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-sans ${
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-sans inline-block ${
                             member.station === '-' 
-                              ? 'bg-slate-100 text-slate-450 dark:bg-slate-800 dark:text-slate-500' 
+                              ? 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500' 
                               : 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-950'
                           }`}>
                             {member.station}
                           </span>
                         </td>
-
-                        {/* Shift */}
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-500 dark:text-slate-400">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-500 dark:text-slate-400 text-xs">
                           {member.shift}
                         </td>
-
-                        {/* Prep Speed */}
                         <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-slate-700 dark:text-slate-300">
                           {member.avgPrepTime}
                         </td>
-
-                        {/* Completed */}
                         <td className="px-6 py-4 whitespace-nowrap text-center font-bold text-slate-700 dark:text-slate-300">
                           {member.ordersCompleted}
                         </td>
-
-                        {/* Rating */}
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-1 font-bold text-slate-700 dark:text-slate-300">
                             <span className="text-amber-500 text-sm">★</span>
                             <span>{member.rating}</span>
                           </div>
                         </td>
-
-                        {/* Status */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase inline-flex items-center gap-1.5 ${statusBg[member.status]}`}>
                             <div className={`w-1.5 h-1.5 rounded-full ${statusDot[member.status]}`} />
                             <span>{member.status.replace('-', ' ')}</span>
                           </span>
                         </td>
-
-                        {/* Actions */}
-                        <td className="px-6 py-4 whitespace-nowrap text-right relative overflow-visible">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-6 py-4 whitespace-nowrap text-right relative">
+                          <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleStatusCycle(member.id)}
-                              className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-all"
+                              className="px-2.5 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-all"
                               title="Toggle Shift Status"
                             >
-                              Shift Status
+                              Status
                             </button>
                             <button
                               onClick={() => handleAssignStation(member.id)}
-                              className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-all"
+                              className="px-2.5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-bold transition-all"
                               title="Assign Next Station"
                             >
-                              Assign Station
+                              Station
                             </button>
 
-                            {/* Dropdown Action Wrapper */}
                             <div className="relative inline-block text-left">
                               <button
                                 onClick={() => setActiveDropdownId(activeDropdownId === member.id ? null : member.id)}
-                                className="p-1.5 text-slate-400 hover:text-slate-655 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center justify-center"
+                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center justify-center"
                                 title="More Actions"
                               >
                                 <span className="material-symbols-outlined text-[18px] block">more_vert</span>
@@ -672,7 +641,7 @@ export default function KitchenStaffPage() {
                                     className="fixed inset-0 z-40 bg-transparent border-none outline-none cursor-default"
                                     onClick={() => setActiveDropdownId(null)}
                                   />
-                                  <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 py-1 animate-fadeIn">
+                                  <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 py-1">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -687,9 +656,9 @@ export default function KitchenStaffPage() {
                                         setEditAvatar(member.avatar || '');
                                         setActiveDropdownId(null);
                                       }}
-                                      className="w-full px-4 py-2.5 text-left text-xs font-semibold font-sans text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
+                                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
                                     >
-                                      <span className="material-symbols-outlined text-[16px] text-slate-450 dark:text-slate-400">edit</span>
+                                      <span className="material-symbols-outlined text-[16px] text-slate-400">edit</span>
                                       View & Edit
                                     </button>
                                     <button
@@ -698,9 +667,9 @@ export default function KitchenStaffPage() {
                                         handleRemoveStaff(member.id);
                                         setActiveDropdownId(null);
                                       }}
-                                      className="w-full px-4 py-2.5 text-left text-xs font-semibold font-sans text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 mt-1 transition-colors"
+                                      className="w-full px-4 py-2.5 text-left text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 flex items-center gap-2 border-t border-slate-100 dark:border-slate-700 mt-1 transition-colors"
                                     >
-                                      <span className="material-symbols-outlined text-[16px] text-red-450 dark:text-red-400">delete</span>
+                                      <span className="material-symbols-outlined text-[16px] text-red-500">delete</span>
                                       Delete Staff
                                     </button>
                                   </div>
@@ -730,10 +699,10 @@ export default function KitchenStaffPage() {
       {activeTab === 'joinees' && (
         <div className="space-y-6">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left text-sm">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full border-collapse text-left text-sm min-w-[800px]">
                 <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">
+                  <tr className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                     <th className="px-6 py-4">Applicant</th>
                     <th className="px-6 py-4">Applied Role</th>
                     <th className="px-6 py-4">Contact Info</th>
@@ -746,8 +715,7 @@ export default function KitchenStaffPage() {
                   {filteredJoinees.map(joinee => {
                     const initials = getInitials(joinee.name);
                     return (
-                      <tr key={joinee.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-850/20 transition-colors">
-                        {/* Applicant */}
+                      <tr key={joinee.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full shrink-0 overflow-hidden bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 flex items-center justify-center font-bold text-sm border border-purple-200/50 dark:border-purple-900/40">
@@ -763,31 +731,21 @@ export default function KitchenStaffPage() {
                             </div>
                           </div>
                         </td>
-
-                        {/* Applied Role */}
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-655 dark:text-slate-300">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-600 dark:text-slate-300">
                           {joinee.role}
                         </td>
-
-                        {/* Contact Info */}
                         <td className="px-6 py-4 whitespace-nowrap text-xs">
                           <p className="font-semibold text-slate-600 dark:text-slate-400">{joinee.email}</p>
                           <p className="text-slate-400 font-medium mt-0.5">{joinee.phone}</p>
                         </td>
-
-                        {/* Applied Date */}
-                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-500 dark:text-slate-400">
+                        <td className="px-6 py-4 whitespace-nowrap font-medium text-slate-500 dark:text-slate-400 text-xs">
                           {joinee.appliedDate}
                         </td>
-
-                        {/* Status */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-blue-50 text-blue-700 dark:bg-blue-950/20 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50">
                             {joinee.status}
                           </span>
                         </td>
-
-                        {/* Actions */}
                         <td className="px-6 py-4 whitespace-nowrap text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button
@@ -798,9 +756,9 @@ export default function KitchenStaffPage() {
                             </button>
                             <button
                               onClick={() => handleApproveJoinee(joinee)}
-                              className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
+                              className="px-3.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-all shadow-sm"
                             >
-                              Approve & Roster
+                              Approve
                             </button>
                           </div>
                         </td>
@@ -809,7 +767,7 @@ export default function KitchenStaffPage() {
                   })}
                   {filteredJoinees.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-slate-400 dark:text-slate-550 font-semibold font-sans">
+                      <td colSpan={6} className="text-center py-12 text-slate-400 dark:text-slate-500 font-semibold font-sans">
                         No pending applicant requests match your search.
                       </td>
                     </tr>
@@ -821,10 +779,10 @@ export default function KitchenStaffPage() {
         </div>
       )}
 
-      {/* Floating Success/Error Feedback Toast */}
+      {/* Toast Feedback */}
       {toast && (
         <div
-          className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-xl z-[200] flex items-center gap-2 border text-sm font-semibold font-sans animate-fadeIn ${
+          className={`fixed top-4 left-1/2 -translate-x-1/2 px-5 py-3 rounded-2xl shadow-xl z-[200] flex items-center gap-2 border text-xs sm:text-sm font-semibold font-sans ${
             toast.type === 'success'
               ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-950 dark:border-green-900 dark:text-green-300'
               : 'bg-red-50 border-red-200 text-red-700 dark:bg-red-950 dark:border-red-900 dark:text-red-300'
@@ -837,17 +795,14 @@ export default function KitchenStaffPage() {
         </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────── */}
       {/* ADD STAFF MEMBER MODAL */}
-      {/* ──────────────────────────────────────────────────────── */}
       {addModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-scaleIn">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg font-sans text-slate-800 dark:text-white flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <div className="px-5 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-base sm:text-lg font-sans text-slate-800 dark:text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500">person_add</span>
-                Add Roster Staff Member
+                Add Staff Member
               </h3>
               <button
                 onClick={() => setAddModalOpen(false)}
@@ -857,11 +812,9 @@ export default function KitchenStaffPage() {
               </button>
             </div>
 
-            {/* Modal Body Form */}
-            <form onSubmit={handleAddStaffSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Profile Image Row */}
-              <div className="flex items-center gap-4 p-3.5 bg-slate-50 dark:bg-slate-850/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="w-14 h-14 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-450 border border-orange-200 dark:border-orange-900 flex items-center justify-center font-bold text-base overflow-hidden shrink-0">
+            <form onSubmit={handleAddStaffSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border border-orange-200 flex items-center justify-center font-bold text-sm overflow-hidden shrink-0">
                   {newAvatar ? (
                     <img src={newAvatar} alt="New avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -869,70 +822,50 @@ export default function KitchenStaffPage() {
                   )}
                 </div>
                 <div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleAvatarFileChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
+                  <input type="file" ref={fileInputRef} onChange={handleAvatarFileChange} accept="image/*" className="hidden" />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3.5 py-1.5 border border-slate-200 dark:border-slate-750 hover:bg-white dark:hover:bg-slate-800 text-slate-655 dark:text-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-[16px]">add_a_photo</span>
-                    Upload & Crop Photo
+                    <span className="material-symbols-outlined text-[15px]">add_a_photo</span>
+                    Upload Photo
                   </button>
-                  <p className="text-[10px] text-slate-400 mt-1 font-medium font-sans">JPG, PNG, or GIF. Max size 2MB.</p>
                 </div>
               </div>
 
-              {/* Full Name */}
               <div>
-                <label htmlFor="modal-chef-name" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                  Full Name
-                </label>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
                 <input
-                  id="modal-chef-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="e.g. Chef Rohan"
-                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   required
                 />
               </div>
 
-              {/* Role & Status */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label htmlFor="modal-chef-role" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Role
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Role</label>
                   <select
-                    id="modal-chef-role"
                     value={newRole}
                     onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   >
                     {ROLE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
+                      <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="modal-chef-status" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Status
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
                   <select
-                    id="modal-chef-status"
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value as KitchenStaff['status'])}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   >
                     <option value="on-duty">On Duty</option>
                     <option value="on-break">On Break</option>
@@ -941,86 +874,68 @@ export default function KitchenStaffPage() {
                 </div>
               </div>
 
-              {/* Station & Shift */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label htmlFor="modal-chef-station" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Station Allocation
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Station Allocation</label>
                   <select
-                    id="modal-chef-station"
                     value={newStation}
                     onChange={(e) => setNewStation(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   >
                     {STATION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
+                      <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="modal-chef-shift" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Shift Hours
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Shift Hours</label>
                   <input
-                    id="modal-chef-shift"
                     type="text"
                     value={newShift}
                     onChange={(e) => setNewShift(e.target.value)}
                     placeholder="e.g. 6:00 AM - 2:00 PM"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   />
                 </div>
               </div>
 
-              {/* Contact Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label htmlFor="modal-chef-phone" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Contact Phone
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contact Phone</label>
                   <input
-                    id="modal-chef-phone"
                     type="tel"
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
-                    placeholder="e.g. +91 99999 88888"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    placeholder="+91 99999 88888"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="modal-chef-email" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Email Address
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Address</label>
                   <input
-                    id="modal-chef-email"
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="e.g. chef@flavoroast.com"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    placeholder="chef@domain.com"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   />
                 </div>
               </div>
 
-              {/* Modal Buttons Footer */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 shrink-0">
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setAddModalOpen(false)}
-                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold font-sans transition-all"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all font-sans flex items-center gap-1.5 shadow-sm shadow-orange-500/20"
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-[16px]">done</span>
                   Save to Roster
                 </button>
               </div>
@@ -1029,31 +944,26 @@ export default function KitchenStaffPage() {
         </div>
       )}
 
-      {/* ──────────────────────────────────────────────────────── */}
       {/* EDIT STAFF MEMBER MODAL */}
-      {/* ──────────────────────────────────────────────────────── */}
       {editingStaff && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-scaleIn">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-850 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-lg font-sans text-slate-800 dark:text-white flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+            <div className="px-5 sm:px-6 py-4 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-base sm:text-lg font-sans text-slate-800 dark:text-white flex items-center gap-2">
                 <span className="material-symbols-outlined text-orange-500">edit_square</span>
-                Edit Staff Member Details
+                Edit Staff Member
               </h3>
               <button
                 onClick={() => setEditingStaff(null)}
-                className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 dark:text-slate-300 flex items-center justify-center border border-slate-200 dark:border-slate-700 transition-colors"
+                className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-400 dark:text-slate-300 flex items-center justify-center border border-slate-200 dark:border-slate-700"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
 
-            {/* Modal Body Form */}
-            <form onSubmit={handleEditStaffSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Profile Image Row */}
-              <div className="flex items-center gap-4 p-3.5 bg-slate-50 dark:bg-slate-850/50 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="w-14 h-14 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-450 border border-orange-200 dark:border-orange-900 flex items-center justify-center font-bold text-base overflow-hidden shrink-0">
+            <form onSubmit={handleEditStaffSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              <div className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                <div className="w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border border-orange-200 flex items-center justify-center font-bold text-sm overflow-hidden shrink-0">
                   {editAvatar ? (
                     <img src={editAvatar} alt="Edit avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -1061,77 +971,58 @@ export default function KitchenStaffPage() {
                   )}
                 </div>
                 <div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleAvatarFileChange}
-                    accept="image/*"
-                    className="hidden"
-                  />
+                  <input type="file" ref={fileInputRef} onChange={handleAvatarFileChange} accept="image/*" className="hidden" />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="px-3.5 py-1.5 border border-slate-200 dark:border-slate-750 hover:bg-white dark:hover:bg-slate-800 text-slate-655 dark:text-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                    className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-[16px]">add_a_photo</span>
-                    Upload & Crop Photo
+                    <span className="material-symbols-outlined text-[15px]">add_a_photo</span>
+                    Upload Photo
                   </button>
                   {editAvatar && (
                     <button
                       type="button"
                       onClick={() => setEditAvatar('')}
-                      className="ml-2 px-3 py-1.5 text-xs text-red-500 font-bold border border-transparent hover:border-red-200 dark:hover:border-red-900/50 rounded-lg transition-colors"
+                      className="mt-1 text-xs text-red-500 font-bold block"
                     >
-                      Remove
+                      Remove photo
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Full Name */}
               <div>
-                <label htmlFor="edit-chef-name" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                  Full Name
-                </label>
+                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Full Name</label>
                 <input
-                  id="edit-chef-name"
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   required
                 />
               </div>
 
-              {/* Role & Status */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label htmlFor="edit-chef-role" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Role
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Role</label>
                   <select
-                    id="edit-chef-role"
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   >
                     {ROLE_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
+                      <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="edit-chef-status" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Status
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</label>
                   <select
-                    id="edit-chef-status"
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value as KitchenStaff['status'])}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   >
                     <option value="on-duty">On Duty</option>
                     <option value="on-break">On Break</option>
@@ -1140,83 +1031,65 @@ export default function KitchenStaffPage() {
                 </div>
               </div>
 
-              {/* Station & Shift */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label htmlFor="edit-chef-station" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Station Allocation
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Station Allocation</label>
                   <select
-                    id="edit-chef-station"
                     value={editStation}
                     onChange={(e) => setEditStation(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   >
                     {STATION_OPTIONS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
+                      <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label htmlFor="edit-chef-shift" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Shift Hours
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Shift Hours</label>
                   <input
-                    id="edit-chef-shift"
                     type="text"
                     value={editShift}
                     onChange={(e) => setEditShift(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   />
                 </div>
               </div>
 
-              {/* Contact Info */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label htmlFor="edit-chef-phone" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Contact Phone
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contact Phone</label>
                   <input
-                    id="edit-chef-phone"
                     type="tel"
                     value={editPhone}
                     onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="edit-chef-email" className="block text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1.5 font-sans">
-                    Email Address
-                  </label>
+                  <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Address</label>
                   <input
-                    id="edit-chef-email"
                     type="email"
                     value={editEmail}
                     onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 dark:text-white font-sans text-sm"
+                    className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-orange-500 dark:text-white text-sm"
                   />
                 </div>
               </div>
 
-              {/* Modal Buttons Footer */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 shrink-0">
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditingStaff(null)}
-                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold font-sans transition-all"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold hover:shadow-lg transition-all font-sans flex items-center gap-1.5 shadow-sm shadow-orange-500/20"
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold shadow-sm"
                 >
-                  <span className="material-symbols-outlined text-[16px]">done</span>
                   Save Changes
                 </button>
               </div>
@@ -1225,7 +1098,7 @@ export default function KitchenStaffPage() {
         </div>
       )}
 
-      {/* Image Cropper Modal for Add/Edit Staff form */}
+      {/* Image Cropper Modal */}
       <ImageCropperModal
         isOpen={cropperOpen}
         imageSrc={tempImageSrc}
