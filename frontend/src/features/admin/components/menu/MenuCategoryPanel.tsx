@@ -80,7 +80,7 @@ export function MenuCategoryPanel({ mobileOpen = false, onMobileClose }: Props):
   return (
     <>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden lg:flex w-[200px] flex-shrink-0 flex-col sticky top-0 self-start pt-1">
+      <aside className="hidden lg:flex w-full lg:w-56 xl:w-64 flex-shrink-0 flex-col sticky top-0 self-start p-4 sm:p-5 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
         <CategoryList
           onManageCategories={() => setShowManage(true)}
           onAddItem={() => setShowAddItem(true)}

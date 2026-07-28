@@ -191,7 +191,7 @@ export function MenuHeader({ onToggleCategories }: Props): JSX.Element {
         className="hidden"
       />
 
-      <div className="px-3 sm:px-4 lg:px-0 pt-1 pb-4 sm:pb-5">
+      <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-sm">
         {/* Title row */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="min-w-0">

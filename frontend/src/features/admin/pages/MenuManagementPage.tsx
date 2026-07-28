@@ -29,21 +29,18 @@ export function MenuManagementPage(): JSX.Element {
   }, [refresh]);
 
   return (
-    <div className="flex flex-col bg-gray-50 dark:bg-gray-950">
+    <div className="space-y-4 sm:space-y-5 animate-fadeIn">
       <MenuHeader onToggleCategories={() => setShowCategories((v) => !v)} />
 
-      <div className="flex gap-5">
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-5 items-start">
         {/* Category panel — desktop sidebar / mobile drawer */}
         <MenuCategoryPanel
           mobileOpen={showCategories}
           onMobileClose={() => setShowCategories(false)}
         />
 
-        {/* Divider — desktop only */}
-        <div className="hidden lg:block w-px bg-gray-100 dark:bg-gray-800 flex-shrink-0" />
-
-        {/* Main content — grows naturally, no overflow clipping */}
-        <div className="flex-1 flex flex-col min-w-0 pb-6">
+        {/* Main content — wrapped in padded, rounded card box */}
+        <div className="flex-1 min-w-0 w-full bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-4 sm:p-5 lg:p-6 shadow-sm">
           <MenuFilterBar />
           <MenuGrid />
         </div>

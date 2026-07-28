@@ -355,8 +355,7 @@ export default function SecuritySettings({ darkMode }: SecuritySettingsProps) {
                       ? "text-red-400/60 hover:text-red-400 hover:bg-red-500/10"
                       : "text-red-400 hover:text-red-600 hover:bg-red-50"
                   }`}
-                  title="Revoke session"
-                >
+                  title="Revoke session">
                   <Trash2 size={13} />
                 </button>
               )}
