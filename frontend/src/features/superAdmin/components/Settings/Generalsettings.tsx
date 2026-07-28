@@ -9,7 +9,7 @@ interface GeneralSettingsProps {
 }
 
 export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
-  const [form, setForm] = useState({
+  const DEFAULT_FORM = {
     platformName: "HQ Terminal",
     supportEmail: "support@hqterminal.io",
     maintenanceMode: false,
@@ -19,6 +19,20 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
     disableCleaningPanel: false,
     disableAdminPanel: false,
     allowRegistration: true,
+  };
+
+  const [form, setForm] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('hq_general_settings_cache');
+      if (cached) {
+        try {
+          return { ...DEFAULT_FORM, ...JSON.parse(cached) };
+        } catch (e) {
+          // ignore error
+        }
+      }
+    }
+    return DEFAULT_FORM;
   });
 
   const [colorTheme, setColorTheme] = useState<'dark' | 'light' | 'system'>(() => {
@@ -51,7 +65,6 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
     }
   };
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -67,7 +80,7 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
         if (!isMounted) return;
         const data = res.data?.data || res.data;
         if (data) {
-          setForm({
+          const updated = {
             platformName: data.platformName || "HQ Terminal",
             supportEmail: data.supportEmail || "support@hqterminal.io",
             maintenanceMode: !!data.maintenanceMode,
@@ -77,7 +90,11 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
             disableCleaningPanel: !!data.disableCleaningPanel,
             disableAdminPanel: !!data.disableAdminPanel,
             allowRegistration: data.enablePartnerRegistration !== undefined ? !!data.enablePartnerRegistration : true,
-          });
+          };
+          setForm(updated);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('hq_general_settings_cache', JSON.stringify(updated));
+          }
         }
       })
       .catch((err) => {
@@ -85,7 +102,6 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
       })
       .finally(() => {
         if (isMounted) {
-          setLoading(false);
           setTimeout(() => {
             isInitialMount.current = false;
           }, 100);
@@ -120,8 +136,8 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
     }
   };
 
-  const updateField = (key: keyof typeof form, value: string | boolean) => {
-    setForm((prev) => {
+  const updateField = (key: keyof typeof DEFAULT_FORM, value: string | boolean) => {
+    setForm((prev: typeof DEFAULT_FORM) => {
       let updated = { ...prev, [key]: value };
 
       // Master maintenance mode logic: if toggled ON, turn ON all sub panel disable toggles
@@ -154,14 +170,6 @@ export default function GeneralSettings({ darkMode }: GeneralSettingsProps) {
       return updated;
     });
   };
-
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-xs text-slate-400 animate-pulse">
-        Loading platform settings...
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5">

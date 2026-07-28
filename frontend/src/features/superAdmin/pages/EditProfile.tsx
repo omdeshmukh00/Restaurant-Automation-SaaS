@@ -318,7 +318,7 @@ export default function EditProfile() {
   const { darkMode } = useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
-  const { user, setUser, signOut } = useAuth();
+  const { user, setUser, updateUser, signOut } = useAuth();
   const [isEditInfoModalOpen, setIsEditInfoModalOpen] = useState(false);
 
   const { settings, refetch: refetchSettings } = usePlatformSettingsGuard();
@@ -564,11 +564,12 @@ export default function EditProfile() {
 
       if (response.data?.success || response.data) {
         const updatedUser = response.data.data?.user || response.data.user;
+        const activePanel = user?.panel || "superadmin";
         const nextUser = {
           id: updatedUser._id || updatedUser.id,
           name: updatedUser.name,
           role: user?.role || "super-admin",
-          panel: "superadmin" as const,
+          panel: activePanel,
           email: updatedUser.email,
           mobile: updatedUser.mobile,
           avatar: updatedUser.avatar,
@@ -577,9 +578,12 @@ export default function EditProfile() {
           restaurantName: user?.restaurantName || "Graphura Cloud",
         };
 
-        setStoredUser("superadmin", nextUser);
+        setStoredUser(activePanel, nextUser);
         if (setUser) {
           setUser(nextUser);
+        }
+        if (updateUser) {
+          updateUser(nextUser);
         }
 
         setSaved(true);

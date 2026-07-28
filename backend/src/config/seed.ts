@@ -59,33 +59,43 @@ type SeedUserInput = {
 
 async function upsertUser(input: SeedUserInput) {
   const password = await hashPassword(input.password);
+  const existing = await UserModel.findOne({ email: input.email.toLowerCase() });
+
+  const setObj: Record<string, any> = {
+    email: input.email.toLowerCase(),
+    mobile: input.mobile,
+    password,
+    role: input.role,
+    status: UserStatus.ACTIVE,
+    restaurantId: input.restaurantId ?? null,
+    kitchen_role: input.kitchen_role ?? null,
+    staff_role: input.staff_role ?? null,
+    cleaning_role: input.cleaning_role ?? null,
+    dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+    isEmailVerified: true,
+    isMobileVerified: true,
+    isDeleted: false,
+    deletedAt: null,
+    failedLoginAttempts: 0,
+    lockUntil: null,
+  };
+
+  // Only set default profile info if user is new or has no avatar/location/bio set
+  if (!existing) {
+    setObj.name = input.name;
+    setObj.location = input.location ?? null;
+    setObj.avatar = input.avatar ?? null;
+    setObj.bio = input.bio ?? null;
+  } else {
+    if (!existing.name) setObj.name = input.name;
+    if (!existing.avatar && input.avatar) setObj.avatar = input.avatar;
+    if (!existing.location && input.location) setObj.location = input.location;
+    if (!existing.bio && input.bio) setObj.bio = input.bio;
+  }
 
   return UserModel.findOneAndUpdate(
     { email: input.email.toLowerCase() },
-    {
-      $set: {
-        name: input.name,
-        email: input.email.toLowerCase(),
-        mobile: input.mobile,
-        password,
-        role: input.role,
-        status: UserStatus.ACTIVE,
-        restaurantId: input.restaurantId ?? null,
-        kitchen_role: input.kitchen_role ?? null,
-        staff_role: input.staff_role ?? null,
-        cleaning_role: input.cleaning_role ?? null,
-        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
-        location: input.location ?? null,
-        avatar: input.avatar ?? null,
-        bio: input.bio ?? null,
-        isEmailVerified: true,
-        isMobileVerified: true,
-        isDeleted: false,
-        deletedAt: null,
-        failedLoginAttempts: 0,
-        lockUntil: null,
-      },
-    },
+    { $set: setObj },
     {
       new: true,
       upsert: true,

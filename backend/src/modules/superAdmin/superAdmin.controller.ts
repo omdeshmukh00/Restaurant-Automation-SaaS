@@ -94,44 +94,53 @@ import { getPlatformSettings } from './platformSettings.model';
 
 export const getPlatformSettingsController = asyncHandler(async (req: Request, res: Response) => {
   const settings = await getPlatformSettings();
-  
-  const { RestaurantRequestModel } = await import('./restaurantRequest.model');
-  const paidRequests = await RestaurantRequestModel.find({
-    paymentStatus: 'CAPTURED',
-    paymentAmount: { $gt: 0 }
-  }).setOptions({ bypassTenant: true }).lean();
 
-  const totalRevenue = paidRequests.reduce((sum: number, r: any) => sum + (r.paymentAmount || 0), 0);
+  const includeHistory = req.query.includeHistory !== 'false';
 
-  const history = paidRequests.map((r: any) => ({
-    id: r._id.toString(),
-    restaurantName: r.restaurantName,
-    ownerName: r.ownerName,
-    amount: r.paymentAmount,
-    currency: r.paymentCurrency || 'INR',
-    paymentId: r.paymentId,
-    timestamp: r.paymentTimestamp || r.updatedAt
-  }));
+  let totalRevenue = 0;
+  let history: any[] = [];
+  let totalSubscriptionRevenue = 0;
+  let subscriptionHistory: any[] = [];
 
-  const { SubscriptionPaymentModel } = await import('../subscriptions/subscriptions.model');
-  const paidSubscriptions = await SubscriptionPaymentModel.find({
-    status: 'completed'
-  })
-    .populate('restaurantId')
-    .setOptions({ bypassTenant: true })
-    .lean();
+  if (includeHistory) {
+    const { RestaurantRequestModel } = await import('./restaurantRequest.model');
+    const paidRequests = await RestaurantRequestModel.find({
+      paymentStatus: 'CAPTURED',
+      paymentAmount: { $gt: 0 }
+    }).setOptions({ bypassTenant: true }).lean();
 
-  const totalSubscriptionRevenue = paidSubscriptions.reduce((sum: number, sp: any) => sum + (sp.amount || 0), 0);
+    totalRevenue = paidRequests.reduce((sum: number, r: any) => sum + (r.paymentAmount || 0), 0);
 
-  const subscriptionHistory = paidSubscriptions.map((sp: any) => ({
-    id: sp._id.toString(),
-    restaurantName: sp.restaurantId?.name || 'Unknown Restaurant',
-    ownerName: sp.restaurantId?.ownerName || 'Unknown Owner',
-    amount: sp.amount,
-    currency: sp.currency || 'INR',
-    paymentId: sp.providerPaymentId || sp.providerOrderId || sp._id.toString(),
-    timestamp: sp.paidAt || sp.createdAt
-  }));
+    history = paidRequests.map((r: any) => ({
+      id: r._id.toString(),
+      restaurantName: r.restaurantName,
+      ownerName: r.ownerName,
+      amount: r.paymentAmount,
+      currency: r.paymentCurrency || 'INR',
+      paymentId: r.paymentId,
+      timestamp: r.paymentTimestamp || r.updatedAt
+    }));
+
+    const { SubscriptionPaymentModel } = await import('../subscriptions/subscriptions.model');
+    const paidSubscriptions = await SubscriptionPaymentModel.find({
+      status: 'completed'
+    })
+      .populate('restaurantId')
+      .setOptions({ bypassTenant: true })
+      .lean();
+
+    totalSubscriptionRevenue = paidSubscriptions.reduce((sum: number, sp: any) => sum + (sp.amount || 0), 0);
+
+    subscriptionHistory = paidSubscriptions.map((sp: any) => ({
+      id: sp._id.toString(),
+      restaurantName: sp.restaurantId?.name || 'Unknown Restaurant',
+      ownerName: sp.restaurantId?.ownerName || 'Unknown Owner',
+      amount: sp.amount,
+      currency: sp.currency || 'INR',
+      paymentId: sp.providerPaymentId || sp.providerOrderId || sp._id.toString(),
+      timestamp: sp.paidAt || sp.createdAt
+    }));
+  }
 
   ok(res, {
     ...settings.toObject(),

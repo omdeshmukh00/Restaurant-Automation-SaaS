@@ -253,15 +253,16 @@ export default function Restaurant() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate({ search: '?requests=new' })}
-              className={`group py-2 px-3.5 rounded-xl border text-[11px] font-bold hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              className={`relative self-start sm:self-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all duration-200 ${
                 darkMode
-                  ? 'bg-slate-900/50 border-slate-800 text-slate-300'
-                  : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+                  ? "border-orange-500/30 text-orange-300 bg-orange-500/10 hover:bg-orange-500/15"
+                  : "border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100"
               }`}
             >
+              <Building2 size={13} />
               New Requests
               {pendingCount > 0 && (
-                <span className="ml-1 min-w-4 h-4 px-1 rounded-full bg-orange-600 text-white text-[9px] flex items-center justify-center font-bold">
+                <span className="ml-1 min-w-5 h-5 px-1 rounded-full bg-orange-600 text-white text-[10px] flex items-center justify-center font-bold">
                   {pendingCount}
                 </span>
               )}
