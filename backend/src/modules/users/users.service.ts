@@ -2,7 +2,7 @@
 // User business logic â€” all queries filter isDeleted: false by default
 
 import { UserModel, IUser } from './users.model';
-import { hashPassword } from '../../utils/crypto';
+import { hashPassword, normalizeMobile } from '../../utils/crypto';
 import { RegisterInput, UpdateProfileInput } from './users.schema';
 import { UserRole } from '../../constants/roles';
 
@@ -42,7 +42,7 @@ export async function findByEmail(email: string, includePassword: boolean = fals
  * Find user by mobile (includes password for auth).
  */
 export async function findByMobile(mobile: string, includePassword: boolean = false): Promise<IUser | null> {
-  const query = UserModel.findOne({ mobile });
+  const query = UserModel.findOne({ mobile: normalizeMobile(mobile) });
   if (includePassword) query.select('+password');
   return query.exec();
 }
@@ -154,7 +154,7 @@ export async function emailExists(email?: string): Promise<boolean> {
  * Check if mobile is already registered.
  */
 export async function mobileExists(mobile: string): Promise<boolean> {
-  const count = await UserModel.countDocuments({ mobile });
+  const count = await UserModel.countDocuments({ mobile: normalizeMobile(mobile) });
   return count > 0;
 }
 

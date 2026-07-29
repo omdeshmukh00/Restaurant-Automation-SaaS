@@ -758,15 +758,7 @@ const SuperAdminAuth: React.FC = () => {
       )}
 
       {/* Footer */}
-      <div className="mt-8 pt-6 border-t border-slate-100 dark:border-zinc-800 flex justify-center items-center space-x-2 text-sm">
-        <span className="text-slate-400 dark:text-zinc-500">Need help?</span>
-        <button
-          type="button"
-          className="text-orange-600 dark:text-orange-500 hover:text-orange-700 font-semibold hover:underline"
-        >
-          Contact your administrator
-        </button>
-      </div>
+
     </motion.div>
   );
 };

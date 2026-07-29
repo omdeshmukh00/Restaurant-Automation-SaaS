@@ -70,5 +70,5 @@ export function generateOTP(length: number = 6): string {
  */
 export function normalizeMobile(mobile: string): string {
   if (!mobile) return '';
-  return mobile.replace(/[^\d+]/g, '').trim();
+  return mobile.replace(/\D/g, '').trim();
 }

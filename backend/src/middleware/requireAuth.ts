@@ -58,7 +58,12 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   }
 
   if (!token) {
-    // Fallback: try ALL panel access cookies
+    // Fallback: check generic access cookie first before checking other panel access cookies
+    token = req.cookies?.[env.ACCESS_COOKIE_NAME];
+  }
+
+  if (!token) {
+    // Fallback: try ALL panel access cookies if URL panel couldn't be detected
     const ALL_PANELS: Panel[] = ['customer', 'kitchen', 'staff', 'cleaning', 'admin', 'superadmin'];
     for (const p of ALL_PANELS) {
       const cookieName = panelAccessCookieName(p);
@@ -78,6 +83,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 
   try {
     const payload = verifyAccessToken(token);
+    const resolvedTenantId = payload.tenantId || payload.restaurantId;
 
     req.user = {
       _id: payload._id,
@@ -85,7 +91,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
       email: payload.email,
       role: payload.role,
       restaurantId: payload.restaurantId,
-      tenantId: payload.tenantId,
+      tenantId: resolvedTenantId,
       panel: payload.panel,
       internal_role: payload.internal_role,
       mustChangePassword: payload.mustChangePassword,
@@ -93,8 +99,8 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
       firstLogin: payload.firstLogin,
     };
 
-    if (payload.tenantId) {
-      tenantContext.run({ tenantId: payload.tenantId }, () => {
+    if (resolvedTenantId) {
+      tenantContext.run({ tenantId: resolvedTenantId }, () => {
         next();
       });
     } else {

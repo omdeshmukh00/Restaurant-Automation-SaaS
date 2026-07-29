@@ -7,7 +7,7 @@ import * as otpService from '../../services/otp.service';
 import { generateTokenPair } from '../../services/jwt.service';
 import { AppError } from '../../utils/AppError';
 import { asyncHandler } from '../../utils/asyncHandler';
-import { hashToken } from '../../utils/crypto';
+import { hashToken, normalizeMobile } from '../../utils/crypto';
 import { COOKIE_OPTIONS } from '../../utils/constants';
 import { parseExpiry } from '../../utils/date';
 import { sendSuccess } from '../../utils/response';
@@ -395,11 +395,12 @@ export const requestOtp = asyncHandler(async (req: Request, res: Response) => {
 
   const { expiresAt, otp } = await otpService.createOTP(identifier, type);
 
-  const query = isEmail ? { email: identifier.toLowerCase() } : { mobile: identifier };
+  const normalizedIdentifier = isEmail ? identifier.toLowerCase() : normalizeMobile(identifier);
+  const query = isEmail ? { email: normalizedIdentifier } : { mobile: normalizedIdentifier };
   const user = await UserModel.findOne(query);
 
   if (isEmail) {
-    sendOTPEmail(identifier.toLowerCase(), otp).catch((err) => {
+    sendOTPEmail(normalizedIdentifier, otp).catch((err) => {
       logger.error('Failed to send OTP email asynchronously', err);
     });
   }
@@ -431,7 +432,8 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
 
   await otpService.verifyOTP(identifier, type, otp);
 
-  const query = isEmail ? { email: identifier.toLowerCase() } : { mobile: identifier };
+  const normalizedIdentifier = isEmail ? identifier.toLowerCase() : normalizeMobile(identifier);
+  const query = isEmail ? { email: normalizedIdentifier } : { mobile: normalizedIdentifier };
   let user = await UserModel.findOne(query);
 
   if (!user) {
@@ -440,14 +442,14 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     }
     user = await UserModel.create({
       name: name.trim(),
-      mobile: isEmail ? undefined : identifier,
-      email: isEmail ? identifier.toLowerCase() : undefined,
+      mobile: isEmail ? undefined : normalizedIdentifier,
+      email: isEmail ? normalizedIdentifier : undefined,
       role: UserRole.CUSTOMER,
       isMobileVerified: !isEmail,
       isEmailVerified: isEmail,
     });
 
-    logger.info(`Customer registered dynamically via OTP: ${identifier}`);
+    logger.info(`Customer registered dynamically via OTP: ${normalizedIdentifier}`);
     socketService.broadcast('customer:created', { id: user._id.toString() });
   } else {
     if (isEmail) {
@@ -458,12 +460,7 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     await user.save();
   }
 
-  const payload = {
-    _id: user._id.toString(),
-    email: user.email ?? '',
-    role: user.role,
-    ...(user.restaurantId && { restaurantId: user.restaurantId.toString() }),
-  };
+  const payload = authService.buildPayload(user);
 
   const tokens = generateTokenPair(payload);
   const tokenHash = await hashToken(tokens.refreshToken);
@@ -494,14 +491,15 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
     userAgent: req.headers['user-agent'],
   });
 
+  const userObj = user.toObject();
+  delete (userObj as any).password;
+  delete (userObj as any).refreshTokens;
+
   sendSuccess(res, {
     customerId: user._id,
     user: {
+      ...userObj,
       id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      mobile: user.mobile,
-      role: user.role,
       restaurantId: user.restaurantId?.toString(),
     },
     accessToken: tokens.accessToken,
@@ -572,17 +570,7 @@ export const resetFirstLoginPassword = asyncHandler(async (req: Request, res: Re
   const panel = USER_ROLE_TO_PANEL[user.role as UserRole] ?? undefined;
   
   // Generate token pair and set cookies for the new session
-  const payload = {
-    _id: user._id.toString(),
-    email: user.email,
-    role: user.role,
-    panel,
-    mustChangePassword: user.mustChangePassword,
-    mustResetPassword: user.mustResetPassword,
-    firstLogin: user.firstLogin,
-    ...(user.restaurantId && { restaurantId: user.restaurantId.toString() }),
-    ...(user.tenantId && { tenantId: user.tenantId }),
-  };
+  const payload = authService.buildPayload(user);
 
   const tokens = generateTokenPair(payload);
   const tokenHash = await hashToken(tokens.refreshToken);

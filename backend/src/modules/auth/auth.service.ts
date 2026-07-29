@@ -26,7 +26,7 @@ function getInternalRole(user: IUser): string | undefined {
   }
 }
 
-function buildPayload(user: IUser): JwtPayload {
+export function buildPayload(user: IUser): JwtPayload {
   return {
     _id: user._id.toString(),
     email: user.email,

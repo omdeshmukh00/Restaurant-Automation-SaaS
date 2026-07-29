@@ -13,8 +13,8 @@ describe('Auth Contract Schemas', () => {
     });
   });
 
-  it('rejects non-document customer OTP request payloads', () => {
-    const result = requestOtpSchema.safeParse({ email: 'guest@example.com' });
+  it('rejects invalid customer OTP request payloads', () => {
+    const result = requestOtpSchema.safeParse({ mobile: 'invalid-mobile-123' });
 
     expect(result.success).toBe(false);
   });

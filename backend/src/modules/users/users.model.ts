@@ -4,6 +4,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { UserRole, KitchenRole, StaffInternalRole, CleaningRole } from '../../constants/roles';
 import { UserStatus } from '../../constants/statuses';
+import { normalizeMobile } from '../../utils/crypto';
 
 export interface IUser extends Document {
   name: string;
@@ -261,6 +262,17 @@ userSchema.index({ isDeleted: 1 });
 userSchema.index({ 'refreshTokens.tokenHash': 1 });
 // TTL index for auto-clearing locked accounts (lock expires naturally)
 userSchema.index({ lockUntil: 1 }, { expireAfterSeconds: 0, sparse: true });
+
+// ── Pre-save middleware: normalize email and mobile ────────────────────
+userSchema.pre('save', function (next) {
+  if (this.email) {
+    this.email = this.email.trim().toLowerCase();
+  }
+  if (this.mobile) {
+    this.mobile = normalizeMobile(this.mobile);
+  }
+  next();
+});
 
 // ── Query middleware: exclude soft-deleted by default ──────────────────
 userSchema.pre('find', function () {

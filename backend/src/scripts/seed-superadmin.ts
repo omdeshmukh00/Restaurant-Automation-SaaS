@@ -33,7 +33,7 @@ async function run(): Promise<void> {
   const name = input.name || 'Platform Owner';
   const email = (input.email || 'adminsuper22@gmail.com').toLowerCase().trim();
   const mobile = (input.mobile || '4444444444').trim();
-  const password = input.password || 'Happy@100';
+  const password = input.password || 'Super@123';
 
   console.log('\n==================================================');
   console.log('       SUPERADMIN TERMINAL SEEDING TOOL           ');
