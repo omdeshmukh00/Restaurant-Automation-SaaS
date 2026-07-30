@@ -16,6 +16,7 @@ import {
   User,
   LogOut,
   X,
+  LifeBuoy,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -47,6 +48,7 @@ export default function Sidebar({
     { path: "/superadmin/subscriptions", label: "Subscriptions", icon: CreditCard },
     { path: "/superadmin/analytics", label: "Analytics", icon: BarChart3 },
     { path: "/superadmin/transactions", label: "Transactions", icon: IndianRupee },
+    { path: "/superadmin/tickets", label: "Support Tickets", icon: LifeBuoy },
     { path: "/superadmin/alerts", label: "Alerts", icon: Bell },
     { path: "/superadmin/audit-logs", label: "Audit Logs", icon: FileText },
     { path: "/superadmin/users", label: "Users", icon: Users },

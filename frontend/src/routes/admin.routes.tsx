@@ -13,6 +13,7 @@ import { TableManagementPage } from '../features/admin/pages/TableManagementPage
 import  SettingsPage from '../features/admin/pages/SettingsPage';
 import ResetPasswordPage from '../features/admin/pages/ResetPasswordPage';
 import { OffersPage } from '../features/admin/pages/OffersPage';
+import RaiseTicketPage from '../features/admin/pages/RaiseTicketPage';
 
 export const adminRoutes: RouteObject[] = [
   {
@@ -29,6 +30,8 @@ export const adminRoutes: RouteObject[] = [
       { path: 'staff',        element: <StaffManagementPage /> },
       { path: 'reports',      element: <ReportsPage /> },
       { path: 'tables',       element: <TableManagementPage /> },      
+      { path: 'tickets',      element: <RaiseTicketPage /> },
+      { path: 'raise-ticket', element: <RaiseTicketPage /> },
       { path: 'settings',     element: <SettingsPage /> },
       { path: 'reset-password', element: <ResetPasswordPage /> },
     ],

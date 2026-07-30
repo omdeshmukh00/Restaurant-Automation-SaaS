@@ -774,6 +774,16 @@ superAdminRouter.get('/users', async (req, res, next) => {
   }
 });
 
+// Support Tickets management for SuperAdmin
+import { TicketsController } from '../tickets/tickets.controller';
+superAdminRouter.get('/tickets/contacts', TicketsController.superAdminGetContacts);
+superAdminRouter.get('/tickets', TicketsController.superAdminList);
+superAdminRouter.post('/tickets/:id/messages', TicketsController.superAdminAddMessage);
+superAdminRouter.patch('/tickets/:id/status', TicketsController.superAdminUpdateStatus);
+superAdminRouter.delete('/tickets/:id', TicketsController.deleteTicket);
+superAdminRouter.post('/tickets/:id/delete-message', TicketsController.deleteMessage);
+superAdminRouter.post('/tickets/:id/block', TicketsController.toggleBlock);
+
 // Mount module-level superAdmin routes (restaurant-requests, etc.)
 import superAdminModuleRouter from '../superAdmin/superAdmin.routes';
 superAdminRouter.use('/', superAdminModuleRouter);

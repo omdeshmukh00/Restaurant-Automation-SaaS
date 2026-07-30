@@ -153,7 +153,7 @@ export default function SuperAdminLayout() {
 
       {/* ── MAIN CONTENT AREA ───────────────────────────────────────────── */}
       <main
-        className={`flex-1 min-w-0 flex flex-col overflow-y-auto pt-16 h-screen transition-all duration-300 ${
+        className={`flex-1 min-w-0 flex flex-col overflow-y-auto pt-16 h-screen transition-[margin] duration-300 ${
           sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[260px]"
         }`}
       >

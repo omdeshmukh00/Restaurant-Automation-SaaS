@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Image as ImageIcon, Upload } from 'lucide-react';
 
 import { useMenuStore } from '../../store/menu.store';
@@ -42,7 +43,6 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
   const [isVeg, setIsVeg] = useState(false);
   const [isSpicy, setIsSpicy] = useState(false);
   const [isAvailable, setIsAvailable] = useState(true);
-  const [preparationComplexity, setPreparationComplexity] = useState('1');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -103,7 +103,7 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
         isSpicy,
         isAvailable,
         stockQuantity: stockNum,
-        preparationComplexity: Number(preparationComplexity) || 1,
+        preparationComplexity: 1,
         image: imageUrl || '',
       });
       if (!formError) onClose();
@@ -114,7 +114,7 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-900">
         <div className="mb-4 flex items-center justify-between">
@@ -173,19 +173,6 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
                 placeholder="0"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Preparation Complexity (1-10)</label>
-            <input
-              type="number"
-              min={1}
-              max={10}
-              className={inputClass}
-              value={preparationComplexity}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPreparationComplexity(e.target.value)}
-              placeholder="1"
-            />
           </div>
 
           <div>
@@ -297,6 +284,7 @@ export function AddItemModal({ onClose }: AddItemModalProps): JSX.Element {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -72,7 +72,7 @@ export default function AdminLayout(): JSX.Element {
 
           {/* Main Area */}
           <div
-            className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+            className={`flex-1 flex flex-col min-w-0 transition-[margin] duration-300 ${
               sidebarCollapsed ? 'ml-[72px]' : 'ml-[72px] lg:ml-64'
             }`}
           >

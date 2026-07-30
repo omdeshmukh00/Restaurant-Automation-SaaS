@@ -42,6 +42,7 @@ import supplierRouter from '../suppliers/supplier.routes';
 import reservationsRouter from '../reservations/reservations.routes';
 import customersRouter from '../customers/customers.routes';
 import adminOrdersRouter from '../orders/admin.orders.routes';
+import ticketsRouter from '../tickets/tickets.routes';
 
 export const adminRouter = Router();
 
@@ -82,3 +83,5 @@ adminRouter.use('/suppliers', supplierRouter);
 adminRouter.use('/analytics', analyticsRouter);
 adminRouter.use('/audit-logs', auditLogsRouter);
 adminRouter.use('/settlements', settlementRouter);
+adminRouter.use('/tickets', ticketsRouter);
+
