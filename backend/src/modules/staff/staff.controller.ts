@@ -721,3 +721,194 @@ export async function assignStaffShiftController(req: Request, res: Response, ne
     next(error);
   }
 }
+
+// ── Salary Disbursement Controllers ────────────────────────────────────
+
+export async function paySalaryController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.query.restaurantId);
+    const { staffId, month, year, paymentMethod, transactionRef, notes } = req.body;
+
+    if (!staffId || !month || !year) {
+      throw new AppError('staffId, month, and year are required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+
+    const staff = await UserModel.findOne({
+      _id: staffId,
+      restaurantId,
+      role: { $in: STAFF_ROLES },
+    }).lean();
+
+    if (!staff) {
+      throw new AppError('Staff member not found', 404, ErrorCode.NOT_FOUND);
+    }
+
+    const amount = staff.salary || 0;
+    if (amount <= 0) {
+      throw new AppError('Staff member has no salary configured', 400, ErrorCode.VALIDATION_ERROR);
+    }
+
+    const { SalaryDisbursementModel, DisbursementStatus, PaymentMethod: SalaryPaymentMethod } = await import('./salaryDisbursement.model');
+
+    // Check for duplicate payment
+    const existing = await SalaryDisbursementModel.findOne({
+      restaurantId,
+      staffId,
+      month,
+      year,
+    });
+
+    if (existing && existing.status === DisbursementStatus.PAID) {
+      throw new AppError(`Salary for ${staff.name} already paid for ${month}/${year}`, 409, ErrorCode.CONFLICT);
+    }
+
+    const disbursement = existing
+      ? await SalaryDisbursementModel.findByIdAndUpdate(
+          existing._id,
+          {
+            status: DisbursementStatus.PAID,
+            paymentMethod: paymentMethod || SalaryPaymentMethod.CASH,
+            paidAt: new Date(),
+            paidBy: req.user?.id ?? null,
+            transactionRef: transactionRef || null,
+            notes: notes || '',
+            amount,
+          },
+          { new: true },
+        )
+      : await SalaryDisbursementModel.create({
+          restaurantId,
+          staffId,
+          staffName: staff.name,
+          staffRole: staff.role,
+          amount,
+          month,
+          year,
+          status: DisbursementStatus.PAID,
+          paymentMethod: paymentMethod || SalaryPaymentMethod.CASH,
+          paidAt: new Date(),
+          paidBy: req.user?.id ?? null,
+          transactionRef: transactionRef || null,
+          notes: notes || '',
+        });
+
+    ok(res, { disbursement }, existing ? 200 : 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function bulkPaySalaryController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.query.restaurantId);
+    const { month, year, paymentMethod } = req.body;
+
+    if (!month || !year) {
+      throw new AppError('month and year are required', 400, ErrorCode.VALIDATION_ERROR);
+    }
+
+    const staffMembers = await UserModel.find({
+      restaurantId,
+      role: { $in: STAFF_ROLES },
+      isDeleted: false,
+      status: UserStatus.ACTIVE,
+    }).lean();
+
+    const { SalaryDisbursementModel, DisbursementStatus, PaymentMethod: SalaryPaymentMethod } = await import('./salaryDisbursement.model');
+
+    const results: { paid: number; skipped: number; failed: number; total: number } = {
+      paid: 0,
+      skipped: 0,
+      failed: 0,
+      total: staffMembers.length,
+    };
+
+    for (const staff of staffMembers) {
+      try {
+        const amount = staff.salary || 0;
+        if (amount <= 0) {
+          results.skipped++;
+          continue;
+        }
+
+        const existing = await SalaryDisbursementModel.findOne({
+          restaurantId,
+          staffId: staff._id,
+          month,
+          year,
+        });
+
+        if (existing && existing.status === DisbursementStatus.PAID) {
+          results.skipped++;
+          continue;
+        }
+
+        if (existing) {
+          await SalaryDisbursementModel.findByIdAndUpdate(existing._id, {
+            status: DisbursementStatus.PAID,
+            paymentMethod: paymentMethod || SalaryPaymentMethod.CASH,
+            paidAt: new Date(),
+            paidBy: req.user?.id ?? null,
+            amount,
+          });
+        } else {
+          await SalaryDisbursementModel.create({
+            restaurantId,
+            staffId: staff._id,
+            staffName: staff.name,
+            staffRole: staff.role,
+            amount,
+            month,
+            year,
+            status: DisbursementStatus.PAID,
+            paymentMethod: paymentMethod || SalaryPaymentMethod.CASH,
+            paidAt: new Date(),
+            paidBy: req.user?.id ?? null,
+          });
+        }
+
+        results.paid++;
+      } catch {
+        results.failed++;
+      }
+    }
+
+    ok(res, { results });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getSalaryHistoryController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const restaurantId = resolveRestaurantId(req, req.query.restaurantId);
+    const { month, year, staffId, page: pageStr, limit: limitStr } = req.query as Record<string, string>;
+
+    const page = Number(pageStr) || 1;
+    const limit = Number(limitStr) || 20;
+    const skip = (page - 1) * limit;
+
+    const { SalaryDisbursementModel } = await import('./salaryDisbursement.model');
+
+    const query: Record<string, unknown> = { restaurantId };
+    if (month) query.month = Number(month);
+    if (year) query.year = Number(year);
+    if (staffId) query.staffId = staffId;
+
+    const [disbursements, total] = await Promise.all([
+      SalaryDisbursementModel.find(query)
+        .sort({ year: -1, month: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      SalaryDisbursementModel.countDocuments(query),
+    ]);
+
+    ok(res, {
+      disbursements,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    next(error);
+  }
+}

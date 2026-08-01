@@ -17,6 +17,9 @@ import {
   getStaffShiftsController,
   listStaffController,
   updateStaffController,
+  paySalaryController,
+  bulkPaySalaryController,
+  getSalaryHistoryController,
 } from './staff.controller';
 
 const router = Router();
@@ -30,5 +33,10 @@ router.get('/performance', validate({ query: adminStaffQuerySchema }), getStaffP
 router.get('/:id', validate({ params: entityIdParamsSchema }), getStaffByIdController);
 router.patch('/:id', validate({ params: entityIdParamsSchema, body: updateStaffBodySchema }), updateStaffController);
 router.delete('/:id', validate({ params: entityIdParamsSchema }), deleteStaffController);
+
+// ── Salary Disbursement ────────────────────────────────────────────────
+router.post('/salary/pay', paySalaryController);
+router.post('/salary/pay-all', bulkPaySalaryController);
+router.get('/salary/history', getSalaryHistoryController);
 
 export default router;

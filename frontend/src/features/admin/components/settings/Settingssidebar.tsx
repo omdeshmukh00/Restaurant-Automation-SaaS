@@ -8,7 +8,7 @@ import { useSettingsStore } from '../../store/settings.store';
 const sections = [
   { id: 'profile',        label: 'Profile Settings',        icon: User },
   { id: 'restaurant',     label: 'Restaurant Information',  icon: Store },
-  { id: 'billing',        label: 'Billing & Subscription',  icon: CreditCard },
+  { id: 'billing',        label: 'Billing & Settlements',  icon: CreditCard },
   { id: 'team',           label: 'Team & Permissions',      icon: Users },
   { id: 'notifications',  label: 'Notification Preferences',icon: Bell },
   { id: 'system',         label: 'System Preferences',      icon: Settings2 },

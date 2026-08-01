@@ -32,7 +32,7 @@ function SettingsContent(): JSX.Element {
       );
     case 'billing':
       return (
-        <div className="w-full max-w-2xl">
+        <div className="w-full max-w-4xl">
           <BillingCard />
         </div>
       );

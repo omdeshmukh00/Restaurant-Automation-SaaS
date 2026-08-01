@@ -58,4 +58,8 @@ router.post('/:id/billing/order', restaurantAdminAndSuper, validate({ params: su
 router.post('/purchase/create-order', restaurantAdminAndSuper, controller.createPurchaseOrder);
 router.post('/purchase/verify', restaurantAdminAndSuper, controller.verifyPurchase);
 
+// Auto-renewal
+router.post('/auto-renew/trigger', superAdminOnly, controller.triggerAutoRenewals);
+router.patch('/auto-renew/toggle', restaurantAdminAndSuper, controller.toggleAutoRenew);
+
 export default router;

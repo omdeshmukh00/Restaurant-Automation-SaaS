@@ -1107,3 +1107,130 @@ export async function getSubscriptionUsageDashboard(restaurantId: string) {
     quotas,
   };
 }
+
+/**
+ * Process auto-renewals for all subscriptions that have `autoRenew = true`
+ * and whose `nextBillingDate` has passed. Called by a cron job or scheduler.
+ *
+ * For each qualifying subscription:
+ * 1. Creates a SubscriptionPayment record (mock/manual — real Razorpay recurring would
+ *    be handled by webhook).
+ * 2. Extends the billing period by the appropriate cycle duration.
+ * 3. Logs a RENEWED event and sends a notification to the admin.
+ */
+export async function processAutoRenewals(): Promise<{ renewed: number; skipped: number; failed: number }> {
+  const now = new Date();
+  const results = { renewed: 0, skipped: 0, failed: 0 };
+
+  try {
+    const dueSubs = await SubscriptionModel.find({
+      autoRenew: true,
+      status: SubscriptionStatus.ACTIVE,
+      nextBillingDate: { $lte: now },
+    });
+
+    for (const sub of dueSubs) {
+      try {
+        // Skip if already using Razorpay recurring (handled by webhook)
+        if (
+          sub.paymentProvider === SubscriptionPaymentProvider.RAZORPAY &&
+          sub.providerSubscriptionId
+        ) {
+          results.skipped++;
+          continue;
+        }
+
+        const planDoc = await PlatformPlanModel.findById(sub.planId).lean();
+        if (!planDoc) {
+          logger.warn(`[AutoRenew] Plan not found for subscription ${sub._id}`);
+          results.skipped++;
+          continue;
+        }
+
+        const days = sub.billingCycle === BillingCycle.YEARLY ? 365 : 30;
+        const amount =
+          sub.billingCycle === BillingCycle.YEARLY
+            ? ((planDoc as any).priceYearly ??
+              Math.round(
+                (planDoc as any).priceMonthly *
+                  12 *
+                  (1 - ((planDoc as any).yearlyDiscountPercentage ?? 20) / 100),
+              ))
+            : (planDoc as any).priceMonthly ?? 0;
+
+        // Create a payment record
+        const payment = await SubscriptionPaymentModel.create({
+          subscriptionId: sub._id,
+          restaurantId: sub.restaurantId,
+          planId: sub.planId,
+          provider: sub.paymentProvider || SubscriptionPaymentProvider.MOCK,
+          status: SubscriptionPaymentStatus.COMPLETED,
+          billingCycle: sub.billingCycle,
+          amount,
+          currency: 'INR',
+          paidAt: now,
+          metadata: { source: 'auto_renewal' },
+        });
+
+        // Extend billing period
+        const newPeriodStart = new Date();
+        const newPeriodEnd = new Date(newPeriodStart);
+        newPeriodEnd.setDate(newPeriodEnd.getDate() + days);
+
+        sub.currentPeriodStart = newPeriodStart;
+        sub.currentPeriodEnd = newPeriodEnd;
+        sub.nextBillingDate = newPeriodEnd;
+        sub.lastPaymentId = payment._id as any;
+        sub.lastPaymentReference = payment._id.toString();
+        sub.isTrial = false;
+        sub.trialEndsAt = null;
+        sub.trialStartsAt = null;
+        await sub.save();
+
+        // Log event
+        await appendSubscriptionHistory({
+          subscriptionId: sub._id,
+          restaurantId: sub.restaurantId,
+          eventType: SubscriptionEventType.RENEWED,
+          plan: sub.plan,
+          billingCycle: sub.billingCycle,
+          startDate: newPeriodStart,
+          endDate: newPeriodEnd,
+          paymentId: payment._id.toString(),
+          amount,
+          status: 'active',
+        });
+
+        // Notify admin
+        await sendSubscriptionNotification(
+          sub.restaurantId.toString(),
+          'Subscription Auto-Renewed',
+          `Your ${sub.plan} subscription has been auto-renewed for ${days} days. Amount: ₹${amount}.`,
+          'SUBSCRIPTION_AUTO_RENEWED',
+        );
+
+        results.renewed++;
+        logger.info(`[AutoRenew] Renewed subscription ${sub._id} for restaurant ${sub.restaurantId}`);
+      } catch (err: any) {
+        results.failed++;
+        logger.error(`[AutoRenew] Failed to renew subscription ${sub._id}`, { error: err.message });
+
+        // Log the failure event
+        try {
+          await appendSubscriptionHistory({
+            subscriptionId: sub._id,
+            restaurantId: sub.restaurantId,
+            eventType: SubscriptionEventType.AUTO_RENEWAL_SKIPPED,
+            metadata: { error: err.message },
+          });
+        } catch {
+          // Ignore secondary failures
+        }
+      }
+    }
+  } catch (err) {
+    logger.error('[AutoRenew] processAutoRenewals failed', { error: err });
+  }
+
+  return results;
+}

@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { adminRestaurantApi } from '../api/admin.restaurants.api';
 import { adminUserApi, type AdminProfile } from '../api/admin.users.api';
 import { useStaffStore } from './staff.store';
+import { apiClient } from '../../../shared/services/apiClient';
+import { getStoredUser } from '../../../auth/tokenStore';
 
 export interface AdminProfileData {
   id: string;
@@ -55,6 +57,50 @@ export interface Integration {
   status: string;
 }
 
+export interface BankDetailsData {
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+  branch?: string;
+}
+
+export interface TransactionRecord {
+  _id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  provider: string;
+  billingCycle: string;
+  paidAt?: string;
+  createdAt: string;
+  plan?: string;
+}
+
+export interface SettlementRecord {
+  _id: string;
+  grossSales: number;
+  netSettlement: number;
+  platformCommission: number;
+  status: string;
+  settlementPeriod: { from: string; to: string };
+  paidAt?: string;
+  settlementMethod?: string;
+}
+
+export interface SalaryRecord {
+  _id: string;
+  staffId: string;
+  staffName: string;
+  staffRole: string;
+  amount: number;
+  month: number;
+  year: number;
+  status: string;
+  paymentMethod: string;
+  paidAt?: string;
+}
+
 const STATIC_INTEGRATIONS: Integration[] = [
   {
     id: 'pos',
@@ -103,6 +149,15 @@ interface SettingsState {
   editingRestaurant: boolean;
   saved: string | null;
 
+  // Billing & Settlements
+  bankDetails: BankDetailsData | null;
+  transactions: TransactionRecord[];
+  settlements: SettlementRecord[];
+  settlementSummary: { pendingSettlements: number; completedSettlements: number; totalNetSettlement: number } | null;
+  salaryHistory: SalaryRecord[];
+  autoRenew: boolean;
+  billingLoading: boolean;
+
   setActiveSection: (section: string) => void;
   setEditingRestaurant: (value: boolean) => void;
   clearSaved: () => void;
@@ -112,6 +167,13 @@ interface SettingsState {
   changePlan: (plan: string) => Promise<void>;
   toggleNotification: (id: string) => Promise<void>;
   toggleIntegration: (id: string) => Promise<void>;
+
+  // Billing & Settlements actions
+  fetchBillingData: () => Promise<void>;
+  updateBankDetails: (data: BankDetailsData) => Promise<void>;
+  toggleAutoRenew: (value: boolean) => Promise<void>;
+  paySalary: (staffId: string, month: number, year: number, paymentMethod?: string) => Promise<void>;
+  payAllSalaries: (month: number, year: number, paymentMethod?: string) => Promise<void>;
 }
 
 const initialIntegrationStatus = () =>
@@ -132,6 +194,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     status: 'free',
     paymentMethod: 'Free',
   },
+  bankDetails: null,
+  transactions: [],
+  settlements: [],
+  settlementSummary: null,
+  salaryHistory: [],
+  autoRenew: true,
+  billingLoading: false,
   team: { totalMembers: 0, managers: 0, kitchenStaff: 0, serviceStaff: 0 },
   notifications: [
     {
@@ -252,6 +321,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         },
         notifications,
         integrations,
+        bankDetails: (settingsRes as any)?.bankDetails ?? null,
       });
     } catch (e) {
       set({
@@ -356,5 +426,75 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ),
       }));
     }
+  },
+
+  // ── Billing & Settlements Actions ────────────────────────────────────
+
+  fetchBillingData: async () => {
+    set({ billingLoading: true });
+    const restaurantId = getStoredUser('admin')?.restaurantId;
+    try {
+      const [txRes, settleRes, summaryRes, salaryRes, subRes] = await Promise.all([
+        apiClient.get('/subscriptions/current', { params: { restaurantId } }).catch(() => null),
+        apiClient.get('/admin/settlements', { params: { restaurantId, limit: 10 } }).catch(() => null),
+        apiClient.get('/admin/settlements/summary', { params: { restaurantId } }).catch(() => null),
+        apiClient.get('/admin/staff/salary/history', { params: { restaurantId, limit: 20 } }).catch(() => null),
+        apiClient.get('/subscriptions/current', { params: { restaurantId } }).catch(() => null),
+      ]);
+
+      const sub = subRes?.data?.data?.subscription;
+      const payments = sub?.lastPaymentId ? [] : []; // Payment history would come from a dedicated endpoint
+
+      set({
+        billingLoading: false,
+        settlements: settleRes?.data?.data?.settlements ?? [],
+        settlementSummary: summaryRes?.data?.data ?? null,
+        salaryHistory: salaryRes?.data?.data?.disbursements ?? [],
+        autoRenew: sub?.autoRenew ?? true,
+      });
+    } catch {
+      set({ billingLoading: false });
+    }
+  },
+
+  updateBankDetails: async (data) => {
+    await adminRestaurantApi.updateSettings({ bankDetails: data });
+    set({ bankDetails: data, saved: 'Bank details saved successfully' });
+  },
+
+  toggleAutoRenew: async (value) => {
+    const prev = get().autoRenew;
+    set({ autoRenew: value });
+    try {
+      await apiClient.patch('/subscriptions/auto-renew/toggle', { autoRenew: value });
+      set({ saved: value ? 'Auto-renewal enabled' : 'Auto-renewal disabled' });
+    } catch {
+      set({ autoRenew: prev });
+    }
+  },
+
+  paySalary: async (staffId, month, year, paymentMethod) => {
+    const restaurantId = getStoredUser('admin')?.restaurantId;
+    await apiClient.post('/admin/staff/salary/pay', {
+      staffId,
+      month,
+      year,
+      paymentMethod: paymentMethod || 'CASH',
+      restaurantId,
+    });
+    set({ saved: 'Salary paid successfully' });
+    get().fetchBillingData();
+  },
+
+  payAllSalaries: async (month, year, paymentMethod) => {
+    const restaurantId = getStoredUser('admin')?.restaurantId;
+    await apiClient.post('/admin/staff/salary/pay-all', {
+      month,
+      year,
+      paymentMethod: paymentMethod || 'CASH',
+      restaurantId,
+    });
+    set({ saved: 'All salaries paid successfully' });
+    get().fetchBillingData();
   },
 }));

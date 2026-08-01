@@ -25,6 +25,14 @@ export interface ISettlement extends Document {
   refunds: number;
   netSettlement: number;
   status: SettlementStatus;
+  settlementMethod?: string;
+  bankDetails?: {
+    accountHolderName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+    branch?: string;
+  };
   generatedAt?: Date;
   paidAt?: Date;
   notes?: string;
@@ -67,6 +75,22 @@ const settlementSchema = new Schema<ISettlement>(
     generatedAt: { type: Date, default: null },
     paidAt: { type: Date, default: null },
     notes: { type: String, trim: true, default: '' },
+    settlementMethod: {
+      type: String,
+      enum: ['BANK_TRANSFER', 'MANUAL', 'UPI'],
+      default: null,
+    },
+    bankDetails: {
+      type: {
+        accountHolderName: { type: String, trim: true },
+        accountNumber: { type: String, trim: true },
+        ifscCode: { type: String, trim: true, uppercase: true },
+        bankName: { type: String, trim: true },
+        branch: { type: String, trim: true },
+      },
+      default: null,
+      _id: false,
+    },
   },
   {
     timestamps: true,

@@ -140,3 +140,22 @@ export const getUsageDashboard = asyncHandler(async (req: Request, res: Response
   const dashboard = await service.getSubscriptionUsageDashboard(restaurantId);
   ok(res, dashboard);
 });
+
+export const triggerAutoRenewals = asyncHandler(async (_req: Request, res: Response) => {
+  const results = await service.processAutoRenewals();
+  ok(res, { message: 'Auto-renewal processing completed', results });
+});
+
+export const toggleAutoRenew = asyncHandler(async (req: Request, res: Response) => {
+  const restaurantId = req.user?.restaurantId;
+  if (!restaurantId) {
+    throw new AppError('Restaurant context required', 400, ErrorCode.INVALID_REQUEST);
+  }
+  const { autoRenew } = req.body;
+  if (typeof autoRenew !== 'boolean') {
+    throw new AppError('autoRenew must be a boolean', 400, ErrorCode.VALIDATION_ERROR);
+  }
+  const sub = await service.getCurrentSubscription(restaurantId);
+  const updated = await service.updateSubscription((sub as any)._id.toString(), { autoRenew } as any);
+  ok(res, { subscription: updated });
+});

@@ -147,6 +147,17 @@ export const updateRestaurantSettingsSchema = z.object({
   sections: z
     .array(z.string().trim().min(1, 'Section name is required'))
     .optional(),
+
+  bankDetails: z
+    .object({
+      accountHolderName: z.string().trim().min(2, 'Account holder name is required').max(100),
+      accountNumber: z.string().trim().min(8, 'Account number must be at least 8 digits').max(20),
+      ifscCode: z.string().trim().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code format'),
+      bankName: z.string().trim().min(2, 'Bank name is required').max(100),
+      branch: z.string().trim().max(100).optional(),
+    })
+    .optional()
+    .nullable(),
 }).refine(data => Object.keys(data).length > 0, {
   message: 'At least one field is required',
   path: ['unknown'],

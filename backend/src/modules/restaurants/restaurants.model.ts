@@ -1,6 +1,14 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { RestaurantStatus } from '../../constants/statuses';
 
+type BankDetails = {
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+  branch?: string;
+};
+
 type RestaurantSettings = {
   currency: string;
   taxRate: number;
@@ -75,6 +83,7 @@ export interface IRestaurant extends Document {
   tags?: string[];
   joinedDate?: Date;
   isDeleted?: boolean;
+  bankDetails?: BankDetails;
   coverImage?: string;
   isVeg: string;
   createdAt: Date;
@@ -187,6 +196,17 @@ const restaurantSchema = new Schema<IRestaurant>(
     isDeleted: { type: Boolean, default: false, index: true },
     coverImage: { type: String, trim: true, default: null },
     isVeg: { type: String, enum: ['veg', 'non-veg', 'both'], default: 'both' },
+    bankDetails: {
+      type: {
+        accountHolderName: { type: String, trim: true, required: true },
+        accountNumber: { type: String, trim: true, required: true },
+        ifscCode: { type: String, trim: true, uppercase: true, required: true },
+        bankName: { type: String, trim: true, required: true },
+        branch: { type: String, trim: true },
+      },
+      default: null,
+      _id: false,
+    },
     location_url: {
       type: String,
       trim: true,

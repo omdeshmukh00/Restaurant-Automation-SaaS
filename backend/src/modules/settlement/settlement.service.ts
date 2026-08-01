@@ -210,10 +210,12 @@ export class SettlementService {
 
   /**
    * Mark a settlement as PAID (admin action).
+   * Snapshots the restaurant's bank details for audit purposes.
    */
   static async markSettlementPaid(
     restaurantId: string | Types.ObjectId,
     settlementId: string | Types.ObjectId,
+    settlementMethod?: string,
   ) {
     const settlement = await SettlementModel.findOne({
       _id: toObjectId(settlementId),
@@ -228,8 +230,22 @@ export class SettlementService {
       return settlement;
     }
 
+    // Snapshot bank details from restaurant
+    const { RestaurantModel } = await import('../restaurants/restaurants.model');
+    const restaurant = await RestaurantModel.findById(restaurantId).lean();
+    if (restaurant?.bankDetails) {
+      settlement.bankDetails = {
+        accountHolderName: restaurant.bankDetails.accountHolderName,
+        accountNumber: restaurant.bankDetails.accountNumber,
+        ifscCode: restaurant.bankDetails.ifscCode,
+        bankName: restaurant.bankDetails.bankName,
+        branch: restaurant.bankDetails.branch,
+      };
+    }
+
     settlement.status = SettlementStatus.PAID;
     settlement.paidAt = new Date();
+    settlement.settlementMethod = settlementMethod || (restaurant?.bankDetails ? 'BANK_TRANSFER' : 'MANUAL');
     await settlement.save();
 
     // Notify admin about settlement completion
