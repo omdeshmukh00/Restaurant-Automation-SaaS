@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/RestaurantAutomation');
+  await mongoose.connect('mongodb+srv://graphuratestingDB:FChgN9ZIZBi5ItdK@graphuratestingdb.v2gcmi8.mongodb.net/RestaurantAutomation?retryWrites=true&w=majority');
   const db = mongoose.connection.db;
   try {
     await db.collection('bills').dropIndex('restaurantId_1_invoiceNumber_1');

@@ -186,7 +186,7 @@ export function AdminSubscriptionCheckoutModal({
         }
 
         const options = {
-          key: import.meta.env.VITE_RAZORPAY_KEY_ID || '',
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
           amount: Math.round(orderData.amount * 100),
           currency: orderData.currency || 'INR',
           name: `${platformName} SaaS Plan`,

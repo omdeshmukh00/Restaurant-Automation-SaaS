@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 async function run() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/RestaurantAutomation';
+  const uri = process.env.MONGODB_URI || 'mongodb+srv://graphuratestingdb.v2gcmi8.mongodb.net/RestaurantAutomation';
   await mongoose.connect(uri);
   
   const { RestaurantRequestModel } = require('./src/modules/superAdmin/restaurantRequest.model');

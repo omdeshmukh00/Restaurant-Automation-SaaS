@@ -65,7 +65,7 @@ export default function PaymentDialog({
 
       // 2. Configure Razorpay Options
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || '',
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
         amount: amount * 100, // Razorpay expects paise
         currency: currency,
         name: `${platformName} Partner Onboarding`,

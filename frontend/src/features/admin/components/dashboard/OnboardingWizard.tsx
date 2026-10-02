@@ -153,7 +153,7 @@ export default function OnboardingWizard({ restaurant: initialRestaurant, onComp
 
         // 3. Launch Razorpay popup
         const options = {
-          key: import.meta.env.VITE_RAZORPAY_KEY_ID || '',
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T2OBoMpRJxZfjk',
           amount: orderData.amount * 100, // Razorpay expects paise
           currency: orderData.currency,
           name: `${platformName} SaaS Plan`,

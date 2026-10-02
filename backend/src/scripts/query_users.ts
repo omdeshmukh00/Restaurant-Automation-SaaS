@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/RestaurantAutomation";
+const uri = "mongodb+srv://graphuratestingDB:FChgN9ZIZBi5ItdK@graphuratestingdb.v2gcmi8.mongodb.net/RestaurantAutomation?retryWrites=true&w=majority";
 
 async function run() {
   await mongoose.connect(uri);
